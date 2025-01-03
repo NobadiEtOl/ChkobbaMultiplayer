@@ -61,7 +61,7 @@ public class DeckController : MonoBehaviour
             cardPools[cardIDString] = new List<GameObject>();
 
             // Instantiate and add a fixed number of cards to the pool
-            for (int i = 0; i < 2; i++)
+            for (int i = 0; i < 3; i++)
             {
                 GameObject card = Instantiate(cardPrefab);
                 card.SetActive(false); // Deactivate the card
@@ -167,6 +167,7 @@ public class DeckController : MonoBehaviour
     //Adds the card Object of the selected card to the center
     public void PlaceCardToCenter(Vector3 placementLocation, int[] placedCardID)
     {
+        Debug.Log("Entered PlaceCardToCenter: " + placedCardID[0] + "_" + placedCardID[1]);
         GameObject placedCard = GetCardFromPool(placedCardID);
         if (placedCard != null)
         {
@@ -183,6 +184,7 @@ public class DeckController : MonoBehaviour
     private GameObject GetCardFromPool(int[] cardID)
     {
         string cardIDString = GameManager.TurnCardIdToString(cardID);
+        print("cardIDString: " + cardIDString);
 
         if (cardPools.ContainsKey(cardIDString) && cardPools[cardIDString].Count > 0)
         {

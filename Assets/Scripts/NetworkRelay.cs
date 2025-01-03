@@ -9,99 +9,253 @@ using System;
 [Serializable]
 public struct SerializableDictionary : INetworkSerializable
 {
-    public List<KeyValuePair<int, List<int[]>>> data;
+    private List<int> keys;              // List to store dictionary keys
+    private List<List<int[]>> values;    // List to store dictionary values (nested lists)
 
+    // Constructor to initialize from a regular dictionary
     public SerializableDictionary(Dictionary<int, List<int[]>> dictionary)
     {
-        data = new List<KeyValuePair<int, List<int[]>>>(dictionary);
+        keys = new List<int>();
+        values = new List<List<int[]>>();
+
+        foreach (var kvp in dictionary)
+        {
+            keys.Add(kvp.Key);
+
+            // Deep copy of the nested list
+            List<int[]> deepCopiedList = new List<int[]>();
+            foreach (var array in kvp.Value)
+            {
+                deepCopiedList.Add((int[])array.Clone());
+            }
+            values.Add(deepCopiedList);
+        }
     }
 
+    // Convert back to a regular dictionary
+    public Dictionary<int, List<int[]>> ToDictionary()
+    {
+        Dictionary<int, List<int[]>> dictionary = new Dictionary<int, List<int[]>>();
+        for (int i = 0; i < keys.Count; i++)
+        {
+            dictionary[keys[i]] = values[i];
+        }
+        return dictionary;
+    }
+
+    // Add key-value pair
+    public void Add(int key, List<int[]> value)
+    {
+        keys.Add(key);
+
+        // Deep copy of the nested list
+        List<int[]> deepCopiedList = new List<int[]>();
+        foreach (var array in value)
+        {
+            deepCopiedList.Add((int[])array.Clone());
+        }
+        values.Add(deepCopiedList);
+    }
+
+    // Clear the dictionary
+    public void Clear()
+    {
+        keys.Clear();
+        values.Clear();
+    }
+
+    // Serialize and deserialize the dictionary
     public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
     {
-        foreach (var kvp in data)
+        int keyCount = keys?.Count ?? 0;
+        serializer.SerializeValue(ref keyCount);
+
+        if (serializer.IsReader)
         {
-            // Serialize key
-            int key = kvp.Key;
+            keys = new List<int>(keyCount);
+            values = new List<List<int[]>>(keyCount);
+        }
+
+        for (int i = 0; i < keyCount; i++)
+        {
+            int key = i < keys.Count ? keys[i] : 0;
             serializer.SerializeValue(ref key);
 
-            // Serialize the list of int[] (arrays inside the list)
-            List<int[]> value = kvp.Value;
-            int listCount = value.Count;
-            serializer.SerializeValue(ref listCount); // Serialize the list size
-
-            for (int i = 0; i < value.Count; i++)  // Use a for loop instead of foreach
+            if (serializer.IsReader)
             {
-                int[] array = value[i];
-                int arrayLength = array.Length;
-                serializer.SerializeValue(ref arrayLength); // Serialize array length
+                keys.Add(key);
+            }
 
-                for (int j = 0; j < array.Length; j++)  // Serialize each element in the array
+            int valueCount = i < values.Count ? values[i]?.Count ?? 0 : 0;
+            serializer.SerializeValue(ref valueCount);
+
+            if (serializer.IsReader)
+            {
+                values.Add(new List<int[]>());
+            }
+
+            for (int j = 0; j < valueCount; j++)
+            {
+                int arrayLength = i < values.Count && j < values[i]?.Count ? values[i][j]?.Length ?? 0 : 0;
+                serializer.SerializeValue(ref arrayLength);
+
+                if (serializer.IsReader)
                 {
-                    int element = array[j];  // Access the element with a regular for loop
-                    serializer.SerializeValue(ref element); // Serialize the element
+                    values[i].Add(new int[arrayLength]);
+                }
+
+                for (int k = 0; k < arrayLength; k++)
+                {
+                    int element = j < values[i].Count && k < values[i][j]?.Length ? values[i][j][k] : 0;
+                    serializer.SerializeValue(ref element);
+
+                    if (serializer.IsReader)
+                    {
+                        values[i][j][k] = element;
+                    }
                 }
             }
         }
     }
 
-    public Dictionary<int, List<int[]>> ToDictionary()
+    // Print all contents (debugging)
+    public void PrintAll()
     {
-        var dictionary = new Dictionary<int, List<int[]>>();
-
-        // Loop through the data and convert to dictionary format
-        foreach (var kvp in data)
+        if (keys == null || values == null || keys.Count == 0)
         {
-            dictionary.Add(kvp.Key, kvp.Value);
+            Debug.Log("SerializableDictionary is empty.");
+            return;
         }
 
-        return dictionary;
+        for (int i = 0; i < keys.Count; i++)
+        {
+            Debug.Log($"Key: {keys[i]}");
+            Debug.Log("Values:");
+            foreach (var array in values[i])
+            {
+                Debug.Log($"  [{string.Join(", ", array)}]");
+            }
+        }
     }
-
 }
 
 [Serializable]
 public struct SerializableList : INetworkSerializable
 {
-    public List<int[]> data;
+    private List<int[]> data; // The list to store the arrays
 
     // Constructor to initialize from a regular List<int[]>
     public SerializableList(List<int[]> list)
     {
-        data = new List<int[]>(list);
-    }
-
-    // Network serialization method
-    public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
-    {
-        // Serialize the list size
-        int listCount = data.Count;
-        serializer.SerializeValue(ref listCount);  // Serialize the list size
-
-        // Serialize each int[] in the list
-        for (int i = 0; i < data.Count; i++)
+        // Ensure deep copying for immutability
+        data = list != null ? new List<int[]>(list.Count) : new List<int[]>();
+        if (list != null)
         {
-            int[] array = data[i];
-            int arrayLength = array.Length;
-            serializer.SerializeValue(ref arrayLength);  // Serialize array length
-
-            // Serialize each element in the array
-            for (int j = 0; j < array.Length; j++)
+            foreach (var array in list)
             {
-                int element = array[j];
-                serializer.SerializeValue(ref element);  // Serialize each element
+                data.Add(array != null ? (int[])array.Clone() : null); // Deep copy each array, handle nulls
             }
         }
     }
 
-    // Convert the SerializableList back to a regular List<int[]>
+    // Convert back to a regular List<int[]>
     public List<int[]> ToList()
     {
-        return new List<int[]>(data);
+        // Ensure deep copying for immutability
+        List<int[]> list = new List<int[]>(data.Count);
+        foreach (var array in data)
+        {
+            list.Add(array != null ? (int[])array.Clone() : null); // Deep copy each array when returning
+        }
+        return list;
+    }
+
+    // Add an array to the list
+    public void Add(int[] value)
+    {
+        data.Add(value != null ? (int[])value.Clone() : null); // Deep copy the array, handle nulls
+    }
+
+    // Clear the list
+    public void Clear()
+    {
+        data.Clear();
+    }
+
+    // Serialize and deserialize the list
+    public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
+    {
+        int count = data?.Count ?? 0;
+        serializer.SerializeValue(ref count); // Serialize the number of items in the list
+
+        // Initialize list if reading
+        if (serializer.IsReader)
+        {
+            data = new List<int[]>(count);
+        }
+
+        // Serialize each array
+        for (int i = 0; i < count; i++)
+        {
+            int arrayLength = 0;
+
+            if (serializer.IsWriter && data[i] != null)
+            {
+                arrayLength = data[i].Length;
+            }
+            serializer.SerializeValue(ref arrayLength); // Serialize the length of the array
+
+            if (serializer.IsReader)
+            {
+                data.Add(arrayLength > 0 ? new int[arrayLength] : null); // Handle empty or null arrays
+            }
+
+            for (int j = 0; j < arrayLength; j++)
+            {
+                int element = 0;
+
+                if (serializer.IsWriter)
+                {
+                    element = data[i][j];
+                }
+
+                serializer.SerializeValue(ref element); // Serialize an element of the array
+
+                if (serializer.IsReader)
+                {
+                    data[i][j] = element; // Assign the value to the deserialized array
+                }
+            }
+        }
+    }
+
+    // Print all contents (debugging)
+    public void PrintAll()
+    {
+        if (data == null || data.Count == 0)
+        {
+            Debug.Log("SerializableList is empty.");
+            return;
+        }
+
+        for (int i = 0; i < data.Count; i++)
+        {
+            if (data[i] == null)
+            {
+                Debug.Log($"Array {i}: null");
+            }
+            else
+            {
+                Debug.Log($"Array {i}: [{string.Join(", ", data[i])}]");
+            }
+        }
     }
 }
 
+
 public class NetworkRelay : NetworkBehaviour
 {
+    [SerializeField]private Server server;
     private List<GameManager> gameManagers;
     public static NetworkRelay Instance { get; private set; }
     // Start is called before the first frame update
@@ -129,61 +283,113 @@ public class NetworkRelay : NetworkBehaviour
     }
 
     //ClientRpc
-    [ClientRpc]
+    [ClientRpc(RequireOwnership = false)]
     public void UpdateCurrentPlayerClientRPC(int currentPlayer)
     {
-        gameManagers[0].UpdateCurrentPlayer(currentPlayer);
-        print("trying");
+        Debug.Log("ClientRpc called: Updating current player");
+        if (GameManager.LocalInstance != null)
+        {
+            GameManager.LocalInstance.UpdateCurrentPlayer(currentPlayer);
+        }
+        else
+        {
+            Debug.LogError("GameManagers list is null or empty!");
+        }
+        Debug.Log("ClientRpc Updating current player execution complete.");
     }
-    [ClientRpc]
+    [ClientRpc(RequireOwnership = false)]
+    public void UpdateCenterCardIDListClientRPC(SerializableList serializableList)
+    {
+        Debug.Log("ClientRpc called: Updating current player");
+        if (GameManager.LocalInstance != null)
+        {
+            GameManager.LocalInstance.UpdateCenterCardIDList(serializableList);
+        }
+        else
+        {
+            Debug.LogError("GameManagers list is null or empty!");
+        }
+        Debug.Log("ClientRpc Updating current player execution complete.");
+    }
+    [ClientRpc(RequireOwnership = false)]
     public void InitializeCardPrefabsClientRPC()
     {
-        gameManagers[0].InitializeCardPrefabs();
+        Debug.Log("ClientRpc called: Initializing card prefabs.");
+        GameManager.LocalInstance.InitializeCardPrefabs();
+        Debug.Log("ClientRpc called: Initializing card prefabs ended.");
     }
-    [ClientRpc]
+
+    [ClientRpc(RequireOwnership = false)]
     public void DealCardPrefabsToPlayersClientRPC(int playerCount, SerializableDictionary serializableDictionary)
     {
-        gameManagers[0].DealCardPrefabsToPlayers(playerCount,serializableDictionary);
+        Debug.Log("ClientRpc called: Dealing card prefabs to players.");
+        //Debug.Log("PlayerCount: " + playerCount);
+        //serializableDictionary.PrintAll();
+        GameManager.LocalInstance.CardPrefabsToPlayers(playerCount,serializableDictionary);
+        Debug.Log("ClientRpc called: Dealing card prefabs to players ended.");
     }
-    [ClientRpc]
+
+    [ClientRpc(RequireOwnership = false)]
     public void DealCardPrefabsToCenterClientRPC(SerializableList serializableList)
     {
-        gameManagers[0].DealCardPrefabsToCenter(serializableList);
+        Debug.Log("ClientRpc called: Dealing card prefabs to center.");
+        serializableList.PrintAll();
+        GameManager.LocalInstance.CardPrefabsToCenter(serializableList);
+        Debug.Log("ClientRpc called: Dealing card prefabs to center ended.");
     }
 
+    [ClientRpc(RequireOwnership = false)]
+    public void SendMoveToClientRPC(int[] selectedHandCard, SerializableList selectedCenterCards, int playerNumber)
+    {
+        Debug.Log("ClientRpc called: SendMoveToClientRPC.");
+        GameManager.LocalInstance.DiscardPlayedCards(selectedHandCard, selectedCenterCards, playerNumber);
+        Debug.Log("ClientRpc called: SendMoveToClientRPC ended.");
+    }
+
+    [ClientRpc(RequireOwnership = false)]
+    public void SendCardAddedToCenterClientRPC(int[] cardID)
+    {
+        GameManager.LocalInstance.GetCardAddedToCenter(cardID);
+    }
     //ServerRPC
-    [ServerRpc]
+    [ServerRpc(RequireOwnership = false)]
     public void PlayerChkobbaServerRPC(int playerNumber)
     {
-        Server.Singleton.PlayerChkobba(playerNumber);
+        server.PlayerChkobba(playerNumber);
     }
 
-    [ServerRpc]//Called after player plays a move
+    /*[ServerRpc(RequireOwnership = false)]//Called after player plays a move
     public void EndTurnAfterPlayServerRPC(int playerNumber,SerializableList serializableList)
     {
-        Server.Singleton.lastPlayerToCapture = playerNumber;
-        Server.Singleton.AddDiscardedCardsToPlayerPool(serializableList);
-        Server.Singleton.EndTurn();//End turn
-    }
+        server.lastPlayerToCapture = playerNumber;
+        server.AddDiscardedCardsToPlayerPool(serializableList);
+        server.EndTurn();//End turn
+    }*/
 
-    [ServerRpc]//Called after player adds a card to the center
-    public void EndTurnAfterCenterServerRPC(int[] currentSelectedHandCard)
-    {
-        Server.Singleton.centerCardsIDs.Add(currentSelectedHandCard);
-        Server.Singleton.EndTurn();
-    }
-
-    [ServerRpc]
+    [ServerRpc(RequireOwnership = false)]
     public void RemoveCenterCardsServerRPC(SerializableList serializableList)
     {
         
-        Server.Singleton.RemoveCardsFromCenter(serializableList);
+        server.RemoveCardsFromCenter(serializableList);
         
     }
     [ServerRpc(RequireOwnership = false)]
     public void PrintMessageServerRPC(string message)
     {
         Debug.Log("PrintMessageServerRPC called with message: " + message);
-        Server.Singleton.PrintMessage(message);
+        server.PrintMessage(message);
     }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void SendMoveToServerRPC(int[] selectedHandCard, SerializableList serializableList, int playerNumber)
+    {
+        server.GetMove(selectedHandCard,serializableList,playerNumber);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void AddCenterCardServerRPC(int[] cardID)
+    {
+        server.AddCardIDToCenter(cardID);
+    }
+    
 }

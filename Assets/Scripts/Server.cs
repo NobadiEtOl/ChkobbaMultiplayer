@@ -11,6 +11,8 @@ public class Server : NetworkBehaviour
 {
     private List<int[]> deckCardsIDs;//List of all the cardIDs represents the deck  
     private Dictionary<int, List<int[]>> playersHandCardsIDs;//Dictionary containing all the players' hands
+    public SerializableDictionary playersHandCardsIDsSerialized = new SerializableDictionary();
+    public SerializableList tempSerializableList = new SerializableList();
     private Dictionary<int, List<int[]>> playersPooledCardsIDs;//Dictionary containing all the players' pools
     [SerializeField]private List<Text> poolTexts = new List<Text>();//Pool of the players in text for debugging
     [SerializeField]private int playerCount = 2;
@@ -21,8 +23,8 @@ public class Server : NetworkBehaviour
     //public bool dealFlag = false; //Used to check when the cards should be dealt
     int[] points;  // To store points for each player
     public int lastPlayerToCapture=1;
-    
     public static Server Singleton { get; private set; }
+    [SerializeField]private NetworkRelay networkRelay;
     private void OnEnable()
     {
         Singleton = this;
@@ -30,32 +32,7 @@ public class Server : NetworkBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        if(IsServer)
-        {
-            System.Random random = new System.Random(DateTime.Now.Millisecond);
-            seed=random.Next();
-            points = new int[playerCount];
-            Debug.Log("NetworkManager State: " + NetworkManager.Singleton.NetworkConfig.NetworkTransport);
-            //Invoke("StartGame",0f);
-        }
-        else //To make sure cleint side does not have s server script
-
-        print("GameManager Started");
-        if (NetworkRelay.Instance != null)
-        {   
-            print("in here");
-            StartCoroutine(DelayedMessageSend());
-        }
-        else
-        {
-            print("NetworkRelay.Instance is null.");
-        }
-    }
-
-    private IEnumerator DelayedMessageSend()
-    {
-        yield return new WaitForSeconds(1);  // Wait for a short delay
-        NetworkRelay.Instance.PrintMessageServerRPC("message sent");
+        print("server.cs start");
     }
 
     /*[SerializeField]private GameObject multiplayerObjectPrefab;
@@ -66,18 +43,73 @@ public class Server : NetworkBehaviour
     }*/
     public void StartGame()
     {
-        //Define current player and update Client
+        if (!IsServer)
+        {
+            Debug.LogError("StartGame() called on a non-server instance!");
+            return;
+        }
+        if(networkRelay==null)
+        {
+            Debug.LogError("Network relay script empty");
+        }
+        ServerStart();
+
+        // Define current player and update Client
         currentPlayer = 0;
-        //Initialize the deck and suffle it
+
+        // Initialize the deck and shuffle it
         SaveAllCards();
         SuffleCards(seed);
-        //Initialize cardObjects
-        NetworkRelay.Instance.UpdateCurrentPlayerClientRPC(currentPlayer);
-        NetworkRelay.Instance.InitializeCardPrefabsClientRPC();
-        //Deal the cards
+
+        // Debug before ClientRpc calls
+        Debug.Log("About to call ClientRpc functions.");
+
+        // Initialize cardObjects
+        if (networkRelay != null)
+        {
+            networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer);
+            networkRelay.InitializeCardPrefabsClientRPC();
+        }
+        else
+        {
+            Debug.LogError("NetworkRelay is null!");
+        }
+
+        // Deal the cards
         InitializePlayerPools();
         DealCardsToPlayerHands();
         DealCardsToCenter();
+    }
+    private void ServerStart()
+    {
+        if(!IsServer)
+        {
+            print("Server no open");
+        }
+        else
+        {
+            System.Random random = new System.Random(DateTime.Now.Millisecond);
+            seed=random.Next();
+            points = new int[playerCount];
+            Debug.Log("NetworkManager State: " + NetworkManager.Singleton.NetworkConfig.NetworkTransport);
+            //Invoke("StartGame",0f);
+        }
+
+        if (networkRelay != null)
+        {   
+            print("networkRelay is not null");
+            DelayedMessageSend();
+        }
+        else
+        {
+            print("NetworkRelay is null.");
+        }
+    }
+
+    private void DelayedMessageSend()
+    {
+        print("DelayedMessageSend");
+        networkRelay.PrintMessageServerRPC("message sent");
     }
 
     public bool winnerPrintFlag = false;
@@ -176,8 +208,18 @@ public class Server : NetworkBehaviour
         //print("deckCardCount:");
         //print(deckCardsIDs.Count);
         //Sends players hand to the gameManger so that card objects be given to the players
-        SerializableDictionary serializableDictionary  = new SerializableDictionary(playersHandCardsIDs);
-        NetworkRelay.Instance.DealCardPrefabsToPlayersClientRPC(playerCount,serializableDictionary);
+        print("Executing DealCardPrefabsToPlayersClientRPC");
+        //playersHandCardsIDsSerialized = new NetworkVariable<SerializableDictionary>(new SerializableDictionary());
+        //SerializableDictionary tempDic = 
+        playersHandCardsIDsSerialized = new SerializableDictionary(playersHandCardsIDs);
+        //playersHandCardsIDsSerialized.PrintAll();
+        //Invoke(nameof(Delayed_DealCardPrefabsToPlayers),0.5f);
+        Delayed_DealCardPrefabsToPlayers();
+    }
+
+    private void Delayed_DealCardPrefabsToPlayers()
+    {
+        if(IsServer)networkRelay.DealCardPrefabsToPlayersClientRPC(playerCount, playersHandCardsIDsSerialized);
     }
 
     //Chooses the cards to be dealth to the center
@@ -192,8 +234,18 @@ public class Server : NetworkBehaviour
             deckCardsIDs.RemoveAt(deckCardsIDs.Count-1);
         }
         //Sends center cards to the gameManger so that card objects be put to the center
-        SerializableList serializableList = new SerializableList(centerCardsIDs);
-        NetworkRelay.Instance.DealCardPrefabsToCenterClientRPC(serializableList);
+        tempSerializableList = new SerializableList(centerCardsIDs);
+        networkRelay.UpdateCenterCardIDListClientRPC(tempSerializableList);
+        //tempSerializableList.PrintAll();
+        //Invoke(nameof(Delayed_DealCardPrefabsToCenter),0.5f);
+        Delayed_DealCardPrefabsToCenter();
+        //Instance is the probable cause of my problems
+    }
+
+
+    private void Delayed_DealCardPrefabsToCenter()
+    {
+        if(IsServer)networkRelay.DealCardPrefabsToCenterClientRPC(tempSerializableList);
     }
 
     //Add played cards to the current players pool.
@@ -230,7 +282,7 @@ public class Server : NetworkBehaviour
 
         int nextPlayer = (turnCounter%playerCount);
         currentPlayer = nextPlayer;
-        NetworkRelay.Instance.UpdateCurrentPlayerClientRPC(currentPlayer);
+        networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer);
         print("TurnCounter:"  + turnCounter);
         //PrintCenterCards();
     }
@@ -470,12 +522,6 @@ public class Server : NetworkBehaviour
         }
     }
 
-    //Called when a card should be removed from the center
-    /*public void RemoveCardFromCenter(int[] cardToBeRemoved)
-    {
-        centerCardsIDs.Remove(cardToBeRemoved);
-    }*/
-
     public void RemoveCardsFromCenter(SerializableList serializableList)
     {
         List<int[]> cardsToRemove = serializableList.ToList();
@@ -483,10 +529,63 @@ public class Server : NetworkBehaviour
         {
             centerCardsIDs.RemoveAll(card => card.SequenceEqual(cardToBeRemoved));
         }
+        networkRelay.UpdateCenterCardIDListClientRPC(new SerializableList(centerCardsIDs));
     }
 
     public void PrintMessage(string message)
     {
         print(message);
+    }
+
+    public static void PrintDictionary(Dictionary<int, List<int[]>> dictionary)
+    {
+        if (dictionary == null || dictionary.Count == 0)
+        {
+            Debug.Log("Dictionary is empty.");
+            return;
+        }
+
+        foreach (var kvp in dictionary)
+        {
+            Debug.Log($"Key: {kvp.Key}");
+            Debug.Log("Values:");
+            foreach (var array in kvp.Value)
+            {
+                string arrayContents = string.Join(", ", array);
+                Debug.Log($"  [{arrayContents}]");
+            }
+        }
+    }
+
+    public static void PrintList(List<int[]> list)
+    {
+        if(list == null || list.Count == 0)
+        {
+            Debug.Log("List is empty");
+            return;
+        }
+        int counter=0;
+        foreach(var array in list)
+        {
+            Debug.Log("---------------------"); 
+            Debug.Log("Array[" + counter + "]: [" + array[0] + "," + array[1] + "]");
+            counter++;
+        }
+    }
+
+    public void GetMove(int[] selectedHandCard, SerializableList serializableList, int playerNumber)
+    {
+        networkRelay.SendMoveToClientRPC(selectedHandCard, serializableList, playerNumber);
+        lastPlayerToCapture = playerNumber;
+        AddDiscardedCardsToPlayerPool(serializableList);
+        EndTurn();
+    }
+
+    public void AddCardIDToCenter(int[] cardID)
+    {
+        centerCardsIDs.Add(cardID);
+        networkRelay.UpdateCenterCardIDListClientRPC(new SerializableList(centerCardsIDs));
+        networkRelay.SendCardAddedToCenterClientRPC(cardID);
+        EndTurn();
     }
 }

@@ -21,12 +21,15 @@ public class CardInteraction : MonoBehaviour
             cardID = GetCardID(temp);
         }
         else cardID = new int[]{5,1};//Add button has a special ID.
+
+        gameObject.tag = cardID[0] + "_" + cardID[1];
         
     }
 
     //Check clicks done to the cards
     private void OnMouseDown()
     {
+        Debug.Log("OnMouseDown");
         // Check if the card's parent is PlayerHand1 and the user is Player 1
         if (transform.parent.name == "PlayerHand1" && GameManager.currentPlayerNo == 0) //&& Player.playerID == 1)
         {

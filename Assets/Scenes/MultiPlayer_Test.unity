@@ -1324,11 +1324,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: eb9d0cf20cb7dc147a4b8ed8b0672a5b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  playersHandCardsIDsSerialized: {}
   poolTexts: []
   playerCount: 2
   seed: 124
   currentPlayer: 0
   lastPlayerToCapture: 1
+  networkRelay: {fileID: 2001506852}
   winnerPrintFlag: 0
 --- !u!4 &2001506851
 Transform:
@@ -1357,7 +1359,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 630738afa4f13634f8d18d9e43176cd2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  gameManager: {fileID: 0}
+  server: {fileID: 2001506850}
 --- !u!1 &2003683457
 GameObject:
   m_ObjectHideFlags: 0

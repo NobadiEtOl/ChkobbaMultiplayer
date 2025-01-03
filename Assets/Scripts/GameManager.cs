@@ -4,8 +4,9 @@ using System.Collections.Generic;
 using Unity.VisualScripting;
 using System.Linq;
 using UnityEngine;
+using Unity.Netcode;
 
-public class GameManager : MonoBehaviour
+public class GameManager : NetworkBehaviour
 {
     public static GameManager LocalInstance { get; private set; }
     [SerializeField]private DeckController deckController;
@@ -17,20 +18,36 @@ public class GameManager : MonoBehaviour
     private List<CardInteraction> cardInteractionsScripts;//Reference to the scripts of every card.
     private List<GameObject> cardObjectsToBeDiscarted = new List<GameObject>();
     public static int currentPlayerNo;
+    private NetworkRelay networkRelay;
+    private List<int[]> centerCardIDList;
 
     void Start()
     {
         print("GameManger Started");
-        NetworkRelay.Instance.AddGameManager(this); 
-        if (NetworkRelay.Instance != null)
+        //Setting the localInstances for ClientRPC messages
+        if(LocalInstance == null)
+        {
+            LocalInstance = this;
+        }
+        else 
+        {
+            Debug.LogWarning("Duplicate GameManager detected. Destroying extra instance.");
+            Destroy(gameObject);
+        }
+
+        //Setting the networkRealy script to sen ServerRPCs
+        networkRelay = FindObjectOfType<NetworkRelay>();
+        if (networkRelay != null)
         {   
             print("in here");
-            NetworkRelay.Instance.PrintMessageServerRPC("message sent");
+            networkRelay.PrintMessageServerRPC("message sent");
         }
         else
         {
-            print("NetworkRelay.Instance is null.");
+            print("NetworkRelay is null.");
         }
+        
+        networkRelay.AddGameManager(this); 
     }
 
     public void GetLocalInstance()
@@ -47,56 +64,33 @@ public class GameManager : MonoBehaviour
     }
 
     //Puts the proper card objects in front of correct players
-    public void DealCardPrefabsToPlayers(int playerCount, SerializableDictionary serializedDictionary)
+    
+    public void CardPrefabsToPlayers(int playerCount,SerializableDictionary serializableDictionary)
     {
-        Dictionary<int, List<int[]>> playerHands = serializedDictionary.ToDictionary();
+        Debug.Log("Inside DealCardPrefabsToPlayers GameManager");
+        Dictionary<int, List<int[]>> playerHands = serializableDictionary.ToDictionary();
+        //Server.PrintDictionary(playerHands);
         if(deckController)deckController.DealPlayers(playerCount,playerHands);
-        else Debug.LogError("burda hata");
+        else Debug.Log("burda hata");
     }
 
     //Puts the proper card objects to the center
-    public void DealCardPrefabsToCenter(SerializableList serializableList)
+    public void CardPrefabsToCenter(SerializableList serializableList)
     {   
+        Debug.Log("Inside DealCardPrefabsToCenter GameManager");
         List<int[]> centerCardIDs = serializableList.ToList();
-        deckController.DealCenter(centerCardIDs);
-    }
-
-    public void DiscardPlayedCards(int[] playedCard, List<int[]> selectedCenterCards, int playerNumber)
-    {
-        //Removes the card objects from the center and player hand
-        foreach(GameObject cardObject in cardObjectsToBeDiscarted)
-        {
-            cardObject.transform.position = new Vector3(-10000,-10000,0);
-            centerCardsObjects.Remove(cardObject);
-            cardObject.transform.parent = null;
-        }
-        
-        //print("SelectedCenterCards.Count: " + selectedCenterCards.Count);
-        //Removes the selectedCenterCards from the centerCards list
-        print("centerCards.Count: " + centerCards.Count);
-        foreach (int[] selectedCardId in selectedCenterCards)
-        {
-            centerCards = centerCards.Where(card => !(card[0] == selectedCardId[0] && card[1] == selectedCardId[1])).ToList();
-        }
-        print("centerCards.Count: " + centerCards.Count);
-
-        if(centerCards.Count == 0)
-        {
-            NetworkRelay.Instance.PlayerChkobbaServerRPC(playerNumber);
-        }
-        PrintCenterCards();
-        //Combine the selected hand cards with the selected center card(s)
-        selectedCenterCards.Add(playedCard);
-        SerializableList serializableList = new SerializableList(selectedCenterCards);
-        NetworkRelay.Instance.EndTurnAfterPlayServerRPC(playerNumber,serializableList);
-        CardInteraction.isOneCardSelected = false;
+        //Server.PrintList(centerCardIDs);
+        if(deckController)deckController.DealCenter(centerCardIDs);
+        else Debug.Log("burda başka hata");
     }
 
     //To remove the played card from the hand when it played to the center
-    public void DiscardHandCards()
+    public void DiscardHandCards(int[] cardID)
     {
-        cardObjectsToBeDiscarted[0].transform.position = new Vector3(-10000,-10000,0);
-        cardObjectsToBeDiscarted[0].transform.parent = null;
+        GameObject tempCardObject = GameObject.FindWithTag(TurnCardIdToString(cardID));
+        tempCardObject.transform.position = new Vector3(-10000,-10000,0);
+        tempCardObject.transform.parent = null;
+        Destroy(tempCardObject);
     }
 
     //Gets all the scripts of the cards from the deckController
@@ -136,16 +130,21 @@ public class GameManager : MonoBehaviour
     //Called when the player decides to put the selected hand card to the center
     private void CardAddedToCenter()
     {
-        //print("CardAddedToCenter");
-        //UI
-        AddCardToCenter();
-        DiscardHandCards();
-        //Logic
-        NetworkRelay.Instance.EndTurnAfterCenterServerRPC(currentSelectedHandCard);
+        if(CheckIfCanBeAddedToCenter())
+        {
+            networkRelay.AddCenterCardServerRPC(currentSelectedHandCard);
+            currentSelectedHandCard = new int[]{0,0};
+            currentSelectedCenterCards.Clear();
+        }
     }
 
+    public void GetCardAddedToCenter(int[] cardID)
+    {
+        AddCardToCenter(cardID);
+        DiscardHandCards(cardID);
+    }
     //To add the proper cardObject to the center when a card from the player hand gets placed
-    public void AddCardToCenter()
+    public void AddCardToCenter(int[] cardID)
     {
         List<Vector3> centerCardLocations = new List<Vector3>();
 
@@ -163,7 +162,7 @@ public class GameManager : MonoBehaviour
             //Send the position of where the card object will be placed
             if(!centerCardLocations.Contains(new Vector3(locationCounter * 700, 0, 0)))
             {
-                deckController.PlaceCardToCenter(new Vector3(locationCounter * 700, 0, 0),currentSelectedHandCard);
+                deckController.PlaceCardToCenter(new Vector3(locationCounter * 700, 0, 0),cardID);
                 locationFlag=true;
             }
             locationCounter++;
@@ -218,10 +217,11 @@ public class GameManager : MonoBehaviour
 
                 // Now remove the cards outside of the foreach loop
                 SerializableList serializableList = new SerializableList(cardsToRemove);
-                NetworkRelay.Instance.RemoveCenterCardsServerRPC(serializableList);
-
+                networkRelay.RemoveCenterCardsServerRPC(serializableList);
+                serializableList = new SerializableList(currentSelectedCenterCards);
                 //Update the game UI after the move is played
-                DiscardPlayedCards(currentSelectedHandCard, currentSelectedCenterCards, playerNumber);//Discard played cards only if sums match up
+                networkRelay.SendMoveToServerRPC(currentSelectedHandCard,serializableList,playerNumber);
+                //DiscardPlayedCards(currentSelectedHandCard, currentSelectedCenterCards, playerNumber);//Discard played cards only if sums match up
                 
             }
             //Clear the list even if its a correct move
@@ -236,10 +236,111 @@ public class GameManager : MonoBehaviour
         //print(currentSelectedCenterCards.Count);
         return sumFlag;
     }
+
+    public bool CheckIfCanBeAddedToCenter()
+    {
+        int cardValue = currentSelectedHandCard[1]; // Get cardID[1]
+
+        // Check against singular centerCardID[1] values
+        foreach (int[] centerCardID in centerCardIDList)
+        {
+            if (cardValue == centerCardID[1])
+            {
+                return false;
+            }
+        }
+
+        // Check against the sum of two different centerCardID[1] values
+        for (int i = 0; i < centerCardIDList.Count; i++)
+        {
+            for (int j = i + 1; j < centerCardIDList.Count; j++)
+            {
+                if (i != j) // Ensure i and j are different indices
+                {
+                    int sum = centerCardIDList[i][1] + centerCardIDList[j][1];
+                    if (cardValue == sum)
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        // If no match found, return true
+        return true;
+    }
+
+    public void DiscardPlayedCards(int[] playedCard, SerializableList serializedList, int playerNumber)
+    {
+        List<int[]> selectedCenterCards = serializedList.ToList();
+        List<int[]> selectedCards = new List<int[]>(selectedCenterCards);
+        selectedCards.Add(playedCard);
+        cardObjectsToBeDiscarted.Clear();
+        foreach(int[] cardID in selectedCards)
+        {
+            GameObject tempCardObject = GameObject.FindWithTag(cardID[0] + "_" + cardID[1]);
+            if(tempCardObject != null)
+            {
+                Debug.Log("Found card with tag:" + cardID[0] + "_" + cardID[1] + "and name: " + tempCardObject.name);
+                cardObjectsToBeDiscarted.Add(tempCardObject);
+            }
+            else
+            {
+                Debug.LogWarning("No card found with the tag: " + cardID[0] + "_" + cardID[1]);
+            }
+        }
+        //Removes the card objects from the center and player hand
+        if(cardObjectsToBeDiscarted.Count==0 ||cardObjectsToBeDiscarted == null)
+        {
+            print("cardObjectsToBeDiscarted is empty");
+        }
+        else
+        {
+            print("cardObjectsToBeDiscarted.Count(): ");
+            print(cardObjectsToBeDiscarted.Count());
+        } 
+        foreach(GameObject cardObject in cardObjectsToBeDiscarted)
+        {
+            cardObject.transform.position = new Vector3(-10000,-10000,0);
+            if(centerCardsObjects.Remove(cardObject))print("yes");
+            else print("no");
+            cardObject.transform.parent = null;
+        }
+        
+        //print("SelectedCenterCards.Count: " + selectedCenterCards.Count);
+        //Removes the selectedCenterCards from the centerCards list
+        print("centerCards.Count: " + centerCards.Count);
+        foreach (int[] selectedCardId in selectedCenterCards)
+        {
+            centerCards = centerCards.Where(card => !(card[0] == selectedCardId[0] && card[1] == selectedCardId[1])).ToList();
+        }
+        print("centerCards.Count: " + centerCards.Count);
+
+        if(centerCards.Count == 0)
+        {
+            networkRelay.PlayerChkobbaServerRPC(playerNumber);
+        }
+        PrintCenterCards();
+        //Combine the selected hand cards with the selected center card(s)
+        selectedCenterCards.Add(playedCard);
+        SerializableList serializableList = new SerializableList(selectedCenterCards);
+        //networkRelay.EndTurnAfterPlayServerRPC(playerNumber,serializableList);
+        CardInteraction.isOneCardSelected = false;
+    }
     
     public void UpdateCurrentPlayer(int playerNumber)
     {
+        Debug.Log("Inside UpdateCurrentPlayer");
         currentPlayerNo=playerNumber;
+        Debug.Log("currentPlayerNo: " + currentPlayerNo);
+    }
+    public void UpdateCenterCardIDList(SerializableList serializableList)
+    {
+        Debug.Log("Inside UpdateCenterCardIDList");
+        List<int[]> tempCenterList = serializableList.ToList();
+        centerCardIDList = tempCenterList;
+        Server.PrintList(centerCardIDList);
+        Debug.Log("Ending UpdateCenterCardIDList");
     }
 
     public static string TurnCardIdToString(int[] tempCardID)
