@@ -45,6 +45,17 @@ TagManager:
   - 4_9
   - 4_10
   - 5_1
+  - PlayerHand1
+  - PlayerHand2
+  - PlayerHand3
+  - PlayerHand4
+  - Center
+  - PoolText1
+  - PoolText2
+  - PoolText3
+  - PoolText4
+  - RoundOverText
+  - WinScreen
   layers:
   - Default
   - TransparentFX

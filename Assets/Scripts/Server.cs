@@ -3,9 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using Unity.VisualScripting;
 using UnityEngine;
-using UnityEngine.UI;
 using System.Linq;
 using Unity.Netcode;
+using UnityEngine.Pool;
 
 public class Server : NetworkBehaviour
 {
@@ -14,8 +14,7 @@ public class Server : NetworkBehaviour
     public SerializableDictionary playersHandCardsIDsSerialized = new SerializableDictionary();
     public SerializableList tempSerializableList = new SerializableList();
     private Dictionary<int, List<int[]>> playersPooledCardsIDs;//Dictionary containing all the players' pools
-    [SerializeField]private List<Text> poolTexts = new List<Text>();//Pool of the players in text for debugging
-    [SerializeField]private int playerCount = 2;
+    [SerializeField]private int playerCount=0;
     public List<int[]> centerCardsIDs;//List of all the cards in the center
     [SerializeField]private int seed = 124;//Seed for the deck suffle
     private int turnCounter=0;
@@ -28,6 +27,7 @@ public class Server : NetworkBehaviour
     private void OnEnable()
     {
         Singleton = this;
+        if(playerCount==0)playerCount=2;
     }
     // Start is called before the first frame update
     void Start()
@@ -41,8 +41,9 @@ public class Server : NetworkBehaviour
         GameObject newObject = Instantiate(multiplayerObjectPrefab, new Vector3(960, 540, 0), Quaternion.identity);
         newObject.GetComponent<NetworkObject>().Spawn();
     }*/
-    public void StartGame()
+    public void StartGame(int tempPlayerCount)
     {
+        playerCount = tempPlayerCount;
         if (!IsServer)
         {
             Debug.LogError("StartGame() called on a non-server instance!");
@@ -77,8 +78,16 @@ public class Server : NetworkBehaviour
 
         // Deal the cards
         InitializePlayerPools();
-        DealCardsToPlayerHands();
+        StartCoroutine(InitialDealCoroutine());
+    }
+
+    private IEnumerator InitialDealCoroutine()
+    {
         DealCardsToCenter();
+
+        yield return new WaitForSeconds(2);
+
+        DealCardsToPlayerHands();
     }
     private void ServerStart()
     {
@@ -90,6 +99,7 @@ public class Server : NetworkBehaviour
         {
             System.Random random = new System.Random(DateTime.Now.Millisecond);
             seed=random.Next();
+            seed=1234;
             points = new int[playerCount];
             Debug.Log("NetworkManager State: " + NetworkManager.Singleton.NetworkConfig.NetworkTransport);
             //Invoke("StartGame",0f);
@@ -205,15 +215,9 @@ public class Server : NetworkBehaviour
                 //Add functions to run animations
             }
         }
-        //print("deckCardCount:");
-        //print(deckCardsIDs.Count);
+
         //Sends players hand to the gameManger so that card objects be given to the players
-        print("Executing DealCardPrefabsToPlayersClientRPC");
-        //playersHandCardsIDsSerialized = new NetworkVariable<SerializableDictionary>(new SerializableDictionary());
-        //SerializableDictionary tempDic = 
         playersHandCardsIDsSerialized = new SerializableDictionary(playersHandCardsIDs);
-        //playersHandCardsIDsSerialized.PrintAll();
-        //Invoke(nameof(Delayed_DealCardPrefabsToPlayers),0.5f);
         Delayed_DealCardPrefabsToPlayers();
     }
 
@@ -242,7 +246,9 @@ public class Server : NetworkBehaviour
         //Instance is the probable cause of my problems
     }
 
-
+    //******Check if the centerCardIDList in the game manager
+    //is updated correctly, if so you dont need to send tempSerializableList
+    //to the game mananger and you can use centerCardIDList instead
     private void Delayed_DealCardPrefabsToCenter()
     {
         if(IsServer)networkRelay.DealCardPrefabsToCenterClientRPC(tempSerializableList);
@@ -257,7 +263,14 @@ public class Server : NetworkBehaviour
             playersPooledCardsIDs[currentPlayer].Add(discardedCardID);
         }
 
-        PrintPlayerPools();
+        int chkobbaPlayer=5;
+        if(centerCardsIDs.Count==0)
+        {
+            Debug.Log("Chkobba Player " + currentPlayer);
+            PlayerChkobba(currentPlayer);
+            chkobbaPlayer=currentPlayer;
+        }
+        networkRelay.PrintPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs), chkobbaPlayer);
     }
     
     //Called at the end of each turn
@@ -290,6 +303,7 @@ public class Server : NetworkBehaviour
     private void DecideWinner()
     {
         AddRemainingCardsToPlayerPool();
+        string roundOverText = "";
 
         // Variables to track rule comparisons
         int maxCardCount = 0;
@@ -443,19 +457,40 @@ public class Server : NetworkBehaviour
                     maxPoints = points[i];
                 }
             }
-            Debug.Log($"Player {i} has {points[i]} points!");
+            if(playerCount==4)
+            {
+                roundOverText += $"Team {i+1} has {points[i]} points!";
+                roundOverText += "\n";
+            }
+            else
+            {
+                roundOverText += $"Player {i+1} has {points[i]} points!";
+                roundOverText += "\n";
+            }
         }
+        roundOverText += "\n";
+        roundOverText += "\n";
+        roundOverText += "\n";
+        roundOverText += "\n";
+        roundOverText += "\n";
+        roundOverText += "\n";
 
         if (playerCount == 4)
         {
-            Debug.Log($"Team {winnerIDs[0]} wins with {maxPoints} points!");
+            roundOverText += $"Team {winnerIDs[0]+1} wins with {maxPoints} points!";
         }
         else
         {
-            Debug.Log($"Player {winnerIDs[0]} wins with {maxPoints} points!");
+            roundOverText += $"Player {winnerIDs[0]+1} wins with {maxPoints} points!";
         }
+
+        SendWinScreen(roundOverText);
     }
 
+    private void SendWinScreen(string message)
+    {
+        networkRelay.ShowWinScreenClientRPC(message);
+    }
 
     //Add remaining cards in the center to the pool of the player who last captured a card.
     public void AddRemainingCardsToPlayerPool()
@@ -465,7 +500,7 @@ public class Server : NetworkBehaviour
             playersPooledCardsIDs[lastPlayerToCapture].Add(remainingCardsID);
         }
 
-        PrintPlayerPools();
+        networkRelay.PrintPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs),5);
     }
 
     public void PrintCenterCards()
@@ -474,30 +509,6 @@ public class Server : NetworkBehaviour
         foreach(int[] cardID in centerCardsIDs)
         {
             print(cardID[0] + "_" + cardID[1]);
-        }
-    }
-
-    private void PrintPlayerPools()
-    {
-        foreach (var kvp in playersPooledCardsIDs)
-        {
-            int playerKey = kvp.Key;
-            List<int[]> cardList = kvp.Value;
-
-            // Updating the poolTexts UI with player pools
-            if (playerKey < poolTexts.Count)
-            {
-                string cardRepresentation = string.Join(", ", cardList.Select(card => $"[{card[0]}_{card[1]}]"));
-                poolTexts[playerKey].text = $"Player {playerKey}: {cardRepresentation}";
-            }
-
-            Debug.Log($"Player {playerKey}:");
-
-            foreach (var card in cardList)
-            {
-                string cardRepresentation = string.Join(", ", card);
-                Debug.Log($"  Card: [{cardRepresentation}]");
-            }
         }
     }
 
@@ -577,6 +588,7 @@ public class Server : NetworkBehaviour
     {
         networkRelay.SendMoveToClientRPC(selectedHandCard, serializableList, playerNumber);
         lastPlayerToCapture = playerNumber;
+        serializableList.Add(selectedHandCard);
         AddDiscardedCardsToPlayerPool(serializableList);
         EndTurn();
     }
@@ -588,4 +600,10 @@ public class Server : NetworkBehaviour
         networkRelay.SendCardAddedToCenterClientRPC(cardID);
         EndTurn();
     }
+
+    public int SendPlayerNumber()
+    {
+        return NetworkManager.Singleton.ConnectedClients.Count-1;
+    }
+
 }

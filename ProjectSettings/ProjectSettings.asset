@@ -44,8 +44,8 @@ PlayerSettings:
   m_HolographicTrackingLossScreen: {fileID: 0}
   defaultScreenWidth: 1920
   defaultScreenHeight: 1080
-  defaultScreenWidthWeb: 960
-  defaultScreenHeightWeb: 540
+  defaultScreenWidthWeb: 1440
+  defaultScreenHeightWeb: 810
   m_StereoRenderingPath: 0
   m_ActiveColorSpace: 1
   unsupportedMSAAFallback: 0
@@ -775,7 +775,7 @@ PlayerSettings:
   webGLDebugSymbols: 0
   webGLEmscriptenArgs: 
   webGLModulesDirectory: 
-  webGLTemplate: APPLICATION:PWA
+  webGLTemplate: APPLICATION:Minimal
   webGLAnalyzeBuildSize: 0
   webGLUseEmbeddedResources: 0
   webGLCompressionFormat: 0
@@ -895,12 +895,12 @@ PlayerSettings:
   hmiLogStartupTiming: 0
   hmiCpuConfiguration: 
   apiCompatibilityLevel: 6
-  activeInputHandler: 0
+  activeInputHandler: 2
   windowsGamepadBackendHint: 0
-  cloudProjectId: b3546d27-c39f-4b42-8499-9c920c2196e0
+  cloudProjectId: 35bede26-217d-4042-bb7c-b4cb4dd2f0f3
   framebufferDepthMemorylessMode: 0
   qualitySettingsNames: []
-  projectName: Chkobba
+  projectName: ChkobbaMultiplayer
   organizationId: mehmetozankilic
   cloudEnabled: 0
   legacyClampBlendShapeWeights: 0
