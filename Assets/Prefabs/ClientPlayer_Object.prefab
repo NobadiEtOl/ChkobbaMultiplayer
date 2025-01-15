@@ -153,7 +153,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_Sprite: {fileID: -2413806693520163455, guid: a86470a33a6bf42c4b3595704624658b, type: 3}
-  m_Color: {r: 0.39713484, g: 0, b: 0.49411765, a: 1}
+  m_Color: {r: 0.39713484, g: 0, b: 0.49411765, a: 0.10980392}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -207,6 +207,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d541ad9d53ae3224c963f1d20ced3ec5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  thisPlayerNumber: 0
   gameManager: {fileID: 8187030169234041226}
   addCardPrefab: {fileID: 3140535162796287579, guid: df1ff5cbe47292146be6ee1e6a717e46, type: 3}
   cardPrefabsList:

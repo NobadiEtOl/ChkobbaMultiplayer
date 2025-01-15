@@ -85,7 +85,7 @@ public class Server : NetworkBehaviour
     {
         DealCardsToCenter();
 
-        yield return new WaitForSeconds(2);
+        yield return new WaitForSeconds(1.25f);
 
         DealCardsToPlayerHands();
     }
@@ -99,7 +99,7 @@ public class Server : NetworkBehaviour
         {
             System.Random random = new System.Random(DateTime.Now.Millisecond);
             seed=random.Next();
-            seed=1234;
+            //seed=1234;
             points = new int[playerCount];
             Debug.Log("NetworkManager State: " + NetworkManager.Singleton.NetworkConfig.NetworkTransport);
             //Invoke("StartGame",0f);
@@ -309,11 +309,13 @@ public class Server : NetworkBehaviour
         int maxCardCount = 0;
         int maxDiamonds = 0;
         int maxSevens = 0;
+        int maxSixes = 0;
 
         // Temporary variables to track the player or team with most cards/diamonds/sevens
         List<int> playerWithMostCards = new List<int>();
         List<int> playerWithMostDiamonds = new List<int>();
         List<int> playerWithMostSevens = new List<int>();
+        List<int> playerWithMostSixes = new List<int>();
         List<int> playerWithSevenOfDiamonds = new List<int>();
 
         Dictionary<int, List<int[]>> pooledCards;
@@ -358,6 +360,7 @@ public class Server : NetworkBehaviour
             // Rule 2: Count diamonds and sevens
             int diamondsCount = 0;
             int sevensCount = 0;
+            int sixCount = 0;
             bool hasSevenOfDiamonds = false;
 
             foreach (var card in cardList)
@@ -378,6 +381,10 @@ public class Server : NetworkBehaviour
                 if (value == 7) // Count Sevens (any kind of seven)
                 {
                     sevensCount++;
+                }
+                if (value == 6) // Count Sevens (any kind of seven)
+                {
+                    sixCount++;
                 }
             }
 
@@ -414,6 +421,20 @@ public class Server : NetworkBehaviour
                 }
             }
 
+            if (sixCount >= maxSixes)
+            {
+                if (sixCount == maxSixes)
+                {
+                    playerWithMostSixes.Add(playerID);
+                }
+                else
+                {
+                    playerWithMostSixes.Clear();
+                    playerWithMostSixes.Add(playerID);
+                    maxSixes = sixCount;
+                }
+            }
+
             // Track seven of diamonds
             if (hasSevenOfDiamonds)
             {
@@ -436,6 +457,13 @@ public class Server : NetworkBehaviour
         if (playerWithMostSevens.Count == 1)
         {
             points[playerWithMostSevens[0]]++;
+        }
+        else if(playerWithMostSevens.Count == 2)
+        {
+            if(playerWithMostSixes.Count == 1)
+            {
+                points[playerWithMostSixes[0]]++;
+            }
         }
 
         // Determine the winner (max points)
@@ -501,6 +529,7 @@ public class Server : NetworkBehaviour
         }
 
         networkRelay.PrintPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs),5);
+        networkRelay.AddRemainingCardsToPoolClientRPC(lastPlayerToCapture);
     }
 
     public void PrintCenterCards()

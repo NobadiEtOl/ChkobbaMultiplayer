@@ -132,7 +132,7 @@ public class DeckController : MonoBehaviour
                 if(i==0)
                 {
                     card.SetActive(true); // Deactivate the card
-                    card.transform.position = new Vector3(-3000, -2000, 0); // Place off-screen
+                    card.transform.position = new Vector3(-3800, -2500, 0); // Place off-screen
                     card.transform.rotation = Quaternion.Euler(0, 180, 0);
                 }
                 else
@@ -161,6 +161,7 @@ public class DeckController : MonoBehaviour
         List<GameObject> cardObjects = new List<GameObject>();
         List<Vector3> positions = new List<Vector3>();
         List<Quaternion> rotations = new List<Quaternion>();
+        int turnAround = 180;
 
         if (playerCount == 2 || playerCount == 4)
         {
@@ -188,13 +189,13 @@ public class DeckController : MonoBehaviour
                             // Positions for 2 players
                             if (relativeIndex == 0) // This player (treated as player 0)
                             {
-                                position = new Vector3(j * 700, -2000, 0); // Bottom position
+                                position = new Vector3((j * 700)+275, -1600, 0); // Bottom position
                                 
                             }
                             else if (relativeIndex == 1) // The other player (treated as player 1)
                             {
-                                position = new Vector3(j * 700, 2000, 0); // Top position
-                                rotation = Quaternion.Euler(0, 180, 0);
+                                position = new Vector3((j * 700)+275, 1600, 0); // Top position
+                                rotation = Quaternion.Euler(0, turnAround, 0);
                             }
                         }
                         else if (playerCount == 4)
@@ -203,19 +204,19 @@ public class DeckController : MonoBehaviour
                             switch (relativeIndex)
                             {
                                 case 0: // This player (treated as player 0)
-                                    position = new Vector3(j * 700 + 200, -2000, 0); // Bottom position
+                                    position = new Vector3((j * 700)+275, -1600, 0); // Bottom position
                                     break;
                                 case 1: // Next player (treated as player 1)
-                                    position = new Vector3(5000, j * 700 - 500, 0); // Right position
-                                    rotation = Quaternion.Euler(0, 180, 90);
+                                    position = new Vector3(4655, j * 700 - 700, 0); // Right position
+                                    rotation = Quaternion.Euler(0, turnAround, 90);
                                     break;
                                 case 2: // Opposite player (treated as player 2)
-                                    position = new Vector3(j * 700 + 200, 2000, 0); // Top position
-                                    rotation = Quaternion.Euler(0, 180, 0);
+                                    position = new Vector3((j * 700)+275, 1600, 0); // Top position
+                                    rotation = Quaternion.Euler(0, turnAround, 0);
                                     break;
                                 case 3: // Previous player (treated as player 3)
-                                    position = new Vector3(-2500, j * 700 - 500, 0); // Left position
-                                    rotation = Quaternion.Euler(0, 180, 90);
+                                    position = new Vector3(-2700, j * 700 - 700, 0); // Left position
+                                    rotation = Quaternion.Euler(0, turnAround, 90);
                                     break;
                             }
                         }
@@ -225,6 +226,7 @@ public class DeckController : MonoBehaviour
 
                         // Set the parent of the card to the correct hand
                         tempCardObject.transform.parent = playerParentHands[i].transform;
+                        if(relativeIndex == 0) Debug.Log("playerParentHand: " + i);
                     }
                 }
             }
@@ -254,7 +256,7 @@ public class DeckController : MonoBehaviour
             cardObjects.Add(tempCenterCard);
             if (tempCenterCard != null)
             {
-                positions.Add(new Vector3(i * 700, 0, 0));
+                positions.Add(new Vector3((i * 100) + 75, 0, i*-10));
                 tempCenterCard.transform.parent = centerParent.transform;
                 gameManager.centerCardsObjects.Add(tempCenterCard);
                 gameManager.centerCards.Add(cardID);
@@ -262,6 +264,7 @@ public class DeckController : MonoBehaviour
             }
         }
         ChainMoveCards(positions, cardObjects, 10, rotations);
+        Invoke("UpdateCenterCardsLayout", 0.8f);
     }
     
     private void SendCardInteractionsToGameManager()
@@ -355,7 +358,7 @@ public class DeckController : MonoBehaviour
 
         // Calculate the starting position for the layout
         float totalWidth = (totalCards - 1) * cardSpacing; // Total width occupied by the cards
-        float startX = centerPosition.x - (totalWidth / 2) + 700; // Leftmost card position
+        float startX = centerPosition.x - (totalWidth / 2) + 975; // Leftmost card position
 
         // Arrange cards
         for (int i = 0; i < totalCards; i++)
@@ -452,8 +455,11 @@ public class DeckController : MonoBehaviour
         StartCoroutine(ChainMoveCardsCoroutine(positions, cardObject, speed, rotations));
     }
 
+    int offset=-600; 
+    int offsetCounter=0;
     public void ChainMoveCardsToPool(Vector3 position, List<GameObject> cardObjects, float speed)
     {   
+        Debug.Log("inside ChainMoveCardsToPool");
         List<Vector3> positions = new List<Vector3>();
         List<Quaternion> rotations = new List<Quaternion>();
         for (int i = 0; i<cardObjects.Count; i++)
@@ -461,6 +467,17 @@ public class DeckController : MonoBehaviour
             positions.Add(position);
             Quaternion rotation = Quaternion.Euler(0, 180, UnityEngine.Random.Range(170f, 190f));
             rotations.Add(rotation);
+
+            if(gameManager.centerCardsObjects.Count == 0)
+            {
+                if(i==cardObjects.Count-1)
+                {
+                    rotations[i] = Quaternion.Euler(0, 0, 90);
+                    positions[i] = new Vector3(-1200,0+(offset*offsetCounter),0);
+                    offsetCounter++;
+                }
+                else positions[i] = new Vector3(-1000,0+(offset*offsetCounter),0);
+            }
         }
 
         StartCoroutine(ChainMoveCardsCoroutine(positions, cardObjects, speed, rotations));
@@ -491,11 +508,25 @@ public class DeckController : MonoBehaviour
         tempFlag=true;
     }
 
+    public void AddCardsToPlayerPool(int playerNumber)
+    {
+        Debug.Log("inside AddCardsToPlayerPool: " + gameManager.centerCardsObjects.Count);
+        List<GameObject> centerObjects = new List<GameObject>();
+        int relativePoolIndex = (playerNumber - thisPlayerNumber + playerCount) % playerCount;
+        foreach(Transform child in GameObject.Find("Center").transform)
+        {
+            GameObject gameObject = child.gameObject;
+            centerObjects.Add(gameObject);
+        }
+        ChainMoveCardsToPool(playerPools[relativePoolIndex], centerObjects, 10);
+    }
+
     public void MoveCardsToPlayerPool(List<GameObject> cardObjects, int playerNumber)
     {   
         int relativePoolIndex = (playerNumber - thisPlayerNumber + playerCount) % playerCount;
         foreach(var card in cardObjects)
-        {
+        {   
+            Debug.Log("Also inside the loop");
             card.transform.parent = null;
             gameManager.centerCardsObjects.Remove(card);    
         }

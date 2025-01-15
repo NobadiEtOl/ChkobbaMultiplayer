@@ -9,18 +9,13 @@ public class CardInteraction : MonoBehaviour
     private int[] cardID = new int[2];
     //A static variable to keep track of if the player selected a card or not 
     public static bool isOneCardSelected;
-    public bool isPlayable = true; // Condition to check if the card can be played when the server is iplemented
+    public bool isPlayable = false; // Condition to check if the card can be played when the server is iplemented
     private Vector3 originalPosition; // Original position of the card
     private bool isDragging = false; // Is the card currently being dragged
     private float snapBackThreshold = 500f; // Minimum distance to call functions, adjust as needed
-    private GameObject selectedCardIndicator; 
     void Start()
     {
         isOneCardSelected=false;
-        originalPosition = transform.position;
-
-        selectedCardIndicator = transform.GetChild(1).gameObject;
-        selectedCardIndicator.SetActive(false);
 
         //Create IDs for every card except for the add button
 
@@ -38,45 +33,14 @@ public class CardInteraction : MonoBehaviour
     private void OnMouseDown()
     {
         Debug.Log("OnMouseDown");
-
-        selectedCardIndicator.SetActive(true);
+        originalPosition = transform.position;
+        int thisPlayerNumber = DeckController.LocalInstance.thisPlayerNumber;
 
         // Store the original position when dragging starts
         // Check if the card's parent is PlayerHand1 and the user is Player 1
-        if (transform.parent.name == "PlayerHand1" && GameManager.currentPlayerNo == 0) //&& Player.playerID == 1)
+        if (transform.parent.name == "PlayerHand"+(thisPlayerNumber+1)  && GameManager.currentPlayerNo == thisPlayerNumber) //&& Player.playerID == 1)
         {
-            // The user is Player 1 and the card is in their hand
-            if (isPlayable)
-            {
-                SelectCard();
-            }
-        }
-        // Similarly, you can check for Player 2
-        else if (transform.parent.name == "PlayerHand2" && GameManager.currentPlayerNo == 1) //&& Player.playerID == 1)
-        {
-            if (isPlayable)
-            {
-                SelectCard();
-            }
-
-        }
-        //Player 3
-        else if (transform.parent.name == "PlayerHand3" && GameManager.currentPlayerNo == 2) //&& Player.playerID == 1)
-        {
-            if (isPlayable)
-            {
-                SelectCard();
-            }
-
-        }
-        //Player 4
-        else if (transform.parent.name == "PlayerHand4" && GameManager.currentPlayerNo == 3) //&& Player.playerID == 1)
-        {
-            if (isPlayable)
-            {
-                SelectCard();
-            }
-
+            SelectCard();
         }
         else if(transform.parent.name == "Center" && isOneCardSelected)
         {   
@@ -91,6 +55,32 @@ public class CardInteraction : MonoBehaviour
 
         
     }
+
+    /*private void OnMouseDown()
+    {
+        Debug.Log("OnMouseDown");
+        originalPosition = transform.position;
+        int thisPlayerNumber = DeckController.LocalInstance.thisPlayerNumber;
+
+        // Store the original position when dragging starts
+        // Check if the card's parent is PlayerHand1 and the user is Player 1
+        if (transform.parent.name.Contains("PlayerHand"))
+        {
+            SelectCard();
+        }
+        else if(transform.parent.name == "Center" && isOneCardSelected)
+        {   
+            TryToPlayMove();
+        }
+        else
+        {
+            Debug.Log("This card is not in your hand or cannot be played.");
+            print("Clicked card: " + gameObject.name + ", Parent: " + transform.parent.name + "OneCardSelected: " + isOneCardSelected);
+            isOneCardSelected=false;        
+        }
+
+        
+    }*/
 
     void OnMouseDrag()
     {
@@ -149,7 +139,6 @@ public class CardInteraction : MonoBehaviour
     private void SelectCard()//Event when a card is selected
     {
         isDragging = true;
-        originalPosition = transform.position;  
         //print("I am here");
         OnCardSelected?.Invoke(this.cardID, this.gameObject);
         isOneCardSelected=true;

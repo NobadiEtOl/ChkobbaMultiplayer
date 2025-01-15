@@ -91,6 +91,12 @@ public class NetworkRelay : NetworkBehaviour
         }
     }
 
+    [ClientRpc(RequireOwnership = false)]
+    public void AddRemainingCardsToPoolClientRPC(int playerNumber)
+    {
+        DeckController.LocalInstance.AddCardsToPlayerPool(playerNumber);
+    }
+
     //ServerRPC
     [ServerRpc(RequireOwnership = false)]
     public void PlayerChkobbaServerRPC(int playerNumber)
