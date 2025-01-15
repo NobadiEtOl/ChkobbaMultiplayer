@@ -6,6 +6,7 @@ using System.Linq;
 using UnityEngine;
 using Unity.Netcode;
 using UnityEngine.UI;
+using UnityEngine.UIElements;
 
 public class GameManager : NetworkBehaviour
 {
@@ -22,6 +23,8 @@ public class GameManager : NetworkBehaviour
     private List<int[]> centerCardIDList;
     private List<Text> poolTexts = new List<Text>();//Pool of the players in text for debugging
     private GameObject winScreen;
+
+    
 
     void Start()
     {
@@ -121,22 +124,14 @@ public class GameManager : NetworkBehaviour
 
     public void GetCardAddedToCenter(int[] cardID)
     {
-        AddCardToCenter(cardID);
         DiscardHandCards(cardID);
-    }
-
-    //To add the proper cardObject to the center when a card from the player hand gets placed
-    public void AddCardToCenter(int[] cardID)
-    {
-        deckController.PlaceCardToCenter(new Vector3(0, 0, 0),cardID);
-        UpdateCenterCardsLayout();
     }
 
     //To remove the played card from the hand when it played to the center
     public void DiscardHandCards(int[] cardID)
     {
         //UI
-        deckController.DiscardHandCard(TurnCardIdToString(cardID));
+        deckController.DiscardHandCardToCenter(cardID);
     }
 
     public void UpdateCenterCardsLayout()
@@ -267,13 +262,14 @@ public class GameManager : NetworkBehaviour
             }
         }
 
+        deckController.MoveCardsToPlayerPool(cardObjectsToBeDiscarted,playerNumber);
         //Removes the card objects from the center and player hand
-        foreach(GameObject cardObject in cardObjectsToBeDiscarted)
+        /*foreach(GameObject cardObject in cardObjectsToBeDiscarted)
         {
             cardObject.transform.position = new Vector3(-10000,-10000,0);
             centerCardsObjects.Remove(cardObject);
             cardObject.transform.parent = null;
-        }
+        }*/
         
         //Removes the selectedCenterCards from the centerCards list
         foreach (int[] selectedCardId in selectedCenterCards)

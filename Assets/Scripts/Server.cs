@@ -14,7 +14,7 @@ public class Server : NetworkBehaviour
     public SerializableDictionary playersHandCardsIDsSerialized = new SerializableDictionary();
     public SerializableList tempSerializableList = new SerializableList();
     private Dictionary<int, List<int[]>> playersPooledCardsIDs;//Dictionary containing all the players' pools
-    [SerializeField]private int playerCount=0;
+    [SerializeField]public int playerCount=0;
     public List<int[]> centerCardsIDs;//List of all the cards in the center
     [SerializeField]private int seed = 124;//Seed for the deck suffle
     private int turnCounter=0;
