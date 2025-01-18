@@ -18,20 +18,33 @@ public class GameManager : NetworkBehaviour
     public List<GameObject> centerCardsObjects = new List<GameObject>();//List of the card objects in the center
     private List<CardInteraction> cardInteractionsScripts;//Reference to the scripts of every card.
     private List<GameObject> cardObjectsToBeDiscarted = new List<GameObject>();
-    public static int currentPlayerNo;
+    public static int currentPlayerNo = 5;
     private NetworkRelay networkRelay;
     private List<int[]> centerCardIDList;
     private List<Text> poolTexts = new List<Text>();//Pool of the players in text for debugging
     private GameObject winScreen;
+    Text roundOverText;
+    public List<int[]> myCards;
+    private float turnTimer=16;
+    private Text currentPlayerText;
+    private Text turnTimerText;
+    public List<GameObject> activeCardIndicatorList=new List<GameObject>();
 
-    
+    private List<Text> pointTexts=new List<Text>();
 
     void Start()
     {
         print("GameManger Started");
 
+        AudioManager.Instance.PlayAudio(4,0.04f,true);
+
         //Setting the networkRealy script to sen ServerRPCs
         networkRelay = FindObjectOfType<NetworkRelay>();
+
+        pointTexts.Add(GameObject.Find("Point0").GetComponent<Text>());
+        pointTexts.Add(GameObject.Find("Point1").GetComponent<Text>());
+
+        if(pointTexts == null || pointTexts.Count == 0)Debug.LogError("point text empty");
 
         //Setting the localInstances for ClientRPC messages
         if(LocalInstance == null)
@@ -45,9 +58,46 @@ public class GameManager : NetworkBehaviour
         }
 
         winScreen = GameObject.FindGameObjectWithTag("WinScreen");
-        if(winScreen.activeSelf)winScreen.SetActive(false);
+        roundOverText = GameObject.FindGameObjectWithTag("RoundOverText").GetComponent<Text>();
+        roundOverText.text = "Connected \n\n\n Waiting For Game To Start";
+        currentPlayerText = GameObject.Find("CurrentPlayerText").GetComponent<Text>();
         
         GetPoolTexts();
+    }
+
+    public bool printFlag=false;
+    private bool playAfterTimeOutFlag = true;
+    void FixedUpdate()
+    {
+        if(printFlag)
+        {
+            foreach(int[] cardID in myCards)
+            {
+                Debug.Log("cardID: " + cardID[0] + "_" + cardID[1]);
+            }
+            printFlag=false;
+            if(currentPlayerNo == deckController.thisPlayerNumber)Invoke("PlayAfterTimeOut",1);
+        }
+
+        /*if(turnTimer<=0)
+        {
+            if(currentPlayerNo == deckController.thisPlayerNumber && playAfterTimeOutFlag)
+            {
+                PlayAfterTimeOut();
+                Debug.LogWarning("currently here");
+            }
+            playAfterTimeOutFlag=false;
+        }
+        else if(turnTimerText != null && currentPlayerNo!=5)
+        {
+            turnTimer -= Time.deltaTime;
+            turnTimerText.text = Mathf.RoundToInt(turnTimer).ToString();
+        }*/
+    }
+
+    public void PrintFlagMakeTrue()
+    {
+        printFlag=true;
     }
 
     private void GetPoolTexts()
@@ -57,12 +107,15 @@ public class GameManager : NetworkBehaviour
             string tempTag = "PoolText" + (i+1);
             poolTexts.Add(GameObject.FindGameObjectWithTag(tempTag).GetComponent<Text>());
             //Debug.Log(tempTag);
+            poolTexts[i].gameObject.SetActive(false);
         }
     }
 
     public void InitializeCardPrefabs()
     {
         deckController.DeckStart();
+        playerChkobba = new List<int>{0,0,0,0};
+        if(winScreen.activeSelf)winScreen.SetActive(false);
     }
 
     //Puts the proper card objects in front of correct players    
@@ -115,8 +168,10 @@ public class GameManager : NetworkBehaviour
         if(CheckIfCanBeAddedToCenter())
         {
             networkRelay.AddCenterCardServerRPC(currentSelectedHandCard);
+            myCards.Remove(currentSelectedHandCard);
             currentSelectedHandCard = new int[]{0,0};
             currentSelectedCenterCards.Clear();
+            DeactivateCardIndicators();
             return true;
         }
         else return false;
@@ -155,7 +210,7 @@ public class GameManager : NetworkBehaviour
     //Checks if played move is legal before sending it to the server
     public bool CheckIfLegal(int playerNumber)
     {
-        if(currentSelectedHandCard[0] == 0 || currentSelectedHandCard[1]==0)Debug.LogError("Something went horribly wrong");
+        if(currentSelectedHandCard[0] == 0 || currentSelectedHandCard[1]==0)return false;
         bool sumFlag=false;
         int selectedCenterCardsSum=0;
 
@@ -190,10 +245,13 @@ public class GameManager : NetworkBehaviour
             //Update the game UI after the move is played
             serializableList = new SerializableList(currentSelectedCenterCards);
             networkRelay.SendMoveToServerRPC(currentSelectedHandCard,serializableList,playerNumber);
+            myCards.Remove(currentSelectedHandCard);
 
             //Clear the list even if its a correct move
             currentSelectedHandCard = new int[]{0,0};
             currentSelectedCenterCards.Clear();
+
+            DeactivateCardIndicators();
         }
 
         return sumFlag;
@@ -201,6 +259,11 @@ public class GameManager : NetworkBehaviour
 
     public bool CheckIfCanBeAddedToCenter()
     {
+        if(currentSelectedHandCard[0] == 0 || currentSelectedHandCard[1]==0)
+        {
+            return false;
+        }
+
         int cardValue = currentSelectedHandCard[1]; // Get cardID[1]
 
         // Check against singular centerCardID[1] values
@@ -222,6 +285,37 @@ public class GameManager : NetworkBehaviour
         // Use a recursive method to check all combinations
         return !CheckCombinations(centerValues, cardValue);
     }
+
+    public bool CheckIfCanBeAddedToCenter(int[] cardID)
+    {
+        if(cardID[0] == 0 || cardID[1]==0)
+        {
+            return false;
+        }
+
+        int cardValue = cardID[1]; // Get cardID[1]
+
+        // Check against singular centerCardID[1] values
+        foreach (int[] centerCardID in centerCardIDList)
+        {
+            if (cardValue == centerCardID[1])
+            {
+                return false;
+            }
+        }
+
+        // Check against all combinations of centerCardID[1] values
+        List<int> centerValues = new List<int>();
+        foreach (int[] centerCardID in centerCardIDList)
+        {
+            centerValues.Add(centerCardID[1]);
+        }
+
+        // Use a recursive method to check all combinations
+        return !CheckCombinations(centerValues, cardValue);
+    }
+
+    
 
     // Helper function to check all combinations
     private bool CheckCombinations(List<int> values, int target, int start = 0, int currentSum = 0, int depth = 0)
@@ -263,29 +357,23 @@ public class GameManager : NetworkBehaviour
         }
 
         deckController.MoveCardsToPlayerPool(cardObjectsToBeDiscarted,playerNumber);
-        //Removes the card objects from the center and player hand
-        /*foreach(GameObject cardObject in cardObjectsToBeDiscarted)
-        {
-            cardObject.transform.position = new Vector3(-10000,-10000,0);
-            centerCardsObjects.Remove(cardObject);
-            cardObject.transform.parent = null;
-        }*/
-        
-        //Removes the selectedCenterCards from the centerCards list
+
         foreach (int[] selectedCardId in selectedCenterCards)
         {
             centerCards = centerCards.Where(card => !(card[0] == selectedCardId[0] && card[1] == selectedCardId[1])).ToList();
         }
         
         PrintCenterCards();
-        UpdateCenterCardsLayout();
+        Invoke("UpdateCenterCardsLayout",1f);
         CardInteraction.isOneCardSelected = false;
     }
     
     public void UpdateCurrentPlayer(int playerNumber)
     {
         currentPlayerNo=playerNumber;
+        currentPlayerText.text = "Current Player: " + (currentPlayerNo+1);
     }
+
     public void UpdateCenterCardIDList(SerializableList serializableList)
     {
         List<int[]> tempCenterList = serializableList.ToList();
@@ -332,11 +420,37 @@ public class GameManager : NetworkBehaviour
         }
     }
 
-    public void ShowWinScreen(string message)
+    public void ShowWinScreen(string message, int winnerSide, int point0, int point1)
     {
+        
+        if(poolTexts[0].text == null)Debug.LogError("noluyor");
+        Debug.LogWarning(point0 + "*_" + point1);
+        pointTexts[0].text = point0.ToString();
+        pointTexts[1].text = point1.ToString();
         winScreen.SetActive(true);
-        Text roundOverText = GameObject.FindGameObjectWithTag("RoundOverText").GetComponent<Text>();
         roundOverText.text = message;
+
+        if(winnerSide != -1)
+        {
+            if(winnerSide==3)
+            {   
+                //Draw
+                AudioManager.Instance.PlayAudio(2,0.5f,false);
+            }
+            else if(deckController.thisPlayerNumber==0 || deckController.thisPlayerNumber==2)
+            {
+                //Side 0 win or lose
+                if(winnerSide==0)AudioManager.Instance.PlayAudio(2,0.5f,false);
+                else AudioManager.Instance.PlayAudio(1,0.5f,false);
+            }
+            else if(deckController.thisPlayerNumber==1 || deckController.thisPlayerNumber==3)
+            {
+                //Side 1 win or lose
+                if(winnerSide==1)AudioManager.Instance.PlayAudio(2,0.5f,false);
+                else AudioManager.Instance.PlayAudio(1,0.5f,false);
+            }
+        }
+    
     }
     
     public void GetPlayerNumber(int playerNumber)
@@ -348,4 +462,81 @@ public class GameManager : NetworkBehaviour
     {
         networkRelay.AskPlayerNumberServerRPC();
     }
+
+    private void PlayAfterTimeOut()
+    {
+        int[] playableCardID={0,0};
+
+        foreach(int[] cardID in myCards)
+        {
+            if(CheckIfCanBeAddedToCenter(cardID))
+            {
+                networkRelay.AddCenterCardServerRPC(cardID);
+                myCards.Remove(cardID);
+                currentSelectedHandCard = new int[]{0,0};
+                currentSelectedCenterCards.Clear();
+                return;
+            }
+            else playableCardID=cardID;
+        }
+
+        currentSelectedCenterCards = GetMatchingCards(playableCardID);
+        currentSelectedHandCard = playableCardID;
+        CheckIfLegal(currentPlayerNo);
+    }
+
+    public List<int[]> GetMatchingCards(int[] currentSelectedHandCard)
+    {
+        if(currentSelectedHandCard[0]==0 || currentSelectedHandCard[1]==0) return null;
+
+        if (currentSelectedHandCard == null || currentSelectedHandCard.Length < 2)
+        {
+            Debug.LogError("Invalid card ID provided.");
+            return null;
+        }
+
+        int targetValue = currentSelectedHandCard[1]; // Get cardID[1]
+
+        // If the selected card's value is zero, return null
+        if (targetValue == 0)
+        {
+            return null;
+        }
+
+        // Find combinations of centerCardID[1] values
+        for (int i = 0; i < centerCardIDList.Count; i++)
+        {
+            List<int[]> potentialMatch = new List<int[]>();
+            int sum = 0;
+
+            for (int j = i; j < centerCardIDList.Count; j++)
+            {
+                sum += centerCardIDList[j][1];
+                potentialMatch.Add(centerCardIDList[j]);
+
+                if (sum == targetValue)
+                {
+                    return potentialMatch; // Return the first matching combination
+                }
+
+                if (sum > targetValue)
+                {
+                    break; // Stop this inner loop since the sum exceeded target
+                }
+            }
+        }
+
+        // No matching combination found
+        return null;
+    }
+
+    public void DeactivateCardIndicators()
+    {
+        foreach(GameObject indicator in activeCardIndicatorList)
+        {
+            indicator.SetActive(false);
+        }
+        activeCardIndicatorList.Clear();
+    }
+
 }

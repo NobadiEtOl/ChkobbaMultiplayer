@@ -25,7 +25,7 @@ public class NetworkManagerUI : MonoBehaviour
 
     void Awake()
     {
-        serverButton.onClick.AddListener(async () => {await StartHostWithRelay();});
+        serverButton.onClick.AddListener(() => {Server.Singleton.SkipTurn();});
         clientButton.onClick.AddListener(async () => {await StartClientWithRelay();});
         hostButton.onClick.AddListener(async () => {await StartHostWithRelay();});
         startGameTwoPlayerButton.onClick.AddListener(() => {Server.Singleton.StartGame(2);});

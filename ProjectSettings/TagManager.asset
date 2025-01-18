@@ -56,11 +56,12 @@ TagManager:
   - PoolText4
   - RoundOverText
   - WinScreen
+  - PlayerPool1
   layers:
   - Default
   - TransparentFX
   - Ignore Raycast
-  - 
+  - Cards
   - Water
   - UI
   - 

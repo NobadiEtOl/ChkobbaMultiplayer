@@ -77,9 +77,9 @@ public class NetworkRelay : NetworkBehaviour
     }
 
     [ClientRpc(RequireOwnership = false)]
-    public void ShowWinScreenClientRPC(string message)
+    public void ShowWinScreenClientRPC(string message, int winnerSide, int point0, int point1)
     {
-        GameManager.LocalInstance.ShowWinScreen(message);
+        GameManager.LocalInstance.ShowWinScreen(message,winnerSide,point0,point1);
     }
 
     [ClientRpc(RequireOwnership = false)]
@@ -95,6 +95,12 @@ public class NetworkRelay : NetworkBehaviour
     public void AddRemainingCardsToPoolClientRPC(int playerNumber)
     {
         DeckController.LocalInstance.AddCardsToPlayerPool(playerNumber);
+    }
+
+    [ClientRpc(RequireOwnership = false)]
+    public void SkipTurnClientRPC()
+    {
+        GameManager.LocalInstance.PrintFlagMakeTrue();
     }
 
     //ServerRPC

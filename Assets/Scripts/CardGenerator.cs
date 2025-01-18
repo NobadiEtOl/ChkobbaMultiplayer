@@ -4,10 +4,10 @@ using UnityEditor;
 
 public class CardGenerator : MonoBehaviour
 {
-    // Public variables to be set in the Unity Inspector
     public Sprite[] cardFaces; // Array of sprites for the card faces
     public Sprite cardBack;    // The sprite for the card back
-    public GameObject cardPrefab; // The card prefab template (you can drag in an empty prefab with the required components)
+    public GameObject cardPrefab; // The card prefab template
+    public GameObject selectedCardIndicatorPrefab; // Prefab for the selected card indicator
 
     void Start()
     {
@@ -16,64 +16,75 @@ public class CardGenerator : MonoBehaviour
 
     void CreateCardPrefabs()
     {
-        // Check if card faces and back are assigned
-        if (cardFaces.Length == 0 || cardBack == null)
+        // Check if card faces, back, and selected card indicator are assigned
+        if (cardFaces.Length == 0 || cardBack == null || selectedCardIndicatorPrefab == null)
         {
-            Debug.LogError("Card Faces or Card Back not assigned!");
+            Debug.LogError("Card Faces, Card Back, or Selected Card Indicator not assigned!");
             return;
         }
 
-        int faceCounter=1;
-        int kindCounter=1;
-        // Loop through each card face
-        foreach (Sprite face in cardFaces)
+        int kindCounter = 1;
+
+        for (int faceCounter = 1; faceCounter <= cardFaces.Length; faceCounter++)
         {
             // Create the card prefab from the template
             GameObject newCard = Instantiate(cardPrefab);
 
             // Set the card face sprite to the face of the card
-            newCard.GetComponent<SpriteRenderer>().sprite = face;
-
-            //To check if all cards are present
-            //newCard.transform.position = new Vector3(faceCounter * 10, 0,faceCounter);
+            newCard.GetComponent<SpriteRenderer>().sprite = cardFaces[faceCounter - 1];
 
             // Create a background card object and set its sprite
             GameObject back = new GameObject("CardBack");
             back.transform.SetParent(newCard.transform); // Attach the card back to the card face
-            back.transform.localPosition = new Vector3(0,0,0.0001f); // Position the back correctly behind the face
+            back.transform.localPosition = new Vector3(0, 0, 0.1f); // Position the back correctly behind the face
             back.transform.localRotation = Quaternion.Euler(0, 180, 0);
 
             // Add a sprite renderer to the back object
             SpriteRenderer backRenderer = back.AddComponent<SpriteRenderer>();
             backRenderer.sprite = cardBack;
 
-            // Optionally, set sorting layer or order to make sure the face is on top of the back
-            backRenderer.sortingOrder = 0;  // Set the card back behind the card face
+            // Set sorting layer or order to ensure correct layering
+            backRenderer.sortingOrder = 0;  // Card back behind the card face
             newCard.GetComponent<SpriteRenderer>().sortingOrder = 0;
 
-            // You can also add other custom components or scripts to the card here if needed
-            // E.g., newCard.AddComponent<CardBehavior>();
-            
-            string kindName="";
+            // Add the selected card indicator as a child
+            GameObject selectedIndicator = Instantiate(selectedCardIndicatorPrefab, newCard.transform);
+            selectedIndicator.name = "SelectedCardIndicator";
+            selectedIndicator.transform.localPosition = new Vector3(0, 0, 0.2f);  // Position it relative to the card
+            selectedIndicator.SetActive(false); // Initially make it inactive
 
-            if(faceCounter<=10)kindCounter=1;
-            else if(faceCounter<=20)kindCounter=2;
-            else if(faceCounter<=30)kindCounter=3;
-            else if(faceCounter<=40)kindCounter=4;
-            else kindCounter=0;
+            // Determine kind (suit) and number
+            string kindName = "";
+            if (faceCounter % 10 == 1 && faceCounter != 1)
+            {
+                kindCounter++;
+            }
 
-            if(kindCounter==1)kindName="Carreau";
-            else if(kindCounter==2)kindName="Coeur";
-            else if(kindCounter==3)kindName="Pique";
-            else if(kindCounter==4)kindName="Trefle";
-            else kindName="error";
+            switch (kindCounter)
+            {
+                case 1:
+                    kindName = "Carreau";
+                    break;
+                case 2:
+                    kindName = "Coeur";
+                    break;
+                case 3:
+                    kindName = "Pique";
+                    break;
+                case 4:
+                    kindName = "Trefle";
+                    break;
+                default:
+                    kindName = "error";
+                    break;
+            }
 
-            string temp = (faceCounter%10==0) ? 10.ToString() : (faceCounter%10).ToString();
+            string temp = (faceCounter % 10 == 0) ? "10" : (faceCounter % 10).ToString();
 
+            // Assign name, tag, and layer
             newCard.name = kindName + "_" + temp;
-
-            faceCounter++;
-
+            newCard.tag = kindCounter + "_" + temp;
+            newCard.layer = 3;
         }
     }
 }

@@ -13,14 +13,17 @@ public class CardInteraction : MonoBehaviour
     private Vector3 originalPosition; // Original position of the card
     private bool isDragging = false; // Is the card currently being dragged
     private float snapBackThreshold = 500f; // Minimum distance to call functions, adjust as needed
+
+    private GameObject selectedCardIndicator;
     void Start()
     {
         isOneCardSelected=false;
 
         //Create IDs for every card except for the add button
 
-        string[] temp = gameObject.name.Split("_");
-        cardID = GetCardID(temp);
+        cardID = GetCardID();
+
+        selectedCardIndicator = gameObject.transform.GetChild(1).gameObject;
 
         Transform cardBackTransform = transform.GetChild(0);
         cardBackTransform.localPosition = new Vector3(0,0,0.02f);
@@ -118,6 +121,7 @@ public class CardInteraction : MonoBehaviour
             }
             
         }
+        else transform.position = originalPosition;
     }
 
     // Function to handle the card being moved far enough
@@ -139,8 +143,11 @@ public class CardInteraction : MonoBehaviour
     private void SelectCard()//Event when a card is selected
     {
         isDragging = true;
+        GameManager.LocalInstance.DeactivateCardIndicators();
         //print("I am here");
         OnCardSelected?.Invoke(this.cardID, this.gameObject);
+        selectedCardIndicator.SetActive(true);
+        GameManager.LocalInstance.activeCardIndicatorList.Add(selectedCardIndicator);
         isOneCardSelected=true;
     }
 
@@ -154,23 +161,37 @@ public class CardInteraction : MonoBehaviour
     public event Action<int[], GameObject, int> OnCardsPlayed;
     private void TryToPlayMove()//Event when selected cards is to be played
     {
+        selectedCardIndicator.SetActive(true);
+        GameManager.LocalInstance.activeCardIndicatorList.Add(selectedCardIndicator);
         OnCardsPlayed?.Invoke(this.cardID, this.gameObject, GameManager.currentPlayerNo);
     }
 
     //Generates the cardId from its name
-    private int[] GetCardID(string[] cardName)
+    private int[] GetCardID()
     {
-        if(cardName[0] == "Carreau") cardID[0]=1;
-        else if(cardName[0] == "Coeur") cardID[0]=2;
-        else if(cardName[0] == "Pique") cardID[0]=3;
-        else if(cardName[0] == "Trefle") cardID[0]=4;
-        else Debug.LogError("Card kind cant be identified");
+        string[] tagStrings = gameObject.tag.Split('_');
 
-        string cardValue = cardName[1].Split(" ")[0];
+        if (tagStrings.Length != 2)
+        {
+            Debug.LogError("Invalid tag format! Expected 'Kind_Value'.");
+            return new int[] { 0, 0 };
+        }
 
-        Int32.TryParse(cardValue, out cardID[1]);
-        if(cardID[1] <= 0 || cardID[1] > 10) Debug.LogError("Card value cannot be identified");
+        int[] cardID = { 0, 0 };
 
-        return new int[] { cardID[0], cardID[1]};
+        // Parse the first part of the tag (Kind)
+        if (!int.TryParse(tagStrings[0], out cardID[0]) || cardID[0] <= 0)
+        {
+            Debug.LogError($"Invalid card kind: {tagStrings[0]}");
+        }
+
+        // Parse the second part of the tag (Value)
+        if (!int.TryParse(tagStrings[1], out cardID[1]) || cardID[1] <= 0 || cardID[1] > 10)
+        {
+            Debug.LogError($"Invalid card value: {tagStrings[1]}");
+        }
+
+        return cardID;
     }
+
 }

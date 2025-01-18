@@ -24,6 +24,9 @@ public class Server : NetworkBehaviour
     public int lastPlayerToCapture=1;
     public static Server Singleton { get; private set; }
     [SerializeField]private NetworkRelay networkRelay;
+    private int startingPlayerNo=0;
+    private float timer=0;
+
     private void OnEnable()
     {
         Singleton = this;
@@ -35,14 +38,29 @@ public class Server : NetworkBehaviour
         print("server.cs start");
     }
 
+    void Update()
+    {
+        timer+=Time.deltaTime;
+        if(winnerPrintFlag)
+        {
+            DecideWinner();
+            winnerPrintFlag = false;
+        }
+    }
+
     /*[SerializeField]private GameObject multiplayerObjectPrefab;
     public void InstantiateMultiplayerObject()
     {
         GameObject newObject = Instantiate(multiplayerObjectPrefab, new Vector3(960, 540, 0), Quaternion.identity);
         newObject.GetComponent<NetworkObject>().Spawn();
     }*/
+
+    private int roundCount=0;
     public void StartGame(int tempPlayerCount)
     {
+        timer=0;
+        roundCount++;
+        turnCounter=0;
         playerCount = tempPlayerCount;
         if (!IsServer)
         {
@@ -56,7 +74,8 @@ public class Server : NetworkBehaviour
         ServerStart();
 
         // Define current player and update Client
-        currentPlayer = 0;
+        currentPlayer = startingPlayerNo%playerCount;
+        startingPlayerNo++;
 
         // Initialize the deck and shuffle it
         SaveAllCards();
@@ -68,7 +87,7 @@ public class Server : NetworkBehaviour
         // Initialize cardObjects
         if (networkRelay != null)
         {
-            networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer);
+            Invoke("CallUpdateCurrentPlayer", 1);
             networkRelay.InitializeCardPrefabsClientRPC();
         }
         else
@@ -81,8 +100,17 @@ public class Server : NetworkBehaviour
         StartCoroutine(InitialDealCoroutine());
     }
 
+    public void CallUpdateCurrentPlayer()
+    {
+        networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer);
+    }
+
     private IEnumerator InitialDealCoroutine()
     {
+        AudioManager.Instance.PlayAudio(0,5,false);
+
+        yield return new WaitForSeconds(3.5f);
+
         DealCardsToCenter();
 
         yield return new WaitForSeconds(1.25f);
@@ -100,7 +128,7 @@ public class Server : NetworkBehaviour
             System.Random random = new System.Random(DateTime.Now.Millisecond);
             seed=random.Next();
             //seed=1234;
-            points = new int[playerCount];
+            if(roundCount==1)points = new int[playerCount];
             Debug.Log("NetworkManager State: " + NetworkManager.Singleton.NetworkConfig.NetworkTransport);
             //Invoke("StartGame",0f);
         }
@@ -123,14 +151,6 @@ public class Server : NetworkBehaviour
     }
 
     public bool winnerPrintFlag = false;
-    void Update()
-    {
-        if(winnerPrintFlag)
-        {
-            DecideWinner();
-            winnerPrintFlag = false;
-        }
-    }
 
     //Add all cards to the deckCardIDs by creating all necessary IDs.
     private void SaveAllCards()
@@ -286,18 +306,23 @@ public class Server : NetworkBehaviour
             //If each player played their 3 cards new cards are dealt
             DealCardsToPlayerHands();
         }
-        NextTurn();
+        Invoke("NextTurn",1);
     }
 
     private void NextTurn()
     {
         turnCounter++;
 
-        int nextPlayer = (turnCounter%playerCount);
-        currentPlayer = nextPlayer;
+        currentPlayer = (currentPlayer+1)%playerCount;
+
         networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer);
         print("TurnCounter:"  + turnCounter);
         //PrintCenterCards();
+    }
+
+    public void SkipTurn()
+    {
+        networkRelay.SkipTurnClientRPC();
     }
 
     private void DecideWinner()
@@ -502,22 +527,70 @@ public class Server : NetworkBehaviour
         roundOverText += "\n";
         roundOverText += "\n";
         roundOverText += "\n";
+        
+        int winnerSide=-1;
 
-        if (playerCount == 4)
+        if(points[0]>=1 || points[1]>=1)
         {
-            roundOverText += $"Team {winnerIDs[0]+1} wins with {maxPoints} points!";
+            if (playerCount == 4)
+            {
+                if(points[0]==points[1])
+                {
+                    roundOverText += $"Both teams surpassed 11 points with {maxPoints} points!";
+                    winnerSide=3;
+                }
+                else 
+                {
+                    roundOverText += $"Team {winnerIDs[0]+1} surpassed 11 points with {maxPoints} points!";
+                    winnerSide=winnerIDs[0];
+                }
+                
+            }
+            else
+            {
+                if(points[0]==points[1])
+                {
+                    roundOverText += $"Both players surpassed 11 points with {maxPoints} points!";
+                    winnerSide=3;
+                }
+                else 
+                {
+                    roundOverText += $"Player {winnerIDs[0]+1} surpassed 11 points with {maxPoints} points!";
+                    winnerSide=winnerIDs[0];
+                }
+            }
         }
         else
         {
-            roundOverText += $"Player {winnerIDs[0]+1} wins with {maxPoints} points!";
+            if (playerCount == 4)
+            {
+                roundOverText += $"Team {winnerIDs[0]+1} wins with {maxPoints} points!";
+            }
+            else
+            {
+                roundOverText += $"Player {winnerIDs[0]+1} wins with {maxPoints} points!";
+            }
         }
 
-        SendWinScreen(roundOverText);
+        Debug.LogWarning(points[0] + "_" + points[1]);
+        SendWinScreen(roundOverText,winnerSide,points[0],points[1]);
+
+        Invoke("StartGameAutomatic",10f);
+
     }
 
-    private void SendWinScreen(string message)
+    private void StartGameAutomatic()
+    {   
+        if(timer>=11)
+        {
+            StartGame(playerCount);
+        }
+
+    }
+
+    private void SendWinScreen(string message,int winnerSide, int point0, int point1)
     {
-        networkRelay.ShowWinScreenClientRPC(message);
+        networkRelay.ShowWinScreenClientRPC(message, winnerSide, point0, point1);
     }
 
     //Add remaining cards in the center to the pool of the player who last captured a card.

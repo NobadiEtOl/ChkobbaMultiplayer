@@ -22,6 +22,8 @@ public class DeckController : MonoBehaviour
     private List<Vector3> playerPools = new List<Vector3>();
     private int relativeIndex = 0;
     private int playerCount = 0;
+    private GameObject cardPool;
+    private GameObject chkobbaText;
 
     void Start()
     {   
@@ -34,6 +36,9 @@ public class DeckController : MonoBehaviour
             Debug.LogWarning("Duplicate GameManager detected. Destroying extra instance.");
             //Destroy(gameObject);
         }
+
+        chkobbaText = GameObject.Find("ChkobbaText");
+        chkobbaText.SetActive(false);
 
         cardPrefabs = new Dictionary<string, GameObject>();
         cardPools = new Dictionary<string, List<GameObject>>();
@@ -116,7 +121,8 @@ public class DeckController : MonoBehaviour
     private void InitializeCardPool()
     {
         cardInteractionList = new List<CardInteraction>();
-        GameObject cardPool = new GameObject("CardPool");
+        if(cardPool!=null)DestroyCards();
+        cardPool = new GameObject("CardPool");
         foreach (var cardPrefabEntry in cardPrefabs)
         {
             var cardIDString = cardPrefabEntry.Key;
@@ -126,19 +132,19 @@ public class DeckController : MonoBehaviour
             cardPools[cardIDString] = new List<GameObject>();
 
             // Instantiate and add a fixed number of cards to the pool
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 1; i++)
             {
                 GameObject card = Instantiate(cardPrefab);
                 if(i==0)
                 {
                     card.SetActive(true); // Deactivate the card
-                    card.transform.position = new Vector3(-3800, -2500, 0); // Place off-screen
+                    card.transform.position = transform.position; // Place off-screen
                     card.transform.rotation = Quaternion.Euler(0, 180, 0);
                 }
                 else
                 {
                     card.SetActive(false); // Deactivate the card
-                    card.transform.position = new Vector3(-2000, -2000, 0); // Place off-screen
+                    card.transform.position = transform.position; // Place off-screen
                 }
 
                 // Get the CardInteraction component and add it to the list
@@ -152,7 +158,46 @@ public class DeckController : MonoBehaviour
                 cardPools[cardIDString].Add(card);
             }
         }
+
+        
+
+        cardPool.transform.position = GameObject.Find("CardPoolObject").transform.position;
     }
+
+    private void DestroyCards()
+    {
+        // Get the layer index for the "Cards" layer
+        int cardsLayer = LayerMask.NameToLayer("Cards");
+
+        if (cardsLayer == -1)
+        {
+            Debug.LogError("Layer 'Cards' does not exist.");
+            return;
+        }
+
+        // Find all GameObjects in the scene
+        GameObject[] allGameObjects = FindObjectsOfType<GameObject>();
+
+        // Iterate through all GameObjects and destroy those on the "Cards" layer
+        foreach (GameObject obj in allGameObjects)
+        {
+            if (obj.layer == cardsLayer)
+            {
+                Destroy(obj);
+            }
+        }
+
+        gameManager.centerCards.Clear();
+        gameManager.centerCardsObjects.Clear();
+        offsetCounter0=0;
+        offsetCounter1=0;
+        offsetCounter2=0;
+
+
+        Debug.Log("All objects on the 'Cards' layer have been destroyed.");
+        Destroy(cardPool);
+    }
+
 
     //Deals to players according to the playerCount
     public void DealPlayers(int playerCount, Dictionary<int, List<int[]>> playerHands)
@@ -169,12 +214,19 @@ public class DeckController : MonoBehaviour
             {
                 // Determine the actual player index, relative to thisPlayerNumber
                 relativeIndex = (i - thisPlayerNumber + playerCount) % playerCount;
+                if(relativeIndex == 0)
+                {
+                    gameManager.myCards = new List<int[]>();
+                }
 
                 for (int j = 0; j < 3; j++)
                 {
                     // Get the card ID for the relative player
                     var cardID = playerHands[i][j];
-
+                    if(relativeIndex == 0)
+                    {
+                        gameManager.myCards.Add(cardID);
+                    }
                     // Get the card object for the cardID
                     GameObject tempCardObject = GetCardFromPool(cardID);
                     if (tempCardObject != null)
@@ -239,8 +291,6 @@ public class DeckController : MonoBehaviour
             Debug.LogError("Player number is different from 2 or 4");
         }
     }
-
-
 
     //Deals to center according to the playerCount
     public void DealCenter(List<int[]> centerCardIDs)
@@ -344,6 +394,7 @@ public class DeckController : MonoBehaviour
             gameManager.centerCardsObjects.Add(placedCard);
         }
 
+        AudioManager.Instance.PlayAudio(3,1,false);
         UpdateCenterCardsLayout();
     }
 
@@ -354,6 +405,7 @@ public class DeckController : MonoBehaviour
         Vector3 centerPosition = new Vector3(0, 0, 0); // Center of the layout
 
         int totalCards = gameManager.centerCardsObjects.Count;
+        Debug.Log("Gamemanager.centerCardsObjects.Count: " + gameManager.centerCardsObjects.Count);
         if (totalCards == 0) return;
 
         // Calculate the starting position for the layout
@@ -365,7 +417,7 @@ public class DeckController : MonoBehaviour
         {
             Vector3 targetPosition = new Vector3(startX + (i * cardSpacing), centerPosition.y, centerPosition.z);
 
-            MoveCard(targetPosition, gameManager.centerCardsObjects[i], 10, Quaternion.identity);
+            MoveCard(targetPosition, gameManager.centerCardsObjects[i], 10, Quaternion.identity,false);
             //gameManager.centerCardsObjects[i].transform.position = targetPosition;
 
             // Optionally: Add animation for smooth transition
@@ -373,16 +425,18 @@ public class DeckController : MonoBehaviour
         }
     }
 
-    public void MoveCard(Vector3 endPos, GameObject cardObject, float speed, Quaternion rotation)
+    public void MoveCard(Vector3 endPos, GameObject cardObject, float speed, Quaternion rotation, bool audioFlag=true)
     {
         // Start the coroutine to move the card
-        StartCoroutine(MoveCardCoroutine(endPos, cardObject, speed, rotation));
+        StartCoroutine(MoveCardCoroutine(endPos, cardObject, speed, rotation, audioFlag));
     }
 
-    private IEnumerator MoveCardCoroutine(Vector3 endPos, GameObject cardObject, float speedMultiplier, Quaternion rotation)
+    private IEnumerator MoveCardCoroutine(Vector3 endPos, GameObject cardObject, float speedMultiplier, Quaternion rotation, bool audioFlag=true)
     {
         // Set the initial position of the card
         Vector3 startingPos = cardObject.transform.position;
+
+        if(audioFlag)AudioManager.Instance.PlayAudio(3,1,false);
 
         // Calculate the journey length and base speed
         float journeyLength = Vector3.Distance(startingPos, endPos);
@@ -416,7 +470,7 @@ public class DeckController : MonoBehaviour
     }
 
 
-    public void RotateCard(Quaternion endRotation, GameObject cardObject, float speed)
+    public void RotateCard(Quaternion endRotation, GameObject cardObject, float speed=20)
     {
         // Start the coroutine to rotate the card
         StartCoroutine(RotateCardCoroutine(endRotation, cardObject, speed));
@@ -455,11 +509,12 @@ public class DeckController : MonoBehaviour
         StartCoroutine(ChainMoveCardsCoroutine(positions, cardObject, speed, rotations));
     }
 
-    int offset=-600; 
-    int offsetCounter=0;
-    public void ChainMoveCardsToPool(Vector3 position, List<GameObject> cardObjects, float speed)
+    int offset=150; 
+    int offsetCounter0=-1;
+    int offsetCounter1=-1;
+    int offsetCounter2=0-1;
+    public void ChainMoveCardsToPool(Vector3 position, List<GameObject> cardObjects, float speed, int poolIndex)
     {   
-        Debug.Log("inside ChainMoveCardsToPool");
         List<Vector3> positions = new List<Vector3>();
         List<Quaternion> rotations = new List<Quaternion>();
         for (int i = 0; i<cardObjects.Count; i++)
@@ -473,19 +528,61 @@ public class DeckController : MonoBehaviour
                 if(i==cardObjects.Count-1)
                 {
                     rotations[i] = Quaternion.Euler(0, 0, 90);
-                    positions[i] = new Vector3(-1200,0+(offset*offsetCounter),0);
-                    offsetCounter++;
+                    Debug.LogWarning(poolIndex);
+                    positions[i] = new Vector3(position.x+100, position.y+GetChkobbaYOffset(poolIndex),position.z-GetChkobbaZOffset()+10);
                 }
-                else positions[i] = new Vector3(-1000,0+(offset*offsetCounter),0);
+                StartCoroutine(ChkobbaCoroutine());
             }
         }
 
-        StartCoroutine(ChainMoveCardsCoroutine(positions, cardObjects, speed, rotations));
+        StartCoroutine(ChainMoveCardsCoroutine(positions, cardObjects, speed, rotations,true));
+    }
+
+    private IEnumerator ChkobbaCoroutine()
+    {
+        chkobbaText.SetActive(true);
+
+        yield return new WaitForSeconds(2);
+
+        chkobbaText.SetActive(false);
+    }
+
+    private int GetChkobbaYOffset(int poolIndex)
+    {
+        if(poolIndex==0)
+        {
+            offsetCounter0++;
+            return (offset*offsetCounter0)-200;
+
+        }
+        else if(poolIndex==1)
+        {
+            offsetCounter1++;
+            return -(offset*offsetCounter1)+200;
+        }
+        else if(poolIndex==2)
+        {
+            offsetCounter2++;
+            return -(offset*offsetCounter2)+200;
+        }
+        else return 0;
+    }
+
+    private int zOffsetCounter=0;
+    private int GetChkobbaZOffset()
+    {   
+        zOffsetCounter++;
+        return zOffsetCounter;
     }
 
 
-    private IEnumerator ChainMoveCardsCoroutine(List<Vector3> positions, List<GameObject> cardObjects, float speed, List<Quaternion> rotations)
+    private IEnumerator ChainMoveCardsCoroutine(List<Vector3> positions, List<GameObject> cardObjects, float speed, List<Quaternion> rotations, bool playFlag=false)
     {
+        if(playFlag)
+        {
+            RotateCard(Quaternion.identity,cardObjects[cardObjects.Count-1]);
+            yield return new WaitForSeconds(1);
+        }
         for(int i = 0; i < cardObjects.Count; i++)
         {
             yield return StartCoroutine(MoveCardCoroutine(positions[i], cardObjects[i], speed, rotations[i]));
@@ -518,7 +615,9 @@ public class DeckController : MonoBehaviour
             GameObject gameObject = child.gameObject;
             centerObjects.Add(gameObject);
         }
-        ChainMoveCardsToPool(playerPools[relativePoolIndex], centerObjects, 10);
+
+
+        ChainMoveCardsToPool(playerPools[GetPoolIndex(relativePoolIndex)], centerObjects, 10, relativePoolIndex);
     }
 
     public void MoveCardsToPlayerPool(List<GameObject> cardObjects, int playerNumber)
@@ -527,11 +626,29 @@ public class DeckController : MonoBehaviour
         foreach(var card in cardObjects)
         {   
             Debug.Log("Also inside the loop");
-            card.transform.parent = null;
+            card.transform.parent = cardPool.transform;
             gameManager.centerCardsObjects.Remove(card);    
         }
 
-        ChainMoveCardsToPool(playerPools[relativePoolIndex], cardObjects, 10); 
+        
+        ChainMoveCardsToPool(playerPools[GetPoolIndex(relativePoolIndex)], cardObjects, 10, GetPoolIndex(relativePoolIndex)); 
+    }
+
+    private int GetPoolIndex(int relativePoolIndex)
+    {
+        int poolIndex=0;
+        if(playerCount==4)
+        {
+            if(relativePoolIndex==0 || relativePoolIndex==2)poolIndex=0;
+            else if(relativePoolIndex==1 || relativePoolIndex==3)poolIndex=1;
+        }
+        else if(playerCount==2)
+        {
+            if(relativePoolIndex==0)poolIndex=0;
+            else if(relativePoolIndex==1)poolIndex=2;
+        }
+
+        return poolIndex;
     }
 }
 
