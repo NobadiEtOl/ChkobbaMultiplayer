@@ -14,7 +14,7 @@ public class Server : NetworkBehaviour
     public SerializableDictionary playersHandCardsIDsSerialized = new SerializableDictionary();
     public SerializableList tempSerializableList = new SerializableList();
     private Dictionary<int, List<int[]>> playersPooledCardsIDs;//Dictionary containing all the players' pools
-    [SerializeField]public int playerCount=0;
+    private int playerCount=2;
     public List<int[]> centerCardsIDs;//List of all the cards in the center
     [SerializeField]private int seed = 124;//Seed for the deck suffle
     private int turnCounter=0;
@@ -26,6 +26,10 @@ public class Server : NetworkBehaviour
     [SerializeField]private NetworkRelay networkRelay;
     private int startingPlayerNo=0;
     private float timer=0;
+    private float turnTime = 15f; // 30 seconds per turn
+    private float currentTurnTime = 0f;
+    private bool timerRunning = false;
+    private int connectedPlayerCount=1;
 
     private void OnEnable()
     {
@@ -36,11 +40,33 @@ public class Server : NetworkBehaviour
     void Start()
     {
         print("server.cs start");
+        StartCoroutine(ServerSubsciribe());
+    }
+    private IEnumerator ServerSubsciribe()
+    {
+        Debug.LogWarning("Inside ServerSubscribe");
+        // Wait until the network is listening
+        yield return new WaitUntil(() => NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening);
+
+        Debug.Log("NetworkManager is initialized and listening.");
+
+        // Subscribe to the callback
+        NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
     }
 
     void Update()
     {
         timer+=Time.deltaTime;
+        if (timerRunning)
+        {
+            currentTurnTime -= Time.deltaTime;
+
+            if (currentTurnTime <= 0f)
+            {
+                timerRunning = false;
+                SkipTurn();
+            }
+        }
         if(winnerPrintFlag)
         {
             DecideWinner();
@@ -94,6 +120,12 @@ public class Server : NetworkBehaviour
         {
             Debug.LogError("NetworkRelay is null!");
         }
+
+        GivePlayerCount();
+
+        currentTurnTime = turnTime+15;
+        timerRunning = true;
+        NotifyClientsTurnStarted(currentTurnTime);
 
         // Deal the cards
         InitializePlayerPools();
@@ -296,6 +328,7 @@ public class Server : NetworkBehaviour
     //Called at the end of each turn
     public void EndTurn()
     {
+        //Debug.LogWarning("InsideEndTurn");
         if(turnCounter == 35)
         {   
             //Round ends and a winner is decided after each card is played
@@ -306,7 +339,7 @@ public class Server : NetworkBehaviour
             //If each player played their 3 cards new cards are dealt
             DealCardsToPlayerHands();
         }
-        Invoke("NextTurn",1);
+        NextTurn();
     }
 
     private void NextTurn()
@@ -317,7 +350,20 @@ public class Server : NetworkBehaviour
 
         networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer);
         print("TurnCounter:"  + turnCounter);
+
+        currentTurnTime = turnTime;
+        timerRunning = true;
+        NotifyClientsTurnStarted(currentTurnTime);
         //PrintCenterCards();
+    }
+
+    private void GivePlayerCount()
+    {
+        networkRelay.GivePlayerCountClientRPC(playerCount);
+    }
+    private void NotifyClientsTurnStarted(float currentTurnTime)
+    {
+        networkRelay.NotifyClientsTurnStartedClientRPC(currentTurnTime);
     }
 
     public void SkipTurn()
@@ -523,25 +569,21 @@ public class Server : NetworkBehaviour
         }
         roundOverText += "\n";
         roundOverText += "\n";
-        roundOverText += "\n";
-        roundOverText += "\n";
-        roundOverText += "\n";
-        roundOverText += "\n";
         
         int winnerSide=-1;
-
-        if(points[0]>=1 || points[1]>=1)
+        
+        if(points[0]>=11 || points[1]>=11)
         {
             if (playerCount == 4)
             {
                 if(points[0]==points[1])
                 {
-                    roundOverText += $"Both teams surpassed 11 points with {maxPoints} points!";
+                    roundOverText += $"Both teams wins!!";
                     winnerSide=3;
                 }
                 else 
                 {
-                    roundOverText += $"Team {winnerIDs[0]+1} surpassed 11 points with {maxPoints} points!";
+                    roundOverText += $"Team {winnerIDs[0]+1} wins";
                     winnerSide=winnerIDs[0];
                 }
                 
@@ -550,32 +592,28 @@ public class Server : NetworkBehaviour
             {
                 if(points[0]==points[1])
                 {
-                    roundOverText += $"Both players surpassed 11 points with {maxPoints} points!";
+                    roundOverText += $"Both players wins!!";
                     winnerSide=3;
                 }
                 else 
                 {
-                    roundOverText += $"Player {winnerIDs[0]+1} surpassed 11 points with {maxPoints} points!";
+                    roundOverText += $"Player {winnerIDs[0]+1} wins";
                     winnerSide=winnerIDs[0];
                 }
             }
         }
         else
         {
-            if (playerCount == 4)
-            {
-                roundOverText += $"Team {winnerIDs[0]+1} wins with {maxPoints} points!";
-            }
-            else
-            {
-                roundOverText += $"Player {winnerIDs[0]+1} wins with {maxPoints} points!";
-            }
+            roundOverText += $"\n\nWaiting for another round to start";
         }
 
         Debug.LogWarning(points[0] + "_" + points[1]);
         SendWinScreen(roundOverText,winnerSide,points[0],points[1]);
 
-        Invoke("StartGameAutomatic",10f);
+        if(winnerSide == -1)
+        {
+            Invoke("StartGameAutomatic",10f);
+        }
 
     }
 
@@ -686,13 +724,16 @@ public class Server : NetworkBehaviour
         }
     }
 
-    public void GetMove(int[] selectedHandCard, SerializableList serializableList, int playerNumber)
+    public void GetMove(int[] selectedHandCard, SerializableList serializableList, int playerNumber, int sumValue)
     {
-        networkRelay.SendMoveToClientRPC(selectedHandCard, serializableList, playerNumber);
-        lastPlayerToCapture = playerNumber;
-        serializableList.Add(selectedHandCard);
-        AddDiscardedCardsToPlayerPool(serializableList);
-        EndTurn();
+        if(selectedHandCard[1] == sumValue)
+        {
+            networkRelay.SendMoveToClientRPC(selectedHandCard, serializableList, playerNumber);
+            lastPlayerToCapture = playerNumber;
+            serializableList.Add(selectedHandCard);
+            AddDiscardedCardsToPlayerPool(serializableList);
+            EndTurn();
+        }
     }
 
     public void AddCardIDToCenter(int[] cardID)
@@ -708,4 +749,22 @@ public class Server : NetworkBehaviour
         return NetworkManager.Singleton.ConnectedClients.Count-1;
     }
 
-}
+    private void OnClientConnected(ulong clientId)
+    {
+        Debug.Log($"Client connected with ID: {clientId}");
+        AnotherPlayerConnected();
+    }
+
+    public void AnotherPlayerConnected()
+    {
+        Debug.Log("Inside AnotherPlayerConnected");
+        connectedPlayerCount++;
+        Debug.Log("connectedPlayerCount: " + connectedPlayerCount);
+        Debug.Log("playerCount: " + playerCount);
+        if(playerCount == connectedPlayerCount)
+        {
+            Debug.Log("Inside If");
+            StartGame(playerCount);
+        }
+    }
+}   

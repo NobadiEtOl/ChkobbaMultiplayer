@@ -22,6 +22,7 @@ public class NetworkManagerUI : MonoBehaviour
     [SerializeField] private Button startGameFourPlayerButton;
     [SerializeField] private InputField inputField;
     [SerializeField] private Text joinCodeText;
+    private string joinCodeVar;
 
     void Awake()
     {
@@ -45,6 +46,12 @@ public class NetworkManagerUI : MonoBehaviour
             Debug.LogWarning("IsNotListening");
         }*/
     }
+
+    public void SendJoinCodeToHTML(string joinCode)
+    {
+        Debug.Log("Sending Join Code to HTML: " + joinCode);
+        Application.ExternalCall("receiveJoinCode", joinCode);
+    }
     public async Task<string> StartHostWithRelay()
     {
         await UnityServices.InitializeAsync();
@@ -55,9 +62,26 @@ public class NetworkManagerUI : MonoBehaviour
         Allocation allocation = await RelayService.Instance.CreateAllocationAsync(4);
         NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(allocation, "wss"));
         var joinCode = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
+        joinCodeVar = joinCode;
         joinCodeText.text = joinCode;
-        Debug.Log("JoinCode: " + joinCode);
+        //Server.Singleton.StartGame(2);
+        SendJoinCodeToHTML(joinCode);
         return NetworkManager.Singleton.StartHost() ? joinCode : null;
+    }
+
+    public async Task<bool> StartClientWithRelay(string tempJoinCode)
+    {
+        await UnityServices.InitializeAsync();
+        if (!AuthenticationService.Instance.IsSignedIn)
+        {
+            await AuthenticationService.Instance.SignInAnonymouslyAsync();
+        }
+
+        Debug.Log("Trying to join with joinCode: " + tempJoinCode);
+        joinCodeText.text = tempJoinCode;
+        var joinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode: tempJoinCode);
+        NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(joinAllocation, "wss"));
+        return !string.IsNullOrEmpty(tempJoinCode) && NetworkManager.Singleton.StartClient();
     }
 
     public async Task<bool> StartClientWithRelay()

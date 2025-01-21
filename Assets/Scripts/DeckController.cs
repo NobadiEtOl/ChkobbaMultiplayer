@@ -21,7 +21,7 @@ public class DeckController : MonoBehaviour
     private GameObject centerParent;//Center object to keep track of where the center cards will be placed
     private List<Vector3> playerPools = new List<Vector3>();
     private int relativeIndex = 0;
-    private int playerCount = 0;
+    public int playerCount = 0;
     private GameObject cardPool;
     private GameObject chkobbaText;
 
@@ -45,12 +45,12 @@ public class DeckController : MonoBehaviour
 
         if(NetworkManager.Singleton.IsHost)
         {
-            thisPlayerNumber = 0;
+            thisPlayerNumber = WebGLCommunication.LocalInstance.playerNumber;
         }
         else if(NetworkManager.Singleton.IsClient)
         {
-            thisPlayerNumber = -1;
-            gameManager.AskPlayerNumber();
+            thisPlayerNumber = WebGLCommunication.LocalInstance.playerNumber;
+            //gameManager.AskPlayerNumber();
         }
 
         StartCoroutine(DelayedFlag());
@@ -284,7 +284,7 @@ public class DeckController : MonoBehaviour
             }
 
             // Chain movement for all cards
-            ChainMoveCards(positions, cardObjects, 10, rotations);
+            StartCoroutine(ChainMoveCardsPlayersCoroutine(positions, cardObjects, 10, rotations));
         }
         else
         {
@@ -315,6 +315,12 @@ public class DeckController : MonoBehaviour
         }
         ChainMoveCards(positions, cardObjects, 10, rotations);
         Invoke("UpdateCenterCardsLayout", 0.8f);
+    }
+
+    private IEnumerator ChainMoveCardsPlayersCoroutine(List<Vector3 >positions, List<GameObject> cardObjects, int speead,List<Quaternion> rotations)
+    {
+        yield return new WaitForSeconds(1.5f);
+        ChainMoveCards(positions, cardObjects, 10, rotations);
     }
     
     private void SendCardInteractionsToGameManager()
@@ -581,14 +587,13 @@ public class DeckController : MonoBehaviour
         if(playFlag)
         {
             RotateCard(Quaternion.identity,cardObjects[cardObjects.Count-1]);
-            yield return new WaitForSeconds(1);
         }
         for(int i = 0; i < cardObjects.Count; i++)
         {
             yield return StartCoroutine(MoveCardCoroutine(positions[i], cardObjects[i], speed, rotations[i]));
         }
+    
     }
-
     public void SetPlayerNumber(int playerNumber)
     {
         thisPlayerNumber = playerNumber;
@@ -649,6 +654,11 @@ public class DeckController : MonoBehaviour
         }
 
         return poolIndex;
+    }
+
+    public void GetPlayerCount(int playerC)
+    {
+        playerCount=playerC;
     }
 }
 

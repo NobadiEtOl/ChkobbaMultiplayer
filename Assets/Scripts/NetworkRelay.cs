@@ -103,6 +103,18 @@ public class NetworkRelay : NetworkBehaviour
         GameManager.LocalInstance.PrintFlagMakeTrue();
     }
 
+    [ClientRpc(RequireOwnership = false)]
+    public void NotifyClientsTurnStartedClientRPC(float currentTurnTime)
+    {
+        GameManager.LocalInstance.GetTurnTime(currentTurnTime);
+    }
+
+    [ClientRpc(RequireOwnership = false)]
+    public void GivePlayerCountClientRPC(int playerCount)
+    {
+        DeckController.LocalInstance.GetPlayerCount(playerCount);
+    }
+
     //ServerRPC
     [ServerRpc(RequireOwnership = false)]
     public void PlayerChkobbaServerRPC(int playerNumber)
@@ -133,9 +145,9 @@ public class NetworkRelay : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void SendMoveToServerRPC(int[] selectedHandCard, SerializableList serializableList, int playerNumber)
+    public void SendMoveToServerRPC(int[] selectedHandCard, SerializableList serializableList, int playerNumber, int sumValue)
     {
-        server.GetMove(selectedHandCard,serializableList,playerNumber);
+        server.GetMove(selectedHandCard,serializableList,playerNumber, sumValue);
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -149,4 +161,5 @@ public class NetworkRelay : NetworkBehaviour
     {
         GetPlayerNumberClientRPC(server.SendPlayerNumber());
     }
+
 }
