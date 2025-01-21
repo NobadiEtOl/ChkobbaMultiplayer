@@ -1,4 +1,196 @@
+using System;
 using System.Collections;
+using System.Collections.Generic;
+using Unity.Netcode;
+using UnityEngine;
+using UnityEngine.UI;
+using Unity.Services.Core;
+using Unity.Services.Authentication;
+using Unity.Services.Relay;
+using Unity.Services.Relay.Models;
+using Unity.Netcode.Transports.UTP;
+using Unity.Networking.Transport.Relay;
+using Unity.Services.Lobbies;
+using Unity.Services.Lobbies.Models;
+using System.Threading.Tasks;
+
+public class NetworkManagerUI : MonoBehaviour
+{
+    [SerializeField] private Button serverButton;
+    [SerializeField] private Button clientButton;
+    [SerializeField] private Button hostButton;
+    [SerializeField] private Button startGameTwoPlayerButton;
+    [SerializeField] private Button startGameFourPlayerButton;
+    [SerializeField] private InputField inputField;
+    [SerializeField] private Text joinCodeText;
+    private string joinCodeVar;
+
+    void Awake()
+    {
+        serverButton.onClick.AddListener(() => { Server.Singleton.SkipTurn(); });
+        clientButton.onClick.AddListener(async () => { await StartClientWithRelay(); });
+        hostButton.onClick.AddListener(async () => { await StartHostWithRelay(2); });
+        startGameTwoPlayerButton.onClick.AddListener(async () => { await FindLobbiesAndStartHostIfNoneExist(2); });
+        startGameFourPlayerButton.onClick.AddListener(async () => { await FindLobbiesAndStartHostIfNoneExist(4); });
+    }
+
+    bool isListeningFlag = false;
+    void Update()
+    {
+        if (NetworkManager.Singleton.IsListening && isListeningFlag == false)
+        {
+            Debug.LogWarning("IsListening");
+            isListeningFlag = true;
+        }
+    }
+
+    private string GetUniquePlayerId()
+    {
+        // Generate a unique ID per tab and store it in PlayerPrefs
+        string uniquePlayerId = PlayerPrefs.GetString("UniquePlayerId", null);
+
+        if (string.IsNullOrEmpty(uniquePlayerId))
+        {
+            uniquePlayerId = Guid.NewGuid().ToString();
+            PlayerPrefs.SetString("UniquePlayerId", uniquePlayerId);
+        }
+
+        Debug.Log($"Unique Player ID for this tab: {uniquePlayerId}");
+        return uniquePlayerId;
+    }
+
+    public async Task<string> StartHostWithRelay(int playerCount)
+    {
+        await UnityServices.InitializeAsync();
+
+        if (!AuthenticationService.Instance.IsSignedIn)
+        {
+            await AuthenticationService.Instance.SignInAnonymouslyAsync();
+        }
+
+        Allocation allocation = await RelayService.Instance.CreateAllocationAsync(playerCount);
+        NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(allocation, "wss"));
+        joinCodeVar = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
+        joinCodeText.text = joinCodeVar;
+
+        CreateLobbyOptions options = new CreateLobbyOptions
+        {
+            Data = new Dictionary<string, DataObject>
+            {
+                { "JoinCode", new DataObject(DataObject.VisibilityOptions.Public, joinCodeVar) }
+            }
+        };
+
+        await Lobbies.Instance.CreateLobbyAsync("MyLobby", playerCount, options);
+        Debug.Log($"Host started with join code: {joinCodeVar}");
+        Server.Singleton.SetPlayerCount(playerCount);
+        return NetworkManager.Singleton.StartHost() ? joinCodeVar : null;
+    }
+
+    public async Task<bool> StartClientWithRelay()
+    {
+        await UnityServices.InitializeAsync();
+
+        if (!AuthenticationService.Instance.IsSignedIn)
+        {
+            await AuthenticationService.Instance.SignInAnonymouslyAsync();
+        }
+
+        string inputJoinCode = inputField.text;
+        Debug.Log("Trying to join with joinCode: " + inputJoinCode);
+        joinCodeText.text = inputJoinCode;
+
+        var joinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode: inputJoinCode);
+        NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(joinAllocation, "wss"));
+
+        return !string.IsNullOrEmpty(inputJoinCode) && NetworkManager.Singleton.StartClient();
+    }
+
+    public async Task FindLobbiesAndStartHostIfNoneExist(int playerCount)
+    {
+        await UnityServices.InitializeAsync();
+
+        if (!AuthenticationService.Instance.IsSignedIn)
+        {
+            await AuthenticationService.Instance.SignInAnonymouslyAsync();
+        }
+
+        QueryLobbiesOptions queryOptions = new QueryLobbiesOptions
+        {
+            Filters = new List<QueryFilter>
+            {
+                new QueryFilter(QueryFilter.FieldOptions.AvailableSlots, "0", QueryFilter.OpOptions.GT)
+            }
+        };
+
+        var lobbies = await Lobbies.Instance.QueryLobbiesAsync(queryOptions);
+
+        if (lobbies.Results.Count > 0)
+        {
+            Debug.Log($"Found {lobbies.Results.Count} open lobbies.");
+            foreach (var lobby in lobbies.Results)
+            {
+                Debug.Log($"Lobby Name: {lobby.Name}, Available Slots: {lobby.AvailableSlots}");
+            }
+
+            if (lobbies.Results.Count > 0)
+            {
+                JoinLobby(lobbies.Results[0].Id);
+            }
+        }
+        else
+        {
+            Debug.Log("No open lobbies found. Creating a new one...");
+            await StartHostWithRelay(playerCount);
+        }
+    }
+
+    public async void JoinLobby(string lobbyId)
+    {
+        try
+        {
+            var lobby = await Lobbies.Instance.JoinLobbyByIdAsync(lobbyId);
+
+            if (lobby != null)
+            {
+                UnityTransport transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+                if (transport == null)
+                {
+                    Debug.LogError("UnityTransport component is missing.");
+                    return;
+                }
+
+                var joinCode = lobby.Data["JoinCode"].Value;
+                var joinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode: joinCode);
+                NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(joinAllocation, "wss"));
+
+                NetworkManager.Singleton.StartClient();
+                Debug.Log("Successfully connected to the lobby.");
+            }
+            else
+            {
+                Debug.LogError("Failed to retrieve join allocation.");
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"Error joining lobby: {e}");
+        }
+    }
+
+    public void SendJoinCodeToHTML(string joinCode)
+    {
+        Debug.Log("Sending Join Code to HTML: " + joinCode);
+        Application.ExternalCall("receiveJoinCode", joinCode);
+    }
+}
+
+
+
+
+
+
+/*using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
@@ -11,6 +203,8 @@ using Unity.Netcode.Transports.UTP;
 using Unity.Networking.Transport.Relay;
 using Unity.Networking.Transport;
 using System.Threading.Tasks;
+using Unity.Services.Lobbies;
+using Unity.Services.Lobbies.Models;
 
 
 public class NetworkManagerUI : MonoBehaviour
@@ -44,7 +238,7 @@ public class NetworkManagerUI : MonoBehaviour
         /*else
         {
             Debug.LogWarning("IsNotListening");
-        }*/
+        }//!!!!!!!!!!!!!!!!!!!!!
     }
 
     public void SendJoinCodeToHTML(string joinCode)
@@ -99,142 +293,4 @@ public class NetworkManagerUI : MonoBehaviour
         return !string.IsNullOrEmpty(inputField.text) && NetworkManager.Singleton.StartClient();
     }
 
-    /*private async void CreateRelay()
-    {
-        try
-        {
-            Debug.LogWarning("Inside CreateRelay");
-
-            // Initialize Unity Services and authenticate
-            await UnityServices.InitializeAsync();
-            if (!AuthenticationService.Instance.IsSignedIn)
-            {
-                await AuthenticationService.Instance.SignInAnonymouslyAsync();
-            }
-
-            if (AuthenticationService.Instance.IsSignedIn)
-            {
-                Debug.Log("Signed in successfully.");
-            }
-            else
-            {
-                Debug.LogError("Authentication failed.");
-                return;
-            }
-
-            // Create the Relay allocation
-            Allocation allocation = await RelayService.Instance.CreateAllocationAsync(3, "europe-central2");
-            if (allocation == null || allocation.RelayServer == null)
-            {
-                Debug.LogError("Allocation or RelayServer data is null.");
-                return;
-            }
-
-            Debug.Log($"Relay server IP: {allocation.RelayServer.IpV4}, Port: {allocation.RelayServer.Port}");
-
-            // Get the join code
-            string joinCode = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
-            if (string.IsNullOrEmpty(joinCode))
-            {
-                Debug.LogError("Failed to retrieve the join code.");
-                return;
-            }
-
-            Debug.Log("JoinCode: " + joinCode);
-
-            // Configure UnityTransport with SetHostRelayData
-            UnityTransport transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-            if (transport == null)
-            {
-                Debug.LogError("UnityTransport component is missing.");
-                return;
-            }
-
-            transport.SetHostRelayData(
-                allocation.RelayServer.IpV4,
-                (ushort)allocation.RelayServer.Port,
-                allocation.AllocationIdBytes,
-                allocation.ConnectionData,
-                allocation.Key,
-                true // Secure connection
-            );
-
-            Debug.Log("Host is about to start. Verifying Relay connection...");
-
-            // Start the host
-            if (NetworkManager.Singleton.StartHost())
-            {
-                Debug.Log("Host started successfully. Waiting for clients to connect...");
-            }
-            else
-            {
-                Debug.LogError("Failed to start host.");
-                return;
-            }
-
-            // Optional delay to ensure initialization
-            await Task.Delay(2000);
-
-            // Verify NetworkManager state
-            if (NetworkManager.Singleton.IsListening)
-            {
-                Debug.Log("NetworkManager is listening. Host successfully connected to the Relay server.");
-            }
-            else
-            {
-                Debug.LogError("NetworkManager is not listening. Host connection failed.");
-            }
-
-            Debug.LogWarning("Ending CreateRelay");
-        }
-        catch (RelayServiceException e)
-        {
-            Debug.LogError("RelayServiceException: " + e.Message);
-        }
-    }
-
-    private async void JoinRelay()
-    {   
-        string JoinCodeString = "";
-        if(inputField!=null)
-        {   
-            JoinCodeString = inputField.text;
-            Debug.Log("JoinRelay joinCode: " + JoinCodeString);
-        }
-        else Debug.Log("inputField problem");
-        try
-        {
-            Debug.Log($"Attempting to join relay with join code: {JoinCodeString}");
-
-            // Join the allocation on the relay server using the join code
-            JoinAllocation joinAllocation = await RelayService.Instance.JoinAllocationAsync(JoinCodeString);
-
-            // Set the client's relay data in UnityTransport
-            UnityTransport transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-            if (transport == null)
-            {
-                Debug.LogError("UnityTransport component is missing.");
-                return;
-            }
-
-            transport.SetClientRelayData(
-                joinAllocation.RelayServer.IpV4,
-                (ushort)joinAllocation.RelayServer.Port,
-                joinAllocation.AllocationIdBytes,
-                joinAllocation.Key,
-                joinAllocation.ConnectionData,
-                joinAllocation.HostConnectionData
-            );
-
-            // Start the client and connect to the host via the relay
-            NetworkManager.Singleton.StartClient();
-
-            Debug.Log("Successfully connected to the relay server as a client.");
-        }
-        catch (RelayServiceException e)
-        {
-            Debug.LogError($"RelayServiceException: {e.Message}");
-        }
-    }*/
-
-}
+}*/

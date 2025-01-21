@@ -29,7 +29,7 @@ public class Server : NetworkBehaviour
     private float turnTime = 15f; // 30 seconds per turn
     private float currentTurnTime = 0f;
     private bool timerRunning = false;
-    private int connectedPlayerCount=1;
+    private int connectedPlayerCount=0;
 
     private void OnEnable()
     {
@@ -752,19 +752,30 @@ public class Server : NetworkBehaviour
     private void OnClientConnected(ulong clientId)
     {
         Debug.Log($"Client connected with ID: {clientId}");
-        AnotherPlayerConnected();
+        //AnotherPlayerConnected();
     }
 
-    public void AnotherPlayerConnected()
+    public void AnotherPlayerConnected(ulong clientId)
     {
         Debug.Log("Inside AnotherPlayerConnected");
+        networkRelay.GetPlayerNumberClientRPC(clientId, connectedPlayerCount);
         connectedPlayerCount++;
         Debug.Log("connectedPlayerCount: " + connectedPlayerCount);
         Debug.Log("playerCount: " + playerCount);
         if(playerCount == connectedPlayerCount)
         {
             Debug.Log("Inside If");
-            StartGame(playerCount);
+            Invoke("StartGameDelayed",5);
         }
+    }
+
+    private void StartGameDelayed()
+    {
+        StartGame(playerCount);
+    }
+
+    public void SetPlayerCount(int playerCountVar)
+    {
+        playerCount = playerCountVar;
     }
 }   

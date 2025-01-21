@@ -114,6 +114,14 @@ public class NetworkRelay : NetworkBehaviour
     {
         DeckController.LocalInstance.GetPlayerCount(playerCount);
     }
+    [ClientRpc(RequireOwnership = false)]
+    public void GetPlayerNumberClientRPC(ulong clientID, int playerNumber)
+    {
+        if(NetworkManager.Singleton.LocalClientId == clientID && !IsHost)
+        {
+            GameManager.LocalInstance.GetPlayerNumber(playerNumber);
+        }
+    }
 
     //ServerRPC
     [ServerRpc(RequireOwnership = false)]
@@ -160,6 +168,12 @@ public class NetworkRelay : NetworkBehaviour
     public void AskPlayerNumberServerRPC()
     {
         GetPlayerNumberClientRPC(server.SendPlayerNumber());
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void NotifyCientConnectedServerRPC(ulong clientId)
+    {
+        server.AnotherPlayerConnected(clientId);
     }
 
 }

@@ -72,6 +72,8 @@ public class GameManager : NetworkBehaviour
         GetTurnTimeLocation();
         
         GetPoolTexts();
+
+        networkRelay.NotifyCientConnectedServerRPC(NetworkManager.Singleton.LocalClientId);
     }
 
     public bool printFlag=false;

@@ -32,7 +32,7 @@ public class WebGLCommunication : MonoBehaviour
         if (scene.isLoaded)
         {
             Debug.Log("Game fully loaded!");
-            Invoke("SceneLoaded",3);
+            //Invoke("SceneLoaded",3);
             //SendJoinCodeToHTML(joinCode);
         }
     }

@@ -597,6 +597,7 @@ public class DeckController : MonoBehaviour
     public void SetPlayerNumber(int playerNumber)
     {
         thisPlayerNumber = playerNumber;
+        Debug.LogWarning("thisPlayerNumber: " + thisPlayerNumber);
     }
 
     public int SendPlayerNumber()
