@@ -74,6 +74,8 @@ public class GameManager : NetworkBehaviour
         GetPoolTexts();
 
         networkRelay.NotifyCientConnectedServerRPC(NetworkManager.Singleton.LocalClientId);
+
+        GameObject.Find("Holder").SetActive(false);
     }
 
     public bool printFlag=false;

@@ -109,7 +109,6 @@ public class NetworkManagerUI : MonoBehaviour
     public async Task FindLobbiesAndStartHostIfNoneExist(int playerCount)
     {
         await UnityServices.InitializeAsync();
-
         if (!AuthenticationService.Instance.IsSignedIn)
         {
             await AuthenticationService.Instance.SignInAnonymouslyAsync();
@@ -119,7 +118,8 @@ public class NetworkManagerUI : MonoBehaviour
         {
             Filters = new List<QueryFilter>
             {
-                new QueryFilter(QueryFilter.FieldOptions.AvailableSlots, "0", QueryFilter.OpOptions.GT)
+                new QueryFilter(QueryFilter.FieldOptions.AvailableSlots, "0", QueryFilter.OpOptions.GT), // Lobbies with available slots
+                new QueryFilter(QueryFilter.FieldOptions.MaxPlayers, playerCount.ToString(), QueryFilter.OpOptions.EQ)
             }
         };
 
@@ -127,12 +127,13 @@ public class NetworkManagerUI : MonoBehaviour
 
         if (lobbies.Results.Count > 0)
         {
-            Debug.Log($"Found {lobbies.Results.Count} open lobbies.");
+            Debug.Log($"Found {lobbies.Results.Count} open lobbies for {playerCount} players.");
             foreach (var lobby in lobbies.Results)
             {
-                Debug.Log($"Lobby Name: {lobby.Name}, Available Slots: {lobby.AvailableSlots}");
+                Debug.Log($"Lobby Name: {lobby.Name}, Player Count: {playerCount}, Available Slots: {lobby.AvailableSlots}");
             }
 
+            // Join the first lobby found
             if (lobbies.Results.Count > 0)
             {
                 JoinLobby(lobbies.Results[0].Id);
@@ -140,10 +141,11 @@ public class NetworkManagerUI : MonoBehaviour
         }
         else
         {
-            Debug.Log("No open lobbies found. Creating a new one...");
+            Debug.Log($"No open lobbies for {playerCount} players found. Creating a new one...");
             await StartHostWithRelay(playerCount);
         }
     }
+
 
     public async void JoinLobby(string lobbyId)
     {
