@@ -32,7 +32,7 @@ public class WebGLCommunication : MonoBehaviour
         if (scene.isLoaded)
         {
             Debug.Log("Game fully loaded!");
-            //Invoke("SceneLoaded",3);
+            Invoke("SceneLoaded",3);
             //SendJoinCodeToHTML(joinCode);
         }
     }
@@ -68,7 +68,7 @@ public class WebGLCommunication : MonoBehaviour
                 if (playerNumber == 0)
                 {
                     Debug.Log($"Key: {key}, PlayerNumber: {playerNumber}, PlayerName: {playerName}");
-                    StartHost();
+                    //StartHost();
                     Debug.Log($"Key: {key}, PlayerNumber: {playerNumber}, PlayerName: {playerName}");
                     //SendJoinCodeToHTML(joinCode);
                 }
@@ -76,7 +76,7 @@ public class WebGLCommunication : MonoBehaviour
                 else
                 {
                     Debug.Log($"Key: {key}, PlayerNumber: {playerNumber}, PlayerName: {playerName}");
-                    StartClient();
+                    //StartClient();
                     Debug.Log($"Key: {key}, PlayerNumber: {playerNumber}, PlayerName: {playerName}");
                 }
             }
