@@ -57,6 +57,18 @@ TagManager:
   - RoundOverText
   - WinScreen
   - PlayerPool1
+  - 1_11
+  - 1_12
+  - 1_13
+  - 2_11
+  - 2_12
+  - 2_13
+  - 3_11
+  - 3_12
+  - 3_13
+  - 4_11
+  - 4_12
+  - 4_13
   layers:
   - Default
   - TransparentFX

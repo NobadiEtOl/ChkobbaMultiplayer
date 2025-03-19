@@ -31,43 +31,14 @@ public class GameManager : NetworkBehaviour
     public List<GameObject> activeCardIndicatorList=new List<GameObject>();
     private List<Text> pointTexts=new List<Text>();
     private List<Transform> timerTransforms = new List<Transform>();
+    [SerializeField] public GameObject cardBack;
+    [SerializeField] public GameObject cardIndicator;
 
     void Start()
     {
         print("GameManger Started");
 
-        AudioManager.Instance.PlayAudio(4,0.04f,true);
-
-        //Setting the networkRealy script to sen ServerRPCs
-        networkRelay = FindObjectOfType<NetworkRelay>();
-
-        pointTexts.Add(GameObject.Find("Point0").GetComponent<Text>());
-        pointTexts.Add(GameObject.Find("Point1").GetComponent<Text>());
-
-        if(pointTexts == null || pointTexts.Count == 0)Debug.LogError("point text empty");
-
-        //Setting the localInstances for ClientRPC messages
-        if(LocalInstance == null)
-        {
-            LocalInstance = this;
-        }
-        else 
-        {
-            Debug.LogWarning("Duplicate GameManager detected. Destroying extra instance.");
-            //Destroy(gameObject);
-        }
-
-        winScreen = GameObject.FindGameObjectWithTag("WinScreen");
-        roundOverText = GameObject.FindGameObjectWithTag("RoundOverText").GetComponent<Text>();
-        roundOverText.text = "Connected \n\n\n Waiting For Game To Start";
-        currentPlayerText = GameObject.Find("CurrentPlayerText").GetComponent<Text>();
-
-        turnTimerText = GameObject.Find("TurnTimer").GetComponent<Text>();
-
-        timerTransforms.Add(GameObject.Find("Timer0").GetComponent<Transform>());
-        timerTransforms.Add(GameObject.Find("Timer1").GetComponent<Transform>());
-        timerTransforms.Add(GameObject.Find("Timer2").GetComponent<Transform>());
-        timerTransforms.Add(GameObject.Find("Timer3").GetComponent<Transform>());
+        InitialSetUp();
 
         GetTurnTimeLocation();
         
@@ -96,32 +67,18 @@ public class GameManager : NetworkBehaviour
         if(turnTimer>15)
         {
             turnTimer-=Time.deltaTime;
-            //turnTimerText.text = Mathf.RoundToInt(turnTimer).ToString();
         }
         else if(turnTimer>0)
         {
             turnTimer-=Time.deltaTime;
             turnTimerText.text = Mathf.RoundToInt(turnTimer).ToString();
         }
-        else Debug.Log("turnTimer: " + turnTimer);
-
 
     }
 
     public void PrintFlagMakeTrue()
     {
         printFlag=true;
-    }
-
-    private void GetPoolTexts()
-    {
-        for(int i = 0; i<4; i++)
-        {
-            string tempTag = "PoolText" + (i+1);
-            poolTexts.Add(GameObject.FindGameObjectWithTag(tempTag).GetComponent<Text>());
-            //Debug.Log(tempTag);
-            poolTexts[i].gameObject.SetActive(false);
-        }
     }
 
     public void InitializeCardPrefabs()
@@ -207,7 +164,7 @@ public class GameManager : NetworkBehaviour
     public void UpdateCenterCardsLayout()
     {
         //UI
-        deckController.UpdateCenterCardsLayout();
+        //deckController.UpdateCenterCardsLayout();
     }
 
     //Called when the player tries to play the selected card with one or two center cards
@@ -618,6 +575,7 @@ public class GameManager : NetworkBehaviour
 
     private void GetTurnTimeLocation()
     {
+        //Decide placerment according to the number of players
         if(deckController.playerCount == 2)
         {
             int relativeIndex = (currentPlayerNo - deckController.thisPlayerNumber + 2) % 2;
@@ -636,6 +594,53 @@ public class GameManager : NetworkBehaviour
             int relativeIndex = (currentPlayerNo - deckController.thisPlayerNumber + 4) % 4;
             turnTimerText.transform.position = timerTransforms[relativeIndex].position;
         }
+    }
+
+    private void GetPoolTexts()
+    {
+        for(int i = 0; i<4; i++)
+        {
+            string tempTag = "PoolText" + (i+1);
+            poolTexts.Add(GameObject.FindGameObjectWithTag(tempTag).GetComponent<Text>());
+            //Debug.Log(tempTag);
+            poolTexts[i].gameObject.SetActive(false);
+        }
+    }
+
+    private void InitialSetUp()
+    {
+        AudioManager.Instance.PlayAudio(4,0.04f,true);
+
+        //Setting the networkRealy script to sen ServerRPCs
+        networkRelay = FindObjectOfType<NetworkRelay>();
+
+        pointTexts.Add(GameObject.Find("Point0").GetComponent<Text>());
+        pointTexts.Add(GameObject.Find("Point1").GetComponent<Text>());
+
+        if(pointTexts == null || pointTexts.Count == 0)Debug.LogError("point text empty");
+
+        //Setting the localInstances for ClientRPC messages
+        if(LocalInstance == null)
+        {
+            LocalInstance = this;
+        }
+        else 
+        {
+            Debug.LogWarning("Duplicate GameManager detected. Destroying extra instance.");
+            //Destroy(gameObject);
+        }
+
+        winScreen = GameObject.FindGameObjectWithTag("WinScreen");
+        roundOverText = GameObject.FindGameObjectWithTag("RoundOverText").GetComponent<Text>();
+        roundOverText.text = "Connected \n\n\n Waiting For Game To Start";
+        currentPlayerText = GameObject.Find("CurrentPlayerText").GetComponent<Text>();
+
+        turnTimerText = GameObject.Find("TurnTimer").GetComponent<Text>();
+
+        timerTransforms.Add(GameObject.Find("Timer0").GetComponent<Transform>());
+        timerTransforms.Add(GameObject.Find("Timer1").GetComponent<Transform>());
+        timerTransforms.Add(GameObject.Find("Timer2").GetComponent<Transform>());
+        timerTransforms.Add(GameObject.Find("Timer3").GetComponent<Transform>());
     }
 
 }

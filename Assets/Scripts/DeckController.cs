@@ -101,7 +101,7 @@ public class DeckController : MonoBehaviour
     {
         for (int i = 0; i < cardPrefabsList.Count; i++)
         {
-            int[] cardID = new int[] { (i / 10) + 1, (i % 10) + 1 };
+            int[] cardID = new int[] { (i / 13) + 1, (i % 13) + 1 };
             string cardIDString = GameManager.TurnCardIdToString(cardID); // Convert cardID to string
 
             // Check if the card ID already exists in the dictionary
@@ -306,15 +306,16 @@ public class DeckController : MonoBehaviour
             cardObjects.Add(tempCenterCard);
             if (tempCenterCard != null)
             {
-                positions.Add(new Vector3((i * 100) + 75, 0, i*-10));
+                positions.Add(new Vector3(980, 0, i*-10));
                 tempCenterCard.transform.parent = centerParent.transform;
                 gameManager.centerCardsObjects.Add(tempCenterCard);
                 gameManager.centerCards.Add(cardID);
-                rotations.Add(Quaternion.identity);
+                if(i==3)rotations.Add(Quaternion.Euler(0, 0, UnityEngine.Random.Range(-12,12)));
+                else rotations.Add(Quaternion.Euler(0, 180, UnityEngine.Random.Range(-12,12)));
             }
         }
         ChainMoveCards(positions, cardObjects, 10, rotations);
-        Invoke("UpdateCenterCardsLayout", 0.8f);
+        //Invoke("UpdateCenterCardsLayout", 0.8f);
     }
 
     private IEnumerator ChainMoveCardsPlayersCoroutine(List<Vector3 >positions, List<GameObject> cardObjects, int speead,List<Quaternion> rotations)
@@ -393,15 +394,16 @@ public class DeckController : MonoBehaviour
         GameObject placedCard = GameObject.FindGameObjectWithTag(GameManager.TurnCardIdToString(placedCardID) );
         if (placedCard != null)
         {
-            placedCard.transform.rotation = Quaternion.identity;
+            placedCard.transform.rotation = Quaternion.Euler(0,0,UnityEngine.Random.Range(-12,12));
             placedCard.transform.parent = centerParent.transform;
+            placedCard.transform.position = new Vector3(980,0,-10*GameManager.LocalInstance.centerCardsObjects.Count);
 
             gameManager.centerCards.Add(placedCardID);
             gameManager.centerCardsObjects.Add(placedCard);
         }
 
         AudioManager.Instance.PlayAudio(3,1,false);
-        UpdateCenterCardsLayout();
+        //UpdateCenterCardsLayout();
     }
 
     public void UpdateCenterCardsLayout()

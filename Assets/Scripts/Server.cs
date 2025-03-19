@@ -41,6 +41,8 @@ public class Server : NetworkBehaviour
     {
         print("server.cs start");
         StartCoroutine(ServerSubsciribe());
+        Invoke("StartGameDelayed",5);
+
     }
     private IEnumerator ServerSubsciribe()
     {
@@ -188,26 +190,26 @@ public class Server : NetworkBehaviour
     private void SaveAllCards()
     {
         deckCardsIDs = new List<int[]>();
-         // Carreau cards (kind=1, value=1 to 10)
-        for (int value = 1; value <= 10; value++)
+        //Club cards (kind=1, value=1 to 13)
+        for (int value = 1; value <= 13; value++)
         {
             deckCardsIDs.Add(new int[] { 1, value });
         }
 
-        // Coeur cards (kind=2, value=1 to 10)
-        for (int value = 1; value <= 10; value++)
+        //Diamond cards (kind=2, value=1 to 13)
+        for (int value = 1; value <= 13; value++)
         {
             deckCardsIDs.Add(new int[] { 2, value });
         }
 
-        // Pique cards (kind=3, value=1 to 10)
-        for (int value = 1; value <= 10; value++)
+        //Heart cards (kind=3, value=1 to 13)
+        for (int value = 1; value <= 13; value++)
         {
             deckCardsIDs.Add(new int[] { 3, value });
         }
 
-        // Trefle cards (kind=4, value=1 to 10)
-        for (int value = 1; value <= 10; value++)
+        //Spade cards (kind=4, value=1 to 13)
+        for (int value = 1; value <= 13; value++)
         {
             deckCardsIDs.Add(new int[] { 4, value });
         }
