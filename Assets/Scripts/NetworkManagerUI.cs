@@ -16,7 +16,7 @@ using System.Threading.Tasks;
 
 public class NetworkManagerUI : MonoBehaviour
 {
-    [SerializeField] private Button serverButton;
+    [SerializeField] private Button startButton;
     [SerializeField] private Button clientButton;
     [SerializeField] private Button hostButton;
     [SerializeField] private Button startGameTwoPlayerButton;
@@ -27,7 +27,7 @@ public class NetworkManagerUI : MonoBehaviour
 
     void Awake()
     {
-        serverButton.onClick.AddListener(() => { Server.Singleton.SkipTurn(); });
+        startButton.onClick.AddListener(() => { Server.Singleton.StartGameAfterDelay(); });
         clientButton.onClick.AddListener(async () => { await StartClientWithRelay(); });
         hostButton.onClick.AddListener(async () => { await StartHostWithRelay(2); });
         startGameTwoPlayerButton.onClick.AddListener(async () => { await FindLobbiesAndStartHostIfNoneExist(2); });

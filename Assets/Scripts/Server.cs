@@ -6,6 +6,7 @@ using UnityEngine;
 using System.Linq;
 using Unity.Netcode;
 using UnityEngine.Pool;
+using UnityEngine.Tilemaps;
 
 public class Server : NetworkBehaviour
 {
@@ -16,6 +17,7 @@ public class Server : NetworkBehaviour
     private Dictionary<int, List<int[]>> playersPooledCardsIDs;//Dictionary containing all the players' pools
     private int playerCount=2;
     public List<int[]> centerCardsIDs;//List of all the cards in the center
+    public int[] topCardIDs = new int[2];
     [SerializeField]private int seed = 124;//Seed for the deck suffle
     private int turnCounter=0;
     public int currentPlayer;//The player that is currently playing
@@ -41,7 +43,7 @@ public class Server : NetworkBehaviour
     {
         print("server.cs start");
         StartCoroutine(ServerSubsciribe());
-        Invoke("StartGameDelayed",5);
+        //Invoke("StartGameDelayed",5);
 
     }
     private IEnumerator ServerSubsciribe()
@@ -257,7 +259,7 @@ public class Server : NetworkBehaviour
     private void DealCardsToPlayerHands()
     {
         InitializePlayersHands();//With each new deal players has to start with a fresh hand
-        for(int i=0; i<3; i++)
+        for(int i=0; i<4; i++)
         {
             for(int j=0; j<playerCount; j++)
             {
@@ -290,6 +292,7 @@ public class Server : NetworkBehaviour
             int[] tempCardID = deckCardsIDs[deckCardsIDs.Count-1];
             centerCardsIDs.Add(tempCardID);
             deckCardsIDs.RemoveAt(deckCardsIDs.Count-1);
+            //if(i==3)topCardIDs=tempCardID;
         }
         //Sends center cards to the gameManger so that card objects be put to the center
         tempSerializableList = new SerializableList(centerCardsIDs);
@@ -318,7 +321,8 @@ public class Server : NetworkBehaviour
         }
 
         int chkobbaPlayer=5;
-        if(centerCardsIDs.Count==0)
+        Debug.LogWarning(discardedCardIDs.Count+"111");
+        if(discardedCardIDs.Count==2)
         {
             Debug.Log("Chkobba Player " + currentPlayer);
             PlayerChkobba(currentPlayer);
@@ -336,9 +340,9 @@ public class Server : NetworkBehaviour
             //Round ends and a winner is decided after each card is played
             DecideWinner();
         }
-        else if(turnCounter%(playerCount*3)==(playerCount*3)-1)
+        else if(turnCounter%(playerCount*4)==(playerCount*4)-1)
         {
-            //If each player played their 3 cards new cards are dealt
+            //If each player played their 4 cards new cards are dealt
             DealCardsToPlayerHands();
         }
         NextTurn();
@@ -770,7 +774,10 @@ public class Server : NetworkBehaviour
             Invoke("StartGameDelayed",5);
         }
     }
-
+    public void StartGameAfterDelay()
+    {
+        Invoke("StartGameDelayed",3f);
+    }
     private void StartGameDelayed()
     {
         StartGame(playerCount);

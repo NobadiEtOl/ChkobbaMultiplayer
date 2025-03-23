@@ -206,7 +206,7 @@ public class DeckController : MonoBehaviour
         List<GameObject> cardObjects = new List<GameObject>();
         List<Vector3> positions = new List<Vector3>();
         List<Quaternion> rotations = new List<Quaternion>();
-        int turnAround = 180;
+        int turnAround = 0;
 
         if (playerCount == 2 || playerCount == 4)
         {
@@ -219,7 +219,7 @@ public class DeckController : MonoBehaviour
                     gameManager.myCards = new List<int[]>();
                 }
 
-                for (int j = 0; j < 3; j++)
+                for (int j = 0; j < 4; j++)
                 {
                     // Get the card ID for the relative player
                     var cardID = playerHands[i][j];
@@ -531,7 +531,7 @@ public class DeckController : MonoBehaviour
             Quaternion rotation = Quaternion.Euler(0, 180, UnityEngine.Random.Range(170f, 190f));
             rotations.Add(rotation);
 
-            if(gameManager.centerCardsObjects.Count == 0)
+            if(cardObjects.Count == 2)
             {
                 if(i==cardObjects.Count-1)
                 {

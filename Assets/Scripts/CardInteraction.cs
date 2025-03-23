@@ -49,23 +49,10 @@ public class CardInteraction : MonoBehaviour
         originalPosition = transform.position;
         int thisPlayerNumber = DeckController.LocalInstance.thisPlayerNumber;
 
-        //Select a card to be played if its that players turn and they are trying to select a card from their own hand
         if (transform.parent.name == "PlayerHand"+(thisPlayerNumber+1) /*&& GameManager.currentPlayerNo == thisPlayerNumber*/ || transform.parent.name.Contains("PlayerHand"))
         {
             SelectCard();
         }
-        //Try to play a move if a card is already selected and a ceter card is pressed 
-        else if(transform.parent.name == "Center" && isOneCardSelected)
-        {   
-            TryToPlayMove();
-        }
-        else
-        {
-            Debug.Log("else");
-            isOneCardSelected=false;        
-        }
-
-        
     }
 
     void OnMouseDrag()
@@ -91,13 +78,23 @@ public class CardInteraction : MonoBehaviour
         //Try to add the card to the center if moved enough distance
         if (distanceMoved > snapBackThreshold)
         {
-            if(transform.parent.name != "Center" )
+            /*if(transform.parent.name != "Center" )
             {
                 //Snap the card back to the original position if the card cannot be added to center
                 if(!OnCardMoved())//Checks if can be added to center
                 {
                     transform.position = originalPosition;
                 }
+            }*/
+                    //Try to play a move if a card is already selected and a ceter card is pressed 
+            if(transform.parent.name.Contains("PlayerHand") && isOneCardSelected)
+            {   
+                TryToPlayMove();
+            }
+            else
+            {
+                Debug.Log("else");
+                isOneCardSelected=false;        
             }
             
         }

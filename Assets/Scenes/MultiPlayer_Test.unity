@@ -571,7 +571,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f50e4ba39afe8af4ba7cae04aafe4064, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  serverButton: {fileID: 1075128832}
+  startButton: {fileID: 1075128832}
   clientButton: {fileID: 405408014}
   hostButton: {fileID: 211100040}
   startGameTwoPlayerButton: {fileID: 330901397}
@@ -2039,12 +2039,12 @@ GameObject:
   - component: {fileID: 1075128833}
   - component: {fileID: 1075128832}
   m_Layer: 5
-  m_Name: SkipButton
+  m_Name: StartButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1075128831
 RectTransform:
   m_ObjectHideFlags: 0
@@ -2058,11 +2058,11 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1705623005}
-  m_Father: {fileID: 1565506108}
+  m_Father: {fileID: 1386298423}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 795, y: 412}
+  m_AnchoredPosition: {x: -115, y: -78}
   m_SizeDelta: {x: 100, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1075128832
@@ -3166,6 +3166,7 @@ RectTransform:
   m_LocalScale: {x: 0, y: 0, z: 0}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 1075128831}
   - {fileID: 214413853}
   - {fileID: 522176566}
   - {fileID: 520410780}
@@ -3612,7 +3613,6 @@ RectTransform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 1075128831}
   - {fileID: 405408013}
   - {fileID: 211100039}
   - {fileID: 330901396}
@@ -3986,7 +3986,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: Skip
+  m_Text: Start
 --- !u!222 &1705623007
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -4665,6 +4665,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: eb9d0cf20cb7dc147a4b8ed8b0672a5b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  topCardIDs: 0000000000000000
   seed: 124
   currentPlayer: 0
   lastPlayerToCapture: 1

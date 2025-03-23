@@ -176,7 +176,14 @@ public class GameManager : NetworkBehaviour
         {
             currentSelectedCenterCards.Add(cardID);
         }
-        CheckIfLegal(playerNumber);
+        if(centerCards.Count!=0 && centerCards[centerCards.Count-1][1] == cardID[1])
+        {
+            CheckIfLegal(playerNumber);
+        }
+        else
+        {
+            CardAddedToCenter();
+        }
     }
 
     //Checks if played move is legal before sending it to the server
@@ -187,13 +194,15 @@ public class GameManager : NetworkBehaviour
         int selectedCenterCardsSum=0;
 
         //Calculates the sum and compares it with the played card to check if the move is legal
-        foreach(int[] cCard in currentSelectedCenterCards)
+        /*foreach(int[] cCard in currentSelectedCenterCards)
         {
             selectedCenterCardsSum+=cCard[1];
-        }
+        }*/
+
+        selectedCenterCardsSum += centerCards[centerCards.Count-1][1];
 
         
-        bool CheckPriority()
+        /*bool CheckPriority()
         {
             foreach (int[] array in centerCardIDList)
             {
@@ -203,15 +212,15 @@ public class GameManager : NetworkBehaviour
                 }
             }
             return false;
-        }
+        }*/
 
         if(selectedCenterCardsSum == currentSelectedHandCard[1]) sumFlag=true;
         if(selectedCenterCardsSum > currentSelectedHandCard[1]) DeactivateCardIndicators();
-        if(currentSelectedCenterCards.Count>1 && CheckPriority())
+        /*if(currentSelectedCenterCards.Count>1 && CheckPriority())
         {
             sumFlag=false;
             DeactivateCardIndicators();
-        } 
+        }*/
 
         //Final control to decide if cards can be played
         if(sumFlag)
@@ -219,7 +228,7 @@ public class GameManager : NetworkBehaviour
             List<int[]> cardsToRemove = new List<int[]>();
 
             // Iterate over the selected center cards and add them to the removal list
-            foreach (int[] cardToBeRemoved in currentSelectedCenterCards)
+            foreach (int[] cardToBeRemoved in centerCards)
             {
                 cardsToRemove.Add(cardToBeRemoved);
             }
@@ -229,13 +238,13 @@ public class GameManager : NetworkBehaviour
             networkRelay.RemoveCenterCardsServerRPC(serializableList);
 
             //Update the game UI after the move is played
-            serializableList = new SerializableList(currentSelectedCenterCards);
+            serializableList = new SerializableList(centerCards);
             networkRelay.SendMoveToServerRPC(currentSelectedHandCard,serializableList,playerNumber,selectedCenterCardsSum);
             myCards.Remove(currentSelectedHandCard);
 
             //Clear the list even if its a correct move
             currentSelectedHandCard = new int[]{0,0};
-            currentSelectedCenterCards.Clear();
+            centerCards.Clear();
 
             DeactivateCardIndicators();
         }
@@ -245,7 +254,7 @@ public class GameManager : NetworkBehaviour
 
     public bool CheckIfCanBeAddedToCenter()
     {
-        if(currentSelectedHandCard[0] == 0 || currentSelectedHandCard[1]==0)
+        /*if(currentSelectedHandCard[0] == 0 || currentSelectedHandCard[1]==0)
         {
             return false;
         }
@@ -269,12 +278,23 @@ public class GameManager : NetworkBehaviour
         }
 
         // Use a recursive method to check all combinations
-        return !CheckCombinations(centerValues, cardValue);
+        return !CheckCombinations(centerValues, cardValue);*/
+
+        if(centerCards.Count==0)return true;
+        //Plays the card if it can be played
+        Debug.LogWarning(currentSelectedHandCard[1]);
+        Debug.LogWarning(centerCards[centerCards.Count-1][1]);
+        if(currentSelectedHandCard[1] == centerCards[centerCards.Count-1][1])
+        {
+            CardsPlayed(currentSelectedHandCard, GameObject.FindWithTag(currentSelectedHandCard[0] + "_" + currentSelectedHandCard[1]),currentPlayerNo);
+            return false;
+        }
+        return true;
     }
 
     public bool CheckIfCanBeAddedToCenter(int[] cardID)
     {
-        if(cardID[0] == 0 || cardID[1]==0)
+        /*if(cardID[0] == 0 || cardID[1]==0)
         {
             return false;
         }
@@ -298,7 +318,10 @@ public class GameManager : NetworkBehaviour
         }
 
         // Use a recursive method to check all combinations
-        return !CheckCombinations(centerValues, cardValue);
+        return !CheckCombinations(centerValues, cardValue);*/
+        if(centerCards.Count==0)return true;
+        if(cardID[1] == centerCards[centerCards.Count-1][1])return false;
+        return true;
     }
 
     
