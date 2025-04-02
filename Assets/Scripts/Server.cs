@@ -734,6 +734,7 @@ public class Server : NetworkBehaviour
     {
         if(selectedHandCard[1] == sumValue)
         {
+            RemoveCardsFromCenter(serializableList);
             networkRelay.SendMoveToClientRPC(selectedHandCard, serializableList, playerNumber);
             lastPlayerToCapture = playerNumber;
             serializableList.Add(selectedHandCard);

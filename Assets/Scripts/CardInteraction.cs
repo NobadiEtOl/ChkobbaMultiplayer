@@ -19,27 +19,20 @@ public class CardInteraction : MonoBehaviour
     {
         isOneCardSelected=false;
 
+        InitializeCard();
+    }
+
+    private void InitializeCard()
+    {
         //Create IDs for every card except for the add button
         cardID = GetCardID();
-
-        //Identifing the card indicator element
-        GameObject cardInd = Instantiate(GameManager.LocalInstance.cardIndicator, transform.position, Quaternion.identity);
-        cardInd.transform.parent = transform;
-        Transform cardIndTransform = cardInd.transform;
-        cardIndTransform.localPosition = new Vector3(0,0,0.04f);
-        cardInd.SetActive(false);
-        selectedCardIndicator = cardInd;
-
-        //Identifing and placing the back of the cards
-        GameObject cardBack = Instantiate(GameManager.LocalInstance.cardBack, transform.position, Quaternion.identity);
-        cardBack.transform.parent = transform;
-        Transform cardBackTransform = cardBack.transform;
-        cardBackTransform.localPosition = new Vector3(0,0,0.02f);
-
         gameObject.tag = cardID[0] + "_" + cardID[1];
 
+        InitializeCardInd();
+
+        InitializeCardBack();
+
         transform.localScale = new Vector3(380,400, 2);
-        
     }
 
     //Check clicks done to the cards
@@ -78,15 +71,7 @@ public class CardInteraction : MonoBehaviour
         //Try to add the card to the center if moved enough distance
         if (distanceMoved > snapBackThreshold)
         {
-            /*if(transform.parent.name != "Center" )
-            {
-                //Snap the card back to the original position if the card cannot be added to center
-                if(!OnCardMoved())//Checks if can be added to center
-                {
-                    transform.position = originalPosition;
-                }
-            }*/
-                    //Try to play a move if a card is already selected and a ceter card is pressed 
+            //Try to play a move if a card is already selected and a ceter card is pressed 
             if(transform.parent.name.Contains("PlayerHand") && isOneCardSelected)
             {   
                 TryToPlayMove();
@@ -101,32 +86,22 @@ public class CardInteraction : MonoBehaviour
         else transform.position = originalPosition;
     }
 
-    public event Action<int[], GameObject> OnCardSelected;
+    public event Action<int[]> OnCardSelected;
     private void SelectCard()//Event when a card is selected
     {
         isDragging = true;
 
         GameManager.LocalInstance.DeactivateCardIndicators();
 
-        OnCardSelected?.Invoke(this.cardID, this.gameObject);
+        OnCardSelected?.Invoke(this.cardID);
         selectedCardIndicator.SetActive(true);
         GameManager.LocalInstance.activeCardIndicatorList.Add(selectedCardIndicator);
         isOneCardSelected=true;
     }
 
-    public delegate bool BoolDelegate();
-    public event BoolDelegate OnCardAddedToCenter;
-    private bool OnCardMoved()//Event when selected card is to be placed in the center
-    {
-        return OnCardAddedToCenter?.Invoke() ?? false;
-    }
-
     public event Action<int[], GameObject, int> OnCardsPlayed;
     private void TryToPlayMove()//Event when selected cards is to be played
     {
-        selectedCardIndicator.SetActive(true);
-        GameManager.LocalInstance.activeCardIndicatorList.Add(selectedCardIndicator);
-
         OnCardsPlayed?.Invoke(this.cardID, this.gameObject, GameManager.currentPlayerNo);
     }
 
@@ -154,6 +129,26 @@ public class CardInteraction : MonoBehaviour
         }
 
         return cardID;
+    }
+
+    private void InitializeCardInd()
+    {
+        //Identifing the card indicator element
+        GameObject cardInd = Instantiate(GameManager.LocalInstance.cardIndicator, transform.position, Quaternion.identity);
+        cardInd.transform.parent = transform;
+        Transform cardIndTransform = cardInd.transform;
+        cardIndTransform.localPosition = new Vector3(0,0,0.04f);
+        cardInd.SetActive(false);
+        selectedCardIndicator = cardInd;
+    }
+
+    private void InitializeCardBack()
+    {
+        //Identifing and placing the back of the cards
+        GameObject cardBack = Instantiate(GameManager.LocalInstance.cardBack, transform.position, Quaternion.identity);
+        cardBack.transform.parent = transform;
+        Transform cardBackTransform = cardBack.transform;
+        cardBackTransform.localPosition = new Vector3(0,0,0.02f);
     }
 
 }

@@ -100,7 +100,7 @@ public class NetworkRelay : NetworkBehaviour
     [ClientRpc(RequireOwnership = false)]
     public void SkipTurnClientRPC()
     {
-        GameManager.LocalInstance.PrintFlagMakeTrue();
+        GameManager.LocalInstance.SkipTurn();
     }
 
     [ClientRpc(RequireOwnership = false)]

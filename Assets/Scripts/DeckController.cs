@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using Unity.Mathematics;
 using Unity.Netcode;
 using UnityEngine;
@@ -14,7 +15,7 @@ public class DeckController : MonoBehaviour
     [SerializeField] private GameObject addCardPrefab;//Prefab of the add button
     [SerializeField] private List<GameObject> cardPrefabsList;//Prefabs of all the cards.
     [SerializeField] private Dictionary<string, GameObject> cardPrefabs;//A dictionary to keep track of each card prefabs with its ID
-    private Dictionary<string, List<GameObject>> cardPools;//A dictionary of card ID and a list of all the instantiated cards
+    private Dictionary<string, GameObject> cardPools;//A dictionary of card ID and a list of all the instantiated cards
     private List<GameObject> activeCards = new List<GameObject>();
     private List<CardInteraction> cardInteractionList; // List to store CardInteraction references
     private GameObject[] playerParentHands = new GameObject[4];//Array of player hand objects to keep track of where the card objects will be placed
@@ -22,7 +23,7 @@ public class DeckController : MonoBehaviour
     private List<Vector3> playerPools = new List<Vector3>();
     private int relativeIndex = 0;
     public int playerCount = 0;
-    private GameObject cardPool;
+    //private GameObject cardPool;
     private GameObject chkobbaText;
 
     void Start()
@@ -37,57 +38,8 @@ public class DeckController : MonoBehaviour
             //Destroy(gameObject);
         }
 
-        chkobbaText = GameObject.Find("ChkobbaText");
-        chkobbaText.SetActive(false);
-
-        cardPrefabs = new Dictionary<string, GameObject>();
-        cardPools = new Dictionary<string, List<GameObject>>();
-
-        if(NetworkManager.Singleton.IsHost)
-        {
-            thisPlayerNumber = WebGLCommunication.LocalInstance.playerNumber;
-        }
-        else if(NetworkManager.Singleton.IsClient)
-        {
-            thisPlayerNumber = WebGLCommunication.LocalInstance.playerNumber;
-            //gameManager.AskPlayerNumber();
-        }
-
-        StartCoroutine(DelayedFlag());
-        GetPools();
-        GetPlayerHandObjects();
-    }
-
-    private void GetPools()
-    {
-        for(int i = 0; i<4; i++)
-        {
-            string tempTag = "PlayerPool" + (i+1);
-            playerPools.Add(GameObject.Find(tempTag).GetComponent<Transform>().position);
-            //Debug.Log(tempTag);
-        }
-    }
-
-    private bool tempFlag=false;
-    void Update()
-    {
-        if(tempFlag)
-        {
-            Debug.Log("ThisPlayerNumber: " + thisPlayerNumber);
-            tempFlag=false;
-        }
-    }
-
-    private void GetPlayerHandObjects()
-    {
-        for(int i = 0; i<4 ; i++)
-        {
-            string tempTag = "PlayerHand" + (i+1);
-            playerParentHands[i] = GameObject.FindGameObjectWithTag(tempTag);
-            Debug.Log(playerParentHands[i].name);
-        }
-        centerParent = GameObject.FindGameObjectWithTag("Center");
-        Debug.Log(centerParent.name);
+        InitialDeckSetUp();
+        
     }
 
     //Called when the deck is ready to start
@@ -118,86 +70,80 @@ public class DeckController : MonoBehaviour
 
 
     //Initialize and instantiate all the card objects that can be used
+    private List<GameObject> cardObjectList = new List<GameObject>();
     private void InitializeCardPool()
     {
-        cardInteractionList = new List<CardInteraction>();
-        if(cardPool!=null)DestroyCards();
-        cardPool = new GameObject("CardPool");
-        foreach (var cardPrefabEntry in cardPrefabs)
+        if(cardPools.Count==0)
         {
-            var cardIDString = cardPrefabEntry.Key;
-            var cardPrefab = cardPrefabEntry.Value;
+            cardInteractionList = new List<CardInteraction>();
+            Transform deckTransform = GameObject.Find("DeckTransform").transform;
 
-            // Create a pool for this card type
-            cardPools[cardIDString] = new List<GameObject>();
-
-            // Instantiate and add a fixed number of cards to the pool
-            for (int i = 0; i < 1; i++)
+            foreach (var cardPrefabEntry in cardPrefabs)
             {
-                GameObject card = Instantiate(cardPrefab);
-                if(i==0)
-                {
-                    card.SetActive(true); // Deactivate the card
-                    card.transform.position = transform.position; // Place off-screen
-                    card.transform.rotation = Quaternion.Euler(0, 180, 0);
-                }
-                else
-                {
-                    card.SetActive(false); // Deactivate the card
-                    card.transform.position = transform.position; // Place off-screen
-                }
+                var cardIDString = cardPrefabEntry.Key;
+                var cardPrefab = cardPrefabEntry.Value;
 
-                // Get the CardInteraction component and add it to the list
-                CardInteraction cardInteraction = card.GetComponent<CardInteraction>();
-                if (cardInteraction != null)
+                // Instantiate and add a fixed number of cards to the pool
+                for (int i = 0; i < 1; i++)
                 {
-                    cardInteractionList.Add(cardInteraction); // Store the reference in the list
+                    GameObject card = Instantiate(cardPrefab);
+                    if(i==0)
+                    {
+                        card.SetActive(true); // Deactivate the card
+                        card.transform.rotation = Quaternion.Euler(0, 180, 0);
+                    }
+                    else
+                    {
+                        card.SetActive(false); // Deactivate the card
+                    }
+
+                    // Get the CardInteraction component and add it to the list
+                    CardInteraction cardInteraction = card.GetComponent<CardInteraction>();
+                    if (cardInteraction != null)
+                    {
+                        cardInteractionList.Add(cardInteraction); // Store the reference in the list
+                    }
+                    
+                    card.transform.position = deckTransform.transform.position;
+                    card.transform.parent = deckTransform.transform;
+                    cardPools[cardIDString] = card;
+                    cardObjectList.Add(card);
                 }
-                
-                card.transform.parent = cardPool.transform;
-                cardPools[cardIDString].Add(card);
             }
         }
 
+        else ResetCards();
         
-
-        cardPool.transform.position = GameObject.Find("CardPoolObject").transform.position;
     }
 
-    private void DestroyCards()
+    [ContextMenu("Reset Cards")]
+    private void ResetCards()
     {
-        // Get the layer index for the "Cards" layer
-        int cardsLayer = LayerMask.NameToLayer("Cards");
+        Transform deckTransform = GameObject.Find("DeckTransform").transform;
 
-        if (cardsLayer == -1)
+        foreach (var card in cardObjectList)
         {
-            Debug.LogError("Layer 'Cards' does not exist.");
-            return;
-        }
-
-        // Find all GameObjects in the scene
-        GameObject[] allGameObjects = FindObjectsOfType<GameObject>();
-
-        // Iterate through all GameObjects and destroy those on the "Cards" layer
-        foreach (GameObject obj in allGameObjects)
-        {
-            if (obj.layer == cardsLayer)
+            if (card != null)
             {
-                Destroy(obj);
+                card.transform.parent = null; // Unparent the card
+                card.transform.parent = deckTransform;
             }
         }
 
+        activeCards.Clear();
         gameManager.centerCards.Clear();
         gameManager.centerCardsObjects.Clear();
         offsetCounter0=0;
         offsetCounter1=0;
         offsetCounter2=0;
 
+        List<Vector3> positions = Enumerable.Repeat(deckTransform.position, 52).ToList();
+        List<Quaternion> rotations = Enumerable.Repeat(Quaternion.Euler(0, 180, 0), 52).ToList();
 
-        Debug.Log("All objects on the 'Cards' layer have been destroyed.");
-        Destroy(cardPool);
+        ChainMoveCards(positions,cardObjectList, 10, rotations);
+
+        Debug.Log("All cards have been reset to the deck position.");
     }
-
 
     //Deals to players according to the playerCount
     public void DealPlayers(int playerCount, Dictionary<int, List<int[]>> playerHands)
@@ -206,90 +152,54 @@ public class DeckController : MonoBehaviour
         List<GameObject> cardObjects = new List<GameObject>();
         List<Vector3> positions = new List<Vector3>();
         List<Quaternion> rotations = new List<Quaternion>();
-        int turnAround = 0;
 
-        if (playerCount == 2 || playerCount == 4)
-        {
-            for (int i = 0; i < playerCount; i++)
-            {
-                // Determine the actual player index, relative to thisPlayerNumber
-                relativeIndex = (i - thisPlayerNumber + playerCount) % playerCount;
-                if(relativeIndex == 0)
-                {
-                    gameManager.myCards = new List<int[]>();
-                }
-
-                for (int j = 0; j < 4; j++)
-                {
-                    // Get the card ID for the relative player
-                    var cardID = playerHands[i][j];
-                    if(relativeIndex == 0)
-                    {
-                        gameManager.myCards.Add(cardID);
-                    }
-                    // Get the card object for the cardID
-                    GameObject tempCardObject = GetCardFromPool(cardID);
-                    if (tempCardObject != null)
-                    {
-                        cardObjects.Add(tempCardObject);
-
-                        Vector3 position = Vector3.zero;
-                        Quaternion rotation = Quaternion.identity;
-
-                        if (playerCount == 2)
-                        {
-                            // Positions for 2 players
-                            if (relativeIndex == 0) // This player (treated as player 0)
-                            {
-                                position = new Vector3((j * 700)+275, -1600, 0); // Bottom position
-                                
-                            }
-                            else if (relativeIndex == 1) // The other player (treated as player 1)
-                            {
-                                position = new Vector3((j * 700)+275, 1600, 0); // Top position
-                                rotation = Quaternion.Euler(0, turnAround, 0);
-                            }
-                        }
-                        else if (playerCount == 4)
-                        {
-                            // Positions for 4 players
-                            switch (relativeIndex)
-                            {
-                                case 0: // This player (treated as player 0)
-                                    position = new Vector3((j * 700)+275, -1600, 0); // Bottom position
-                                    break;
-                                case 1: // Next player (treated as player 1)
-                                    position = new Vector3(4655, j * 700 - 700, 0); // Right position
-                                    rotation = Quaternion.Euler(0, turnAround, 90);
-                                    break;
-                                case 2: // Opposite player (treated as player 2)
-                                    position = new Vector3((j * 700)+275, 1600, 0); // Top position
-                                    rotation = Quaternion.Euler(0, turnAround, 0);
-                                    break;
-                                case 3: // Previous player (treated as player 3)
-                                    position = new Vector3(-2700, j * 700 - 700, 0); // Left position
-                                    rotation = Quaternion.Euler(0, turnAround, 90);
-                                    break;
-                            }
-                        }
-
-                        positions.Add(position);
-                        rotations.Add(rotation);
-
-                        // Set the parent of the card to the correct hand
-                        tempCardObject.transform.parent = playerParentHands[i].transform;
-                        if(relativeIndex == 0) Debug.Log("playerParentHand: " + i);
-                    }
-                }
-            }
-
-            // Chain movement for all cards
-            StartCoroutine(ChainMoveCardsPlayersCoroutine(positions, cardObjects, 10, rotations));
-        }
-        else
+        if (playerCount != 2 && playerCount != 4)
         {
             Debug.LogError("Player number is different from 2 or 4");
+            return;
         }
+
+        for (int i = 0; i < playerCount; i++)
+        {
+            relativeIndex = (i - thisPlayerNumber + playerCount) % playerCount;
+            if (relativeIndex == 0) gameManager.myCards = new List<int[]>();
+
+            for (int j = 0; j < 4; j++)
+            {
+                var cardID = playerHands[i][j];
+                if (relativeIndex == 0) gameManager.myCards.Add(cardID);
+
+                GameObject tempCardObject = GetCardFromPool(cardID);
+                if (tempCardObject == null) continue;
+
+                cardObjects.Add(tempCardObject);
+                tempCardObject.transform.parent = playerParentHands[i].transform;
+
+                Vector3 position = Vector3.zero;
+                Quaternion rotation = Quaternion.identity;
+
+                if (playerCount == 2)
+                {
+                    position = new Vector3((j * 700) + 275, relativeIndex == 0 ? -1600 : 1600, 0);
+                    if (relativeIndex == 1) rotation = Quaternion.Euler(0, 180, 0);
+                }
+                else if (playerCount == 4)
+                {
+                    switch (relativeIndex)
+                    {
+                        case 0: position = new Vector3((j * 700) + 275, -1600, 0); break;
+                        case 1: position = new Vector3(4655, j * 700 - 700, 0); rotation = Quaternion.Euler(0, 180, 90); break;
+                        case 2: position = new Vector3((j * 700) + 275, 1600, 0); rotation = Quaternion.Euler(0, 180, 0); break;
+                        case 3: position = new Vector3(-2700, j * 700 - 700, 0); rotation = Quaternion.Euler(0, 180, 90); break;
+                    }
+                }
+
+                positions.Add(position);
+                rotations.Add(rotation);
+            }
+        }
+
+        StartCoroutine(ChainMoveCardsPlayersCoroutine(positions, cardObjects, 10, rotations));
     }
 
     //Deals to center according to the playerCount
@@ -335,10 +245,10 @@ public class DeckController : MonoBehaviour
         string cardIDString = GameManager.TurnCardIdToString(cardID);
         print("cardIDString: " + cardIDString);
 
-        if (cardPools.ContainsKey(cardIDString) && cardPools[cardIDString].Count > 0)
+        if (cardPools.ContainsKey(cardIDString) && cardPools[cardIDString] != null)
         {
-            var card = cardPools[cardIDString][0];
-            cardPools[cardIDString].RemoveAt(0);
+            var card = cardPools[cardIDString];
+            cardPools[cardIDString] = null;
             card.SetActive(true);
             activeCards.Add(card);
             return card;
@@ -348,88 +258,61 @@ public class DeckController : MonoBehaviour
         return null;
     }
 
-    private void ReturnAllActiveCardsToPool()
-    {
-        foreach (var card in activeCards.ToArray())
-        {
-            int[] cardID = ExtractCardID(card); // Define a way to get cardID from the card object
-            ReturnCardToPool(card, cardID);
-        }
-    }
-    
-    private void ReturnCardToPool(GameObject card, int[] cardID)
-    {
-        string cardIDString = GameManager.TurnCardIdToString(cardID);
-
-        if (cardPools.ContainsKey(cardIDString))
-        {
-            card.SetActive(false);
-            card.transform.position = new Vector3(-2000, -2000, 0); // Place off-screen
-            activeCards.Remove(card);
-            cardPools[cardIDString].Add(card);
-        }
-        else
-        {
-            Debug.LogError($"No pool found for card ID: {cardIDString}");
-        }
-    }
-
-    private int[] ExtractCardID(GameObject card)
-    {
-        // Implement logic to extract cardID from card metadata or name
-        throw new NotImplementedException("Add logic to extract cardID from the GameObject");
-    }
-
     public void DiscardHandCardToCenter(int[] cardID)
     {
-        /*GameObject tempCardObject = GameObject.FindWithTag(GameManager.TurnCardIdToString(cardID));
-        tempCardObject.transform.position = new Vector3(-10000,-10000,0);
-        tempCardObject.transform.parent = null;*/
-        PlaceCardToCenter(cardID);
-    }
-
-    //Adds the card Object of the selected card to the center
-    public void PlaceCardToCenter(int[] placedCardID)
-    {
-        GameObject placedCard = GameObject.FindGameObjectWithTag(GameManager.TurnCardIdToString(placedCardID) );
+        GameObject placedCard = GameObject.FindGameObjectWithTag(GameManager.TurnCardIdToString(cardID) );
         if (placedCard != null)
         {
             placedCard.transform.rotation = Quaternion.Euler(0,0,UnityEngine.Random.Range(-12,12));
             placedCard.transform.parent = centerParent.transform;
             placedCard.transform.position = new Vector3(980,0,-10*GameManager.LocalInstance.centerCardsObjects.Count);
 
-            gameManager.centerCards.Add(placedCardID);
+            gameManager.centerCards.Add(cardID);
             gameManager.centerCardsObjects.Add(placedCard);
         }
 
         AudioManager.Instance.PlayAudio(3,1,false);
-        //UpdateCenterCardsLayout();
     }
 
-    public void UpdateCenterCardsLayout()
+    public void UpdateCurrentPlayerHandLayout()
     {
-        // Define the spacing and center of the layout
+        // Define the spacing for the layout
         float cardSpacing = 600f; // Distance between cards
-        Vector3 centerPosition = new Vector3(0, 0, 0); // Center of the layout
 
-        int totalCards = gameManager.centerCardsObjects.Count;
-        Debug.Log("Gamemanager.centerCardsObjects.Count: " + gameManager.centerCardsObjects.Count);
+        // Get the parent object of the current player's hand
+        Debug.Log("Current player's no: " + GameManager.currentPlayerNo);
+        GameObject currentPlayerHand = playerParentHands[GameManager.currentPlayerNo];
+
+        // Get all the cards that are children of the current player's hand
+        List<GameObject> playerCards = new List<GameObject>();
+        int counter=0;
+        foreach (Transform child in currentPlayerHand.transform)
+        {
+            if(counter>1)playerCards.Add(child.gameObject);
+            counter++;
+        }
+
+        int totalCards = playerCards.Count;
+        Debug.Log("Current player's card count: " + totalCards);
         if (totalCards == 0) return;
+
+        // Calculate the center position dynamically based on the cards' positions
+        float minY = playerCards.Min(card => card.transform.position.y);
+        float maxY = playerCards.Max(card => card.transform.position.y);
+        float centerY = (minY + maxY) / 2;
+
+        Vector3 centerPosition = new Vector3(0, centerY, 0); // Center of the layout for the current player
 
         // Calculate the starting position for the layout
         float totalWidth = (totalCards - 1) * cardSpacing; // Total width occupied by the cards
-        float startX = centerPosition.x - (totalWidth / 2) + 975; // Leftmost card position
+        float startX = centerPosition.x - (totalWidth / 2); // Leftmost card position
 
         // Arrange cards
         for (int i = 0; i < totalCards; i++)
         {
             Vector3 targetPosition = new Vector3(startX + (i * cardSpacing), centerPosition.y, centerPosition.z);
 
-            MoveCard(targetPosition, gameManager.centerCardsObjects[i], 10, Quaternion.identity,false);
-            //gameManager.centerCardsObjects[i].transform.position = targetPosition;
-
-            // Optionally: Add animation for smooth transition
-            // You can use a coroutine or tweening library for this
+            MoveCard(targetPosition, playerCards[i], 10, Quaternion.identity, false);
         }
     }
 
@@ -592,7 +475,7 @@ public class DeckController : MonoBehaviour
         }
         for(int i = 0; i < cardObjects.Count; i++)
         {
-            yield return StartCoroutine(MoveCardCoroutine(positions[i], cardObjects[i], speed, rotations[i]));
+            yield return StartCoroutine(MoveCardCoroutine(positions[i], cardObjects[i], speed + (i*0.25f), rotations[i]));
         }
     
     }
@@ -607,10 +490,10 @@ public class DeckController : MonoBehaviour
         return thisPlayerNumber;
     }
 
-    private IEnumerator DelayedFlag()
+    [ContextMenu("Print ThisPlayerNumber")]
+    private void PrintThisPlayerNumber()
     {
-        yield return new WaitForSeconds(1);
-        tempFlag=true;
+        Debug.Log("ThisPlayerNumber: " + thisPlayerNumber);
     }
 
     public void AddCardsToPlayerPool(int playerNumber)
@@ -634,7 +517,7 @@ public class DeckController : MonoBehaviour
         foreach(var card in cardObjects)
         {   
             Debug.Log("Also inside the loop");
-            card.transform.parent = cardPool.transform;
+            //card.transform.parent = cardPool.transform;
             gameManager.centerCardsObjects.Remove(card);    
         }
 
@@ -662,6 +545,51 @@ public class DeckController : MonoBehaviour
     public void GetPlayerCount(int playerC)
     {
         playerCount=playerC;
+    }
+
+    private void InitialDeckSetUp()
+    {
+        chkobbaText = GameObject.Find("ChkobbaText");
+        chkobbaText.SetActive(false);
+
+        cardPrefabs = new Dictionary<string, GameObject>();
+        cardPools = new Dictionary<string, GameObject>();
+
+        if(NetworkManager.Singleton.IsHost)
+        {
+            thisPlayerNumber = WebGLCommunication.LocalInstance.playerNumber;
+        }
+        else if(NetworkManager.Singleton.IsClient)
+        {
+            thisPlayerNumber = WebGLCommunication.LocalInstance.playerNumber;
+            //gameManager.AskPlayerNumber();
+        }
+
+        //StartCoroutine(DelayedFlag());
+        GetPools();
+        GetPlayerHandObjects();
+    }
+
+    private void GetPools()
+    {
+        for(int i = 0; i<4; i++)
+        {
+            string tempTag = "PlayerPool" + (i+1);
+            playerPools.Add(GameObject.Find(tempTag).GetComponent<Transform>().position);
+            //Debug.Log(tempTag);
+        }
+    }
+
+    private void GetPlayerHandObjects()
+    {
+        for(int i = 0; i<4 ; i++)
+        {
+            string tempTag = "PlayerHand" + (i+1);
+            playerParentHands[i] = GameObject.FindGameObjectWithTag(tempTag);
+            Debug.Log(playerParentHands[i].name);
+        }
+        centerParent = GameObject.FindGameObjectWithTag("Center");
+        Debug.Log(centerParent.name);
     }
 }
 
