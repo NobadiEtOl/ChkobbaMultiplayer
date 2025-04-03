@@ -1,7 +1,9 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO.Compression;
 using System.Linq;
+using System.Threading.Tasks;
 using Unity.Mathematics;
 using Unity.Netcode;
 using UnityEngine;
@@ -149,9 +151,6 @@ public class DeckController : MonoBehaviour
     public void DealPlayers(int playerCount, Dictionary<int, List<int[]>> playerHands)
     {
         this.playerCount = playerCount;
-        List<GameObject> cardObjects = new List<GameObject>();
-        List<Vector3> positions = new List<Vector3>();
-        List<Quaternion> rotations = new List<Quaternion>();
 
         if (playerCount != 2 && playerCount != 4)
         {
@@ -159,7 +158,26 @@ public class DeckController : MonoBehaviour
             return;
         }
 
-        for (int i = 0; i < playerCount; i++)
+        if (playerCount == 2)
+        {
+            DealTwoPlayers(playerHands);
+        }
+        else if (playerCount == 4)
+        {
+            DealFourPlayers(playerHands);
+        }
+    }
+
+    private void DealTwoPlayers(Dictionary<int, List<int[]>> playerHands)
+    {
+        var cardObjects = new List<GameObject>();
+        var positions = new List<Vector3>();
+        var rotations = new List<Quaternion>();
+
+        float archRadius = 1000f; // Radius of the arch for the cards
+        float angleStep = 30f; // Angle between cards in degrees
+
+        for (int i = 0; i < 2; i++)
         {
             relativeIndex = (i - thisPlayerNumber + playerCount) % playerCount;
             if (relativeIndex == 0) gameManager.myCards = new List<int[]>();
@@ -173,28 +191,99 @@ public class DeckController : MonoBehaviour
                 if (tempCardObject == null) continue;
 
                 cardObjects.Add(tempCardObject);
-                tempCardObject.transform.parent = playerParentHands[i].transform;
+                tempCardObject.transform.parent = playerHandTransforms[relativeIndex == 0 ? 0 : 2].transform;
 
-                Vector3 position = Vector3.zero;
-                Quaternion rotation = Quaternion.identity;
+                Vector3 handTransformPosition = playerHandTransforms[relativeIndex == 0 ? 0 : 2].position;
 
-                if (playerCount == 2)
-                {
-                    position = new Vector3((j * 700) + 275, relativeIndex == 0 ? -1600 : 1600, 0);
-                    if (relativeIndex == 1) rotation = Quaternion.Euler(0, 180, 0);
-                }
-                else if (playerCount == 4)
-                {
-                    switch (relativeIndex)
-                    {
-                        case 0: position = new Vector3((j * 700) + 275, -1600, 0); break;
-                        case 1: position = new Vector3(4655, j * 700 - 700, 0); rotation = Quaternion.Euler(0, 180, 90); break;
-                        case 2: position = new Vector3((j * 700) + 275, 1600, 0); rotation = Quaternion.Euler(0, 180, 0); break;
-                        case 3: position = new Vector3(-2700, j * 700 - 700, 0); rotation = Quaternion.Euler(0, 180, 90); break;
-                    }
-                }
+                // Calculate the center of the arch
+                Vector3 archCenter = handTransformPosition + new Vector3(0, relativeIndex == 0 ? -archRadius : archRadius, 0);
 
+                // Calculate the starting angle for the layout
+                float startAngle = -angleStep * (4 - 1) / 2; // Center the arch
+                float angle = startAngle + j * angleStep;
+
+                // Calculate the position for the card
+                Vector3 position = archCenter + Quaternion.Euler(0, 0, angle) * (handTransformPosition - archCenter);
+                position.z -= j * 10; // Decrease z value from left to right
                 positions.Add(position);
+
+                // Calculate the rotation for the card
+                Quaternion rotation = Quaternion.Euler(0, 0, angle);
+                rotations.Add(rotation);
+            }
+        }
+
+        StartCoroutine(ChainMoveCardsPlayersCoroutine(positions, cardObjects, 10, rotations));
+    }
+
+    private void DealFourPlayers(Dictionary<int, List<int[]>> playerHands)
+    {
+        var cardObjects = new List<GameObject>();
+        var positions = new List<Vector3>();
+        var rotations = new List<Quaternion>();
+
+        float archRadius = 1000f; // Radius of the arch for the cards
+        float angleStep = 30f; // Angle between cards in degrees
+
+        for (int i = 0; i < 4; i++)
+        {
+            relativeIndex = (i - thisPlayerNumber + playerCount) % playerCount;
+            if (relativeIndex == 0) gameManager.myCards = new List<int[]>();
+
+            for (int j = 0; j < 4; j++)
+            {
+                var cardID = playerHands[i][j];
+                if (relativeIndex == 0) gameManager.myCards.Add(cardID);
+
+                GameObject tempCardObject = GetCardFromPool(cardID);
+                if (tempCardObject == null) continue;
+
+                cardObjects.Add(tempCardObject);
+                tempCardObject.transform.parent = playerHandTransforms[relativeIndex].transform;
+
+                Vector3 handTransformPosition = playerHandTransforms[relativeIndex].position;
+
+                // Calculate the center of the arch
+                Vector3 archCenter = handTransformPosition;
+                switch (relativeIndex)
+                {
+                    case 0: // Bottom
+                        archCenter += new Vector3(0, -archRadius, 0);
+                        break;
+                    case 1: // Right
+                        archCenter += new Vector3(archRadius, 0, 0);
+                        break;
+                    case 2: // Top
+                        archCenter += new Vector3(0, archRadius, 0);
+                        break;
+                    case 3: // Left
+                        archCenter += new Vector3(-archRadius, 0, 0);
+                        break;
+                }
+
+                // Calculate the starting angle for the layout
+                float startAngle = -angleStep * (4 - 1) / 2; // Center the arch
+                float angle = startAngle + j * angleStep;
+
+                // Calculate the position for the card
+                Vector3 position = archCenter + Quaternion.Euler(0, 0, angle) * (handTransformPosition - archCenter);
+                position.z -= j * 10; // Decrease z value from left to right
+                positions.Add(position);
+
+                // Calculate the rotation for the card
+                Quaternion rotation;
+                if (relativeIndex == 0 || relativeIndex == 2)
+                {
+                    rotation = Quaternion.Euler(0, 0, angle);
+                }
+                else if (relativeIndex == 1 || relativeIndex == 3)
+                {
+                    rotation = Quaternion.Euler(0, 0, 90 + angle);
+                }
+                else
+                {
+                    rotation = Quaternion.identity;
+                }
                 rotations.Add(rotation);
             }
         }
@@ -209,6 +298,7 @@ public class DeckController : MonoBehaviour
         List<GameObject> cardObjects = new List<GameObject>();
         List<Vector3> positions = new List<Vector3>();
         List<Quaternion> rotations = new List<Quaternion>();
+
         for (int i = 0; i < 4; i++)
         {
             var cardID = centerCardIDs[i];
@@ -216,16 +306,22 @@ public class DeckController : MonoBehaviour
             cardObjects.Add(tempCenterCard);
             if (tempCenterCard != null)
             {
-                positions.Add(new Vector3(980, 0, i*-10));
+                // Calculate position based on centerTransform
+                Vector3 centerPosition = centerTransform.position;
+                positions.Add(new Vector3(centerPosition.x, centerPosition.y, centerPosition.z + i * -10));
+                
                 tempCenterCard.transform.parent = centerParent.transform;
                 gameManager.centerCardsObjects.Add(tempCenterCard);
                 gameManager.centerCards.Add(cardID);
-                if(i==3)rotations.Add(Quaternion.Euler(0, 0, UnityEngine.Random.Range(-12,12)));
-                else rotations.Add(Quaternion.Euler(0, 180, UnityEngine.Random.Range(-12,12)));
+
+                if (i == 3)
+                    rotations.Add(Quaternion.Euler(0, 0, UnityEngine.Random.Range(-12, 12)));
+                else
+                    rotations.Add(Quaternion.Euler(0, 180, UnityEngine.Random.Range(-12, 12)));
             }
         }
+
         ChainMoveCards(positions, cardObjects, 10, rotations);
-        //Invoke("UpdateCenterCardsLayout", 0.8f);
     }
 
     private IEnumerator ChainMoveCardsPlayersCoroutine(List<Vector3 >positions, List<GameObject> cardObjects, int speead,List<Quaternion> rotations)
@@ -260,59 +356,154 @@ public class DeckController : MonoBehaviour
 
     public void DiscardHandCardToCenter(int[] cardID)
     {
-        GameObject placedCard = GameObject.FindGameObjectWithTag(GameManager.TurnCardIdToString(cardID) );
+        GameObject placedCard = GameObject.FindGameObjectWithTag(GameManager.TurnCardIdToString(cardID));
         if (placedCard != null)
         {
-            placedCard.transform.rotation = Quaternion.Euler(0,0,UnityEngine.Random.Range(-12,12));
+            placedCard.transform.rotation = Quaternion.Euler(0, 0, UnityEngine.Random.Range(-12, 12));
             placedCard.transform.parent = centerParent.transform;
-            placedCard.transform.position = new Vector3(980,0,-10*GameManager.LocalInstance.centerCardsObjects.Count);
+
+            // Use centerTransform for positioning
+            Vector3 centerPosition = centerTransform.position;
+            placedCard.transform.position = new Vector3(centerPosition.x, centerPosition.y, centerPosition.z - 10 * GameManager.LocalInstance.centerCardsObjects.Count);
 
             gameManager.centerCards.Add(cardID);
             gameManager.centerCardsObjects.Add(placedCard);
         }
 
-        AudioManager.Instance.PlayAudio(3,1,false);
+        AudioManager.Instance.PlayAudio(3, 1, false);
+        UpdateCurrentPlayerHandLayout();
     }
 
     public void UpdateCurrentPlayerHandLayout()
     {
+        if (playerCount == 2)
+        {
+            UpdateCurrentPlayerHandLayoutTwoPlayers();
+        }
+        else if (playerCount == 4)
+        {
+            UpdateCurrentPlayerHandLayoutFourPlayers();
+        }
+    }
+
+    private void UpdateCurrentPlayerHandLayoutTwoPlayers()
+    {
         // Define the spacing for the layout
-        float cardSpacing = 600f; // Distance between cards
+        float archRadius = 1000f; // Radius of the arch for the cards
+        float angleStep = 30f; // Angle between cards in degrees
+
+        // Map player numbers to hand indices for two players
+        int handIndex = GameManager.currentPlayerNo == 0 ? 0 : 2;
 
         // Get the parent object of the current player's hand
-        Debug.Log("Current player's no: " + GameManager.currentPlayerNo);
-        GameObject currentPlayerHand = playerParentHands[GameManager.currentPlayerNo];
+        GameObject currentPlayerHand = playerParentHands[handIndex];
 
         // Get all the cards that are children of the current player's hand
-        List<GameObject> playerCards = new List<GameObject>();
-        int counter=0;
+        var playerCards = new List<GameObject>();
+        int counter = 0;
         foreach (Transform child in currentPlayerHand.transform)
         {
-            if(counter>1)playerCards.Add(child.gameObject);
+            if (counter > 0) playerCards.Add(child.gameObject);
             counter++;
         }
 
         int totalCards = playerCards.Count;
-        Debug.Log("Current player's card count: " + totalCards);
         if (totalCards == 0) return;
 
-        // Calculate the center position dynamically based on the cards' positions
-        float minY = playerCards.Min(card => card.transform.position.y);
-        float maxY = playerCards.Max(card => card.transform.position.y);
-        float centerY = (minY + maxY) / 2;
+        // Get the center position from the playerHandTransforms based on the hand index
+        Transform playerHandTransform = playerHandTransforms[handIndex];
+        Vector3 handTransformPosition = playerHandTransform.position;
 
-        Vector3 centerPosition = new Vector3(0, centerY, 0); // Center of the layout for the current player
+        // Calculate the center of the arch
+        Vector3 archCenter = handTransformPosition + new Vector3(0, handIndex == 0 ? -archRadius : archRadius, 0);
 
-        // Calculate the starting position for the layout
-        float totalWidth = (totalCards - 1) * cardSpacing; // Total width occupied by the cards
-        float startX = centerPosition.x - (totalWidth / 2); // Leftmost card position
+        // Calculate the starting angle for the layout
+        float startAngle = -angleStep * (totalCards - 1) / 2; // Center the arch
 
         // Arrange cards
         for (int i = 0; i < totalCards; i++)
         {
-            Vector3 targetPosition = new Vector3(startX + (i * cardSpacing), centerPosition.y, centerPosition.z);
+            float angle = startAngle + i * angleStep;
 
-            MoveCard(targetPosition, playerCards[i], 10, Quaternion.identity, false);
+            // Calculate the position for the card
+            Vector3 targetPosition = archCenter + Quaternion.Euler(0, 0, angle) * (handTransformPosition - archCenter);
+            targetPosition.z -= i * 10; // Decrease z value from left to right
+            Quaternion targetRotation = Quaternion.Euler(0, 0, angle);
+
+            MoveCard(targetPosition, playerCards[i], 10, targetRotation, false);
+        }
+    }
+
+    private void UpdateCurrentPlayerHandLayoutFourPlayers()
+    {
+        // Define the spacing for the layout
+        float archRadius = 1000f; // Radius of the arch for the cards
+        float angleStep = 30f; // Angle between cards in degrees
+
+        // Get the parent object of the current player's hand
+        GameObject currentPlayerHand = playerParentHands[GameManager.currentPlayerNo];
+
+        // Get all the cards that are children of the current player's hand
+        var playerCards = new List<GameObject>();
+        int counter = 0;
+        foreach (Transform child in currentPlayerHand.transform)
+        {
+            if (counter > 0) playerCards.Add(child.gameObject);
+            counter++;
+        }
+
+        int totalCards = playerCards.Count;
+        if (totalCards == 0) return;
+
+        // Get the center position from the playerHandTransforms based on the player number
+        Transform playerHandTransform = playerHandTransforms[GameManager.currentPlayerNo];
+        Vector3 handTransformPosition = playerHandTransform.position;
+
+        // Calculate the center of the arch
+        Vector3 archCenter = handTransformPosition;
+        switch (GameManager.currentPlayerNo)
+        {
+            case 0: // Bottom
+                archCenter += new Vector3(0, -archRadius, 0);
+                break;
+            case 1: // Right
+                archCenter += new Vector3(archRadius, 0, 0);
+                break;
+            case 2: // Top
+                archCenter += new Vector3(0, archRadius, 0);
+                break;
+            case 3: // Left
+                archCenter += new Vector3(-archRadius, 0, 0);
+                break;
+        }
+
+        // Calculate the starting angle for the layout
+        float startAngle = -angleStep * (totalCards - 1) / 2; // Center the arch
+
+        // Arrange cards
+        for (int i = 0; i < totalCards; i++)
+        {
+            float angle = startAngle + i * angleStep;
+
+            // Calculate the position for the card
+            Vector3 targetPosition = archCenter + Quaternion.Euler(0, 0, angle) * (handTransformPosition - archCenter);
+            targetPosition.z -= i * 10; // Decrease z value from left to right
+            Quaternion targetRotation;
+
+            if (GameManager.currentPlayerNo == 0 || GameManager.currentPlayerNo == 2)
+            {
+                targetRotation = Quaternion.Euler(0, 0, angle);
+            }
+            else if (GameManager.currentPlayerNo == 1 || GameManager.currentPlayerNo == 3)
+            {
+                targetRotation = Quaternion.Euler(0, 0, 90 + angle);
+            }
+            else
+            {
+                targetRotation = Quaternion.identity;
+            }
+
+            MoveCard(targetPosition, playerCards[i], 10, targetRotation, false);
         }
     }
 
@@ -322,12 +513,13 @@ public class DeckController : MonoBehaviour
         StartCoroutine(MoveCardCoroutine(endPos, cardObject, speed, rotation, audioFlag));
     }
 
-    private IEnumerator MoveCardCoroutine(Vector3 endPos, GameObject cardObject, float speedMultiplier, Quaternion rotation, bool audioFlag=true)
+    private IEnumerator MoveCardCoroutine(Vector3 endPos, GameObject cardObject, float speedMultiplier, Quaternion rotation, bool audioFlag = true)
     {
-        // Set the initial position of the card
+        // Set the initial position and rotation of the card
         Vector3 startingPos = cardObject.transform.position;
+        Quaternion startingRotation = cardObject.transform.rotation;
 
-        if(audioFlag)AudioManager.Instance.PlayAudio(3,1,false);
+        if (audioFlag) AudioManager.Instance.PlayAudio(3, 1, false);
 
         // Calculate the journey length and base speed
         float journeyLength = Vector3.Distance(startingPos, endPos);
@@ -346,6 +538,9 @@ public class DeckController : MonoBehaviour
             // Move the card's position using Lerp
             cardObject.transform.position = Vector3.Lerp(startingPos, endPos, t);
 
+            // Smoothly interpolate the rotation using Lerp
+            cardObject.transform.rotation = Quaternion.Lerp(startingRotation, rotation, t);
+
             // Increment elapsed time
             timeElapsed += Time.deltaTime;
 
@@ -353,11 +548,9 @@ public class DeckController : MonoBehaviour
             yield return null;
         }
 
-        // Ensure the card reaches the exact end position
+        // Ensure the card reaches the exact end position and rotation
         cardObject.transform.position = endPos;
-
-        // Call RotateCard to apply rotation
-        RotateCard(rotation, cardObject, 20);
+        cardObject.transform.rotation = rotation;
     }
 
 
@@ -477,6 +670,7 @@ public class DeckController : MonoBehaviour
         {
             yield return StartCoroutine(MoveCardCoroutine(positions[i], cardObjects[i], speed + (i*0.25f), rotations[i]));
         }
+        UpdateCurrentPlayerHandLayout();
     
     }
     public void SetPlayerNumber(int playerNumber)
@@ -511,7 +705,7 @@ public class DeckController : MonoBehaviour
         ChainMoveCardsToPool(playerPools[GetPoolIndex(relativePoolIndex)], centerObjects, 10, relativePoolIndex);
     }
 
-    public void MoveCardsToPlayerPool(List<GameObject> cardObjects, int playerNumber)
+    public async Task MoveCardsToPlayerPool(List<GameObject> cardObjects, int playerNumber)
     {   
         int relativePoolIndex = (playerNumber - thisPlayerNumber + playerCount) % playerCount;
         foreach(var card in cardObjects)
@@ -590,6 +784,18 @@ public class DeckController : MonoBehaviour
         }
         centerParent = GameObject.FindGameObjectWithTag("Center");
         Debug.Log(centerParent.name);
+    }
+
+    private List<Transform> playerHandTransforms = new List<Transform>();
+    private Transform centerTransform;
+    public void getPlayerHandTransforms(List<Transform> playerHTransforms, Transform cTransform)
+    {
+        foreach(var playerH in playerHTransforms)
+        {
+            playerHandTransforms.Add(playerH);
+        }
+
+        centerTransform = cTransform;
     }
 }
 

@@ -32,6 +32,8 @@ public class GameManager : NetworkBehaviour
     private List<Transform> timerTransforms = new List<Transform>();
     [SerializeField] public GameObject cardBack;
     [SerializeField] public GameObject cardIndicator;
+    [SerializeField] private List<Transform> playerHandTransforms;
+    [SerializeField] private Transform centerTransform;
 
     void Start()
     {
@@ -108,14 +110,6 @@ public class GameManager : NetworkBehaviour
     public void GetCardAddedToCenter(int[] cardID)
     {
         DiscardHandCards(cardID);
-    }
-
-    //To remove the played card from the hand when it played to the center
-    public void DiscardHandCards(int[] cardID)
-    {
-        //UI
-        UpdateCurrentPlayerHandLayoutCall();
-        deckController.DiscardHandCardToCenter(cardID);
     }
 
     public void UpdateCurrentPlayerHandLayoutCall()
@@ -207,8 +201,14 @@ public class GameManager : NetworkBehaviour
         }
         
         PrintCenterCards();
-        UpdateCurrentPlayerHandLayoutCall();
         CardInteraction.isOneCardSelected = false;
+    }
+    
+    //To remove the played card from the hand when it played to the center
+    public void DiscardHandCards(int[] cardID)
+    {
+        //UI
+        deckController.DiscardHandCardToCenter(cardID);
     }
     
     public void UpdateCurrentPlayer(int playerNumber)
@@ -412,10 +412,16 @@ public class GameManager : NetworkBehaviour
         timerTransforms.Add(GameObject.Find("Timer1").GetComponent<Transform>());
         timerTransforms.Add(GameObject.Find("Timer2").GetComponent<Transform>());
         timerTransforms.Add(GameObject.Find("Timer3").GetComponent<Transform>());
+        playerHandTransforms.Add(GameObject.Find("PlayerHand1").GetComponent<Transform>());
+        playerHandTransforms.Add(GameObject.Find("PlayerHand2").GetComponent<Transform>());
+        playerHandTransforms.Add(GameObject.Find("PlayerHand3").GetComponent<Transform>());
+        playerHandTransforms.Add(GameObject.Find("PlayerHand4").GetComponent<Transform>());
+        centerTransform = GameObject.Find("Center").GetComponent<Transform>();
+        deckController.getPlayerHandTransforms(playerHandTransforms,centerTransform);
 
         GetTurnTimeLocation();
 
-        GetPoolTexts();
+        //GetPoolTexts();
 
         GameObject.Find("StartScreen").SetActive(false);
     }
