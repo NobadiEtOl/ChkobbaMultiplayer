@@ -193,7 +193,7 @@ public class DeckController : MonoBehaviour
                 Vector3 handTransformPosition = playerHandTransforms[relativeIndex == 0 ? 0 : 2].position;
 
                 // Calculate the center of the arch
-                Vector3 archCenter = handTransformPosition + new Vector3(0, relativeIndex == 0 ? -archRadius : archRadius, 0);
+                Vector3 archCenter = handTransformPosition + new Vector3(0, relativeIndex == 0 ? -archRadius : -archRadius, 0);
 
                 // Calculate the starting angle for the layout
                 float startAngle = -angleStep * (4 - 1) / 2; // Center the arch
@@ -219,8 +219,7 @@ public class DeckController : MonoBehaviour
         var positions = new List<Vector3>();
         var rotations = new List<Quaternion>();
 
-        float archRadius = 1000f; // Radius of the arch for the cards
-        float angleStep = 30f; // Angle between cards in degrees
+        float spacing = 200;
 
         for (int i = 0; i < 4; i++)
         {
@@ -238,55 +237,50 @@ public class DeckController : MonoBehaviour
                 cardObjects.Add(tempCardObject);
                 tempCardObject.transform.parent = playerHandTransforms[relativeIndex].transform;
 
-                Vector3 handTransformPosition = playerHandTransforms[relativeIndex].position;
+                Vector3 basePos = playerHandTransforms[relativeIndex].position;
+                Vector3 offset = Vector3.zero;
+                Quaternion rotation = Quaternion.identity;
 
-                // Calculate the center of the arch
-                Vector3 archCenter = handTransformPosition;
+                float yRotationDegrees = 50f;
+                if(relativeIndex==1) yRotationDegrees *= -1;
+
+                float radians = yRotationDegrees * Mathf.Deg2Rad;
+
+                float d = 200f; // This is your desired local offset (e.g., spacing between cards)
+
+                // Offset along local X (left-right in card space)
+                float offsetX = d * Mathf.Cos(radians); // world-space X
+                float offsetZ = d * Mathf.Sin(radians); // world-space Z
+
+
                 switch (relativeIndex)
                 {
-                    case 0: // Bottom
-                        archCenter += new Vector3(0, -archRadius, 0);
+                    case 0: // Bottom (Player 0)
+                        offset = new Vector3(j * spacing, 0, -j * 10);
+                        rotation = Quaternion.identity;
                         break;
-                    case 1: // Right
-                        archCenter += new Vector3(archRadius, 0, 0);
+                    case 1: // Right (Player 1)
+                        offset = new Vector3((offsetX*j)-(1.5f*offsetX), 0, (-j * 10)+(j * offsetZ)-(1.5f*offsetZ));
+                        rotation = Quaternion.Euler(0, -130, 0);
                         break;
-                    case 2: // Top
-                        archCenter += new Vector3(0, archRadius, 0);
+                    case 2: // Top (Player 2)
+                        offset = new Vector3((j * spacing)-(1.5f*spacing), 0, -j * 10);
+                        rotation = Quaternion.Euler(0, 180, 0);
                         break;
-                    case 3: // Left
-                        archCenter += new Vector3(-archRadius, 0, 0);
+                    case 3: // Left (Player 3)
+                        offset = new Vector3((j * offsetX)-(1.5f*offsetX), 0, (-j * 10)+(offsetZ*j)-(1.5f*offsetZ));
+                        rotation = Quaternion.Euler(0, 130, 0);
                         break;
                 }
 
-                // Calculate the starting angle for the layout
-                float startAngle = -angleStep * (4 - 1) / 2; // Center the arch
-                float angle = startAngle + j * angleStep;
-
-                // Calculate the position for the card
-                Vector3 position = archCenter + Quaternion.Euler(0, 0, angle) * (handTransformPosition - archCenter);
-                position.z -= j * 10; // Decrease z value from left to right
-                positions.Add(position);
-
-                // Calculate the rotation for the card
-                Quaternion rotation;
-                if (relativeIndex == 0 || relativeIndex == 2)
-                {
-                    rotation = Quaternion.Euler(0, 0, angle);
-                }
-                else if (relativeIndex == 1 || relativeIndex == 3)
-                {
-                    rotation = Quaternion.Euler(0, 0, 90 + angle);
-                }
-                else
-                {
-                    rotation = Quaternion.identity;
-                }
+                positions.Add(basePos + offset);
                 rotations.Add(rotation);
             }
         }
 
         StartCoroutine(ChainMoveCardsPlayersCoroutine(positions, cardObjects, 10, rotations));
     }
+
 
     //Deals to center according to the playerCount
     public void DealCenter(List<int[]> centerCardIDs)

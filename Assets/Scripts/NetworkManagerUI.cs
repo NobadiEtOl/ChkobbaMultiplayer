@@ -33,7 +33,7 @@ public class NetworkManagerUI : MonoBehaviour
         startGameTwoPlayerButton.onClick.AddListener(async () => { await FindLobbiesAndStartHostIfNoneExist(2); });
         startGameFourPlayerButton.onClick.AddListener(async () => { await FindLobbiesAndStartHostIfNoneExist(4); });
 
-        FindLobbiesAndStartHostIfNoneExist(2);
+        FindLobbiesAndStartHostIfNoneExist(4);
     }
 
     bool isListeningFlag = false;

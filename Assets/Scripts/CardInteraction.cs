@@ -12,7 +12,7 @@ public class CardInteraction : MonoBehaviour
     private Vector3 originalScreenPosition; // Original position in screen space
     private Vector3 offset; // Offset between touch position and card position in screen space
     private bool isDragging = false;
-    private float snapBackThreshold = 500f;
+    private float snapBackThreshold = 250f;
     private GameObject selectedCardIndicator;
     public event Action<int[]> OnCardSelected;
     public event Action<int[], GameObject, int> OnCardsPlayed;
@@ -121,6 +121,10 @@ public class CardInteraction : MonoBehaviour
             {
                 // Invoke OnCardsPlayed
                 OnCardsPlayed?.Invoke(this.cardID, this.gameObject, GameManager.currentPlayerNo);
+                if(activeCardIndicator != null)
+                {
+                    activeCardIndicator.SetActive(false); // Deactivate the previous card indicator
+                }
             }
             else
             {
@@ -194,6 +198,7 @@ public class CardInteraction : MonoBehaviour
         cardInd.transform.parent = transform;
         Transform cardIndTransform = cardInd.transform;
         cardIndTransform.localPosition = new Vector3(0, 0, 0.04f);
+        cardIndTransform.localRotation = cardInd.transform.rotation;
         cardInd.SetActive(false);
         selectedCardIndicator = cardInd;
     }
