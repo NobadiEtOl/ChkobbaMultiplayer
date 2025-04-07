@@ -27,12 +27,12 @@ public class GameManager : NetworkBehaviour
     private float turnTimer=0;
     private Text currentPlayerText;
     private Text turnTimerText;
-    public List<GameObject> activeCardIndicatorList=new List<GameObject>();
     private List<Text> pointTexts=new List<Text>();
     private List<Transform> timerTransforms = new List<Transform>();
     [SerializeField] public GameObject cardBack;
     [SerializeField] public GameObject cardIndicator;
     [SerializeField] private List<Transform> playerHandTransforms;
+    [SerializeField] private List<Transform> playerPoolTransforms;
     [SerializeField] private Transform centerTransform;
 
     void Start()
@@ -123,7 +123,7 @@ public class GameManager : NetworkBehaviour
     {
         //UI
         //Logic
-        if(centerCards.Count!=0 && centerCards[centerCards.Count-1][1] == cardID[1])
+        if(centerCards.Count!=0 && (centerCards[centerCards.Count-1][1] == cardID[1] || 11 == cardID[1]))
         {
             CheckIfLegal(playerNumber);
         }
@@ -139,7 +139,7 @@ public class GameManager : NetworkBehaviour
         //if(currentSelectedHandCard[0] == 0 || currentSelectedHandCard[1]==0)return false;
 
         //Final control to decide if cards can be played
-        if(centerCards[centerCards.Count-1][1] == currentSelectedHandCard[1])
+        if(centerCards[centerCards.Count-1][1] == currentSelectedHandCard[1] || currentSelectedHandCard[1] == 11)
         {
             List<int[]> cardsToRemove = new List<int[]>();
 
@@ -158,8 +158,6 @@ public class GameManager : NetworkBehaviour
             //Clear the list even if its a correct move
             currentSelectedHandCard = new int[]{0,0};
             centerCards.Clear();
-
-            DeactivateCardIndicators();
         }
     }
 
@@ -169,7 +167,6 @@ public class GameManager : NetworkBehaviour
         networkRelay.AddCenterCardServerRPC(currentSelectedHandCard);
         myCards.Remove(currentSelectedHandCard);
         currentSelectedHandCard = null;
-        DeactivateCardIndicators();
         GetTurnTimeLocation();
     }
     
@@ -364,17 +361,6 @@ public class GameManager : NetworkBehaviour
         }
     }
 
-    public void DeactivateCardIndicators()
-    {
-        foreach(GameObject indicator in activeCardIndicatorList)
-        {
-            indicator.SetActive(false);
-        }
-
-        currentSelectedHandCard = null;
-        activeCardIndicatorList.Clear();
-    }
-
     public void GetTurnTime(float turnTime)
     {
         turnTimer = turnTime;
@@ -416,8 +402,12 @@ public class GameManager : NetworkBehaviour
         playerHandTransforms.Add(GameObject.Find("PlayerHand2").GetComponent<Transform>());
         playerHandTransforms.Add(GameObject.Find("PlayerHand3").GetComponent<Transform>());
         playerHandTransforms.Add(GameObject.Find("PlayerHand4").GetComponent<Transform>());
+        playerPoolTransforms.Add(GameObject.Find("PlayerPool1").GetComponent<Transform>());
+        playerPoolTransforms.Add(GameObject.Find("PlayerPool2").GetComponent<Transform>());
+        playerPoolTransforms.Add(GameObject.Find("PlayerPool3").GetComponent<Transform>());
+        playerPoolTransforms.Add(GameObject.Find("PlayerPool4").GetComponent<Transform>());
         centerTransform = GameObject.Find("Center").GetComponent<Transform>();
-        deckController.getPlayerHandTransforms(playerHandTransforms,centerTransform);
+        deckController.getPlayerHandTransforms(playerHandTransforms, playerPoolTransforms, centerTransform);
 
         GetTurnTimeLocation();
 

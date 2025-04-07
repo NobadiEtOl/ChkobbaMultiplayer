@@ -32,6 +32,8 @@ public class NetworkManagerUI : MonoBehaviour
         hostButton.onClick.AddListener(async () => { await StartHostWithRelay(2); });
         startGameTwoPlayerButton.onClick.AddListener(async () => { await FindLobbiesAndStartHostIfNoneExist(2); });
         startGameFourPlayerButton.onClick.AddListener(async () => { await FindLobbiesAndStartHostIfNoneExist(4); });
+
+        FindLobbiesAndStartHostIfNoneExist(2);
     }
 
     bool isListeningFlag = false;
@@ -144,6 +146,8 @@ public class NetworkManagerUI : MonoBehaviour
             Debug.Log($"No open lobbies for {playerCount} players found. Creating a new one...");
             await StartHostWithRelay(playerCount);
         }
+
+        Server.Singleton.StartGameAfterDelay();
     }
 
 

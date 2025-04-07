@@ -1,111 +1,159 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
+using System.Collections.Generic;
 
 public class CardInteraction : MonoBehaviour
-{  
-    //(kind)cardID[0]=>1:Clubs/2:Diamonds/3:Hearts/4:Spades , (value)cardID[1]=>1/2/3/4/5/6/7/8/9/10/11/12/13
+{
     private int[] cardID = new int[2];
-    //A static variable to keep track of if the player selected a card or not 
-    public static bool isOneCardSelected;
-    public bool isPlayable = false; // Condition to check if the card can be played when the server is iplemented
-    private Vector3 originalPosition; // Original position of the card
-    private bool isDragging = false; // Is the card currently being dragged
-    private float snapBackThreshold = 500f; // Minimum distance to call functions, adjust as needed
+    public static bool isOneCardSelected = false;
+    private static CardInteraction currentlySelectedCard = null; // Tracks the currently selected card
+    public bool isPlayable = false;
 
+    private Vector3 originalScreenPosition; // Original position in screen space
+    private Vector3 offset; // Offset between touch position and card position in screen space
+    private bool isDragging = false;
+    private float snapBackThreshold = 500f;
     private GameObject selectedCardIndicator;
+    public event Action<int[]> OnCardSelected;
+    public event Action<int[], GameObject, int> OnCardsPlayed;
+    private static GameObject activeCardIndicator = null; // Tracks the currently active card indicator
+
     void Start()
     {
-        isOneCardSelected=false;
-
         InitializeCard();
     }
 
-    private void InitializeCard()
+    void Update()
     {
-        //Create IDs for every card except for the add button
-        cardID = GetCardID();
-        gameObject.tag = cardID[0] + "_" + cardID[1];
-
-        InitializeCardInd();
-
-        InitializeCardBack();
-
-        transform.localScale = new Vector3(380,400, 2);
-    }
-
-    //Check clicks done to the cards
-    private void OnMouseDown()
-    {
-        //Setting original position for snap back
-        originalPosition = transform.position;
-        int thisPlayerNumber = DeckController.LocalInstance.thisPlayerNumber;
-
-        if (transform.parent.name == "PlayerHand"+(thisPlayerNumber+1) /*&& GameManager.currentPlayerNo == thisPlayerNumber*/ || transform.parent.name.Contains("PlayerHand"))
+        if (Input.touchCount > 0) // Check if there is at least one touch
         {
-            SelectCard();
+            Touch touch = Input.GetTouch(0); // Get the first touch
+            Vector3 touchPosition = touch.position; // Use screen position directly
+
+            switch (touch.phase)
+            {
+                case TouchPhase.Began:
+                    DetectTouchedCard(touchPosition);
+                    break;
+
+                case TouchPhase.Moved:
+                    if (currentlySelectedCard == this) // Only move the selected card
+                    {
+                        OnTouchDrag(touchPosition);
+                    }
+                    break;
+
+                case TouchPhase.Ended:
+                case TouchPhase.Canceled:
+                    if (currentlySelectedCard == this) // Only release the selected card
+                    {
+                        OnTouchUp();
+                        currentlySelectedCard = null; // Clear the selected card
+                    }
+                    break;
+            }
         }
     }
 
-    void OnMouseDrag()
+    private void DetectTouchedCard(Vector3 touchPosition)
+    {
+        // Convert touch position to a ray
+        Ray ray = Camera.main.ScreenPointToRay(touchPosition);
+
+        // Perform a raycast to detect the card
+        if (Physics.Raycast(ray, out RaycastHit hit))
+        {
+            if (hit.collider != null && hit.collider.gameObject == this.gameObject)
+            {
+                OnCardTouched(touchPosition);
+            }
+        }
+    }
+
+    private void OnCardTouched(Vector3 touchPosition)
+    {
+        // Ensure only one card is selected at a time
+        if (currentlySelectedCard != null && currentlySelectedCard != this)
+            return;
+
+        // This method is called when the card is touched or clicked
+        Debug.Log($"Touched Object: {gameObject.name}");
+
+        // Store the original screen position for snap back
+        originalScreenPosition = Camera.main.WorldToScreenPoint(transform.position);
+
+        // Activate the card's indicator and deactivate others
+        SelectCard();
+
+        // Calculate the offset between the touch position and the card's screen position
+        offset = originalScreenPosition - new Vector3(touchPosition.x, touchPosition.y, 0);
+
+        // Set this card as the currently selected card
+        currentlySelectedCard = this;
+
+        // Invoke OnCardSelected
+        OnCardSelected?.Invoke(this.cardID);
+    }
+
+    private void OnTouchDrag(Vector3 touchPosition)
     {
         if (isDragging)
         {
-            // Convert mouse position to world position and move the card
-            Vector3 mousePosition = Input.mousePosition;
-            mousePosition.z = Camera.main.WorldToScreenPoint(transform.position).z; // Keep Z-axis
-            Vector3 worldPosition = Camera.main.ScreenToWorldPoint(mousePosition);
-
-            transform.position = new Vector3(worldPosition.x, worldPosition.y, originalPosition.z); // Move card
+            // Move the card using the screen position and offset
+            Vector3 newScreenPosition = new Vector3(touchPosition.x + offset.x, touchPosition.y + offset.y, originalScreenPosition.z);
+            transform.position = Camera.main.ScreenToWorldPoint(newScreenPosition); // Convert back to world space for rendering
         }
     }
 
-    void OnMouseUp()
+    private void OnTouchUp()
     {
+        if (!isDragging) return;
+
         isDragging = false;
 
-        // Calculate the distance the card has moved
-        float distanceMoved = Vector3.Distance(transform.position, originalPosition);
+        // Calculate the distance the card has moved in screen space
+        float distanceMoved = Vector3.Distance(Camera.main.WorldToScreenPoint(transform.position), originalScreenPosition);
 
-        //Try to add the card to the center if moved enough distance
+        // Try to add the card to the center if moved enough distance
         if (distanceMoved > snapBackThreshold)
         {
-            //Try to play a move if a card is already selected and a ceter card is pressed 
-            if(transform.parent.name.Contains("PlayerHand") && isOneCardSelected)
-            {   
-                TryToPlayMove();
+            if (transform.parent.name.Contains("PlayerHand") && isOneCardSelected)
+            {
+                // Invoke OnCardsPlayed
+                OnCardsPlayed?.Invoke(this.cardID, this.gameObject, GameManager.currentPlayerNo);
             }
             else
             {
                 Debug.Log("else");
-                isOneCardSelected=false;        
+                isOneCardSelected = false;
             }
-            
         }
-        else transform.position = originalPosition;
+        else
+        {
+            // Snap back to the original position
+            transform.position = Camera.main.ScreenToWorldPoint(originalScreenPosition);
+        }
+
+        // Deactivate the card's indicator
+        //selectedCardIndicator.SetActive(false);
     }
 
-    public event Action<int[]> OnCardSelected;
-    private void SelectCard()//Event when a card is selected
+    private void SelectCard()
     {
+        if(activeCardIndicator != null)
+        {
+            activeCardIndicator.SetActive(false); // Deactivate the previous card indicator
+        }
         isDragging = true;
 
-        GameManager.LocalInstance.DeactivateCardIndicators();
-
-        OnCardSelected?.Invoke(this.cardID);
+        // Activate this card's indicator
         selectedCardIndicator.SetActive(true);
-        GameManager.LocalInstance.activeCardIndicatorList.Add(selectedCardIndicator);
-        isOneCardSelected=true;
+        activeCardIndicator = selectedCardIndicator;
+
+        // Mark this card as selected
+        isOneCardSelected = true;
     }
 
-    public event Action<int[], GameObject, int> OnCardsPlayed;
-    private void TryToPlayMove()//Event when selected cards is to be played
-    {
-        OnCardsPlayed?.Invoke(this.cardID, this.gameObject, GameManager.currentPlayerNo);
-    }
-
-    //Generates the cardId from its name
     private int[] GetCardID()
     {
         string[] tagStrings = gameObject.tag.Split('_');
@@ -116,13 +164,11 @@ public class CardInteraction : MonoBehaviour
             Debug.LogError("Invalid tag format! Expected 'Kind_Value'.");
         }
 
-        // Parse the first part of the tag (Kind)
         if (!int.TryParse(tagStrings[0], out cardID[0]) || cardID[0] <= 0)
         {
             Debug.LogError($"Invalid card kind: {tagStrings[0]}");
         }
 
-        // Parse the second part of the tag (Value)
         if (!int.TryParse(tagStrings[1], out cardID[1]) || cardID[1] <= 0 || cardID[1] > 13)
         {
             Debug.LogError($"Invalid card value: {tagStrings[1]}");
@@ -131,24 +177,33 @@ public class CardInteraction : MonoBehaviour
         return cardID;
     }
 
+    private void InitializeCard()
+    {
+        cardID = GetCardID();
+        gameObject.tag = cardID[0] + "_" + cardID[1];
+
+        InitializeCardInd();
+        InitializeCardBack();
+
+        transform.localScale = new Vector3(380, 400, 2);
+    }
+
     private void InitializeCardInd()
     {
-        //Identifing the card indicator element
         GameObject cardInd = Instantiate(GameManager.LocalInstance.cardIndicator, transform.position, Quaternion.identity);
         cardInd.transform.parent = transform;
         Transform cardIndTransform = cardInd.transform;
-        cardIndTransform.localPosition = new Vector3(0,0,0.04f);
+        cardIndTransform.localPosition = new Vector3(0, 0, 0.04f);
         cardInd.SetActive(false);
         selectedCardIndicator = cardInd;
     }
 
     private void InitializeCardBack()
     {
-        //Identifing and placing the back of the cards
         GameObject cardBack = Instantiate(GameManager.LocalInstance.cardBack, transform.position, Quaternion.identity);
         cardBack.transform.parent = transform;
         Transform cardBackTransform = cardBack.transform;
-        cardBackTransform.localPosition = new Vector3(0,0,0.02f);
+        cardBackTransform.localPosition = new Vector3(0, 0, 0.02f);
+        cardBackTransform.localRotation = cardBack.transform.rotation;
     }
-
 }

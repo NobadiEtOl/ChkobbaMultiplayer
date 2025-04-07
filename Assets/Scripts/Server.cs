@@ -68,7 +68,7 @@ public class Server : NetworkBehaviour
             if (currentTurnTime <= 0f)
             {
                 timerRunning = false;
-                SkipTurn();
+                //SkipTurn();
             }
         }
         if(winnerPrintFlag)
@@ -335,7 +335,7 @@ public class Server : NetworkBehaviour
     public void EndTurn()
     {
         //Debug.LogWarning("InsideEndTurn");
-        if(turnCounter == 35)
+        if(turnCounter == 47)
         {   
             //Round ends and a winner is decided after each card is played
             DecideWinner();
@@ -384,16 +384,7 @@ public class Server : NetworkBehaviour
 
         // Variables to track rule comparisons
         int maxCardCount = 0;
-        int maxDiamonds = 0;
-        int maxSevens = 0;
-        int maxSixes = 0;
-
-        // Temporary variables to track the player or team with most cards/diamonds/sevens
         List<int> playerWithMostCards = new List<int>();
-        List<int> playerWithMostDiamonds = new List<int>();
-        List<int> playerWithMostSevens = new List<int>();
-        List<int> playerWithMostSixes = new List<int>();
-        List<int> playerWithSevenOfDiamonds = new List<int>();
 
         Dictionary<int, List<int[]>> pooledCards;
 
@@ -410,6 +401,9 @@ public class Server : NetworkBehaviour
         {
             pooledCards = playersPooledCardsIDs;
         }
+
+        // Reset points
+        points = new int[playerCount == 4 ? 2 : playerCount];
 
         // Iterate through each player's or team's pooled cards
         foreach (var kvp in pooledCards)
@@ -431,116 +425,37 @@ public class Server : NetworkBehaviour
                     playerWithMostCards.Add(playerID);
                     maxCardCount = cardCount;
                 }
-                print(playerID + " has the most Cards");
             }
 
-            // Rule 2: Count diamonds and sevens
-            int diamondsCount = 0;
-            int sevensCount = 0;
-            int sixCount = 0;
-            bool hasSevenOfDiamonds = false;
-
+            // Calculate points based on card values
             foreach (var card in cardList)
             {
                 int kind = card[0];
                 int value = card[1];
 
-                if (kind == 1) // Diamonds (kind = 1)
+                if (value == 1) // Ace
                 {
-                    diamondsCount++;
-                    if (value == 7)
-                    {
-                        hasSevenOfDiamonds = true;
-                        print(playerID + " has the seven of diamonds");
-                    }
+                    points[playerID]++;
                 }
-
-                if (value == 7) // Count Sevens (any kind of seven)
+                else if (value == 11) // Jack
                 {
-                    sevensCount++;
+                    points[playerID]++;
                 }
-                if (value == 6) // Count Sevens (any kind of seven)
+                else if (kind == 1 && value == 2) // 2 of Clubs
                 {
-                    sixCount++;
+                    points[playerID] += 2;
                 }
-            }
-
-            print(playerID + " has " + diamondsCount + " diamonds");
-            print(playerID + " has " + sevensCount + " sevens");
-
-            // Track most diamonds
-            if (diamondsCount >= maxDiamonds)
-            {
-                if (diamondsCount == maxDiamonds)
+                else if (kind == 2 && value == 10) // 10 of Diamonds
                 {
-                    playerWithMostDiamonds.Add(playerID);
+                    points[playerID] += 3;
                 }
-                else
-                {
-                    playerWithMostDiamonds.Clear();
-                    playerWithMostDiamonds.Add(playerID);
-                    maxDiamonds = diamondsCount;
-                }
-            }
-
-            // Track most sevens
-            if (sevensCount >= maxSevens)
-            {
-                if (sevensCount == maxSevens)
-                {
-                    playerWithMostSevens.Add(playerID);
-                }
-                else
-                {
-                    playerWithMostSevens.Clear();
-                    playerWithMostSevens.Add(playerID);
-                    maxSevens = sevensCount;
-                }
-            }
-
-            if (sixCount >= maxSixes)
-            {
-                if (sixCount == maxSixes)
-                {
-                    playerWithMostSixes.Add(playerID);
-                }
-                else
-                {
-                    playerWithMostSixes.Clear();
-                    playerWithMostSixes.Add(playerID);
-                    maxSixes = sixCount;
-                }
-            }
-
-            // Track seven of diamonds
-            if (hasSevenOfDiamonds)
-            {
-                playerWithSevenOfDiamonds.Add(playerID);
             }
         }
 
+        // Add 3-point bonus for most cards
         if (playerWithMostCards.Count == 1)
         {
-            points[playerWithMostCards[0]]++;
-        }
-        if (playerWithMostDiamonds.Count == 1)
-        {
-            points[playerWithMostDiamonds[0]]++;
-        }
-        if (playerWithSevenOfDiamonds.Count == 1)
-        {
-            points[playerWithSevenOfDiamonds[0]]++;
-        }
-        if (playerWithMostSevens.Count == 1)
-        {
-            points[playerWithMostSevens[0]]++;
-        }
-        else if(playerWithMostSevens.Count == 2)
-        {
-            if(playerWithMostSixes.Count == 1)
-            {
-                points[playerWithMostSixes[0]]++;
-            }
+            points[playerWithMostCards[0]] += 3;
         }
 
         // Determine the winner (max points)
@@ -562,49 +477,47 @@ public class Server : NetworkBehaviour
                     maxPoints = points[i];
                 }
             }
-            if(playerCount==4)
+            if (playerCount == 4)
             {
-                roundOverText += $"Team {i+1} has {points[i]} points!";
+                roundOverText += $"Team {i + 1} has {points[i]} points!";
                 roundOverText += "\n";
             }
             else
             {
-                roundOverText += $"Player {i+1} has {points[i]} points!";
+                roundOverText += $"Player {i + 1} has {points[i]} points!";
                 roundOverText += "\n";
             }
         }
         roundOverText += "\n";
-        roundOverText += "\n";
-        
-        int winnerSide=-1;
-        
-        if(points[0]>=11 || points[1]>=11)
+
+        int winnerSide = -1;
+
+        if (points[0] >= 11 || points[1] >= 11)
         {
             if (playerCount == 4)
             {
-                if(points[0]==points[1])
+                if (points[0] == points[1])
                 {
-                    roundOverText += $"Both teams wins!!";
-                    winnerSide=3;
+                    roundOverText += $"Both teams win!!";
+                    winnerSide = 3;
                 }
-                else 
+                else
                 {
-                    roundOverText += $"Team {winnerIDs[0]+1} wins";
-                    winnerSide=winnerIDs[0];
+                    roundOverText += $"Team {winnerIDs[0] + 1} wins";
+                    winnerSide = winnerIDs[0];
                 }
-                
             }
             else
             {
-                if(points[0]==points[1])
+                if (points[0] == points[1])
                 {
-                    roundOverText += $"Both players wins!!";
-                    winnerSide=3;
+                    roundOverText += $"Both players win!!";
+                    winnerSide = 3;
                 }
-                else 
+                else
                 {
-                    roundOverText += $"Player {winnerIDs[0]+1} wins";
-                    winnerSide=winnerIDs[0];
+                    roundOverText += $"Player {winnerIDs[0] + 1} wins";
+                    winnerSide = winnerIDs[0];
                 }
             }
         }
@@ -614,13 +527,12 @@ public class Server : NetworkBehaviour
         }
 
         Debug.LogWarning(points[0] + "_" + points[1]);
-        SendWinScreen(roundOverText,winnerSide,points[0],points[1]);
+        SendWinScreen(roundOverText, winnerSide, points[0], points[1]);
 
-        if(winnerSide == -1)
+        if (winnerSide == -1)
         {
-            Invoke("StartGameAutomatic",10f);
+            Invoke("StartGameAutomatic", 10f);
         }
-
     }
 
     private void StartGameAutomatic()
@@ -732,7 +644,7 @@ public class Server : NetworkBehaviour
 
     public void GetMove(int[] selectedHandCard, SerializableList serializableList, int playerNumber, int sumValue)
     {
-        if(selectedHandCard[1] == sumValue)
+        if(selectedHandCard[1] == sumValue || selectedHandCard[1] == 11)
         {
             RemoveCardsFromCenter(serializableList);
             networkRelay.SendMoveToClientRPC(selectedHandCard, serializableList, playerNumber);

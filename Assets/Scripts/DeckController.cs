@@ -16,12 +16,12 @@ public class DeckController : MonoBehaviour
     [SerializeField]private GameManager gameManager;
     [SerializeField] private GameObject addCardPrefab;//Prefab of the add button
     [SerializeField] private List<GameObject> cardPrefabsList;//Prefabs of all the cards.
-    [SerializeField] private Dictionary<string, GameObject> cardPrefabs;//A dictionary to keep track of each card prefabs with its ID
-    private Dictionary<string, GameObject> cardPools;//A dictionary of card ID and a list of all the instantiated cards
+    private Dictionary<string, GameObject> cardPrefabs;//A dictionary to keep track of each card prefabs with its ID
+    private Dictionary<string, GameObject> deckPool;//A dictionary of card ID and a list of all the instantiated cards
+    private List<Transform> cardPoolTransforms = new List<Transform>();
     private List<GameObject> activeCards = new List<GameObject>();
     private List<CardInteraction> cardInteractionList; // List to store CardInteraction references
     private GameObject[] playerParentHands = new GameObject[4];//Array of player hand objects to keep track of where the card objects will be placed
-    private GameObject centerParent;//Center object to keep track of where the center cards will be placed
     private List<Vector3> playerPools = new List<Vector3>();
     private int relativeIndex = 0;
     public int playerCount = 0;
@@ -75,46 +75,43 @@ public class DeckController : MonoBehaviour
     private List<GameObject> cardObjectList = new List<GameObject>();
     private void InitializeCardPool()
     {
-        if(cardPools.Count==0)
+        if(deckPool.Count==0)
         {
             cardInteractionList = new List<CardInteraction>();
             Transform deckTransform = GameObject.Find("DeckTransform").transform;
 
+            int counter=0;
             foreach (var cardPrefabEntry in cardPrefabs)
             {
                 var cardIDString = cardPrefabEntry.Key;
                 var cardPrefab = cardPrefabEntry.Value;
 
-                // Instantiate and add a fixed number of cards to the pool
-                for (int i = 0; i < 1; i++)
-                {
-                    GameObject card = Instantiate(cardPrefab);
-                    if(i==0)
-                    {
-                        card.SetActive(true); // Deactivate the card
-                        card.transform.rotation = Quaternion.Euler(0, 180, 0);
-                    }
-                    else
-                    {
-                        card.SetActive(false); // Deactivate the card
-                    }
+                
+                GameObject card = Instantiate(cardPrefab);
+                card.SetActive(true); // Deactivate the card
+                card.transform.rotation = Quaternion.Euler(270, 0, 0);
 
-                    // Get the CardInteraction component and add it to the list
-                    CardInteraction cardInteraction = card.GetComponent<CardInteraction>();
-                    if (cardInteraction != null)
-                    {
-                        cardInteractionList.Add(cardInteraction); // Store the reference in the list
-                    }
-                    
-                    card.transform.position = deckTransform.transform.position;
-                    card.transform.parent = deckTransform.transform;
-                    cardPools[cardIDString] = card;
-                    cardObjectList.Add(card);
+
+                // Get the CardInteraction component and add it to the list
+                CardInteraction cardInteraction = card.GetComponent<CardInteraction>();
+                if (cardInteraction != null)
+                {
+                    cardInteractionList.Add(cardInteraction); // Store the reference in the list
                 }
+                
+                card.transform.position = new Vector3(deckTransform.transform.position.x, deckTransform.transform.position.y + (counter*2), deckTransform.transform.position.z);
+                card.transform.parent = deckTransform.transform;
+                deckPool[cardIDString] = card;
+                cardObjectList.Add(card);
+
+                counter++;
             }
+
+            //deckTransform.rotation = Quaternion.Euler(90, 0, 0);
         }
 
         else ResetCards();
+        
         
     }
 
@@ -310,14 +307,14 @@ public class DeckController : MonoBehaviour
                 Vector3 centerPosition = centerTransform.position;
                 positions.Add(new Vector3(centerPosition.x, centerPosition.y, centerPosition.z + i * -10));
                 
-                tempCenterCard.transform.parent = centerParent.transform;
+                tempCenterCard.transform.parent = centerTransform;
                 gameManager.centerCardsObjects.Add(tempCenterCard);
                 gameManager.centerCards.Add(cardID);
 
                 if (i == 3)
-                    rotations.Add(Quaternion.Euler(0, 0, UnityEngine.Random.Range(-12, 12)));
+                    rotations.Add(Quaternion.Euler(60, 0, UnityEngine.Random.Range(-12, 12)));
                 else
-                    rotations.Add(Quaternion.Euler(0, 180, UnityEngine.Random.Range(-12, 12)));
+                    rotations.Add(Quaternion.Euler(300, 180, UnityEngine.Random.Range(-12, 12)));
             }
         }
 
@@ -341,10 +338,10 @@ public class DeckController : MonoBehaviour
         string cardIDString = GameManager.TurnCardIdToString(cardID);
         print("cardIDString: " + cardIDString);
 
-        if (cardPools.ContainsKey(cardIDString) && cardPools[cardIDString] != null)
+        if (deckPool.ContainsKey(cardIDString) && deckPool[cardIDString] != null)
         {
-            var card = cardPools[cardIDString];
-            cardPools[cardIDString] = null;
+            var card = deckPool[cardIDString];
+            deckPool[cardIDString] = null;
             card.SetActive(true);
             activeCards.Add(card);
             return card;
@@ -360,7 +357,7 @@ public class DeckController : MonoBehaviour
         if (placedCard != null)
         {
             placedCard.transform.rotation = Quaternion.Euler(0, 0, UnityEngine.Random.Range(-12, 12));
-            placedCard.transform.parent = centerParent.transform;
+            placedCard.transform.parent = centerTransform;
 
             // Use centerTransform for positioning
             Vector3 centerPosition = centerTransform.position;
@@ -599,6 +596,7 @@ public class DeckController : MonoBehaviour
     int offsetCounter2=0-1;
     public void ChainMoveCardsToPool(Vector3 position, List<GameObject> cardObjects, float speed, int poolIndex)
     {   
+        Debug.LogWarning("ChainMoveCardsToPool: " + poolIndex);
         List<Vector3> positions = new List<Vector3>();
         List<Quaternion> rotations = new List<Quaternion>();
         for (int i = 0; i<cardObjects.Count; i++)
@@ -702,21 +700,23 @@ public class DeckController : MonoBehaviour
         }
 
 
-        ChainMoveCardsToPool(playerPools[GetPoolIndex(relativePoolIndex)], centerObjects, 10, relativePoolIndex);
+        ChainMoveCardsToPool(playerPoolTransforms[GetPoolIndex(relativePoolIndex)].position, centerObjects, 10, relativePoolIndex);
     }
 
-    public async Task MoveCardsToPlayerPool(List<GameObject> cardObjects, int playerNumber)
+    public void MoveCardsToPlayerPool(List<GameObject> cardObjects, int playerNumber)
     {   
         int relativePoolIndex = (playerNumber - thisPlayerNumber + playerCount) % playerCount;
         foreach(var card in cardObjects)
         {   
             Debug.Log("Also inside the loop");
-            //card.transform.parent = cardPool.transform;
-            gameManager.centerCardsObjects.Remove(card);    
+            card.transform.parent = null; // Unparent the card
+            //card.transform.parent = playerPoolTransforms[0];
+            gameManager.centerCardsObjects.Remove(card);  
         }
 
-        
-        ChainMoveCardsToPool(playerPools[GetPoolIndex(relativePoolIndex)], cardObjects, 10, GetPoolIndex(relativePoolIndex)); 
+        Debug.Log("Also outside the loop");
+        ChainMoveCardsToPool(playerPoolTransforms[GetPoolIndex(relativePoolIndex)].position, cardObjects, 10, GetPoolIndex(relativePoolIndex));
+        Debug.Log("Also outside the function"); 
     }
 
     private int GetPoolIndex(int relativePoolIndex)
@@ -747,7 +747,7 @@ public class DeckController : MonoBehaviour
         chkobbaText.SetActive(false);
 
         cardPrefabs = new Dictionary<string, GameObject>();
-        cardPools = new Dictionary<string, GameObject>();
+        deckPool = new Dictionary<string, GameObject>();
 
         if(NetworkManager.Singleton.IsHost)
         {
@@ -782,17 +782,21 @@ public class DeckController : MonoBehaviour
             playerParentHands[i] = GameObject.FindGameObjectWithTag(tempTag);
             Debug.Log(playerParentHands[i].name);
         }
-        centerParent = GameObject.FindGameObjectWithTag("Center");
-        Debug.Log(centerParent.name);
     }
 
     private List<Transform> playerHandTransforms = new List<Transform>();
+    private List<Transform> playerPoolTransforms = new List<Transform>();
     private Transform centerTransform;
-    public void getPlayerHandTransforms(List<Transform> playerHTransforms, Transform cTransform)
+    public void getPlayerHandTransforms(List<Transform> playerHTransforms, List<Transform> playerPTransforms, Transform cTransform)
     {
         foreach(var playerH in playerHTransforms)
         {
             playerHandTransforms.Add(playerH);
+        }
+
+        foreach(var playerP in playerPTransforms)
+        {
+            playerPoolTransforms.Add(playerP);
         }
 
         centerTransform = cTransform;
