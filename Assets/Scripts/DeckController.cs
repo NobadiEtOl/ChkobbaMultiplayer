@@ -138,8 +138,9 @@ public class DeckController : MonoBehaviour
 
         List<Vector3> positions = Enumerable.Repeat(deckTransform.position, 52).ToList();
         List<Quaternion> rotations = Enumerable.Repeat(Quaternion.Euler(0, 180, 0), 52).ToList();
+        List<Vector3> scales = Enumerable.Repeat(new Vector3(750,750,750), 52).ToList();
 
-        ChainMoveCards(positions,cardObjectList, 10, rotations);
+        ChainMoveCards(positions,cardObjectList, 10, rotations, scales);
 
         Debug.Log("All cards have been reset to the deck position.");
     }
@@ -170,9 +171,9 @@ public class DeckController : MonoBehaviour
         var cardObjects = new List<GameObject>();
         var positions = new List<Vector3>();
         var rotations = new List<Quaternion>();
+        var scales = new List<Vector3>(); // List to store scales
 
-        float archRadius = 1000f; // Radius of the arch for the cards
-        float angleStep = 30f; // Angle between cards in degrees
+        float spacing = 200;
 
         for (int i = 0; i < 2; i++)
         {
@@ -190,27 +191,32 @@ public class DeckController : MonoBehaviour
                 cardObjects.Add(tempCardObject);
                 tempCardObject.transform.parent = playerHandTransforms[relativeIndex == 0 ? 0 : 2].transform;
 
-                Vector3 handTransformPosition = playerHandTransforms[relativeIndex == 0 ? 0 : 2].position;
+                Vector3 basePos = playerHandTransforms[relativeIndex == 0 ? 0 : 2].position;
+                Vector3 offset = Vector3.zero;
+                Quaternion rotation = Quaternion.identity;
 
-                // Calculate the center of the arch
-                Vector3 archCenter = handTransformPosition + new Vector3(0, relativeIndex == 0 ? -archRadius : -archRadius, 0);
+                float randomOffset = UnityEngine.Random.Range(-3, 3);
 
-                // Calculate the starting angle for the layout
-                float startAngle = -angleStep * (4 - 1) / 2; // Center the arch
-                float angle = startAngle + j * angleStep;
+                switch (relativeIndex)
+                {
+                    case 0: // Bottom (Player 0)
+                        offset = new Vector3(randomOffset, j * 5, 200);
+                        rotation = Quaternion.Euler(-90, randomOffset * 10, 0);
+                        scales.Add(new Vector3(800, 800, 800));
+                        break;
+                    case 1: // Top (Player 2)
+                        offset = new Vector3(randomOffset, j * 5, -200);
+                        rotation = Quaternion.Euler(-90, 180 + randomOffset * 10, 0);
+                        scales.Add(new Vector3(600, 600, 600));
+                        break;
+                }
 
-                // Calculate the position for the card
-                Vector3 position = archCenter + Quaternion.Euler(0, 0, angle) * (handTransformPosition - archCenter);
-                position.z -= j * 10; // Decrease z value from left to right
-                positions.Add(position);
-
-                // Calculate the rotation for the card
-                Quaternion rotation = Quaternion.Euler(0, 0, angle);
+                positions.Add(basePos + offset);
                 rotations.Add(rotation);
             }
         }
 
-        StartCoroutine(ChainMoveCardsPlayersCoroutine(positions, cardObjects, 10, rotations));
+        StartCoroutine(ChainMoveCardsPlayersCoroutine(positions, cardObjects, 10, rotations, scales));
     }
 
     private void DealFourPlayers(Dictionary<int, List<int[]>> playerHands)
@@ -218,7 +224,8 @@ public class DeckController : MonoBehaviour
         var cardObjects = new List<GameObject>();
         var positions = new List<Vector3>();
         var rotations = new List<Quaternion>();
-
+        var scales = new List<Vector3>(); // List to store scales
+        
         float spacing = 200;
 
         for (int i = 0; i < 4; i++)
@@ -241,8 +248,8 @@ public class DeckController : MonoBehaviour
                 Vector3 offset = Vector3.zero;
                 Quaternion rotation = Quaternion.identity;
 
-                float yRotationDegrees = 50f;
-                if(relativeIndex==1) yRotationDegrees *= -1;
+                float yRotationDegrees = 70f;
+                if (relativeIndex == 1) yRotationDegrees *= -1;
 
                 float radians = yRotationDegrees * Mathf.Deg2Rad;
 
@@ -252,24 +259,29 @@ public class DeckController : MonoBehaviour
                 float offsetX = d * Mathf.Cos(radians); // world-space X
                 float offsetZ = d * Mathf.Sin(radians); // world-space Z
 
+                float randomOffset = UnityEngine.Random.Range(-3, 3);
 
                 switch (relativeIndex)
                 {
                     case 0: // Bottom (Player 0)
-                        offset = new Vector3(j * spacing, 0, -j * 10);
-                        rotation = Quaternion.identity;
+                        offset = new Vector3(randomOffset, j * 5, 200);
+                        rotation = Quaternion.Euler(-90, randomOffset * 10, 0);
+                        scales.Add(new Vector3(800, 800, 800));
                         break;
                     case 1: // Right (Player 1)
-                        offset = new Vector3((offsetX*j)-(1.5f*offsetX), 0, (-j * 10)+(j * offsetZ)-(1.5f*offsetZ));
-                        rotation = Quaternion.Euler(0, -130, 0);
+                        offset = new Vector3(offsetX * randomOffset, j * 5, offsetZ * randomOffset - 200);
+                        rotation = Quaternion.Euler(-90, -130 + randomOffset * 10, 0);
+                        scales.Add(new Vector3(700, 700, 700));
                         break;
                     case 2: // Top (Player 2)
-                        offset = new Vector3((j * spacing)-(1.5f*spacing), 0, -j * 10);
-                        rotation = Quaternion.Euler(0, 180, 0);
+                        offset = new Vector3(randomOffset, j * 5, -200);
+                        rotation = Quaternion.Euler(-90, 180 + randomOffset * 10, 0);
+                        scales.Add(new Vector3(600, 600, 600));
                         break;
                     case 3: // Left (Player 3)
-                        offset = new Vector3((j * offsetX)-(1.5f*offsetX), 0, (-j * 10)+(offsetZ*j)-(1.5f*offsetZ));
-                        rotation = Quaternion.Euler(0, 130, 0);
+                        offset = new Vector3(offsetX * randomOffset, j * 5, +offsetZ * randomOffset - 200);
+                        rotation = Quaternion.Euler(-90, 130 + randomOffset * 10, 0);
+                        scales.Add(new Vector3(700, 700, 700));
                         break;
                 }
 
@@ -278,7 +290,7 @@ public class DeckController : MonoBehaviour
             }
         }
 
-        StartCoroutine(ChainMoveCardsPlayersCoroutine(positions, cardObjects, 10, rotations));
+        StartCoroutine(ChainMoveCardsPlayersCoroutine(positions, cardObjects, 10, rotations, scales));
     }
 
 
@@ -289,6 +301,7 @@ public class DeckController : MonoBehaviour
         List<GameObject> cardObjects = new List<GameObject>();
         List<Vector3> positions = new List<Vector3>();
         List<Quaternion> rotations = new List<Quaternion>();
+        List<Vector3> scales = new List<Vector3>();
 
         for (int i = 0; i < 4; i++)
         {
@@ -306,19 +319,23 @@ public class DeckController : MonoBehaviour
                 gameManager.centerCards.Add(cardID);
 
                 if (i == 3)
-                    rotations.Add(Quaternion.Euler(60, 0, UnityEngine.Random.Range(-12, 12)));
+                    rotations.Add(Quaternion.Euler(90, 0, UnityEngine.Random.Range(-12, 12)));
                 else
-                    rotations.Add(Quaternion.Euler(300, 180, UnityEngine.Random.Range(-12, 12)));
+                    rotations.Add(Quaternion.Euler(90, 180, UnityEngine.Random.Range(-12, 12)));
+
+                scales.Add(new Vector3(750, 750, 750));
             }
         }
 
-        ChainMoveCards(positions, cardObjects, 10, rotations);
+        ChainMoveCards(positions, cardObjects, 10, rotations, scales);
     }
 
-    private IEnumerator ChainMoveCardsPlayersCoroutine(List<Vector3 >positions, List<GameObject> cardObjects, int speead,List<Quaternion> rotations)
+    private IEnumerator ChainMoveCardsPlayersCoroutine(List<Vector3 >positions, List<GameObject> cardObjects, int speed,List<Quaternion> rotations, List<Vector3> scales)
     {
-        yield return new WaitForSeconds(1.5f);
-        ChainMoveCards(positions, cardObjects, 10, rotations);
+        yield return new WaitForSeconds(0.5f);
+        ChainMoveCards(positions, cardObjects, 10, rotations, scales);
+
+        //yield return new WaitForSeconds(3f);
     }
     
     private void SendCardInteractionsToGameManager()
@@ -369,22 +386,37 @@ public class DeckController : MonoBehaviour
     {
         if (playerCount == 2)
         {
-            UpdateCurrentPlayerHandLayoutTwoPlayers();
+            for(int i = 0; i < 2; i++)
+            {
+                UpdateCurrentPlayerHandLayoutTwoPlayers(i);
+            }
         }
         else if (playerCount == 4)
         {
-            UpdateCurrentPlayerHandLayoutFourPlayers();
+            for(int i = 0; i < 4; i++)
+            {
+                UpdateCurrentPlayerHandLayoutFourPlayers(i);
+            }
         }
     }
 
-    private void UpdateCurrentPlayerHandLayoutTwoPlayers()
+    private void UpdateCurrentPlayerHandLayoutTwoPlayers(int playerNumber = -1)
     {
         // Define the spacing for the layout
         float archRadius = 1000f; // Radius of the arch for the cards
         float angleStep = 30f; // Angle between cards in degrees
 
-        // Map player numbers to hand indices for two players
-        int handIndex = GameManager.currentPlayerNo == 0 ? 0 : 2;
+        // Determine the hand index based on the player number
+        int handIndex;
+        if (playerNumber != -1)
+        {
+            handIndex = playerNumber == 0 ? 0 : 2;
+        }
+        else
+        {
+            handIndex = GameManager.currentPlayerNo == 0 ? 0 : 2;
+            playerNumber = GameManager.currentPlayerNo;
+        }
 
         // Get the parent object of the current player's hand
         GameObject currentPlayerHand = playerParentHands[handIndex];
@@ -421,18 +453,29 @@ public class DeckController : MonoBehaviour
             targetPosition.z -= i * 10; // Decrease z value from left to right
             Quaternion targetRotation = Quaternion.Euler(0, 0, angle);
 
-            MoveCard(targetPosition, playerCards[i], 10, targetRotation, false);
+            // Get the current scale of the card
+            Vector3 currentScale = playerCards[i].transform.localScale;
+
+            MoveCard(targetPosition, playerCards[i], 10, targetRotation, currentScale);
         }
     }
 
-    private void UpdateCurrentPlayerHandLayoutFourPlayers()
+    private void UpdateCurrentPlayerHandLayoutFourPlayers(int playerNumber = -1)
     {
         // Define the spacing for the layout
-        float archRadius = 1000f; // Radius of the arch for the cards
-        float angleStep = 30f; // Angle between cards in degrees
+        float spacing = 200;
 
         // Get the parent object of the current player's hand
-        GameObject currentPlayerHand = playerParentHands[GameManager.currentPlayerNo];
+        GameObject currentPlayerHand;
+        if (playerNumber != -1)
+        {
+            currentPlayerHand = playerParentHands[playerNumber];
+        }
+        else
+        {
+            currentPlayerHand = playerParentHands[GameManager.currentPlayerNo];
+            playerNumber = GameManager.currentPlayerNo;
+        }
 
         // Get all the cards that are children of the current player's hand
         var playerCards = new List<GameObject>();
@@ -446,69 +489,83 @@ public class DeckController : MonoBehaviour
         int totalCards = playerCards.Count;
         if (totalCards == 0) return;
 
-        // Get the center position from the playerHandTransforms based on the player number
-        Transform playerHandTransform = playerHandTransforms[GameManager.currentPlayerNo];
-        Vector3 handTransformPosition = playerHandTransform.position;
-
-        // Calculate the center of the arch
-        Vector3 archCenter = handTransformPosition;
-        switch (GameManager.currentPlayerNo)
-        {
-            case 0: // Bottom
-                archCenter += new Vector3(0, -archRadius, 0);
-                break;
-            case 1: // Right
-                archCenter += new Vector3(archRadius, 0, 0);
-                break;
-            case 2: // Top
-                archCenter += new Vector3(0, archRadius, 0);
-                break;
-            case 3: // Left
-                archCenter += new Vector3(-archRadius, 0, 0);
-                break;
-        }
-
-        // Calculate the starting angle for the layout
-        float startAngle = -angleStep * (totalCards - 1) / 2; // Center the arch
+        // Calculate the offset multiplier
+        float offsetMult = (totalCards - 1) / 2f;
 
         // Arrange cards
         for (int i = 0; i < totalCards; i++)
         {
-            float angle = startAngle + i * angleStep;
+            Vector3 offset = Vector3.zero;
+            Quaternion rotation = Quaternion.identity;
 
-            // Calculate the position for the card
-            Vector3 targetPosition = archCenter + Quaternion.Euler(0, 0, angle) * (handTransformPosition - archCenter);
-            targetPosition.z -= i * 10; // Decrease z value from left to right
-            Quaternion targetRotation;
+            float yRotationDegrees = 75f;
+            if (playerNumber == 1) yRotationDegrees *= -1;
 
-            if (GameManager.currentPlayerNo == 0 || GameManager.currentPlayerNo == 2)
+            float radians = yRotationDegrees * Mathf.Deg2Rad;
+
+            float d = 200f; // Desired local offset (e.g., spacing between cards)
+
+            // Offset along local X (left-right in card space)
+            float offsetX = d * Mathf.Cos(radians); // world-space X
+            float offsetZ = d * Mathf.Sin(radians); // world-space Z
+
+            switch (playerNumber)
             {
-                targetRotation = Quaternion.Euler(0, 0, angle);
-            }
-            else if (GameManager.currentPlayerNo == 1 || GameManager.currentPlayerNo == 3)
-            {
-                targetRotation = Quaternion.Euler(0, 0, 90 + angle);
-            }
-            else
-            {
-                targetRotation = Quaternion.identity;
+                case 0: // Bottom (Player 0)
+                    offset = new Vector3(spacing * 6f * (i - offsetMult), 0, i * -20);
+                    rotation = Quaternion.Euler(0, 0, 0);
+                    break;
+                case 1: // Right (Player 1)
+                    offset = new Vector3(offsetX * (i - offsetMult), 0, (-i * 10) + offsetZ * (i - offsetMult) + (i * -20));
+                    rotation = Quaternion.Euler(0, -105, 0);
+                    break;
+                case 2: // Top (Player 2)
+                    offset = new Vector3((i * spacing) - (offsetMult * spacing), 0, i * -20);
+                    rotation = Quaternion.Euler(0, 180, 0);
+                    break;
+                case 3: // Left (Player 3)
+                    offset = new Vector3(offsetX * (i - offsetMult), 0, (-i * 10) + offsetZ * (i - offsetMult) + (i * -20));
+                    rotation = Quaternion.Euler(0, 105, 0);
+                    break;
             }
 
-            MoveCard(targetPosition, playerCards[i], 10, targetRotation, false);
+            Vector3 targetPosition = playerHandTransforms[playerNumber].position + offset;
+            Vector3 currentScale = playerCards[i].transform.localScale; // Use the current scale of the card
+            MoveCard(targetPosition, playerCards[i], 10, rotation, currentScale);
         }
+        if(playerNumber == 0) SetAutoRotateFlagTrue(playerCards);
+    }
+    public void SetAutoRotateFlagTrue(List<GameObject> cardObjects)
+    {
+        // Search the list for a CardInteraction with the matching GameObject
+        foreach (var cardObject in cardObjects)
+        {
+            foreach (var cardInteraction in cardInteractionList)
+            {
+                if (cardInteraction.gameObject == cardObject)
+                {
+                    cardInteraction.autoRotateFlag=true; // Return the matching CardInteraction
+                }
+            }
+        }
+        
+
+        Debug.LogWarning("CardInteraction not found for the specified GameObject.");
+        
     }
 
-    public void MoveCard(Vector3 endPos, GameObject cardObject, float speed, Quaternion rotation, bool audioFlag=true)
+    public void MoveCard(Vector3 endPos, GameObject cardObject, float speed, Quaternion rotation, Vector3 scales,bool audioFlag=true)
     {
         // Start the coroutine to move the card
-        StartCoroutine(MoveCardCoroutine(endPos, cardObject, speed, rotation, audioFlag));
+        StartCoroutine(MoveCardCoroutine(endPos, cardObject, speed, rotation, scales,audioFlag));
     }
 
-    private IEnumerator MoveCardCoroutine(Vector3 endPos, GameObject cardObject, float speedMultiplier, Quaternion rotation, bool audioFlag = true)
+    private IEnumerator MoveCardCoroutine(Vector3 endPos, GameObject cardObject, float speedMultiplier, Quaternion rotation, Vector3 scale, bool audioFlag = true)
     {
-        // Set the initial position and rotation of the card
+        // Set the initial position, rotation, and scale of the card
         Vector3 startingPos = cardObject.transform.position;
         Quaternion startingRotation = cardObject.transform.rotation;
+        Vector3 startingScale = cardObject.transform.localScale;
 
         if (audioFlag) AudioManager.Instance.PlayAudio(3, 1, false);
 
@@ -532,6 +589,9 @@ public class DeckController : MonoBehaviour
             // Smoothly interpolate the rotation using Lerp
             cardObject.transform.rotation = Quaternion.Lerp(startingRotation, rotation, t);
 
+            // Smoothly interpolate the scale using Lerp
+            cardObject.transform.localScale = Vector3.Lerp(startingScale, scale, t);
+
             // Increment elapsed time
             timeElapsed += Time.deltaTime;
 
@@ -539,9 +599,10 @@ public class DeckController : MonoBehaviour
             yield return null;
         }
 
-        // Ensure the card reaches the exact end position and rotation
+        // Ensure the card reaches the exact end position, rotation, and scale
         cardObject.transform.position = endPos;
         cardObject.transform.rotation = rotation;
+        cardObject.transform.localScale = scale;
     }
 
 
@@ -579,9 +640,9 @@ public class DeckController : MonoBehaviour
         cardObject.transform.rotation = endRotation;
     }
 
-    public void ChainMoveCards(List<Vector3> positions, List<GameObject> cardObject, float speed, List<Quaternion> rotations)
+    public void ChainMoveCards(List<Vector3> positions, List<GameObject> cardObject, float speed, List<Quaternion> rotations, List<Vector3> scales)
     {
-        StartCoroutine(ChainMoveCardsCoroutine(positions, cardObject, speed, rotations));
+        StartCoroutine(ChainMoveCardsCoroutine(positions, cardObject, speed, rotations, scales));
     }
 
     int offset=150; 
@@ -593,25 +654,27 @@ public class DeckController : MonoBehaviour
         Debug.LogWarning("ChainMoveCardsToPool: " + poolIndex);
         List<Vector3> positions = new List<Vector3>();
         List<Quaternion> rotations = new List<Quaternion>();
-        for (int i = 0; i<cardObjects.Count; i++)
+        List<Vector3> scales = new List<Vector3>();
+        for (int i = 0; i < cardObjects.Count; i++)
         {
             positions.Add(position);
             Quaternion rotation = Quaternion.Euler(0, 180, UnityEngine.Random.Range(170f, 190f));
             rotations.Add(rotation);
+            scales.Add(new Vector3(700, 700, 700)); // Set scale for all cards
 
-            if(cardObjects.Count == 2)
+            if (cardObjects.Count == 2)
             {
-                if(i==cardObjects.Count-1)
+                if (i == cardObjects.Count - 1)
                 {
                     rotations[i] = Quaternion.Euler(0, 0, 90);
                     Debug.LogWarning(poolIndex);
-                    positions[i] = new Vector3(position.x+100, position.y+GetChkobbaYOffset(poolIndex),position.z-GetChkobbaZOffset()+10);
+                    positions[i] = new Vector3(position.x + 100, position.y + GetChkobbaYOffset(poolIndex), position.z - GetChkobbaZOffset() + 10);
                 }
                 StartCoroutine(ChkobbaCoroutine());
             }
         }
 
-        StartCoroutine(ChainMoveCardsCoroutine(positions, cardObjects, speed, rotations,true));
+        StartCoroutine(ChainMoveCardsCoroutine(positions, cardObjects, speed, rotations, scales, true));
     }
 
     private IEnumerator ChkobbaCoroutine()
@@ -652,7 +715,7 @@ public class DeckController : MonoBehaviour
     }
 
 
-    private IEnumerator ChainMoveCardsCoroutine(List<Vector3> positions, List<GameObject> cardObjects, float speed, List<Quaternion> rotations, bool playFlag=false)
+    private IEnumerator ChainMoveCardsCoroutine(List<Vector3> positions, List<GameObject> cardObjects, float speed, List<Quaternion> rotations, List<Vector3> scales, bool playFlag=false)
     {
         if(playFlag)
         {
@@ -660,7 +723,7 @@ public class DeckController : MonoBehaviour
         }
         for(int i = 0; i < cardObjects.Count; i++)
         {
-            yield return StartCoroutine(MoveCardCoroutine(positions[i], cardObjects[i], speed + (i*0.25f), rotations[i]));
+            yield return StartCoroutine(MoveCardCoroutine(positions[i], cardObjects[i], speed + (i*0.25f), rotations[i],scales[i]));
         }
         UpdateCurrentPlayerHandLayout();
     

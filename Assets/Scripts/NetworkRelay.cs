@@ -40,7 +40,7 @@ public class NetworkRelay : NetworkBehaviour
             Debug.LogError("GameManagers list is null or empty!");
         }
     }
-    [ClientRpc(RequireOwnership = false)]
+    [ClientRpc(RequireOwnership = true)]
     public void InitializeCardPrefabsClientRPC()
     {
         GameManager.LocalInstance.InitializeCardPrefabs();

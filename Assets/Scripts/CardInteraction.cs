@@ -18,6 +18,9 @@ public class CardInteraction : MonoBehaviour
     public event Action<int[], GameObject, int> OnCardsPlayed;
     private static GameObject activeCardIndicator = null; // Tracks the currently active card indicator
 
+    // New variable to control auto-rotation
+    public bool autoRotateFlag = false;
+
     void Start()
     {
         InitializeCard();
@@ -25,7 +28,14 @@ public class CardInteraction : MonoBehaviour
 
     void Update()
     {
-        if (Input.touchCount > 0) // Check if there is at least one touch
+        if (autoRotateFlag)
+        {
+            // Call the rotation function if the card is not already rotating
+            RotateCardWithLerp();
+        }
+
+        // Handle touch input
+        if (Input.touchCount > 0)
         {
             Touch touch = Input.GetTouch(0); // Get the first touch
             Vector3 touchPosition = touch.position; // Use screen position directly
@@ -52,6 +62,67 @@ public class CardInteraction : MonoBehaviour
                     }
                     break;
             }
+        }
+
+        // Handle mouse input
+        if (Input.GetMouseButtonDown(0)) // Left mouse button pressed
+        {
+            Vector3 mousePosition = Input.mousePosition; // Get mouse position
+            DetectTouchedCard(mousePosition);
+        }
+        else if (Input.GetMouseButton(0)) // Left mouse button held down
+        {
+            Vector3 mousePosition = Input.mousePosition; // Get mouse position
+            if (currentlySelectedCard == this) // Only move the selected card
+            {
+                OnTouchDrag(mousePosition);
+            }
+        }
+        else if (Input.GetMouseButtonUp(0)) // Left mouse button released
+        {
+            if (currentlySelectedCard == this) // Only release the selected card
+            {
+                OnTouchUp();
+                currentlySelectedCard = null; // Clear the selected card
+            }
+        }
+    }
+    private bool isRotating = false; // Flag to control rotation
+    private float rotationProgress = 0f; // Tracks the progress of the rotation
+    private Quaternion startRotation; // Starting rotation
+    private Quaternion endRotation; // Target rotation
+    private bool rotateDirection = true; // Tracks the direction of rotation (true = clockwise, false = counterclockwise)
+
+    private void RotateCardWithLerp()
+    {
+        if (!isRotating)
+        {
+            // Initialize the rotation
+            isRotating = true;
+            rotationProgress = 0f;
+
+            // Set the start and end rotations
+            startRotation = transform.rotation;
+            float randomAngle = UnityEngine.Random.Range(10f, 25f); // Slight random angle
+            if (!rotateDirection) randomAngle = -randomAngle; // Reverse direction if needed
+            endRotation = Quaternion.Euler(0 + randomAngle/10, 0, 0 + randomAngle/2);
+        }
+
+        // Increment the rotation progress
+        if(startRotation.eulerAngles.x == 90)rotationProgress += Time.deltaTime;
+        else rotationProgress += Time.deltaTime/7;
+
+        // Smoothly interpolate between the start and end rotations
+        transform.rotation = Quaternion.Lerp(startRotation, endRotation, rotationProgress);
+
+        // Check if the rotation is complete
+        if (rotationProgress >= 1f)
+        {
+            // Toggle the rotation direction for the next cycle
+            rotateDirection = !rotateDirection;
+
+            // Reset the flag to stop rotation
+            isRotating = false;
         }
     }
 
@@ -120,8 +191,9 @@ public class CardInteraction : MonoBehaviour
             if (transform.parent.name.Contains("PlayerHand") && isOneCardSelected)
             {
                 // Invoke OnCardsPlayed
+                Debug.Log("OnCardsPlayed invoked!");
                 OnCardsPlayed?.Invoke(this.cardID, this.gameObject, GameManager.currentPlayerNo);
-                if(activeCardIndicator != null)
+                if (activeCardIndicator != null)
                 {
                     activeCardIndicator.SetActive(false); // Deactivate the previous card indicator
                 }
@@ -144,7 +216,7 @@ public class CardInteraction : MonoBehaviour
 
     private void SelectCard()
     {
-        if(activeCardIndicator != null)
+        if (activeCardIndicator != null)
         {
             activeCardIndicator.SetActive(false); // Deactivate the previous card indicator
         }
@@ -186,10 +258,10 @@ public class CardInteraction : MonoBehaviour
         cardID = GetCardID();
         gameObject.tag = cardID[0] + "_" + cardID[1];
 
+        transform.localScale = new Vector3(750, 750, 750);
+        transform.localRotation = Quaternion.Euler(0, 0, 0);
         InitializeCardInd();
         InitializeCardBack();
-
-        transform.localScale = new Vector3(380, 400, 2);
     }
 
     private void InitializeCardInd()
@@ -199,6 +271,7 @@ public class CardInteraction : MonoBehaviour
         Transform cardIndTransform = cardInd.transform;
         cardIndTransform.localPosition = new Vector3(0, 0, 0.04f);
         cardIndTransform.localRotation = cardInd.transform.rotation;
+        cardIndTransform.localScale = new Vector3(1, 1, 1);
         cardInd.SetActive(false);
         selectedCardIndicator = cardInd;
     }
@@ -210,5 +283,6 @@ public class CardInteraction : MonoBehaviour
         Transform cardBackTransform = cardBack.transform;
         cardBackTransform.localPosition = new Vector3(0, 0, 0.02f);
         cardBackTransform.localRotation = cardBack.transform.rotation;
+        cardBackTransform.localScale = new Vector3(1, 1, 1);
     }
 }

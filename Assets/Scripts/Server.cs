@@ -42,7 +42,7 @@ public class Server : NetworkBehaviour
     void Start()
     {
         print("server.cs start");
-        StartCoroutine(ServerSubsciribe());
+        //StartCoroutine(ServerSubsciribe());
         //Invoke("StartGameDelayed",5);
 
     }
@@ -314,15 +314,45 @@ public class Server : NetworkBehaviour
     //Add played cards to the current players pool.
     public void AddDiscardedCardsToPlayerPool(SerializableList serializableList)
     {
-        List<int[]> discardedCardIDs = serializableList.ToList(); 
+        
+        List<int[]> discardedCardIDs = serializableList.ToList();
+        Debug.LogWarning(discardedCardIDs.Count+"111");
+        foreach(var discardedCardID in discardedCardIDs)
+        {
+            Debug.LogWarning(discardedCardID[0] + "_" + discardedCardID[1]);
+        } 
         foreach(int[] discardedCardID in discardedCardIDs)
         {
             playersPooledCardsIDs[currentPlayer].Add(discardedCardID);
         }
 
         int chkobbaPlayer=5;
-        Debug.LogWarning(discardedCardIDs.Count+"111");
-        if(discardedCardIDs.Count==2)
+        bool jPistiFlag = false;
+        if(discardedCardIDs[discardedCardIDs.Count-1][1] == 11 && discardedCardIDs[discardedCardIDs.Count-2][1] != 11)
+        {
+            jPistiFlag = true;
+        }
+        if(discardedCardIDs.Count == 2 && discardedCardIDs[discardedCardIDs.Count-1][1] != 11)
+        {
+            Debug.LogWarning("Inside Chkobba");
+            //If the last card played is a joker, the player who played it gets a point
+            if(playerCount==2)
+            {
+                points[currentPlayer]++;
+            }
+            else if(playerCount==4)
+            {
+                if(currentPlayer==0 || currentPlayer==2)
+                {
+                    points[0]++;
+                }
+                else if(currentPlayer==1 || currentPlayer==3)
+                {
+                    points[1]++;
+                }
+            }
+        }
+        else if(discardedCardIDs.Count>=4 && discardedCardIDs[discardedCardIDs.Count-1][1]==11 && discardedCardIDs[discardedCardIDs.Count-2][1]==11 && discardedCardIDs[discardedCardIDs.Count-3][1]==11 && discardedCardIDs[discardedCardIDs.Count-4][1]==11)
         {
             Debug.Log("Chkobba Player " + currentPlayer);
             PlayerChkobba(currentPlayer);
@@ -575,18 +605,18 @@ public class Server : NetworkBehaviour
         Debug.LogWarning("Player " + playerID + " Chkobba");
         if(playerCount==2)
         {
-            points[playerID]++;
+            points[playerID]+=10;
         }
 
         if(playerCount==4)
         {
             if(playerID==0 || playerID==2)
             {
-                points[0]++;
+                points[0]+=10;
             }
             else if(playerID==1 || playerID==3)
             {
-                points[1]++;
+                points[1]+=10;
             }
         }
     }
@@ -644,6 +674,7 @@ public class Server : NetworkBehaviour
 
     public void GetMove(int[] selectedHandCard, SerializableList serializableList, int playerNumber, int sumValue)
     {
+        Debug.LogWarning("GetMove called with selectedHandCard: " + selectedHandCard[0] + "_" + selectedHandCard[1]);
         if(selectedHandCard[1] == sumValue || selectedHandCard[1] == 11)
         {
             RemoveCardsFromCenter(serializableList);
@@ -653,10 +684,15 @@ public class Server : NetworkBehaviour
             AddDiscardedCardsToPlayerPool(serializableList);
             EndTurn();
         }
+        else
+        {
+            AddCardIDToCenter(selectedHandCard);
+        } 
     }
 
     public void AddCardIDToCenter(int[] cardID)
     {
+        Debug.LogWarning("AddCardIDToCenter called with cardID: " + cardID[0] + "_" + cardID[1]);
         centerCardsIDs.Add(cardID);
         networkRelay.UpdateCenterCardIDListClientRPC(new SerializableList(centerCardsIDs));
         networkRelay.SendCardAddedToCenterClientRPC(cardID);
@@ -693,7 +729,7 @@ public class Server : NetworkBehaviour
     }
     private void StartGameDelayed()
     {
-        StartGame(playerCount);
+        StartGame(4);
     }
 
     public void SetPlayerCount(int playerCountVar)

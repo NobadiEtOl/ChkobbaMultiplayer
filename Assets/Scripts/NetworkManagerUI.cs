@@ -29,11 +29,11 @@ public class NetworkManagerUI : MonoBehaviour
     {
         startButton.onClick.AddListener(() => { Server.Singleton.StartGameAfterDelay(); });
         clientButton.onClick.AddListener(async () => { await StartClientWithRelay(); });
-        hostButton.onClick.AddListener(async () => { await StartHostWithRelay(2); });
+        hostButton.onClick.AddListener(async () => { print("ofof");await StartHostWithRelay(2); });
         startGameTwoPlayerButton.onClick.AddListener(async () => { await FindLobbiesAndStartHostIfNoneExist(2); });
         startGameFourPlayerButton.onClick.AddListener(async () => { await FindLobbiesAndStartHostIfNoneExist(4); });
 
-        FindLobbiesAndStartHostIfNoneExist(4);
+        //FindLobbiesAndStartHostIfNoneExist(4);
     }
 
     bool isListeningFlag = false;

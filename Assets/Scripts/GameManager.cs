@@ -123,14 +123,16 @@ public class GameManager : NetworkBehaviour
     {
         //UI
         //Logic
-        if(centerCards.Count!=0 && (centerCards[centerCards.Count-1][1] == cardID[1] || 11 == cardID[1]))
+        Debug.Log("Card Played: " + cardID[0] + "_" + cardID[1]);
+        CheckIfLegal(playerNumber);
+        /*if(centerCards.Count!=0 && (centerCards[centerCards.Count-1][1] == cardID[1] || 11 == cardID[1]))
         {
             CheckIfLegal(playerNumber);
         }
         else
         {
             CardAddedToCenter();
-        }
+        }*/
     }
 
     //Checks if played move is legal before sending it to the server
@@ -138,8 +140,25 @@ public class GameManager : NetworkBehaviour
     {
         //if(currentSelectedHandCard[0] == 0 || currentSelectedHandCard[1]==0)return false;
 
+        List<int[]> cardsToRemove = new List<int[]>();
+
+        // Iterate over the selected center cards and add them to the removal list
+        foreach (int[] cardToBeRemoved in centerCards)
+        {
+            cardsToRemove.Add(cardToBeRemoved);
+        }
+
+        SerializableList serializableList = new SerializableList(centerCards);
+
+        //Update the game UI after the move is played
+        Debug.Log("centerCards.Count: " + centerCards.Count);
+        Debug.Log(centerCards.Count > 0 ? centerCards[centerCards.Count-1][1] : 0);   
+        networkRelay.SendMoveToServerRPC(currentSelectedHandCard,serializableList,playerNumber,centerCards.Count > 0 ? centerCards[centerCards.Count-1][1] : 0);
+        myCards.Remove(currentSelectedHandCard);
+
+        //Clear the list even if its a correct move
         //Final control to decide if cards can be played
-        if(centerCards[centerCards.Count-1][1] == currentSelectedHandCard[1] || currentSelectedHandCard[1] == 11)
+        /*if(centerCards[centerCards.Count-1][1] == currentSelectedHandCard[1] || currentSelectedHandCard[1] == 11)
         {
             List<int[]> cardsToRemove = new List<int[]>();
 
@@ -158,7 +177,7 @@ public class GameManager : NetworkBehaviour
             //Clear the list even if its a correct move
             currentSelectedHandCard = new int[]{0,0};
             centerCards.Clear();
-        }
+        }*/
     }
 
     //Called when the player decides to put the selected hand card to the center
@@ -199,6 +218,8 @@ public class GameManager : NetworkBehaviour
         
         PrintCenterCards();
         CardInteraction.isOneCardSelected = false;
+        currentSelectedHandCard = new int[]{0,0};
+        centerCards.Clear();
     }
     
     //To remove the played card from the hand when it played to the center
