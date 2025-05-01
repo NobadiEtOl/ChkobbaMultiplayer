@@ -522,7 +522,7 @@ public class Server : NetworkBehaviour
 
         int winnerSide = -1;
 
-        if (points[0] >= 11 || points[1] >= 11)
+        if (points[0] >= 100 || points[1] >= 100)
         {
             if (playerCount == 4)
             {
@@ -570,6 +570,7 @@ public class Server : NetworkBehaviour
         if(timer>=11)
         {
             StartGame(playerCount);
+            Debug.LogWarning("StartGameAutomatic called");
         }
 
     }

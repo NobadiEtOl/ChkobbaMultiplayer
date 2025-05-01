@@ -105,7 +105,7 @@ public class CardInteraction : MonoBehaviour
             startRotation = transform.rotation;
             float randomAngle = UnityEngine.Random.Range(10f, 25f); // Slight random angle
             if (!rotateDirection) randomAngle = -randomAngle; // Reverse direction if needed
-            endRotation = Quaternion.Euler(0 + randomAngle/10, 0, 0 + randomAngle/2);
+            endRotation = Quaternion.Euler(90 + randomAngle/10, 0, 0 + randomAngle/2);
         }
 
         // Increment the rotation progress
@@ -271,7 +271,7 @@ public class CardInteraction : MonoBehaviour
         Transform cardIndTransform = cardInd.transform;
         cardIndTransform.localPosition = new Vector3(0, 0, 0.04f);
         cardIndTransform.localRotation = cardInd.transform.rotation;
-        cardIndTransform.localScale = new Vector3(1, 1, 1);
+        cardIndTransform.localScale = new Vector3(1.7f, 2.3f, 1);
         cardInd.SetActive(false);
         selectedCardIndicator = cardInd;
     }
@@ -281,7 +281,7 @@ public class CardInteraction : MonoBehaviour
         GameObject cardBack = Instantiate(GameManager.LocalInstance.cardBack, transform.position, Quaternion.identity);
         cardBack.transform.parent = transform;
         Transform cardBackTransform = cardBack.transform;
-        cardBackTransform.localPosition = new Vector3(0, 0, 0.02f);
+        cardBackTransform.localPosition = new Vector3(0, 0, 0.002f);
         cardBackTransform.localRotation = cardBack.transform.rotation;
         cardBackTransform.localScale = new Vector3(1, 1, 1);
     }

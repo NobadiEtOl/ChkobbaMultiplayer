@@ -69,14 +69,17 @@ public class GameManager : NetworkBehaviour
         SubscribeToEvents();
     }
 
+    bool alreadySubbed = false;
     //Subscribes to each of the cards events
     private void SubscribeToEvents()
     {
         // Iterate through the list of CardInteraction scripts
+        if(alreadySubbed)return;
         foreach (var cardInteraction in cardInteractionsScripts)
         {
             cardInteraction.OnCardSelected += CardSelected;
             cardInteraction.OnCardsPlayed += CardsPlayed;
+            alreadySubbed = true;
         }
     }
 
@@ -87,6 +90,14 @@ public class GameManager : NetworkBehaviour
         Dictionary<int, List<int[]>> playerHands = serializableDictionary.ToDictionary();
 
         //Informs the deckController to deal the players' cards
+        StartCoroutine(DelayedDealPlayers(playerCount,playerHands));
+    }
+
+    private IEnumerator DelayedDealPlayers(int playerCount, Dictionary<int, List<int[]>> playerHands)
+    {
+        //Needed so that hands dont get updated before the previous ordeals are done
+        yield return new WaitForSeconds(1.5f);
+        
         if(deckController)deckController.DealPlayers(playerCount,playerHands);
     }
 
@@ -124,6 +135,7 @@ public class GameManager : NetworkBehaviour
         //UI
         //Logic
         Debug.Log("Card Played: " + cardID[0] + "_" + cardID[1]);
+        deckController.SetAutoRotateFlagFalse(cardObject);
         CheckIfLegal(playerNumber);
         /*if(centerCards.Count!=0 && (centerCards[centerCards.Count-1][1] == cardID[1] || 11 == cardID[1]))
         {
@@ -233,6 +245,7 @@ public class GameManager : NetworkBehaviour
     {
         currentPlayerNo=playerNumber;
         currentPlayerText.text = "Current Player: " + (currentPlayerNo+1);
+        //deckController.UpdateCurrentPlayerHandLayout();
         GetTurnTimeLocation();
     }
 
@@ -313,7 +326,8 @@ public class GameManager : NetworkBehaviour
                 else AudioManager.Instance.PlayAudio(1,0.5f,false);
             }
         }
-    
+
+        deckController.ResetCards();
     }
 
     private void UpdatePointText(int point0, int point1)
