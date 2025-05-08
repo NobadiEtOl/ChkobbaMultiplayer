@@ -267,7 +267,7 @@ public class Server : NetworkBehaviour
                 int[] tempCardID = deckCardsIDs[deckCardsIDs.Count-1];
                 playersHandCardsIDs[j].Add(tempCardID);
                 deckCardsIDs.RemoveAt(deckCardsIDs.Count-1);
-                print(tempCardID[0] + "_" + tempCardID[1]);
+                //print(tempCardID[0] + "_" + tempCardID[1]);
                 //Add functions to run animations
             }
         }
@@ -661,14 +661,14 @@ public class Server : NetworkBehaviour
     {
         if(list == null || list.Count == 0)
         {
-            Debug.Log("List is empty");
+            //Debug.Log("List is empty");
             return;
         }
         int counter=0;
         foreach(var array in list)
         {
-            Debug.Log("---------------------"); 
-            Debug.Log("Array[" + counter + "]: [" + array[0] + "," + array[1] + "]");
+            //Debug.Log("---------------------"); 
+            //Debug.Log("Array[" + counter + "]: [" + array[0] + "," + array[1] + "]");
             counter++;
         }
     }

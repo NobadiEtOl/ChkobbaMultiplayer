@@ -163,7 +163,7 @@ public class GameManager : NetworkBehaviour
         SerializableList serializableList = new SerializableList(centerCards);
 
         //Update the game UI after the move is played
-        Debug.Log("centerCards.Count: " + centerCards.Count);
+        //Debug.Log("centerCards.Count: " + centerCards.Count);
         Debug.Log(centerCards.Count > 0 ? centerCards[centerCards.Count-1][1] : 0);   
         networkRelay.SendMoveToServerRPC(currentSelectedHandCard,serializableList,playerNumber,centerCards.Count > 0 ? centerCards[centerCards.Count-1][1] : 0);
         myCards.Remove(currentSelectedHandCard);
@@ -211,6 +211,13 @@ public class GameManager : NetworkBehaviour
         foreach(int[] cardID in selectedCards)
         {   
             GameObject tempCardObject = GameObject.FindWithTag(cardID[0] + "_" + cardID[1]);
+
+            if(cardID == playedCard)
+            {
+                tempCardObject.transform.rotation = Quaternion.Euler(90, 0, 0);
+                tempCardObject.transform.position = (centerTransform.position + tempCardObject.transform.position)/2;
+            }
+            
             if(tempCardObject != null)
             {
                 cardObjectsToBeDiscarted.Add(tempCardObject);
