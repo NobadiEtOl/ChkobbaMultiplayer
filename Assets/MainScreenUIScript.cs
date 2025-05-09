@@ -8,6 +8,7 @@ public class MainScreenUIScript : MonoBehaviour
     [SerializeField] private GameObject quickPlayUI;
     [SerializeField] private GameObject createRoomUI;
     [SerializeField] private GameObject findRoomUI;
+    [SerializeField] private GameObject profileUI;
     // Start is called before the first frame update
     void Start()
     {
@@ -33,6 +34,11 @@ public class MainScreenUIScript : MonoBehaviour
         findRoomUI.SetActive(true);
     }
 
+    public void OnProfileButtonClicked()
+    {
+        profileUI.SetActive(true);
+    }
+
     public void OnQuickPlayCloseButtonClicked()
     {
         quickPlayUI.SetActive(false);
@@ -44,5 +50,10 @@ public class MainScreenUIScript : MonoBehaviour
     public void OnFindRoomCloseButtonClicked()
     {
         findRoomUI.SetActive(false);
+    }
+
+    public void OnProfileCloseButtonClicked()
+    {
+        profileUI.SetActive(false);
     }
 }

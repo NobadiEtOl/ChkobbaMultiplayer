@@ -18,7 +18,8 @@ public class NetworkManagerUI : MonoBehaviour
 {
     [SerializeField] private Button startButton;
     [SerializeField] private Button clientButton;
-    [SerializeField] private Button hostButton;
+    [SerializeField] private Button hostTwoPlayerButton;
+    [SerializeField] private Button hostFourPlayerButton;
     [SerializeField] private Button startGameTwoPlayerButton;
     [SerializeField] private Button startGameFourPlayerButton;
     [SerializeField] private InputField inputField;
@@ -29,7 +30,8 @@ public class NetworkManagerUI : MonoBehaviour
     {
         startButton.onClick.AddListener(() => { Server.Singleton.StartGameAfterDelay(); });
         clientButton.onClick.AddListener(async () => { await StartClientWithRelay(); });
-        hostButton.onClick.AddListener(async () => { print("ofof");await StartHostWithRelay(2); });
+        hostTwoPlayerButton.onClick.AddListener(async () => {await StartHostWithRelay(2); });
+        hostFourPlayerButton.onClick.AddListener(async () => {await StartHostWithRelay(4); });
         startGameTwoPlayerButton.onClick.AddListener(async () => { await FindLobbiesAndStartHostIfNoneExist(2); });
         startGameFourPlayerButton.onClick.AddListener(async () => { await FindLobbiesAndStartHostIfNoneExist(4); });
 

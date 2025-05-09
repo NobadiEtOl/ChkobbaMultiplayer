@@ -101,6 +101,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   isPlayable: 1
+  autoRotateFlag: 0
 --- !u!114 &4741486254294821250
 MonoBehaviour:
   m_ObjectHideFlags: 0
