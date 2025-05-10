@@ -28,7 +28,7 @@ public class NetworkManagerUI : MonoBehaviour
 
     void Awake()
     {
-        startButton.onClick.AddListener(() => { Server.Singleton.StartGameAfterDelay(); });
+        startButton.onClick.AddListener(() => { Server.Singleton.StartGameAfterDelayTwoPlayer(); });
         clientButton.onClick.AddListener(async () => { await StartClientWithRelay(); });
         hostTwoPlayerButton.onClick.AddListener(async () => {await StartHostWithRelay(2); });
         hostFourPlayerButton.onClick.AddListener(async () => {await StartHostWithRelay(4); });
@@ -79,6 +79,7 @@ public class NetworkManagerUI : MonoBehaviour
 
         CreateLobbyOptions options = new CreateLobbyOptions
         {
+            IsPrivate = true, // <--- This makes the lobby joinable only by code
             Data = new Dictionary<string, DataObject>
             {
                 { "JoinCode", new DataObject(DataObject.VisibilityOptions.Public, joinCodeVar) }
@@ -149,7 +150,8 @@ public class NetworkManagerUI : MonoBehaviour
             await StartHostWithRelay(playerCount);
         }
 
-        Server.Singleton.StartGameAfterDelay();
+        if(playerCount==2)Server.Singleton.StartGameAfterDelayTwoPlayer();
+        if(playerCount==4)Server.Singleton.StartGameAfterDelayFourPlayer();
     }
 
 

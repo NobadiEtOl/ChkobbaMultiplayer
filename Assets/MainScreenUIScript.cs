@@ -37,6 +37,7 @@ public class MainScreenUIScript : MonoBehaviour
     public void OnProfileButtonClicked()
     {
         profileUI.SetActive(true);
+        gameObject.GetComponent<ProfileScript>().UpdateMatchCountText();
     }
 
     public void OnQuickPlayCloseButtonClicked()
@@ -55,5 +56,7 @@ public class MainScreenUIScript : MonoBehaviour
     public void OnProfileCloseButtonClicked()
     {
         profileUI.SetActive(false);
+        gameObject.GetComponent<ProfileScript>().ResetCardBackShowcase();
+        gameObject.GetComponent<ProfileScript>().ResetProfilePicShowcase();
     }
 }

@@ -724,13 +724,21 @@ public class Server : NetworkBehaviour
             Invoke("StartGameDelayed",5);
         }
     }
-    public void StartGameAfterDelay()
+    public void StartGameAfterDelayFourPlayer()
     {
-        Invoke("StartGameDelayed",3f);
+        Invoke("StartGameDelayedFourPlayer",3f);
     }
-    private void StartGameDelayed()
+    private void StartGameDelayedFourPlayer()
     {
         StartGame(4);
+    }
+    public void StartGameAfterDelayTwoPlayer()
+    {
+        Invoke("StartGameDelayedTwoPlayer",3f);
+    }
+    private void StartGameDelayedTwoPlayer()
+    {
+        StartGame(2);
     }
 
     public void SetPlayerCount(int playerCountVar)

@@ -430,8 +430,8 @@ public class GameManager : NetworkBehaviour
 
         winScreen = GameObject.FindGameObjectWithTag("WinScreen");
 
-        roundOverText = GameObject.FindGameObjectWithTag("RoundOverText").GetComponent<Text>();
-        roundOverText.text = "Connected \n\n\n Waiting For Game To Start";
+        //roundOverText = GameObject.FindGameObjectWithTag("RoundOverText").GetComponent<Text>();
+        //roundOverText.text = "Connected \n\n\n Waiting For Game To Start";
         currentPlayerText = GameObject.Find("CurrentPlayerText").GetComponent<Text>();
 
         turnTimerText = GameObject.Find("TurnTimer").GetComponent<Text>();

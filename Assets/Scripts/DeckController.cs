@@ -176,7 +176,7 @@ public class DeckController : MonoBehaviour
         var positions = new List<Vector3>();
         var rotations = new List<Quaternion>();
         var scales = new List<Vector3>(); // List to store scales
-
+        
         float spacing = 200;
 
         for (int i = 0; i < 2; i++)
@@ -188,35 +188,39 @@ public class DeckController : MonoBehaviour
             {
                 var cardID = playerHands[i][j];
                 if (relativeIndex == 0) gameManager.myCards.Add(cardID);
+                if (relativeIndex == 1) relativeIndex=2;
 
                 GameObject tempCardObject = GetCardFromPool(cardID);
                 if (tempCardObject == null) continue;
 
                 cardObjects.Add(tempCardObject);
-                tempCardObject.transform.parent = playerHandTransforms[relativeIndex == 0 ? 0 : 2].transform;
+                tempCardObject.transform.parent = playerHandTransforms[relativeIndex].transform;
 
-                Vector3 basePos = playerHandTransforms[relativeIndex == 0 ? 0 : 2].position;
+                Vector3 basePos = playerHandTransforms[relativeIndex].position;
+                Vector3 centerRotation = playerHandTransforms[relativeIndex].rotation.eulerAngles;
                 Vector3 offset = Vector3.zero;
                 Quaternion rotation = Quaternion.identity;
 
-                float randomOffset = UnityEngine.Random.Range(-3, 3);
+                float randomOffset1 = UnityEngine.Random.Range(-5, 5);
+                float randomOffset2 = UnityEngine.Random.Range(-100, 100);
 
                 switch (relativeIndex)
                 {
                     case 0: // Bottom (Player 0)
-                        offset = new Vector3(randomOffset, j * 5, 200);
-                        rotation = Quaternion.Euler(-90, randomOffset * 10, 0);
-                        scales.Add(new Vector3(800, 800, 800));
+                        offset = new Vector3(randomOffset1 * randomOffset2, j * 5, randomOffset1 * randomOffset2);
+                        rotation = Quaternion.Euler(centerRotation.x,centerRotation.y + (randomOffset1*3),centerRotation.z);
+                        //scales.Add(new Vector3(800, 800, 800));
                         break;
-                    case 1: // Top (Player 2)
-                        offset = new Vector3(randomOffset, j * 5, -200);
-                        rotation = Quaternion.Euler(-90, 180 + randomOffset * 10, 0);
-                        scales.Add(new Vector3(600, 600, 600));
+                    case 2: // Top (Player 2)
+                        offset = new Vector3(randomOffset1 * randomOffset2, j * 5, randomOffset1 * randomOffset2);
+                        rotation = Quaternion.Euler(centerRotation.x,centerRotation.y + (randomOffset1*3),centerRotation.z);
+                        //scales.Add(new Vector3(600, 600, 600));
                         break;
                 }
 
                 positions.Add(basePos + offset);
                 rotations.Add(rotation);
+                scales.Add(new Vector3(1000, 1000, 1000));
             }
         }
 
@@ -252,17 +256,6 @@ public class DeckController : MonoBehaviour
                 Vector3 centerRotation = playerHandTransforms[relativeIndex].rotation.eulerAngles;
                 Vector3 offset = Vector3.zero;
                 Quaternion rotation = Quaternion.identity;
-
-                //float yRotationDegrees = 70f;
-                //if (relativeIndex == 1) yRotationDegrees *= -1;
-
-                //float radians = yRotationDegrees * Mathf.Deg2Rad;
-
-                //float d = 200f; // This is your desired local offset (e.g., spacing between cards)
-
-                // Offset along local X (left-right in card space)
-                //float offsetX = d * Mathf.Cos(radians); // world-space X
-                //float offsetZ = d * Mathf.Sin(radians); // world-space Z
 
                 float randomOffset1 = UnityEngine.Random.Range(-5, 5);
                 float randomOffset2 = UnityEngine.Random.Range(-100, 100);
@@ -428,24 +421,28 @@ public class DeckController : MonoBehaviour
 
     private void UpdateCurrentPlayerHandLayoutTwoPlayers(int playerNumber = -1)
     {
-        // Define the spacing for the layout
-        float archRadius = 1000f; // Radius of the arch for the cards
-        float angleStep = 30f; // Angle between cards in degrees
+        if(playerNumber == 1) playerNumber = 2;
 
-        // Determine the hand index based on the player number
-        int handIndex;
+        // Define the spacing for the layout
+        float spacing = 200;
+
+        // Get the parent object of the current player's hand
+        GameObject currentPlayerHand;
         if (playerNumber != -1)
         {
-            handIndex = playerNumber == 0 ? 0 : 2;
+            currentPlayerHand = playerParentHands[playerNumber];
         }
         else
         {
-            handIndex = GameManager.currentPlayerNo == 0 ? 0 : 2;
+            currentPlayerHand = playerParentHands[GameManager.currentPlayerNo];
             playerNumber = GameManager.currentPlayerNo;
         }
 
-        // Get the parent object of the current player's hand
-        GameObject currentPlayerHand = playerParentHands[handIndex];
+
+        if(currentPlayerHand.transform.childCount == 1)
+        {
+            return;
+        }
 
         // Get all the cards that are children of the current player's hand
         var playerCards = new List<GameObject>();
@@ -459,31 +456,36 @@ public class DeckController : MonoBehaviour
         int totalCards = playerCards.Count;
         if (totalCards == 0) return;
 
-        // Get the center position from the playerHandTransforms based on the hand index
-        Transform playerHandTransform = playerHandTransforms[handIndex];
-        Vector3 handTransformPosition = playerHandTransform.position;
-
-        // Calculate the center of the arch
-        Vector3 archCenter = handTransformPosition + new Vector3(0, handIndex == 0 ? -archRadius : archRadius, 0);
-
-        // Calculate the starting angle for the layout
-        float startAngle = -angleStep * (totalCards - 1) / 2; // Center the arch
+        // Calculate the offset multiplier
+        float offsetMult = (totalCards - 1) / 2f;
 
         // Arrange cards
         for (int i = 0; i < totalCards; i++)
         {
-            float angle = startAngle + i * angleStep;
+            Vector3 offset = Vector3.zero;
+            Quaternion rotation = Quaternion.identity;
+            Vector3 centerRotation = playerHandTransforms[relativeIndex].rotation.eulerAngles;
 
-            // Calculate the position for the card
-            Vector3 targetPosition = archCenter + Quaternion.Euler(0, 0, angle) * (handTransformPosition - archCenter);
-            targetPosition.z -= i * 10; // Decrease z value from left to right
-            Quaternion targetRotation = Quaternion.Euler(0, 0, angle);
+            Vector3 currentScale = playerCards[i].transform.localScale; // Use the current scale of the card
 
-            // Get the current scale of the card
-            Vector3 currentScale = playerCards[i].transform.localScale;
+            switch (playerNumber)
+            {
+                case 0: // Bottom (Player 0)
+                    offset = new Vector3(spacing * 15f * (i - offsetMult), 1000, 0);
+                    rotation = Quaternion.Euler(-centerRotation.x,centerRotation.y,centerRotation.z);
+                    currentScale = new Vector3(1750, 1750, 1750);
+                    break;
+                case 2: // Top (Player 2)
+                    offset = new Vector3(spacing * 3f * (i - offsetMult), 1000+(i*10), 0);
+                    rotation = Quaternion.Euler(centerRotation.x,centerRotation.y,centerRotation.z);
+                    break;
+            }
 
-            MoveCard(targetPosition, playerCards[i], 10, targetRotation, currentScale);
+            Vector3 targetPosition = playerHandTransforms[playerNumber].position + offset;
+            MoveCard(targetPosition, playerCards[i], 10, rotation, currentScale);
         }
+        if(playerNumber == 0) StartCoroutine(SetAutoRotateFlagTrue(playerCards));
+        Debug.LogWarning(playerNumber);
     }
 
     private void UpdateCurrentPlayerHandLayoutFourPlayers(int playerNumber = -1)

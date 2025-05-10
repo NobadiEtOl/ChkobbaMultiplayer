@@ -1,5 +1,5 @@
 //using Unity.Netcode;
-using UnityEngine;
+/*using UnityEngine;
 using UnityEngine.UI;
 
 public class Player : MonoBehaviour
@@ -37,6 +37,5 @@ public class Player : MonoBehaviour
     {
         PlayerPrefs.SetInt("CardBackIndex", cardBackIndex);
         PlayerPrefs.Save(); // Ensure the data is written to disk
-        Debug.Log("CardBackIndex saved: " + cardBackIndex);
     }
-}
+}*/
