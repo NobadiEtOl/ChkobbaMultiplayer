@@ -16,6 +16,7 @@ using System.Threading.Tasks;
 
 public class NetworkManagerUI : MonoBehaviour
 {
+    [SerializeField]private MainUIScript mainUIScript;
     [SerializeField] private Button startButton;
     [SerializeField] private Button clientButton;
     [SerializeField] private Button hostTwoPlayerButton;
@@ -30,8 +31,8 @@ public class NetworkManagerUI : MonoBehaviour
     {
         startButton.onClick.AddListener(() => { Server.Singleton.StartGameAfterDelayTwoPlayer(); });
         clientButton.onClick.AddListener(async () => { await StartClientWithRelay(); });
-        hostTwoPlayerButton.onClick.AddListener(async () => {await StartHostWithRelay(2); });
-        hostFourPlayerButton.onClick.AddListener(async () => {await StartHostWithRelay(4); });
+        hostTwoPlayerButton.onClick.AddListener(async () => {await StartHostWithRelay(2,true); });
+        hostFourPlayerButton.onClick.AddListener(async () => {await StartHostWithRelay(4,true); });
         startGameTwoPlayerButton.onClick.AddListener(async () => { await FindLobbiesAndStartHostIfNoneExist(2); });
         startGameFourPlayerButton.onClick.AddListener(async () => { await FindLobbiesAndStartHostIfNoneExist(4); });
 
@@ -63,8 +64,10 @@ public class NetworkManagerUI : MonoBehaviour
         return uniquePlayerId;
     }
 
-    public async Task<string> StartHostWithRelay(int playerCount)
+    public async Task<string> StartHostWithRelay(int playerCount,bool privateFlag)
     {
+        if(privateFlag)mainUIScript.OpenWaitingScreenUI();
+
         await UnityServices.InitializeAsync();
 
         if (!AuthenticationService.Instance.IsSignedIn)
@@ -79,7 +82,7 @@ public class NetworkManagerUI : MonoBehaviour
 
         CreateLobbyOptions options = new CreateLobbyOptions
         {
-            IsPrivate = true, // <--- This makes the lobby joinable only by code
+            IsPrivate = privateFlag, // <--- This makes the lobby joinable only by code
             Data = new Dictionary<string, DataObject>
             {
                 { "JoinCode", new DataObject(DataObject.VisibilityOptions.Public, joinCodeVar) }
@@ -113,6 +116,7 @@ public class NetworkManagerUI : MonoBehaviour
 
     public async Task FindLobbiesAndStartHostIfNoneExist(int playerCount)
     {
+        mainUIScript.OpenWaitingScreenUI();
         await UnityServices.InitializeAsync();
         if (!AuthenticationService.Instance.IsSignedIn)
         {
@@ -147,7 +151,7 @@ public class NetworkManagerUI : MonoBehaviour
         else
         {
             Debug.Log($"No open lobbies for {playerCount} players found. Creating a new one...");
-            await StartHostWithRelay(playerCount);
+            await StartHostWithRelay(playerCount,false);
         }
 
         if(playerCount==2)Server.Singleton.StartGameAfterDelayTwoPlayer();

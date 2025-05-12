@@ -2,9 +2,11 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class MainScreenUIScript : MonoBehaviour
+public class MainUIScript : MonoBehaviour
 {
-    [SerializeField] private GameObject mainMenuUI;
+    [SerializeField]private ProfileScript profileScript;
+    [SerializeField] private GameObject startingScreenUI;
+    [SerializeField] private GameObject waitingScreenUI;
     [SerializeField] private GameObject quickPlayUI;
     [SerializeField] private GameObject createRoomUI;
     [SerializeField] private GameObject findRoomUI;
@@ -56,7 +58,13 @@ public class MainScreenUIScript : MonoBehaviour
     public void OnProfileCloseButtonClicked()
     {
         profileUI.SetActive(false);
-        gameObject.GetComponent<ProfileScript>().ResetCardBackShowcase();
-        gameObject.GetComponent<ProfileScript>().ResetProfilePicShowcase();
+        profileScript.ResetCardBackShowcase();
+        profileScript.ResetProfilePicShowcase();
+    }
+
+    public void OpenWaitingScreenUI()
+    {
+        startingScreenUI.SetActive(false);
+        waitingScreenUI.SetActive(true);
     }
 }
