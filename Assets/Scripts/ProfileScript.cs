@@ -2,10 +2,11 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine.UI;
 using UnityEngine;
+using Unity.VisualScripting;
 
 public class ProfileScript : MonoBehaviour
 {
-    [SerializeReference] private Sprite[] cardBackSprite;
+    [SerializeReference] public Sprite[] cardBackSprites;
     [SerializeReference] private Sprite[] profilePicSprites;
     [SerializeField]private GameObject cardBackShowcase;
     [SerializeField] private GameObject profilePicShowcase;
@@ -20,8 +21,9 @@ public class ProfileScript : MonoBehaviour
     private int total2v2MatchCount;
     private int total2v2MatchWinCount;
     private string playerName;
-    public int cardBackCounter = 0;
-    public int profilePicCounter = 0;  
+    public int cardBackCounter;
+    public int profilePicCounter;  
+
     // Start is called before the first frame update
     void Start()
     {
@@ -37,10 +39,10 @@ public class ProfileScript : MonoBehaviour
         // Update the card backs with the loaded index
         foreach (GameObject card in exampleCards)
         {
-            card.GetComponent<Image>().sprite = cardBackSprite[cardBackIndex];
+            card.GetComponent<Image>().sprite = cardBackSprites[cardBackIndex];
         }
 
-        cardBackShowcase.GetComponent<Image>().sprite = cardBackSprite[cardBackIndex];
+        cardBackShowcase.GetComponent<Image>().sprite = cardBackSprites[cardBackIndex];
         profilePicShowcase.GetComponent<Image>().sprite = profilePicSprites[profilePicIndex];
     }
 
@@ -55,19 +57,19 @@ public class ProfileScript : MonoBehaviour
     public void OnCardBackchangeNext()
     {
         // Increment the counter and loop back to 0 if it exceeds the array length
-        cardBackCounter = (cardBackCounter + 1) % cardBackSprite.Length;
+        cardBackCounter = (cardBackCounter + 1) % cardBackSprites.Length;
 
         // Update the card back showcase with the new sprite
-        cardBackShowcase.GetComponent<Image>().sprite = cardBackSprite[(cardBackIndex + cardBackCounter) % cardBackSprite.Length];
+        cardBackShowcase.GetComponent<Image>().sprite = cardBackSprites[(cardBackIndex + cardBackCounter) % cardBackSprites.Length];
     }
 
     public void OnCardBackchangePrevious()
     {
         // Decrement the counter and loop back to the last index if it goes below 0
-        cardBackCounter = (cardBackCounter - 1 + cardBackSprite.Length) % cardBackSprite.Length;
+        cardBackCounter = (cardBackCounter - 1 + cardBackSprites.Length) % cardBackSprites.Length;
 
         // Update the card back showcase with the new sprite
-        cardBackShowcase.GetComponent<Image>().sprite = cardBackSprite[(cardBackIndex + cardBackCounter + cardBackSprite.Length) % cardBackSprite.Length];
+        cardBackShowcase.GetComponent<Image>().sprite = cardBackSprites[(cardBackIndex + cardBackCounter + cardBackSprites.Length) % cardBackSprites.Length];
     }
 
     public void OnProfilePicChangeNext()
@@ -91,11 +93,11 @@ public class ProfileScript : MonoBehaviour
 
     public void UpdateCardBack()
     {
-        cardBackIndex = (cardBackIndex + cardBackCounter) % cardBackSprite.Length;
+        cardBackIndex = (cardBackIndex + cardBackCounter) % cardBackSprites.Length;
 
         foreach (GameObject card in exampleCards)
         {
-            card.GetComponent<Image>().sprite = cardBackSprite[cardBackIndex];
+            card.GetComponent<Image>().sprite = cardBackSprites[cardBackIndex];
         }
         SaveCardBackIndex(); // Save the card back index whenever it is updated
         cardBackCounter = 0;
@@ -132,7 +134,7 @@ public class ProfileScript : MonoBehaviour
     {
         // Reset the card back showcase to the default sprite
         cardBackCounter = 0;
-        cardBackShowcase.GetComponent<Image>().sprite = cardBackSprite[cardBackIndex];
+        cardBackShowcase.GetComponent<Image>().sprite = cardBackSprites[cardBackIndex];
     }
 
     public void ResetProfilePicShowcase()

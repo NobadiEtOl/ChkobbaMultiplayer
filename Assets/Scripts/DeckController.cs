@@ -28,21 +28,21 @@ public class DeckController : MonoBehaviour
     public int playerCount = 0;
     //private GameObject cardPool;
     private GameObject chkobbaText;
+    
+    void Awake()
+    {
+        if (LocalInstance != null && LocalInstance != this)
+        {
+            Destroy(this.gameObject);
+            return;
+        }
+        LocalInstance = this;
+        // Optionally: DontDestroyOnLoad(this.gameObject);
+    }
 
     void Start()
     {   
-        if(LocalInstance == null)
-        {
-            LocalInstance = this;
-        }
-        else 
-        {
-            Debug.LogWarning("Duplicate GameManager detected. Destroying extra instance.");
-            //Destroy(gameObject);
-        }
-
         InitialDeckSetUp();
-        
     }
 
     //Called when the deck is ready to start
@@ -66,7 +66,7 @@ public class DeckController : MonoBehaviour
             }
             else
             {
-                Debug.LogWarning($"Card prefab with ID {cardIDString} already exists. Skipping...");
+                //Debug.LogWarning($"Card prefab with ID {cardIDString} already exists. Skipping...");
             }
         }
     }
@@ -146,7 +146,7 @@ public class DeckController : MonoBehaviour
 
         ChainMoveCards(positions,cardObjectList, 40, rotations, scales);
 
-        Debug.Log("All cards have been reset to the deck position.");
+        //Debug.Log("All cards have been reset to the deck position.");
     }
 
     //Deals to players according to the playerCount
@@ -156,7 +156,7 @@ public class DeckController : MonoBehaviour
 
         if (playerCount != 2 && playerCount != 4)
         {
-            Debug.LogError("Player number is different from 2 or 4");
+            //Debug.LogError("Player number is different from 2 or 4");
             return;
         }
 
@@ -176,12 +176,15 @@ public class DeckController : MonoBehaviour
         var positions = new List<Vector3>();
         var rotations = new List<Quaternion>();
         var scales = new List<Vector3>(); // List to store scales
-        
-        float spacing = 200;
 
         for (int i = 0; i < 2; i++)
         {
+            Debug.LogWarning("i: " + i);
+            Debug.LogWarning("thisPlayerNumber: " + thisPlayerNumber);
+            
             relativeIndex = (i - thisPlayerNumber + playerCount) % playerCount;
+            Debug.LogWarning("relativeIndex: " + relativeIndex);
+
             if (relativeIndex == 0) gameManager.myCards = new List<int[]>();
 
             for (int j = 0; j < 4; j++)
@@ -233,8 +236,6 @@ public class DeckController : MonoBehaviour
         var positions = new List<Vector3>();
         var rotations = new List<Quaternion>();
         var scales = new List<Vector3>(); // List to store scales
-        
-        float spacing = 200;
 
         for (int i = 0; i < 4; i++)
         {
@@ -341,7 +342,7 @@ public class DeckController : MonoBehaviour
 
     private IEnumerator ChainMoveCardsPlayersCoroutine(List<Vector3 >positions, List<GameObject> cardObjects, int speed,List<Quaternion> rotations, List<Vector3> scales)
     {
-        yield return new WaitForSeconds(0.5f);
+        if(false)yield return new WaitForSeconds(0.5f);
         ChainMoveCards(positions, cardObjects, 10, rotations, scales);
 
         //yield return new WaitForSeconds(3f);
@@ -367,7 +368,7 @@ public class DeckController : MonoBehaviour
             return card;
         }
 
-        Debug.LogError($"No cards available in the pool for ID: {cardIDString}");
+        //Debug.LogError($"No cards available in the pool for ID: {cardIDString}");
         return null;
     }
 
@@ -424,7 +425,7 @@ public class DeckController : MonoBehaviour
         if(playerNumber == 1) playerNumber = 2;
 
         // Define the spacing for the layout
-        float spacing = 200;
+        float spacing = 150;
 
         // Get the parent object of the current player's hand
         GameObject currentPlayerHand;
@@ -471,13 +472,13 @@ public class DeckController : MonoBehaviour
             switch (playerNumber)
             {
                 case 0: // Bottom (Player 0)
-                    offset = new Vector3(spacing * 15f * (i - offsetMult), 1000, 0);
+                    offset = new Vector3(spacing * 15f * (i - offsetMult), 1000, 100);
                     rotation = Quaternion.Euler(-centerRotation.x,centerRotation.y,centerRotation.z);
-                    currentScale = new Vector3(1750, 1750, 1750);
+                    currentScale = new Vector3(1250, 1250, 1250);
                     break;
                 case 2: // Top (Player 2)
                     offset = new Vector3(spacing * 3f * (i - offsetMult), 1000+(i*10), 0);
-                    rotation = Quaternion.Euler(centerRotation.x,centerRotation.y,centerRotation.z);
+                    rotation = Quaternion.Euler(-centerRotation.x,centerRotation.y,centerRotation.z);
                     break;
             }
 
@@ -485,13 +486,13 @@ public class DeckController : MonoBehaviour
             MoveCard(targetPosition, playerCards[i], 10, rotation, currentScale);
         }
         if(playerNumber == 0) StartCoroutine(SetAutoRotateFlagTrue(playerCards));
-        Debug.LogWarning(playerNumber);
+        //Debug.LogWarning(playerNumber);
     }
 
     private void UpdateCurrentPlayerHandLayoutFourPlayers(int playerNumber = -1)
     {
         // Define the spacing for the layout
-        float spacing = 200;
+        float spacing = 150;
 
         // Get the parent object of the current player's hand
         GameObject currentPlayerHand;
@@ -532,17 +533,6 @@ public class DeckController : MonoBehaviour
             Vector3 offset = Vector3.zero;
             Quaternion rotation = Quaternion.identity;
             Vector3 centerRotation = playerHandTransforms[relativeIndex].rotation.eulerAngles;
-
-            float yRotationDegrees = 75f;
-            if (playerNumber == 1) yRotationDegrees *= -1;
-
-            float radians = yRotationDegrees * Mathf.Deg2Rad;
-
-            float d = 200f; // Desired local offset (e.g., spacing between cards)
-
-            // Offset along local X (left-right in card space)
-            float offsetX = d * Mathf.Cos(radians); // world-space X
-            float offsetZ = d * Mathf.Sin(radians); // world-space Z
             Vector3 currentScale = playerCards[i].transform.localScale; // Use the current scale of the card
 
             switch (playerNumber)
@@ -550,19 +540,19 @@ public class DeckController : MonoBehaviour
                 case 0: // Bottom (Player 0)
                     offset = new Vector3(spacing * 15f * (i - offsetMult), 1000, 0);
                     rotation = Quaternion.Euler(-centerRotation.x,centerRotation.y,centerRotation.z);
-                    currentScale = new Vector3(1750, 1750, 1750);
+                    currentScale = new Vector3(1250, 1250, 1250);
                     break;
                 case 1: // Right (Player 1)
                     offset = new Vector3(0, i*10, spacing * 3f * (i - offsetMult));
-                    rotation = Quaternion.Euler(centerRotation.x,centerRotation.y+90,centerRotation.z);
+                    rotation = Quaternion.Euler(-centerRotation.x,centerRotation.y+90,centerRotation.z);
                     break;
                 case 2: // Top (Player 2)
                     offset = new Vector3(spacing * 3f * (i - offsetMult), i*10, 0);
-                    rotation = Quaternion.Euler(centerRotation.x,centerRotation.y,centerRotation.z);
+                    rotation = Quaternion.Euler(-centerRotation.x,centerRotation.y,centerRotation.z);
                     break;
                 case 3: // Left (Player 3)
                     offset = new Vector3(0, i*10, spacing * 3f * (i - offsetMult));
-                    rotation = Quaternion.Euler(centerRotation.x,centerRotation.y+90,centerRotation.z);
+                    rotation = Quaternion.Euler(-centerRotation.x,centerRotation.y+90,centerRotation.z);
                     break;
             }
 
@@ -570,11 +560,11 @@ public class DeckController : MonoBehaviour
             MoveCard(targetPosition, playerCards[i], 10, rotation, currentScale);
         }
         if(playerNumber == 0) StartCoroutine(SetAutoRotateFlagTrue(playerCards));
-        Debug.LogWarning(playerNumber);
+        //Debug.LogWarning(playerNumber);
     }
     public IEnumerator SetAutoRotateFlagTrue(List<GameObject> cardObjects)
     {
-        Debug.LogWarning("CardInteraction not found for the specified GameObject.");
+        //Debug.LogWarning("CardInteraction not found for the specified GameObject.");
         yield return new WaitForSeconds(0.5f);
         // Search the list for a CardInteraction with the matching GameObject
         foreach (var cardObject in cardObjects)
@@ -589,13 +579,13 @@ public class DeckController : MonoBehaviour
         }
         
 
-        Debug.LogWarning("CardInteraction not found for the specified GameObject.");
+        //Debug.LogWarning("CardInteraction not found for the specified GameObject.");
         
     }
 
     public void SetAutoRotateFlagFalse(GameObject cardObject)
     {
-        Debug.LogWarning("CardInteraction not found for the specified GameObject.");
+        //Debug.LogWarning("CardInteraction not found for the specified GameObject.");
         
         foreach (var cardInteraction in cardInteractionList)
         {
@@ -607,7 +597,7 @@ public class DeckController : MonoBehaviour
         
         
 
-        Debug.LogWarning("CardInteraction not found for the specified GameObject.");
+        //Debug.LogWarning("CardInteraction not found for the specified GameObject.");
         
     }
 
@@ -723,7 +713,7 @@ public class DeckController : MonoBehaviour
                 if (i == cardObjects.Count - 1)
                 {
                     rotations[i] = Quaternion.Euler(0, 0, 90);
-                    Debug.LogWarning(poolIndex);
+                    //Debug.LogWarning(poolIndex);
                     positions[i] = new Vector3(position.x + 100, position.y + GetChkobbaYOffset(poolIndex), position.z - GetChkobbaZOffset() + 10);
                 }
                 StartCoroutine(ChkobbaCoroutine());
@@ -735,11 +725,11 @@ public class DeckController : MonoBehaviour
 
     private IEnumerator ChkobbaCoroutine()
     {
-        chkobbaText.SetActive(true);
+        //chkobbaText.SetActive(true);
 
         yield return new WaitForSeconds(2);
 
-        chkobbaText.SetActive(false);
+        //chkobbaText.SetActive(false);
     }
 
     private int GetChkobbaYOffset(int poolIndex)
@@ -785,7 +775,7 @@ public class DeckController : MonoBehaviour
     public void SetPlayerNumber(int playerNumber)
     {
         thisPlayerNumber = playerNumber;
-        Debug.LogWarning("thisPlayerNumber: " + thisPlayerNumber);
+        //Debug.LogWarning("thisPlayerNumber: " + thisPlayerNumber);
     }
 
     public int SendPlayerNumber()
@@ -796,12 +786,12 @@ public class DeckController : MonoBehaviour
     [ContextMenu("Print ThisPlayerNumber")]
     private void PrintThisPlayerNumber()
     {
-        Debug.Log("ThisPlayerNumber: " + thisPlayerNumber);
+        //Debug.Log("ThisPlayerNumber: " + thisPlayerNumber);
     }
 
     public void AddCardsToPlayerPool(int playerNumber)
     {
-        Debug.Log("inside AddCardsToPlayerPool: " + gameManager.centerCardsObjects.Count);
+        //Debug.Log("inside AddCardsToPlayerPool: " + gameManager.centerCardsObjects.Count);
         List<GameObject> centerObjects = new List<GameObject>();
         int relativePoolIndex = (playerNumber - thisPlayerNumber + playerCount) % playerCount;
         foreach(Transform child in GameObject.Find("Center").transform)
@@ -850,21 +840,12 @@ public class DeckController : MonoBehaviour
 
     private void InitialDeckSetUp()
     {
-        chkobbaText = GameObject.Find("ChkobbaText");
-        chkobbaText.SetActive(false);
+        //chkobbaText = GameObject.Find("ChkobbaText");
+        //chkobbaText.SetActive(false);
 
         cardPrefabs = new Dictionary<string, GameObject>();
         deckPool = new Dictionary<string, GameObject>();
 
-        if(NetworkManager.Singleton.IsHost)
-        {
-            thisPlayerNumber = WebGLCommunication.LocalInstance.playerNumber;
-        }
-        else if(NetworkManager.Singleton.IsClient)
-        {
-            thisPlayerNumber = WebGLCommunication.LocalInstance.playerNumber;
-            //gameManager.AskPlayerNumber();
-        }
 
         //StartCoroutine(DelayedFlag());
         GetPools();

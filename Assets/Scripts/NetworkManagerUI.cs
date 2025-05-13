@@ -17,24 +17,22 @@ using System.Threading.Tasks;
 public class NetworkManagerUI : MonoBehaviour
 {
     [SerializeField]private MainUIScript mainUIScript;
-    [SerializeField] private Button startButton;
     [SerializeField] private Button clientButton;
     [SerializeField] private Button hostTwoPlayerButton;
     [SerializeField] private Button hostFourPlayerButton;
-    [SerializeField] private Button startGameTwoPlayerButton;
-    [SerializeField] private Button startGameFourPlayerButton;
+    [SerializeField] private Button quickPlayTwoPlayerButton;
+    [SerializeField] private Button quickPlayFourPlayerButton;
     [SerializeField] private InputField inputField;
     [SerializeField] private Text joinCodeText;
     private string joinCodeVar;
 
     void Awake()
     {
-        startButton.onClick.AddListener(() => { Server.Singleton.StartGameAfterDelayTwoPlayer(); });
         clientButton.onClick.AddListener(async () => { await StartClientWithRelay(); });
         hostTwoPlayerButton.onClick.AddListener(async () => {await StartHostWithRelay(2,true); });
         hostFourPlayerButton.onClick.AddListener(async () => {await StartHostWithRelay(4,true); });
-        startGameTwoPlayerButton.onClick.AddListener(async () => { await FindLobbiesAndStartHostIfNoneExist(2); });
-        startGameFourPlayerButton.onClick.AddListener(async () => { await FindLobbiesAndStartHostIfNoneExist(4); });
+        quickPlayTwoPlayerButton.onClick.AddListener(async () => { await FindLobbiesAndStartHostIfNoneExist(2); });
+        quickPlayFourPlayerButton.onClick.AddListener(async () => { await FindLobbiesAndStartHostIfNoneExist(4); });
 
         //FindLobbiesAndStartHostIfNoneExist(4);
     }
@@ -66,7 +64,7 @@ public class NetworkManagerUI : MonoBehaviour
 
     public async Task<string> StartHostWithRelay(int playerCount,bool privateFlag)
     {
-        if(privateFlag)mainUIScript.OpenWaitingScreenUI();
+        if(privateFlag)mainUIScript.OpenWaitingScreenUI("blue", playerCount.ToString());
 
         await UnityServices.InitializeAsync();
 
@@ -97,6 +95,9 @@ public class NetworkManagerUI : MonoBehaviour
 
     public async Task<bool> StartClientWithRelay()
     {
+        string inputJoinCode = inputField.text;
+        mainUIScript.OpenWaitingScreenUI("yellow", inputJoinCode);
+
         await UnityServices.InitializeAsync();
 
         if (!AuthenticationService.Instance.IsSignedIn)
@@ -104,7 +105,6 @@ public class NetworkManagerUI : MonoBehaviour
             await AuthenticationService.Instance.SignInAnonymouslyAsync();
         }
 
-        string inputJoinCode = inputField.text;
         Debug.Log("Trying to join with joinCode: " + inputJoinCode);
         joinCodeText.text = inputJoinCode;
 
@@ -116,8 +116,10 @@ public class NetworkManagerUI : MonoBehaviour
 
     public async Task FindLobbiesAndStartHostIfNoneExist(int playerCount)
     {
-        mainUIScript.OpenWaitingScreenUI();
+        mainUIScript.OpenWaitingScreenUI("red", playerCount.ToString());
+
         await UnityServices.InitializeAsync();
+
         if (!AuthenticationService.Instance.IsSignedIn)
         {
             await AuthenticationService.Instance.SignInAnonymouslyAsync();
@@ -154,8 +156,8 @@ public class NetworkManagerUI : MonoBehaviour
             await StartHostWithRelay(playerCount,false);
         }
 
-        if(playerCount==2)Server.Singleton.StartGameAfterDelayTwoPlayer();
-        if(playerCount==4)Server.Singleton.StartGameAfterDelayFourPlayer();
+        //if(playerCount==2)Server.Singleton.StartGameAfterDelayTwoPlayer();
+        //if(playerCount==4)Server.Singleton.StartGameAfterDelayFourPlayer();
     }
 
 

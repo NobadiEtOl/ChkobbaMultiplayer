@@ -1,6 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class MainUIScript : MonoBehaviour
 {
@@ -11,6 +13,9 @@ public class MainUIScript : MonoBehaviour
     [SerializeField] private GameObject createRoomUI;
     [SerializeField] private GameObject findRoomUI;
     [SerializeField] private GameObject profileUI;
+    [SerializeField] private GameObject[] currentMode1v1;
+    [SerializeField] private GameObject[] currentMode2v2;
+    [SerializeField] private GameObject currentModeYellow;
     // Start is called before the first frame update
     void Start()
     {
@@ -62,9 +67,37 @@ public class MainUIScript : MonoBehaviour
         profileScript.ResetProfilePicShowcase();
     }
 
-    public void OpenWaitingScreenUI()
+    public void OpenWaitingScreenUI(string color, string playerCount)
     {
-        startingScreenUI.SetActive(false);
+        if(startingScreenUI.activeSelf)startingScreenUI.SetActive(false);
         waitingScreenUI.SetActive(true);
+
+        if(color == "red")
+        {
+            if(playerCount == "2")
+            {
+                currentMode1v1[0].SetActive(true);
+            }
+            else if(playerCount == "4")
+            {
+                currentMode2v2[0].SetActive(true);
+            }
+        }
+        else if(color == "blue")
+        {
+            if(playerCount == "2")
+            {
+                currentMode1v1[1].SetActive(true);
+            }
+            else if(playerCount == "4")
+            {
+                currentMode2v2[1].SetActive(true);
+            }
+        }
+        else if(color == "yellow")
+        {
+            currentModeYellow.SetActive(true);
+            currentModeYellow.transform.GetChild(0).gameObject.GetComponent<Text>().text = playerCount;
+        }
     }
 }

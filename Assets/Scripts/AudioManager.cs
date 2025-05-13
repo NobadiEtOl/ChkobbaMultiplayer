@@ -26,7 +26,7 @@ public class AudioManager : MonoBehaviour
 
     public void PlayAudio(int index, float volume = 1f, bool loop = false)
     {
-        if (index >= 0 && index < audioClips.Count)
+        /*if (index >= 0 && index < audioClips.Count)
         {
             if (audioSourceMap.ContainsKey(index))
             {
@@ -51,7 +51,7 @@ public class AudioManager : MonoBehaviour
         else
         {
             Debug.LogWarning($"Audio clip index {index} is out of range!");
-        }
+        }*/
     }
 
     public void StopAudioByIndex(int index)

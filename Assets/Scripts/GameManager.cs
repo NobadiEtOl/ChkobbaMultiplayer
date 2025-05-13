@@ -20,23 +20,36 @@ public class GameManager : NetworkBehaviour
     public static int currentPlayerNo = 0;
     private NetworkRelay networkRelay;
     private List<int[]> centerCardIDList;
-    private List<Text> poolTexts = new List<Text>();//Pool of the players in text for debugging
-    private GameObject winScreen;
+    [SerializeField]private List<Text> poolTexts = new List<Text>();//Pool of the players in text for debugging
+    //private GameObject winScreen;
     Text roundOverText;
     public List<int[]> myCards;
     private float turnTimer=0;
-    private Text currentPlayerText;
-    private Text turnTimerText;
+    //private Text currentPlayerText;
+    //private Text turnTimerText;
     private List<Text> pointTexts=new List<Text>();
     private List<Transform> timerTransforms = new List<Transform>();
     [SerializeField] public GameObject cardBack;
+    public Sprite cardBackSprite;
     [SerializeField] public GameObject cardIndicator;
     [SerializeField] private List<Transform> playerHandTransforms;
     [SerializeField] private List<Transform> playerPoolTransforms;
     [SerializeField] private Transform centerTransform;
 
+    void Awake()
+    {
+        if (LocalInstance != null && LocalInstance != this)
+        {
+            Destroy(this.gameObject);
+            return;
+        }
+        LocalInstance = this;
+        DontDestroyOnLoad(this.gameObject); // Optional, if you want it to persist
+    }
+
     void Start()
     {
+        Debug.Log("GameManager started");
         InitialGameManagerSetUp();//Identifies and assigns necessary variables and calls other functions
 
         networkRelay.NotifyCientConnectedServerRPC(NetworkManager.Singleton.LocalClientId);// Tells the server that a client is started
@@ -51,15 +64,17 @@ public class GameManager : NetworkBehaviour
         else if(turnTimer>0)
         {
             turnTimer-=Time.deltaTime;
-            turnTimerText.text = Mathf.RoundToInt(turnTimer).ToString();
+            //turnTimerText.text = Mathf.RoundToInt(turnTimer).ToString();
         }
     }
 
     //Gets message from the server to start the deck and the cards
     public void InitializeCardPrefabs()
     {
+        GameObject.Find("WaitingScreen").SetActive(false);
+        GameObject.Find("MainScreen").SetActive(false);
         deckController.DeckStart();
-        if(winScreen.activeSelf)winScreen.SetActive(false);
+        //if(winScreen.activeSelf)winScreen.SetActive(false);
     }
 
     //Gets all the scripts of the cards from the deckController
@@ -109,7 +124,7 @@ public class GameManager : NetworkBehaviour
 
         //Informs the deckController to deal the center cards
         if(deckController)deckController.DealCenter(centerCardIDs);
-        turnTimerText.text = "";
+        //turnTimerText.text = "";
     }
 
     //Called when a card is selected in the player's hand
@@ -134,7 +149,7 @@ public class GameManager : NetworkBehaviour
     {
         //UI
         //Logic
-        Debug.Log("Card Played: " + cardID[0] + "_" + cardID[1]);
+        //Debug.Log("Card Played: " + cardID[0] + "_" + cardID[1]);
         deckController.SetAutoRotateFlagFalse(cardObject);
         CheckIfLegal(playerNumber);
         /*if(centerCards.Count!=0 && (centerCards[centerCards.Count-1][1] == cardID[1] || 11 == cardID[1]))
@@ -164,7 +179,7 @@ public class GameManager : NetworkBehaviour
 
         //Update the game UI after the move is played
         //Debug.Log("centerCards.Count: " + centerCards.Count);
-        Debug.Log(centerCards.Count > 0 ? centerCards[centerCards.Count-1][1] : 0);   
+        //Debug.Log(centerCards.Count > 0 ? centerCards[centerCards.Count-1][1] : 0);   
         networkRelay.SendMoveToServerRPC(currentSelectedHandCard,serializableList,playerNumber,centerCards.Count > 0 ? centerCards[centerCards.Count-1][1] : 0);
         myCards.Remove(currentSelectedHandCard);
 
@@ -251,7 +266,7 @@ public class GameManager : NetworkBehaviour
     public void UpdateCurrentPlayer(int playerNumber)
     {
         currentPlayerNo=playerNumber;
-        currentPlayerText.text = "Current Player: " + (currentPlayerNo+1);
+        //currentPlayerText.text = "Current Player: " + (currentPlayerNo+1);
         //deckController.UpdateCurrentPlayerHandLayout();
         GetTurnTimeLocation();
     }
@@ -285,7 +300,8 @@ public class GameManager : NetworkBehaviour
 
         foreach (var kvp in playersPooledCardsIDs)
         {
-            int playerKey = kvp.Key;
+            int playerKey = kvp.Key%2;
+            Debug.Log("Player " + playerKey);
             List<int[]> cardList = kvp.Value;
 
             // Updating the poolTexts UI with player pools
@@ -306,12 +322,12 @@ public class GameManager : NetworkBehaviour
     public void ShowWinScreen(string message, int winnerSide, int point0, int point1)
     {
         
-        turnTimerText.text = "";
+        //turnTimerText.text = "";
 
         UpdatePointText(point0,point1);
 
-        winScreen.SetActive(true);
-        roundOverText.text = message;
+        //winScreen.SetActive(true);
+        //roundOverText.text = message;
 
         if(winnerSide != -1)
         {
@@ -417,10 +433,10 @@ public class GameManager : NetworkBehaviour
         //Setting the networkRealy script to sen ServerRPCs
         networkRelay = FindObjectOfType<NetworkRelay>();
 
-        pointTexts.Add(GameObject.Find("Point0").GetComponent<Text>());
-        pointTexts.Add(GameObject.Find("Point1").GetComponent<Text>());
+        //pointTexts.Add(GameObject.Find("Point0").GetComponent<Text>());
+        //pointTexts.Add(GameObject.Find("Point1").GetComponent<Text>());
 
-        if(pointTexts == null || pointTexts.Count == 0)Debug.LogError("point text empty");
+        //if(pointTexts == null || pointTexts.Count == 0)Debug.LogError("point text empty");
 
         //Setting the localInstances for ClientRPC messages
         if(LocalInstance == null)
@@ -428,18 +444,18 @@ public class GameManager : NetworkBehaviour
             LocalInstance = this;
         }
 
-        winScreen = GameObject.FindGameObjectWithTag("WinScreen");
+        ProfileScript profileScript = GameObject.Find("MainUI").GetComponent<ProfileScript>();
+        cardBackSprite = profileScript.cardBackSprites[profileScript.cardBackIndex];
+        poolTexts.Add(GameObject.Find("PlayerPoolText1").GetComponent<Text>());
+        GameObject.Find("PlayerPoolText1").GetComponent<Text>().text = "Player 1: ";
+        poolTexts.Add(GameObject.Find("PlayerPoolText2").GetComponent<Text>());
+        GameObject.Find("PlayerPoolText2").GetComponent<Text>().text = "Player 2: ";
+        pointTexts.Add(GameObject.Find("PlayerPointText1").GetComponent<Text>());
+        GameObject.Find("PlayerPointText1").GetComponent<Text>().text = "0 ";
+        pointTexts.Add(GameObject.Find("PlayerPointText2").GetComponent<Text>());
+        GameObject.Find("PlayerPointText2").GetComponent<Text>().text = "0 ";
 
-        //roundOverText = GameObject.FindGameObjectWithTag("RoundOverText").GetComponent<Text>();
-        //roundOverText.text = "Connected \n\n\n Waiting For Game To Start";
-        currentPlayerText = GameObject.Find("CurrentPlayerText").GetComponent<Text>();
-
-        turnTimerText = GameObject.Find("TurnTimer").GetComponent<Text>();
-
-        timerTransforms.Add(GameObject.Find("Timer0").GetComponent<Transform>());
-        timerTransforms.Add(GameObject.Find("Timer1").GetComponent<Transform>());
-        timerTransforms.Add(GameObject.Find("Timer2").GetComponent<Transform>());
-        timerTransforms.Add(GameObject.Find("Timer3").GetComponent<Transform>());
+        
         playerHandTransforms.Add(GameObject.Find("PlayerHand1").GetComponent<Transform>());
         playerHandTransforms.Add(GameObject.Find("PlayerHand2").GetComponent<Transform>());
         playerHandTransforms.Add(GameObject.Find("PlayerHand3").GetComponent<Transform>());
@@ -454,8 +470,6 @@ public class GameManager : NetworkBehaviour
         GetTurnTimeLocation();
 
         //GetPoolTexts();
-
-        GameObject.Find("StartScreen").SetActive(false);
     }
 
     private void GetTurnTimeLocation()
@@ -466,28 +480,18 @@ public class GameManager : NetworkBehaviour
             int relativeIndex = (currentPlayerNo - deckController.thisPlayerNumber + 2) % 2;
             if(relativeIndex == 0)
             {
-                turnTimerText.transform.position = timerTransforms[0].position;
+                //turnTimerText.transform.position = timerTransforms[0].position;
             }
             else if(relativeIndex == 1)
             {
-                turnTimerText.transform.position = timerTransforms[2].position;
+                //turnTimerText.transform.position = timerTransforms[2].position;
             }
         }
 
         else if(deckController.playerCount == 4)
         {
             int relativeIndex = (currentPlayerNo - deckController.thisPlayerNumber + 4) % 4;
-            turnTimerText.transform.position = timerTransforms[relativeIndex].position;
-        }
-    }
-
-    private void GetPoolTexts()
-    {
-        for(int i = 0; i<4; i++)
-        {
-            string tempTag = "PoolText" + (i+1);
-            poolTexts.Add(GameObject.FindGameObjectWithTag(tempTag).GetComponent<Text>());
-            poolTexts[i].gameObject.SetActive(false);
+            //turnTimerText.transform.position = timerTransforms[relativeIndex].position;
         }
     }
 

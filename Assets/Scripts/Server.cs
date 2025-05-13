@@ -43,7 +43,6 @@ public class Server : NetworkBehaviour
     {
         print("server.cs start");
         //StartCoroutine(ServerSubsciribe());
-        //Invoke("StartGameDelayed",5);
 
     }
     private IEnumerator ServerSubsciribe()
@@ -247,12 +246,14 @@ public class Server : NetworkBehaviour
     //Add a new List<int[]> to the dictionary for each player representing the player hands.
     private void InitializePlayersHands()
     {
+        Debug.LogWarning("InitializePlayersHands called");
         playersHandCardsIDs = new Dictionary<int, List<int[]>>();
 
         for(int i=0; i<playerCount; i++)
         {
             playersHandCardsIDs[i] = new List<int[]>();
         }
+        Debug.LogWarning("InitializePlayersHands finished");
     }
 
     //Chooses the cards to be dealth to the players
@@ -316,14 +317,10 @@ public class Server : NetworkBehaviour
     {
         
         List<int[]> discardedCardIDs = serializableList.ToList();
-        Debug.LogWarning(discardedCardIDs.Count+"111");
-        foreach(var discardedCardID in discardedCardIDs)
-        {
-            Debug.LogWarning(discardedCardID[0] + "_" + discardedCardID[1]);
-        } 
         foreach(int[] discardedCardID in discardedCardIDs)
         {
             playersPooledCardsIDs[currentPlayer].Add(discardedCardID);
+            //Debug.LogWarning(discardedCardID[0] + "_" + discardedCardID[1]);
         }
 
         int chkobbaPlayer=5;
@@ -332,32 +329,26 @@ public class Server : NetworkBehaviour
         {
             jPistiFlag = true;
         }
-        if(discardedCardIDs.Count == 2 && discardedCardIDs[discardedCardIDs.Count-1][1] != 11)
+        
+        if(discardedCardIDs.Count == 2)
         {
             Debug.LogWarning("Inside Chkobba");
             //If the last card played is a joker, the player who played it gets a point
-            if(playerCount==2)
+            if(discardedCardIDs[discardedCardIDs.Count-1][1] != 11)
             {
-                points[currentPlayer]++;
+                PlayerChkobba(currentPlayer);
+                chkobbaPlayer = currentPlayer;
             }
-            else if(playerCount==4)
+
+            if(jPistiFlag)
             {
-                if(currentPlayer==0 || currentPlayer==2)
-                {
-                    points[0]++;
-                }
-                else if(currentPlayer==1 || currentPlayer==3)
-                {
-                    points[1]++;
-                }
+                PlayerChkobba(currentPlayer);
+                PlayerChkobba(currentPlayer);
+                chkobbaPlayer = currentPlayer;
             }
+            
         }
-        else if(discardedCardIDs.Count>=4 && discardedCardIDs[discardedCardIDs.Count-1][1]==11 && discardedCardIDs[discardedCardIDs.Count-2][1]==11 && discardedCardIDs[discardedCardIDs.Count-3][1]==11 && discardedCardIDs[discardedCardIDs.Count-4][1]==11)
-        {
-            Debug.Log("Chkobba Player " + currentPlayer);
-            PlayerChkobba(currentPlayer);
-            chkobbaPlayer=currentPlayer;
-        }
+
         networkRelay.PrintPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs), chkobbaPlayer);
     }
     
@@ -373,7 +364,7 @@ public class Server : NetworkBehaviour
         else if(turnCounter%(playerCount*4)==(playerCount*4)-1)
         {
             //If each player played their 4 cards new cards are dealt
-            DealCardsToPlayerHands();
+            Invoke("DealCardsToPlayerHands",1f);
         }
         NextTurn();
     }
@@ -676,7 +667,8 @@ public class Server : NetworkBehaviour
     public void GetMove(int[] selectedHandCard, SerializableList serializableList, int playerNumber, int sumValue)
     {
         Debug.LogWarning("GetMove called with selectedHandCard: " + selectedHandCard[0] + "_" + selectedHandCard[1]);
-        if(selectedHandCard[1] == sumValue || selectedHandCard[1] == 11)
+
+        if(selectedHandCard[1] == sumValue || (selectedHandCard[1] == 11 && sumValue != 0))
         {
             RemoveCardsFromCenter(serializableList);
             networkRelay.SendMoveToClientRPC(selectedHandCard, serializableList, playerNumber);
@@ -718,11 +710,19 @@ public class Server : NetworkBehaviour
         connectedPlayerCount++;
         Debug.Log("connectedPlayerCount: " + connectedPlayerCount);
         Debug.Log("playerCount: " + playerCount);
+
         if(playerCount == connectedPlayerCount)
         {
-            Debug.Log("Inside If");
-            Invoke("StartGameDelayed",5);
+            if(playerCount == 2)
+            {
+                StartGameAfterDelayTwoPlayer();
+            }
+            else if(playerCount == 4)
+            {
+                StartGameAfterDelayFourPlayer();
+            }
         }
+        if(connectedPlayerCount == 1)StartGameAfterDelayFourPlayer();
     }
     public void StartGameAfterDelayFourPlayer()
     {

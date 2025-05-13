@@ -148,7 +148,7 @@ public class CardInteraction : MonoBehaviour
             return;
 
         // This method is called when the card is touched or clicked
-        Debug.Log($"Touched Object: {gameObject.name}");
+        //Debug.Log($"Touched Object: {gameObject.name}");
 
         // Store the original screen position for snap back
         originalScreenPosition = Camera.main.WorldToScreenPoint(transform.position);
@@ -191,7 +191,7 @@ public class CardInteraction : MonoBehaviour
             if (transform.parent.name.Contains("PlayerHand") && isOneCardSelected)
             {
                 // Invoke OnCardsPlayed
-                Debug.Log("OnCardsPlayed invoked!");
+                //Debug.Log("OnCardsPlayed invoked!");
                 OnCardsPlayed?.Invoke(this.cardID, this.gameObject, GameManager.currentPlayerNo);
                 if (activeCardIndicator != null)
                 {
@@ -200,7 +200,7 @@ public class CardInteraction : MonoBehaviour
             }
             else
             {
-                Debug.Log("else");
+                //Debug.Log("else");
                 isOneCardSelected = false;
             }
         }
@@ -237,17 +237,17 @@ public class CardInteraction : MonoBehaviour
 
         if (tagStrings.Length != 2)
         {
-            Debug.LogError("Invalid tag format! Expected 'Kind_Value'.");
+            //Debug.LogError("Invalid tag format! Expected 'Kind_Value'.");
         }
 
         if (!int.TryParse(tagStrings[0], out cardID[0]) || cardID[0] <= 0)
         {
-            Debug.LogError($"Invalid card kind: {tagStrings[0]}");
+            //Debug.LogError($"Invalid card kind: {tagStrings[0]}");
         }
 
         if (!int.TryParse(tagStrings[1], out cardID[1]) || cardID[1] <= 0 || cardID[1] > 13)
         {
-            Debug.LogError($"Invalid card value: {tagStrings[1]}");
+            //Debug.LogError($"Invalid card value: {tagStrings[1]}");
         }
 
         return cardID;
@@ -278,6 +278,7 @@ public class CardInteraction : MonoBehaviour
 
     private void InitializeCardBack()
     {
+        GameManager.LocalInstance.cardBack.GetComponent<SpriteRenderer>().sprite = GameManager.LocalInstance.cardBackSprite;
         GameObject cardBack = Instantiate(GameManager.LocalInstance.cardBack, transform.position, Quaternion.identity);
         cardBack.transform.parent = transform;
         Transform cardBackTransform = cardBack.transform;
