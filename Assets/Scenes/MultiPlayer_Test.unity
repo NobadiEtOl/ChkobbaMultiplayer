@@ -4195,6 +4195,10 @@ PrefabInstance:
       propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Arguments.m_ObjectArgumentAssemblyTypeName
       value: UnityEngine.Object, UnityEngine
       objectReference: {fileID: 0}
+    - target: {fileID: 1011560339784478967, guid: dab5da10fe7642c49904dc160f745cb6, type: 3}
+      propertyPath: m_Text
+      value: Zuber        Pistim
+      objectReference: {fileID: 0}
     - target: {fileID: 1050388139093475802, guid: dab5da10fe7642c49904dc160f745cb6, type: 3}
       propertyPath: m_AnchoredPosition.y
       value: -209.14984

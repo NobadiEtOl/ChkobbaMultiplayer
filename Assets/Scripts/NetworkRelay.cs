@@ -61,7 +61,7 @@ public class NetworkRelay : NetworkBehaviour
     [ClientRpc(RequireOwnership = false)]
     public void SendMoveToClientRPC(int[] selectedHandCard, SerializableList selectedCenterCards, int playerNumber)
     {
-        GameManager.LocalInstance.DiscardPlayedCards(selectedHandCard, selectedCenterCards, playerNumber);
+        GameManager.LocalInstance.GetCardThatCaptured(selectedHandCard, selectedCenterCards, playerNumber);
     }
 
     [ClientRpc(RequireOwnership = false)]
@@ -130,14 +130,6 @@ public class NetworkRelay : NetworkBehaviour
         server.PlayerChkobba(playerNumber);
     }
 
-    /*[ServerRpc(RequireOwnership = false)]//Called after player plays a move
-    public void EndTurnAfterPlayServerRPC(int playerNumber,SerializableList serializableList)
-    {
-        server.lastPlayerToCapture = playerNumber;
-        server.AddDiscardedCardsToPlayerPool(serializableList);
-        server.EndTurn();//End turn
-    }*/
-
     [ServerRpc(RequireOwnership = false)]
     public void RemoveCenterCardsServerRPC(SerializableList serializableList)
     {
@@ -174,6 +166,12 @@ public class NetworkRelay : NetworkBehaviour
     public void NotifyCientConnectedServerRPC(ulong clientId)
     {
         server.AnotherPlayerConnected(clientId);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void NotifyTurnIsReadyToEndServerRPC()
+    {
+        server.EndTurnCheck();
     }
 
 }

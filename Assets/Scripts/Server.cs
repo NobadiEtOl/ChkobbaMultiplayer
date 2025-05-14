@@ -351,7 +351,17 @@ public class Server : NetworkBehaviour
 
         networkRelay.PrintPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs), chkobbaPlayer);
     }
-    
+
+    private int endTurnCounter=0;
+    public void EndTurnCheck()
+    {
+        endTurnCounter++;
+        if(endTurnCounter == connectedPlayerCount)
+        {
+            EndTurn();
+            endTurnCounter = 0;
+        }
+    }
     //Called at the end of each turn
     public void EndTurn()
     {
@@ -675,7 +685,7 @@ public class Server : NetworkBehaviour
             lastPlayerToCapture = playerNumber;
             serializableList.Add(selectedHandCard);
             AddDiscardedCardsToPlayerPool(serializableList);
-            EndTurn();
+            //EndTurn();
         }
         else
         {
@@ -689,7 +699,7 @@ public class Server : NetworkBehaviour
         centerCardsIDs.Add(cardID);
         networkRelay.UpdateCenterCardIDListClientRPC(new SerializableList(centerCardsIDs));
         networkRelay.SendCardAddedToCenterClientRPC(cardID);
-        EndTurn();
+        //EndTurn();
     }
 
     public int SendPlayerNumber()
@@ -722,7 +732,7 @@ public class Server : NetworkBehaviour
                 StartGameAfterDelayFourPlayer();
             }
         }
-        if(connectedPlayerCount == 1)StartGameAfterDelayFourPlayer();
+        //if(connectedPlayerCount == 1)StartGameAfterDelayTwoPlayer();
     }
     public void StartGameAfterDelayFourPlayer()
     {

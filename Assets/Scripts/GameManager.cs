@@ -12,6 +12,7 @@ public class GameManager : NetworkBehaviour
 {
     public static GameManager LocalInstance { get; private set; }
     [SerializeField]private DeckController deckController;
+    
     private int[] currentSelectedHandCard;//Represents the card current player chose to play with.
     public List<int[]> centerCards = new List<int[]>();//List of cards in the center
     public List<GameObject> centerCardsObjects = new List<GameObject>();//List of the card objects in the center
@@ -133,11 +134,6 @@ public class GameManager : NetworkBehaviour
         currentSelectedHandCard = cardID;
     }
 
-    public void GetCardAddedToCenter(int[] cardID)
-    {
-        DiscardHandCards(cardID);
-    }
-
     public void UpdateCurrentPlayerHandLayoutCall()
     {
         //UI
@@ -147,19 +143,8 @@ public class GameManager : NetworkBehaviour
     //Called when the player tries to play the selected card with one or two center cards
     private void CardsPlayed(int[] cardID, GameObject cardObject,int playerNumber)
     {
-        //UI
-        //Logic
-        //Debug.Log("Card Played: " + cardID[0] + "_" + cardID[1]);
         deckController.SetAutoRotateFlagFalse(cardObject);
         CheckIfLegal(playerNumber);
-        /*if(centerCards.Count!=0 && (centerCards[centerCards.Count-1][1] == cardID[1] || 11 == cardID[1]))
-        {
-            CheckIfLegal(playerNumber);
-        }
-        else
-        {
-            CardAddedToCenter();
-        }*/
     }
 
     //Checks if played move is legal before sending it to the server
@@ -177,35 +162,26 @@ public class GameManager : NetworkBehaviour
 
         SerializableList serializableList = new SerializableList(centerCards);
 
-        //Update the game UI after the move is played
-        //Debug.Log("centerCards.Count: " + centerCards.Count);
-        //Debug.Log(centerCards.Count > 0 ? centerCards[centerCards.Count-1][1] : 0);   
-        networkRelay.SendMoveToServerRPC(currentSelectedHandCard,serializableList,playerNumber,centerCards.Count > 0 ? centerCards[centerCards.Count-1][1] : 0);
+        int sumValue = centerCards.Count > 0 ? centerCards[centerCards.Count-1][1] : 0;
+
+        if(currentSelectedHandCard[1] == sumValue || (currentSelectedHandCard[1] == 11 && sumValue != 0))
+        {
+            DiscardPlayedCards(currentSelectedHandCard, serializableList, playerNumber);
+            movePlayedLocally = true;
+        }
+        else
+        {
+            DiscardHandCards(currentSelectedHandCard);
+            movePlayedLocally = true;
+        }
+
+        networkRelay.SendMoveToServerRPC(currentSelectedHandCard,serializableList,playerNumber,sumValue);
         myCards.Remove(currentSelectedHandCard);
 
-        //Clear the list even if its a correct move
-        //Final control to decide if cards can be played
-        /*if(centerCards[centerCards.Count-1][1] == currentSelectedHandCard[1] || currentSelectedHandCard[1] == 11)
-        {
-            List<int[]> cardsToRemove = new List<int[]>();
-
-            // Iterate over the selected center cards and add them to the removal list
-            foreach (int[] cardToBeRemoved in centerCards)
-            {
-                cardsToRemove.Add(cardToBeRemoved);
-            }
-
-            SerializableList serializableList = new SerializableList(centerCards);
-
-            //Update the game UI after the move is played
-            networkRelay.SendMoveToServerRPC(currentSelectedHandCard,serializableList,playerNumber,centerCards[centerCards.Count-1][1]);
-            myCards.Remove(currentSelectedHandCard);
-
-            //Clear the list even if its a correct move
-            currentSelectedHandCard = new int[]{0,0};
-            centerCards.Clear();
-        }*/
+    
     }
+
+    private bool movePlayedLocally = false;
 
     //Called when the player decides to put the selected hand card to the center
     private void CardAddedToCenter()
@@ -215,45 +191,79 @@ public class GameManager : NetworkBehaviour
         currentSelectedHandCard = null;
         GetTurnTimeLocation();
     }
+
+    public void GetCardThatCaptured(int[] playedCard, SerializableList serializedList, int playerNumber)
+    {
+        Debug.Log("Discarding hand cards: " + movePlayedLocally);
+        if(!movePlayedLocally)
+        {
+            DiscardPlayedCards(playedCard, serializedList, playerNumber);
+        }
+        else
+        {
+            movePlayedLocally = false;
+        }
+    }
     
     public void DiscardPlayedCards(int[] playedCard, SerializableList serializedList, int playerNumber)
     {
-        List<int[]> selectedCenterCards = serializedList.ToList();
-        List<int[]> selectedCards = new List<int[]>(selectedCenterCards);
-        selectedCards.Add(playedCard);
-        cardObjectsToBeDiscarted.Clear();
-        
-        foreach(int[] cardID in selectedCards)
-        {   
-            GameObject tempCardObject = GameObject.FindWithTag(cardID[0] + "_" + cardID[1]);
+        Debug.Log("Discarding played cards: " + movePlayedLocally);
+        if(!movePlayedLocally)
+        {
+            List<int[]> selectedCenterCards = serializedList.ToList();
+            List<int[]> selectedCards = new List<int[]>(selectedCenterCards);
+            selectedCards.Add(playedCard);
+            cardObjectsToBeDiscarted.Clear();
+            
+            foreach(int[] cardID in selectedCards)
+            {   
+                GameObject tempCardObject = GameObject.FindWithTag(cardID[0] + "_" + cardID[1]);
 
-            if(cardID == playedCard)
+                if(cardID == playedCard)
+                {
+                    tempCardObject.transform.rotation = Quaternion.Euler(90, 0, 0);
+                    tempCardObject.transform.position = (centerTransform.position + tempCardObject.transform.position)/2;
+                }
+                
+                if(tempCardObject != null)
+                {
+                    cardObjectsToBeDiscarted.Add(tempCardObject);
+                }
+                else
+                {
+                    Debug.LogWarning("No card found with the tag: " + cardID[0] + "_" + cardID[1]);
+                }
+            }
+
+            deckController.MoveCardsToPlayerPool(cardObjectsToBeDiscarted,playerNumber);
+
+            foreach (int[] selectedCardId in selectedCenterCards)
             {
-                tempCardObject.transform.rotation = Quaternion.Euler(90, 0, 0);
-                tempCardObject.transform.position = (centerTransform.position + tempCardObject.transform.position)/2;
+                centerCards = centerCards.Where(card => !(card[0] == selectedCardId[0] && card[1] == selectedCardId[1])).ToList();
             }
             
-            if(tempCardObject != null)
-            {
-                cardObjectsToBeDiscarted.Add(tempCardObject);
-            }
-            else
-            {
-                Debug.LogWarning("No card found with the tag: " + cardID[0] + "_" + cardID[1]);
-            }
+            PrintCenterCards();
         }
-
-        deckController.MoveCardsToPlayerPool(cardObjectsToBeDiscarted,playerNumber);
-
-        foreach (int[] selectedCardId in selectedCenterCards)
+        else
         {
-            centerCards = centerCards.Where(card => !(card[0] == selectedCardId[0] && card[1] == selectedCardId[1])).ToList();
+            movePlayedLocally = false;
+            CardInteraction.isOneCardSelected = false;
+            currentSelectedHandCard = new int[]{0,0};
+            centerCards.Clear();
         }
-        
-        PrintCenterCards();
-        CardInteraction.isOneCardSelected = false;
-        currentSelectedHandCard = new int[]{0,0};
-        centerCards.Clear();
+    }
+
+    public void GetCardAddedToCenter(int[] cardID)
+    {
+        Debug.Log("Discarding hand cards: " + movePlayedLocally);
+        if(!movePlayedLocally)
+        {
+            DiscardHandCards(cardID);
+        }
+        else
+        {
+            movePlayedLocally = false;
+        }
     }
     
     //To remove the played card from the hand when it played to the center
@@ -498,6 +508,11 @@ public class GameManager : NetworkBehaviour
     public void SkipTurn()
     {
         if(currentPlayerNo == deckController.thisPlayerNumber)Invoke("PlayAfterTimeOut",1);
+    }
+
+    public void TellServerTurnEnded()
+    {
+        networkRelay.NotifyTurnIsReadyToEndServerRPC();
     }
 
 }
