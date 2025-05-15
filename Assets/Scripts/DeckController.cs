@@ -592,11 +592,91 @@ public class DeckController : MonoBehaviour
         //Debug.LogWarning("CardInteraction not found for the specified GameObject.");
         
     }
+    
+    private Dictionary<GameObject, (Vector3 pos, Quaternion rot, Vector3 scale)> poolCardOriginalTransforms = new Dictionary<GameObject, (Vector3, Quaternion, Vector3)>();
 
-    public void MoveCard(Vector3 endPos, GameObject cardObject, float speed, Quaternion rotation, Vector3 scales,bool audioFlag=true)
+    [ContextMenu("Showcase Player Pool Cards")]
+    public void ShowcasePlayerPoolCards()
+    {
+        int poolIndex = 0;
+        var poolTransform = playerPoolTransforms[poolIndex];
+        var centerRotation = poolTransform.rotation.eulerAngles;
+        var cards = new List<GameObject>();
+
+        // Gather all cards in the pool and store their original transforms
+        foreach (Transform child in poolTransform)
+        {
+            var card = child.gameObject;
+            cards.Add(card);
+            if (!poolCardOriginalTransforms.ContainsKey(card))
+            {
+                poolCardOriginalTransforms[card] = (card.transform.position, card.transform.rotation, card.transform.localScale);
+            }
+        }
+
+        int totalCards = cards.Count;
+        if (totalCards == 0) return;
+
+        // Sort cards by kind (suit) first, then by value, using tag format "kind_value"
+        cards.Sort((a, b) =>
+        {
+            string aTag = a.tag;
+            string bTag = b.tag;
+            int aKind = 0, aValue = 0, bKind = 0, bValue = 0;
+
+            var aParts = aTag.Split('_');
+            if (aParts.Length == 2)
+            {
+                int.TryParse(aParts[0], out aKind);
+                int.TryParse(aParts[1], out aValue);
+            }
+
+            var bParts = bTag.Split('_');
+            if (bParts.Length == 2)
+            {
+                int.TryParse(bParts[0], out bKind);
+                int.TryParse(bParts[1], out bValue);
+            }
+
+            int kindCompare = aKind.CompareTo(bKind);
+            if (kindCompare != 0) return kindCompare;
+            return aValue.CompareTo(bValue);
+        });
+
+        // Calculate spacing
+        float spacing = 600f; // Adjust as needed
+        float offsetMult = (totalCards - 1) / 2f;
+
+        for (int i = 0; i < totalCards; i++)
+        {
+            Quaternion rotation = Quaternion.Euler(-centerRotation.x, centerRotation.y, centerRotation.z);
+            Vector3 targetPosition = new Vector3(spacing * (i - offsetMult), (i * 10) + 5000, centerTransform.position.z);
+            Vector3 targetScale = new Vector3(1250, 1250, 1250);
+
+            MoveCard(targetPosition, cards[i], 10, rotation, targetScale, false);
+        }
+    }
+
+    [ContextMenu("Stop Showcase Player Pool Cards")]
+    public void StopShowcasePlayerPoolCards()
+    {
+        int poolIndex = 0;
+        var poolTransform = playerPoolTransforms[poolIndex];
+        foreach (Transform child in poolTransform)
+        {
+            var card = child.gameObject;
+            if (poolCardOriginalTransforms.TryGetValue(card, out var original))
+            {
+                MoveCard(original.pos, card, 10, original.rot, original.scale, false);
+            }
+        }
+        poolCardOriginalTransforms.Clear();
+    }
+
+    public void MoveCard(Vector3 endPos, GameObject cardObject, float speed, Quaternion rotation, Vector3 scales, bool audioFlag = true)
     {
         // Start the coroutine to move the card
-        StartCoroutine(MoveCardCoroutine(endPos, cardObject, speed, rotation, scales,audioFlag));
+        StartCoroutine(MoveCardCoroutine(endPos, cardObject, speed, rotation, scales, audioFlag));
     }
 
     private IEnumerator MoveCardCoroutine(Vector3 endPos, GameObject cardObject, float speedMultiplier, Quaternion rotation, Vector3 scale, bool audioFlag = true)
@@ -798,11 +878,12 @@ public class DeckController : MonoBehaviour
 
     public void MoveCardsToPlayerPool(List<GameObject> cardObjects, int playerNumber)
     {   
+        //if (playerCount == 2 && playerNumber == 1) playerNumber = 2;
         int relativePoolIndex = (playerNumber - thisPlayerNumber + playerCount) % playerCount;
         foreach(var card in cardObjects)
         {   
             card.transform.parent = null; // Unparent the card
-            //card.transform.parent = playerPoolTransforms[0];
+            card.transform.parent = playerPoolTransforms[relativePoolIndex];
             gameManager.centerCardsObjects.Remove(card);  
         }
         BuildPoolMoveListsAndMoveCards(playerPoolTransforms[GetPoolIndex(relativePoolIndex)].position, cardObjects, 10, GetPoolIndex(relativePoolIndex));
@@ -813,8 +894,7 @@ public class DeckController : MonoBehaviour
         int poolIndex=0;
         if(playerCount==4)
         {
-            if(relativePoolIndex==0 || relativePoolIndex==2)poolIndex=0;
-            else if(relativePoolIndex==1 || relativePoolIndex==3)poolIndex=1;
+            poolIndex=relativePoolIndex;
         }
         else if(playerCount==2)
         {

@@ -13,6 +13,9 @@ using Unity.Networking.Transport.Relay;
 using Unity.Services.Lobbies;
 using Unity.Services.Lobbies.Models;
 using System.Threading.Tasks;
+#if UNITY_EDITOR
+using ParrelSync;
+#endif
 
 public class NetworkManagerUI : MonoBehaviour
 {
@@ -47,6 +50,15 @@ public class NetworkManagerUI : MonoBehaviour
         }
     }
 
+    public async Task EnsureFreshAnonymousSignIn()
+    {
+        if (AuthenticationService.Instance.IsSignedIn)
+        {
+            AuthenticationService.Instance.SignOut(); // Use synchronous version
+        }
+        await AuthenticationService.Instance.SignInAnonymouslyAsync();
+    }
+
     private string GetUniquePlayerId()
     {
         // Generate a unique ID per tab and store it in PlayerPrefs
@@ -66,12 +78,20 @@ public class NetworkManagerUI : MonoBehaviour
     {
         if(privateFlag)mainUIScript.OpenWaitingScreenUI("blue", playerCount.ToString());
 
-        await UnityServices.InitializeAsync();
+        var initialOptions = new InitializationOptions();
 
-        if (!AuthenticationService.Instance.IsSignedIn)
+        #if UNITY_EDITOR
+        if (ClonesManager.IsClone())
         {
-            await AuthenticationService.Instance.SignInAnonymouslyAsync();
+            string parrelArgument = ClonesManager.GetArgument();
+            initialOptions.SetProfile(parrelArgument);
+            Debug.Log("ParrelSync argument: " + parrelArgument);
         }
+        #endif
+
+        await UnityServices.InitializeAsync(initialOptions);
+
+        await EnsureFreshAnonymousSignIn();
 
         Allocation allocation = await RelayService.Instance.CreateAllocationAsync(playerCount);
         NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(allocation, "wss"));
@@ -87,7 +107,7 @@ public class NetworkManagerUI : MonoBehaviour
             }
         };
 
-        await Lobbies.Instance.CreateLobbyAsync("MyLobby", playerCount, options);
+        currentLobby = await Lobbies.Instance.CreateLobbyAsync("MyLobby", playerCount, options);
         Debug.Log($"Host started with join code: {joinCodeVar}");
         Server.Singleton.SetPlayerCount(playerCount);
         return NetworkManager.Singleton.StartHost() ? joinCodeVar : null;
@@ -98,15 +118,53 @@ public class NetworkManagerUI : MonoBehaviour
         string inputJoinCode = inputField.text;
         mainUIScript.OpenWaitingScreenUI("yellow", inputJoinCode);
 
-        await UnityServices.InitializeAsync();
+        var initialOptions = new InitializationOptions();
 
-        if (!AuthenticationService.Instance.IsSignedIn)
+        #if UNITY_EDITOR
+        if (ClonesManager.IsClone())
         {
-            await AuthenticationService.Instance.SignInAnonymouslyAsync();
+            string parrelArgument = ClonesManager.GetArgument();
+            initialOptions.SetProfile(parrelArgument);
+            Debug.Log("ParrelSync argument: " + parrelArgument);
         }
+        #endif
+
+        await UnityServices.InitializeAsync(initialOptions);
+
+        await EnsureFreshAnonymousSignIn();
 
         Debug.Log("Trying to join with joinCode: " + inputJoinCode);
         joinCodeText.text = inputJoinCode;
+
+        // --- Join the Lobby using the join code ---
+        // Find the lobby that matches the join code
+        var queryOptions = new QueryLobbiesOptions
+        {
+            Filters = new List<QueryFilter>
+            {
+                new QueryFilter(QueryFilter.FieldOptions.S1, inputJoinCode, QueryFilter.OpOptions.EQ)
+            }
+        };
+        var lobbies = await Lobbies.Instance.QueryLobbiesAsync(queryOptions);
+        Lobby foundLobby = null;
+        foreach (var lobby in lobbies.Results)
+        {
+            if (lobby.Data != null && lobby.Data.ContainsKey("JoinCode") && lobby.Data["JoinCode"].Value == inputJoinCode)
+            {
+                foundLobby = lobby;
+                break;
+            }
+        }
+        if (foundLobby != null)
+        {
+            currentLobby = await Lobbies.Instance.JoinLobbyByIdAsync(foundLobby.Id);
+        }
+        else
+        {
+            Debug.LogError("No lobby found with the provided join code.");
+            return false;
+        }
+        // --- End join lobby section ---
 
         var joinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode: inputJoinCode);
         NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(joinAllocation, "wss"));
@@ -118,12 +176,20 @@ public class NetworkManagerUI : MonoBehaviour
     {
         mainUIScript.OpenWaitingScreenUI("red", playerCount.ToString());
 
-        await UnityServices.InitializeAsync();
+        var initialOptions = new InitializationOptions();
 
-        if (!AuthenticationService.Instance.IsSignedIn)
+        #if UNITY_EDITOR
+        if (ClonesManager.IsClone())
         {
-            await AuthenticationService.Instance.SignInAnonymouslyAsync();
+            string parrelArgument = ClonesManager.GetArgument();
+            initialOptions.SetProfile(parrelArgument);
+            Debug.Log("ParrelSync argument: " + parrelArgument);
         }
+        #endif
+
+        await UnityServices.InitializeAsync(initialOptions);
+
+        await EnsureFreshAnonymousSignIn();
 
         QueryLobbiesOptions queryOptions = new QueryLobbiesOptions
         {
@@ -166,6 +232,7 @@ public class NetworkManagerUI : MonoBehaviour
         try
         {
             var lobby = await Lobbies.Instance.JoinLobbyByIdAsync(lobbyId);
+            currentLobby = lobby; // Store the current lobby
 
             if (lobby != null)
             {
@@ -194,119 +261,20 @@ public class NetworkManagerUI : MonoBehaviour
         }
     }
 
-    public void SendJoinCodeToHTML(string joinCode)
+    private Lobby currentLobby; // Store the current lobby when you join/create it
+
+    private async void OnApplicationQuit()
     {
-        Debug.Log("Sending Join Code to HTML: " + joinCode);
-        Application.ExternalCall("receiveJoinCode", joinCode);
+        if (currentLobby != null && AuthenticationService.Instance.IsSignedIn)
+        {
+            try
+            {
+                await Lobbies.Instance.RemovePlayerAsync(currentLobby.Id, AuthenticationService.Instance.PlayerId);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("Failed to leave lobby on quit: " + e);
+            }
+        }
     }
 }
-
-
-
-
-
-
-/*using System.Collections;
-using System.Collections.Generic;
-using Unity.Netcode;
-using UnityEngine;
-using UnityEngine.UI;
-using Unity.Services.Core;
-using Unity.Services.Authentication;
-using Unity.Services.Relay;
-using Unity.Services.Relay.Models;
-using Unity.Netcode.Transports.UTP;
-using Unity.Networking.Transport.Relay;
-using Unity.Networking.Transport;
-using System.Threading.Tasks;
-using Unity.Services.Lobbies;
-using Unity.Services.Lobbies.Models;
-
-
-public class NetworkManagerUI : MonoBehaviour
-{
-    [SerializeField] private Button serverButton;
-    [SerializeField] private Button clientButton;
-    [SerializeField] private Button hostButton;
-    [SerializeField] private Button startGameTwoPlayerButton;
-    [SerializeField] private Button startGameFourPlayerButton;
-    [SerializeField] private InputField inputField;
-    [SerializeField] private Text joinCodeText;
-    private string joinCodeVar;
-
-    void Awake()
-    {
-        serverButton.onClick.AddListener(() => {Server.Singleton.SkipTurn();});
-        clientButton.onClick.AddListener(async () => {await StartClientWithRelay();});
-        hostButton.onClick.AddListener(async () => {await StartHostWithRelay();});
-        startGameTwoPlayerButton.onClick.AddListener(() => {Server.Singleton.StartGame(2);});
-        startGameFourPlayerButton.onClick.AddListener(() => {Server.Singleton.StartGame(4);});
-    }
-
-    bool isListeningFlag = false;
-    void Update()
-    {
-        if(NetworkManager.Singleton.IsListening && isListeningFlag==false)
-        {
-            Debug.LogWarning("IsListening");
-            isListeningFlag=true;
-        }
-        /*else
-        {
-            Debug.LogWarning("IsNotListening");
-        }//!!!!!!!!!!!!!!!!!!!!!
-    }
-
-    public void SendJoinCodeToHTML(string joinCode)
-    {
-        Debug.Log("Sending Join Code to HTML: " + joinCode);
-        Application.ExternalCall("receiveJoinCode", joinCode);
-    }
-    public async Task<string> StartHostWithRelay()
-    {
-        await UnityServices.InitializeAsync();
-        if (!AuthenticationService.Instance.IsSignedIn)
-        {
-            await AuthenticationService.Instance.SignInAnonymouslyAsync();
-        }
-        Allocation allocation = await RelayService.Instance.CreateAllocationAsync(4);
-        NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(allocation, "wss"));
-        var joinCode = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
-        joinCodeVar = joinCode;
-        joinCodeText.text = joinCode;
-        //Server.Singleton.StartGame(2);
-        SendJoinCodeToHTML(joinCode);
-        return NetworkManager.Singleton.StartHost() ? joinCode : null;
-    }
-
-    public async Task<bool> StartClientWithRelay(string tempJoinCode)
-    {
-        await UnityServices.InitializeAsync();
-        if (!AuthenticationService.Instance.IsSignedIn)
-        {
-            await AuthenticationService.Instance.SignInAnonymouslyAsync();
-        }
-
-        Debug.Log("Trying to join with joinCode: " + tempJoinCode);
-        joinCodeText.text = tempJoinCode;
-        var joinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode: tempJoinCode);
-        NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(joinAllocation, "wss"));
-        return !string.IsNullOrEmpty(tempJoinCode) && NetworkManager.Singleton.StartClient();
-    }
-
-    public async Task<bool> StartClientWithRelay()
-    {
-        await UnityServices.InitializeAsync();
-        if (!AuthenticationService.Instance.IsSignedIn)
-        {
-            await AuthenticationService.Instance.SignInAnonymouslyAsync();
-        }
-
-        Debug.Log("Trying to join with joinCode: " + inputField.text);
-        joinCodeText.text = inputField.text;
-        var joinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode: inputField.text);
-        NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(joinAllocation, "wss"));
-        return !string.IsNullOrEmpty(inputField.text) && NetworkManager.Singleton.StartClient();
-    }
-
-}*/

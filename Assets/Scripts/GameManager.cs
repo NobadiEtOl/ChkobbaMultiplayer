@@ -21,7 +21,6 @@ public class GameManager : NetworkBehaviour
     public static int currentPlayerNo = 0;
     private NetworkRelay networkRelay;
     private List<int[]> centerCardIDList;
-    [SerializeField]private List<Text> poolTexts = new List<Text>();//Pool of the players in text for debugging
     //private GameObject winScreen;
     Text roundOverText;
     public List<int[]> myCards;
@@ -314,14 +313,6 @@ public class GameManager : NetworkBehaviour
             Debug.Log("Player " + playerKey);
             List<int[]> cardList = kvp.Value;
 
-            // Updating the poolTexts UI with player pools
-            if (playerKey < poolTexts.Count)
-            {
-                if(playerKey==chkobbaPlayer)playerChkobba[playerKey]++;
-                string cardRepresentation = string.Join(", ", cardList.Select(card => $"[{card[0]}_{card[1]}]"));
-                poolTexts[playerKey].text = $"Player {playerKey}: {cardRepresentation}//ChkobbaCount: {playerChkobba[playerKey]}";
-            }
-
             foreach (var card in cardList)
             {
                 string cardRepresentation = string.Join(", ", card);
@@ -457,10 +448,6 @@ public class GameManager : NetworkBehaviour
 
         ProfileScript profileScript = GameObject.Find("MainUI").GetComponent<ProfileScript>();
         cardBackSprite = profileScript.cardBackSprites[profileScript.cardBackIndex];
-        poolTexts.Add(GameObject.Find("PlayerPoolText1").GetComponent<Text>());
-        GameObject.Find("PlayerPoolText1").GetComponent<Text>().text = "Player 1: ";
-        poolTexts.Add(GameObject.Find("PlayerPoolText2").GetComponent<Text>());
-        GameObject.Find("PlayerPoolText2").GetComponent<Text>().text = "Player 2: ";
         pointTexts.Add(GameObject.Find("PlayerPointText1").GetComponent<Text>());
         GameObject.Find("PlayerPointText1").GetComponent<Text>().text = "0 ";
         pointTexts.Add(GameObject.Find("PlayerPointText2").GetComponent<Text>());
@@ -479,8 +466,6 @@ public class GameManager : NetworkBehaviour
         deckController.getPlayerHandTransforms(playerHandTransforms, playerPoolTransforms, centerTransform);
 
         GetTurnTimeLocation();
-
-        //GetPoolTexts();
     }
 
     private void GetTurnTimeLocation()
