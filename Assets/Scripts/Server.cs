@@ -91,6 +91,11 @@ public class Server : NetworkBehaviour
         roundCount++;
         turnCounter=0;
         playerCount = tempPlayerCount;
+        if(connectedPlayerCount == 1)singleDebuggingMode = true;
+        else singleDebuggingMode = false;
+
+        Debug.Log("singleDebuggingMode: " + singleDebuggingMode);
+
         if (!IsServer)
         {
             Debug.LogError("StartGame() called on a non-server instance!");
@@ -105,6 +110,8 @@ public class Server : NetworkBehaviour
         // Define current player and update Client
         currentPlayer = startingPlayerNo%playerCount;
         startingPlayerNo++;
+        Debug.LogWarning("Current player: " + currentPlayer);
+        Debug.LogWarning("Starting player: " + startingPlayerNo);
 
         // Initialize the deck and shuffle it
         SaveAllCards();
@@ -313,14 +320,14 @@ public class Server : NetworkBehaviour
     }
 
     //Add played cards to the current players pool.
-    public void AddDiscardedCardsToPlayerPool(SerializableList serializableList)
+    public void AddDiscardedCardsToPlayerPool(SerializableList serializableList, int playerNumber)
     {
         
         List<int[]> discardedCardIDs = serializableList.ToList();
         foreach(int[] discardedCardID in discardedCardIDs)
         {
-            playersPooledCardsIDs[currentPlayer].Add(discardedCardID);
-            //Debug.LogWarning(discardedCardID[0] + "_" + discardedCardID[1]);
+            playersPooledCardsIDs[playerNumber].Add(discardedCardID);
+            Debug.LogWarning("PlayerNumber: " + currentPlayer + " discardedCardID: " + discardedCardID[0] + "_" + discardedCardID[1]);
         }
 
         int chkobbaPlayer=5;
@@ -353,13 +360,17 @@ public class Server : NetworkBehaviour
     }
 
     private int endTurnCounter=0;
+    private bool singleDebuggingMode;
     public void EndTurnCheck()
     {
-        endTurnCounter++;
-        if(endTurnCounter == connectedPlayerCount)
+        if(!singleDebuggingMode)
         {
-            EndTurn();
-            endTurnCounter = 0;
+            endTurnCounter++;
+            if(endTurnCounter == connectedPlayerCount)
+            {
+                EndTurn();
+                endTurnCounter = 0;
+            }
         }
     }
     //Called at the end of each turn
@@ -684,13 +695,14 @@ public class Server : NetworkBehaviour
             networkRelay.SendMoveToClientRPC(selectedHandCard, serializableList, playerNumber);
             lastPlayerToCapture = playerNumber;
             serializableList.Add(selectedHandCard);
-            AddDiscardedCardsToPlayerPool(serializableList);
+            AddDiscardedCardsToPlayerPool(serializableList, playerNumber);
             //EndTurn();
         }
         else
         {
             AddCardIDToCenter(selectedHandCard);
-        } 
+        }
+        if(singleDebuggingMode)EndTurn();
     }
 
     public void AddCardIDToCenter(int[] cardID)
@@ -732,12 +744,12 @@ public class Server : NetworkBehaviour
                 StartGameAfterDelayFourPlayer();
             }
         }
-        //if(connectedPlayerCount == 1)StartGameAfterDelayTwoPlayer();
     }
     public void StartGameAfterDelayFourPlayer()
     {
         Invoke("StartGameDelayedFourPlayer",3f);
     }
+    [ContextMenu("StartGameDelayedFourPlayer")]
     private void StartGameDelayedFourPlayer()
     {
         StartGame(4);
@@ -746,6 +758,7 @@ public class Server : NetworkBehaviour
     {
         Invoke("StartGameDelayedTwoPlayer",3f);
     }
+    [ContextMenu("StartGameDelayedTwoPlayer")]
     private void StartGameDelayedTwoPlayer()
     {
         StartGame(2);
@@ -754,5 +767,11 @@ public class Server : NetworkBehaviour
     public void SetPlayerCount(int playerCountVar)
     {
         playerCount = playerCountVar;
+    }
+
+    [ContextMenu("PrintPlayerPools")]
+    public void CallPrintPlayerPools()
+    {
+        networkRelay.PrintPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs),5);
     }
 }   

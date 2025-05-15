@@ -310,7 +310,7 @@ public class GameManager : NetworkBehaviour
 
         foreach (var kvp in playersPooledCardsIDs)
         {
-            int playerKey = kvp.Key%2;
+            int playerKey = kvp.Key;
             Debug.Log("Player " + playerKey);
             List<int[]> cardList = kvp.Value;
 
@@ -325,6 +325,7 @@ public class GameManager : NetworkBehaviour
             foreach (var card in cardList)
             {
                 string cardRepresentation = string.Join(", ", card);
+                Debug.Log("Card: " + cardRepresentation);
             }
         }
     }
@@ -513,6 +514,7 @@ public class GameManager : NetworkBehaviour
     public void TellServerTurnEnded()
     {
         networkRelay.NotifyTurnIsReadyToEndServerRPC();
+        Debug.LogError("Turn ended");
     }
 
 }
