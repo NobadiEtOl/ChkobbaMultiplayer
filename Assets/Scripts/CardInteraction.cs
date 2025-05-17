@@ -258,7 +258,7 @@ public class CardInteraction : MonoBehaviour
         cardID = GetCardID();
         gameObject.tag = cardID[0] + "_" + cardID[1];
 
-        transform.localScale = new Vector3(750, 750, 750);
+        transform.localScale = new Vector3(1000, 1000, 1000);
         transform.localRotation = Quaternion.Euler(0, 0, 0);
         InitializeCardInd();
         InitializeCardBack();

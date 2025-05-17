@@ -11,8 +11,8 @@ using UnityEngine.UIElements;
 public class GameManager : NetworkBehaviour
 {
     public static GameManager LocalInstance { get; private set; }
-    [SerializeField]private DeckController deckController;
-    
+    [SerializeField] private DeckController deckController;
+
     private int[] currentSelectedHandCard;//Represents the card current player chose to play with.
     public List<int[]> centerCards = new List<int[]>();//List of cards in the center
     public List<GameObject> centerCardsObjects = new List<GameObject>();//List of the card objects in the center
@@ -24,16 +24,17 @@ public class GameManager : NetworkBehaviour
     //private GameObject winScreen;
     Text roundOverText;
     public List<int[]> myCards;
-    private float turnTimer=0;
+    private float turnTimer = 0;
     //private Text currentPlayerText;
     //private Text turnTimerText;
-    private List<Text> pointTexts=new List<Text>();
+    private List<Text> pointTexts = new List<Text>();
     private List<Transform> timerTransforms = new List<Transform>();
     [SerializeField] public GameObject cardBack;
     public Sprite cardBackSprite;
     [SerializeField] public GameObject cardIndicator;
     [SerializeField] private List<Transform> playerHandTransforms;
     [SerializeField] private List<Transform> playerPoolTransforms;
+    [SerializeField] private List<Transform> playerPiştiPoolTransforms;
     [SerializeField] private Transform centerTransform;
 
     void Awake()
@@ -57,13 +58,13 @@ public class GameManager : NetworkBehaviour
 
     void FixedUpdate()
     {
-        if(turnTimer>15)
+        if (turnTimer > 15)
         {
-            turnTimer-=Time.deltaTime;
+            turnTimer -= Time.deltaTime;
         }
-        else if(turnTimer>0)
+        else if (turnTimer > 0)
         {
-            turnTimer-=Time.deltaTime;
+            turnTimer -= Time.deltaTime;
             //turnTimerText.text = Mathf.RoundToInt(turnTimer).ToString();
         }
     }
@@ -89,7 +90,7 @@ public class GameManager : NetworkBehaviour
     private void SubscribeToEvents()
     {
         // Iterate through the list of CardInteraction scripts
-        if(alreadySubbed)return;
+        if (alreadySubbed) return;
         foreach (var cardInteraction in cardInteractionsScripts)
         {
             cardInteraction.OnCardSelected += CardSelected;
@@ -99,31 +100,31 @@ public class GameManager : NetworkBehaviour
     }
 
     //Gets message from the server to start dealing cards to players   
-    public void CardPrefabsToPlayers(int playerCount,SerializableDictionary serializableDictionary)
+    public void CardPrefabsToPlayers(int playerCount, SerializableDictionary serializableDictionary)
     {
         //Converts serializablelist to a normal dictionary
         Dictionary<int, List<int[]>> playerHands = serializableDictionary.ToDictionary();
 
         //Informs the deckController to deal the players' cards
-        StartCoroutine(DelayedDealPlayers(playerCount,playerHands));
+        StartCoroutine(DelayedDealPlayers(playerCount, playerHands));
     }
 
     private IEnumerator DelayedDealPlayers(int playerCount, Dictionary<int, List<int[]>> playerHands)
     {
         //Needed so that hands dont get updated before the previous ordeals are done
         yield return new WaitForSeconds(1.5f);
-        
-        if(deckController)deckController.DealPlayers(playerCount,playerHands);
+
+        if (deckController) deckController.DealPlayers(playerCount, playerHands);
     }
 
     //Gets message from the server to start dealing cards to center
     public void CardPrefabsToCenter(SerializableList serializableList)
-    {   
+    {
         //Converts serializablelist to a normal list
         List<int[]> centerCardIDs = serializableList.ToList();
 
         //Informs the deckController to deal the center cards
-        if(deckController)deckController.DealCenter(centerCardIDs);
+        if (deckController) deckController.DealCenter(centerCardIDs);
         //turnTimerText.text = "";
     }
 
@@ -140,7 +141,7 @@ public class GameManager : NetworkBehaviour
     }
 
     //Called when the player tries to play the selected card with one or two center cards
-    private void CardsPlayed(int[] cardID, GameObject cardObject,int playerNumber)
+    private void CardsPlayed(int[] cardID, GameObject cardObject, int playerNumber)
     {
         deckController.SetAutoRotateFlagFalse(cardObject);
         CheckIfLegal(playerNumber);
@@ -161,9 +162,9 @@ public class GameManager : NetworkBehaviour
 
         SerializableList serializableList = new SerializableList(centerCards);
 
-        int sumValue = centerCards.Count > 0 ? centerCards[centerCards.Count-1][1] : 0;
+        int sumValue = centerCards.Count > 0 ? centerCards[centerCards.Count - 1][1] : 0;
 
-        if(currentSelectedHandCard[1] == sumValue || (currentSelectedHandCard[1] == 11 && sumValue != 0))
+        if (currentSelectedHandCard[1] == sumValue || (currentSelectedHandCard[1] == 11 && sumValue != 0))
         {
             DiscardPlayedCards(currentSelectedHandCard, serializableList, playerNumber);
             movePlayedLocally = true;
@@ -174,10 +175,10 @@ public class GameManager : NetworkBehaviour
             movePlayedLocally = true;
         }
 
-        networkRelay.SendMoveToServerRPC(currentSelectedHandCard,serializableList,playerNumber,sumValue);
+        networkRelay.SendMoveToServerRPC(currentSelectedHandCard, serializableList, playerNumber, sumValue);
         myCards.Remove(currentSelectedHandCard);
 
-    
+
     }
 
     private bool movePlayedLocally = false;
@@ -188,13 +189,12 @@ public class GameManager : NetworkBehaviour
         networkRelay.AddCenterCardServerRPC(currentSelectedHandCard);
         myCards.Remove(currentSelectedHandCard);
         currentSelectedHandCard = null;
-        GetTurnTimeLocation();
     }
 
     public void GetCardThatCaptured(int[] playedCard, SerializableList serializedList, int playerNumber)
     {
         Debug.Log("Discarding hand cards: " + movePlayedLocally);
-        if(!movePlayedLocally)
+        if (!movePlayedLocally)
         {
             DiscardPlayedCards(playedCard, serializedList, playerNumber);
         }
@@ -203,28 +203,28 @@ public class GameManager : NetworkBehaviour
             movePlayedLocally = false;
         }
     }
-    
+
     public void DiscardPlayedCards(int[] playedCard, SerializableList serializedList, int playerNumber)
     {
         Debug.Log("Discarding played cards: " + movePlayedLocally);
-        if(!movePlayedLocally)
+        if (!movePlayedLocally)
         {
             List<int[]> selectedCenterCards = serializedList.ToList();
             List<int[]> selectedCards = new List<int[]>(selectedCenterCards);
             selectedCards.Add(playedCard);
             cardObjectsToBeDiscarted.Clear();
-            
-            foreach(int[] cardID in selectedCards)
-            {   
+
+            foreach (int[] cardID in selectedCards)
+            {
                 GameObject tempCardObject = GameObject.FindWithTag(cardID[0] + "_" + cardID[1]);
 
-                if(cardID == playedCard)
+                if (cardID == playedCard)
                 {
                     tempCardObject.transform.rotation = Quaternion.Euler(90, 0, 0);
-                    tempCardObject.transform.position = (centerTransform.position + tempCardObject.transform.position)/2;
+                    tempCardObject.transform.position = (centerTransform.position + tempCardObject.transform.position) / 2;
                 }
-                
-                if(tempCardObject != null)
+
+                if (tempCardObject != null)
                 {
                     cardObjectsToBeDiscarted.Add(tempCardObject);
                 }
@@ -234,20 +234,35 @@ public class GameManager : NetworkBehaviour
                 }
             }
 
-            deckController.MoveCardsToPlayerPool(cardObjectsToBeDiscarted,playerNumber);
+            bool piştiHappened = false;
+
+            if(selectedCards.Count == 2)
+            {
+                if(selectedCards[selectedCards.Count-1][1] != 11)
+                {
+                    piştiHappened = true;
+                }
+
+                else if(selectedCards[selectedCards.Count-1][1] != 11 && selectedCards[selectedCards.Count-2][1] != 11)
+                {
+                    piştiHappened = true;
+                }
+            }
+
+            deckController.MoveCardsToPlayerPool(cardObjectsToBeDiscarted, playerNumber, piştiHappened);
 
             foreach (int[] selectedCardId in selectedCenterCards)
             {
                 centerCards = centerCards.Where(card => !(card[0] == selectedCardId[0] && card[1] == selectedCardId[1])).ToList();
             }
-            
+
             PrintCenterCards();
         }
         else
         {
             movePlayedLocally = false;
             CardInteraction.isOneCardSelected = false;
-            currentSelectedHandCard = new int[]{0,0};
+            currentSelectedHandCard = new int[] { 0, 0 };
             centerCards.Clear();
         }
     }
@@ -255,7 +270,7 @@ public class GameManager : NetworkBehaviour
     public void GetCardAddedToCenter(int[] cardID)
     {
         Debug.Log("Discarding hand cards: " + movePlayedLocally);
-        if(!movePlayedLocally)
+        if (!movePlayedLocally)
         {
             DiscardHandCards(cardID);
         }
@@ -264,20 +279,17 @@ public class GameManager : NetworkBehaviour
             movePlayedLocally = false;
         }
     }
-    
+
     //To remove the played card from the hand when it played to the center
     public void DiscardHandCards(int[] cardID)
     {
         //UI
         deckController.DiscardHandCardToCenter(cardID);
     }
-    
+
     public void UpdateCurrentPlayer(int playerNumber)
     {
-        currentPlayerNo=playerNumber;
-        //currentPlayerText.text = "Current Player: " + (currentPlayerNo+1);
-        //deckController.UpdateCurrentPlayerHandLayout();
-        GetTurnTimeLocation();
+        currentPlayerNo = playerNumber;
     }
 
     public void UpdateCenterCardIDList(SerializableList serializableList)
@@ -294,14 +306,14 @@ public class GameManager : NetworkBehaviour
 
     public void PrintCenterCards()
     {
-        foreach(int[] centerCardID in centerCards)
+        foreach (int[] centerCardID in centerCards)
         {
             print(centerCardID[0]);
             print(centerCardID[1]);
         }
     }
 
-    List<int> playerChkobba = new List<int>{0,0,0,0};
+    List<int> playerChkobba = new List<int> { 0, 0, 0, 0 };
     //!!!! Maybe can be deleted later or deactivated.
     public void PrintPlayerPools(SerializableDictionary serializableDictionary, int chkobbaPlayer)
     {
@@ -323,32 +335,32 @@ public class GameManager : NetworkBehaviour
 
     public void ShowWinScreen(string message, int winnerSide, int point0, int point1)
     {
-        
+
         //turnTimerText.text = "";
 
-        UpdatePointText(point0,point1);
+        UpdatePointText(point0, point1);
 
         //winScreen.SetActive(true);
         //roundOverText.text = message;
 
-        if(winnerSide != -1)
+        if (winnerSide != -1)
         {
-            if(winnerSide==3)
-            {   
+            if (winnerSide == 3)
+            {
                 //Draw
-                AudioManager.Instance.PlayAudio(2,0.5f,false);
+                AudioManager.Instance.PlayAudio(2, 0.5f, false);
             }
-            else if(deckController.thisPlayerNumber==0 || deckController.thisPlayerNumber==2)
+            else if (deckController.thisPlayerNumber == 0 || deckController.thisPlayerNumber == 2)
             {
                 //Side 0 win or lose
-                if(winnerSide==0)AudioManager.Instance.PlayAudio(2,0.5f,false);
-                else AudioManager.Instance.PlayAudio(1,0.5f,false);
+                if (winnerSide == 0) AudioManager.Instance.PlayAudio(2, 0.5f, false);
+                else AudioManager.Instance.PlayAudio(1, 0.5f, false);
             }
-            else if(deckController.thisPlayerNumber==1 || deckController.thisPlayerNumber==3)
+            else if (deckController.thisPlayerNumber == 1 || deckController.thisPlayerNumber == 3)
             {
                 //Side 1 win or lose
-                if(winnerSide==1)AudioManager.Instance.PlayAudio(2,0.5f,false);
-                else AudioManager.Instance.PlayAudio(1,0.5f,false);
+                if (winnerSide == 1) AudioManager.Instance.PlayAudio(2, 0.5f, false);
+                else AudioManager.Instance.PlayAudio(1, 0.5f, false);
             }
         }
 
@@ -357,19 +369,19 @@ public class GameManager : NetworkBehaviour
 
     private void UpdatePointText(int point0, int point1)
     {
-        if(deckController.thisPlayerNumber==0 ||deckController.thisPlayerNumber==2)
+        if (deckController.thisPlayerNumber == 0 || deckController.thisPlayerNumber == 2)
         {
             pointTexts[0].text = point0.ToString();
             pointTexts[1].text = point1.ToString();
         }
-        
-        else if(deckController.thisPlayerNumber==1 ||deckController.thisPlayerNumber==3)
+
+        else if (deckController.thisPlayerNumber == 1 || deckController.thisPlayerNumber == 3)
         {
             pointTexts[1].text = point0.ToString();
-            pointTexts[0].text = point1.ToString();     
+            pointTexts[0].text = point1.ToString();
         }
     }
-    
+
     public void GetPlayerNumber(int playerNumber)
     {
         deckController.SetPlayerNumber(playerNumber);
@@ -382,39 +394,39 @@ public class GameManager : NetworkBehaviour
 
     private void PlayAfterTimeOut()
     {
-        int[] playableCardID={0,0};
+        int[] playableCardID = { 0, 0 };
 
         List<int[]> myCards = new List<int[]>();
 
-        foreach(Transform childTransform in GameObject.Find("PlayerHand"+(deckController.thisPlayerNumber+1)).transform)
-        {   
+        foreach (Transform childTransform in GameObject.Find("PlayerHand" + (deckController.thisPlayerNumber + 1)).transform)
+        {
             string[] tagStrings = childTransform.gameObject.tag.Split('_');
-            if(tagStrings.Length == 2)
+            if (tagStrings.Length == 2)
             {
-                int[] cardID = {0,0};
-                
+                int[] cardID = { 0, 0 };
+
                 int.TryParse(tagStrings[0], out cardID[0]);
-                int.TryParse(tagStrings[1], out cardID[1]);  
-                myCards.Add(cardID);    
+                int.TryParse(tagStrings[1], out cardID[1]);
+                myCards.Add(cardID);
             }
-            
+
         }
 
-        bool addedToCenterFlag=false;
+        bool addedToCenterFlag = false;
 
-        foreach(int[] cardID in myCards)
+        foreach (int[] cardID in myCards)
         {
-            if(cardID[1] != centerCards[centerCards.Count-1][1])
+            if (cardID[1] != centerCards[centerCards.Count - 1][1])
             {
                 currentSelectedHandCard = cardID;
                 CardAddedToCenter();
-                addedToCenterFlag=true;
+                addedToCenterFlag = true;
                 return;
             }
-            else playableCardID=cardID;
+            else playableCardID = cardID;
         }
 
-        if(!addedToCenterFlag)
+        if (!addedToCenterFlag)
         {
             currentSelectedHandCard = playableCardID;
             CheckIfLegal(currentPlayerNo);
@@ -428,78 +440,64 @@ public class GameManager : NetworkBehaviour
 
     private void InitialGameManagerSetUp()
     {
-        AudioManager.Instance.PlayAudio(4,0.04f,true);
+        AudioManager.Instance.PlayAudio(4, 0.04f, true);
 
-        playerChkobba = new List<int>{0,0,0,0};
+        playerChkobba = new List<int> { 0, 0, 0, 0 };
 
         //Setting the networkRealy script to sen ServerRPCs
         networkRelay = FindObjectOfType<NetworkRelay>();
 
-        //pointTexts.Add(GameObject.Find("Point0").GetComponent<Text>());
-        //pointTexts.Add(GameObject.Find("Point1").GetComponent<Text>());
-
-        //if(pointTexts == null || pointTexts.Count == 0)Debug.LogError("point text empty");
 
         //Setting the localInstances for ClientRPC messages
-        if(LocalInstance == null)
+        if (LocalInstance == null)
         {
             LocalInstance = this;
         }
 
         ProfileScript profileScript = GameObject.Find("MainUI").GetComponent<ProfileScript>();
         cardBackSprite = profileScript.cardBackSprites[profileScript.cardBackIndex];
+
         pointTexts.Add(GameObject.Find("PlayerPointText1").GetComponent<Text>());
         GameObject.Find("PlayerPointText1").GetComponent<Text>().text = "0 ";
         pointTexts.Add(GameObject.Find("PlayerPointText2").GetComponent<Text>());
         GameObject.Find("PlayerPointText2").GetComponent<Text>().text = "0 ";
 
-        
-        playerHandTransforms.Add(GameObject.Find("PlayerHand1").GetComponent<Transform>());
-        playerHandTransforms.Add(GameObject.Find("PlayerHand2").GetComponent<Transform>());
-        playerHandTransforms.Add(GameObject.Find("PlayerHand3").GetComponent<Transform>());
-        playerHandTransforms.Add(GameObject.Find("PlayerHand4").GetComponent<Transform>());
-        playerPoolTransforms.Add(GameObject.Find("PlayerPool1").GetComponent<Transform>());
-        playerPoolTransforms.Add(GameObject.Find("PlayerPool2").GetComponent<Transform>());
-        playerPoolTransforms.Add(GameObject.Find("PlayerPool3").GetComponent<Transform>());
-        playerPoolTransforms.Add(GameObject.Find("PlayerPool4").GetComponent<Transform>());
+        GetNecessaryTransforms();
+
+
         centerTransform = GameObject.Find("Center").GetComponent<Transform>();
-        deckController.getPlayerHandTransforms(playerHandTransforms, playerPoolTransforms, centerTransform);
-
-        GetTurnTimeLocation();
-    }
-
-    private void GetTurnTimeLocation()
-    {
-        //Decide placerment according to the number of players
-        if(deckController.playerCount == 2)
-        {
-            int relativeIndex = (currentPlayerNo - deckController.thisPlayerNumber + 2) % 2;
-            if(relativeIndex == 0)
-            {
-                //turnTimerText.transform.position = timerTransforms[0].position;
-            }
-            else if(relativeIndex == 1)
-            {
-                //turnTimerText.transform.position = timerTransforms[2].position;
-            }
-        }
-
-        else if(deckController.playerCount == 4)
-        {
-            int relativeIndex = (currentPlayerNo - deckController.thisPlayerNumber + 4) % 4;
-            //turnTimerText.transform.position = timerTransforms[relativeIndex].position;
-        }
+        deckController.getPlayerHandTransforms(playerHandTransforms, playerPoolTransforms, centerTransform, playerPiştiPoolTransforms);
     }
 
     public void SkipTurn()
     {
-        if(currentPlayerNo == deckController.thisPlayerNumber)Invoke("PlayAfterTimeOut",1);
+        if (currentPlayerNo == deckController.thisPlayerNumber) Invoke("PlayAfterTimeOut", 1);
     }
 
     public void TellServerTurnEnded()
     {
         networkRelay.NotifyTurnIsReadyToEndServerRPC();
         Debug.LogError("Turn ended");
+    }
+
+    private void GetNecessaryTransforms()
+    {
+        //All the necessary transforms for card placements
+
+        playerHandTransforms.Add(GameObject.Find("PlayerHand1").GetComponent<Transform>());
+        playerHandTransforms.Add(GameObject.Find("PlayerHand2").GetComponent<Transform>());
+        playerHandTransforms.Add(GameObject.Find("PlayerHand3").GetComponent<Transform>());
+        playerHandTransforms.Add(GameObject.Find("PlayerHand4").GetComponent<Transform>());
+
+        playerPoolTransforms.Add(GameObject.Find("PlayerPool1").GetComponent<Transform>());
+        playerPoolTransforms.Add(GameObject.Find("PlayerPool2").GetComponent<Transform>());
+        playerPoolTransforms.Add(GameObject.Find("PlayerPool3").GetComponent<Transform>());
+        playerPoolTransforms.Add(GameObject.Find("PlayerPool4").GetComponent<Transform>());
+
+        playerPiştiPoolTransforms.Add(GameObject.Find("PlayerPiştiPool1").GetComponent<Transform>());
+        playerPiştiPoolTransforms.Add(GameObject.Find("PlayerPiştiPool2").GetComponent<Transform>());
+        playerPiştiPoolTransforms.Add(GameObject.Find("PlayerPiştiPool3").GetComponent<Transform>());
+        playerPiştiPoolTransforms.Add(GameObject.Find("PlayerPiştiPool4").GetComponent<Transform>());
     }
 
 }
