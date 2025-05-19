@@ -21,7 +21,7 @@ public class GameManager : NetworkBehaviour
     public static int currentPlayerNo = 0;
     private NetworkRelay networkRelay;
     private List<int[]> centerCardIDList;
-    //private GameObject winScreen;
+    private GameObject winScreen;
     Text roundOverText;
     public List<int[]> myCards;
     private float turnTimer = 0;
@@ -75,7 +75,7 @@ public class GameManager : NetworkBehaviour
         GameObject.Find("WaitingScreen").SetActive(false);
         GameObject.Find("MainScreen").SetActive(false);
         deckController.DeckStart();
-        //if(winScreen.activeSelf)winScreen.SetActive(false);
+        if(winScreen.activeSelf)winScreen.SetActive(false);
     }
 
     //Gets all the scripts of the cards from the deckController
@@ -313,7 +313,6 @@ public class GameManager : NetworkBehaviour
         }
     }
 
-    List<int> playerChkobba = new List<int> { 0, 0, 0, 0 };
     //!!!! Maybe can be deleted later or deactivated.
     public void PrintPlayerPools(SerializableDictionary serializableDictionary, int chkobbaPlayer)
     {
@@ -340,8 +339,8 @@ public class GameManager : NetworkBehaviour
 
         UpdatePointText(point0, point1);
 
-        //winScreen.SetActive(true);
-        //roundOverText.text = message;
+        winScreen.SetActive(true);
+        roundOverText.text = message;
 
         if (winnerSide != -1)
         {
@@ -364,7 +363,7 @@ public class GameManager : NetworkBehaviour
             }
         }
 
-        deckController.ResetCards();
+        //deckController.ResetCards();
     }
 
     private void UpdatePointText(int point0, int point1)
@@ -442,8 +441,6 @@ public class GameManager : NetworkBehaviour
     {
         AudioManager.Instance.PlayAudio(4, 0.04f, true);
 
-        playerChkobba = new List<int> { 0, 0, 0, 0 };
-
         //Setting the networkRealy script to sen ServerRPCs
         networkRelay = FindObjectOfType<NetworkRelay>();
 
@@ -462,6 +459,9 @@ public class GameManager : NetworkBehaviour
         pointTexts.Add(GameObject.Find("PlayerPointText2").GetComponent<Text>());
         GameObject.Find("PlayerPointText2").GetComponent<Text>().text = "0 ";
 
+        winScreen = GameObject.Find("WinScreen");
+        roundOverText = GameObject.Find("RoundOverText").GetComponent<Text>();
+
         GetNecessaryTransforms();
 
 
@@ -477,7 +477,7 @@ public class GameManager : NetworkBehaviour
     public void TellServerTurnEnded()
     {
         networkRelay.NotifyTurnIsReadyToEndServerRPC();
-        Debug.LogError("Turn ended");
+        //Debug.LogError("Turn ended");
     }
 
     private void GetNecessaryTransforms()

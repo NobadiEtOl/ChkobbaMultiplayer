@@ -125,12 +125,6 @@ public class NetworkRelay : NetworkBehaviour
 
     //ServerRPC
     [ServerRpc(RequireOwnership = false)]
-    public void PlayerChkobbaServerRPC(int playerNumber)
-    {
-        server.PlayerChkobba(playerNumber);
-    }
-
-    [ServerRpc(RequireOwnership = false)]
     public void RemoveCenterCardsServerRPC(SerializableList serializableList)
     {
         

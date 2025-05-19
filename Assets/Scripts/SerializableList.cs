@@ -40,6 +40,19 @@ public struct SerializableList : INetworkSerializable
         data.Add(value != null ? (int[])value.Clone() : null); // Deep copy the array, handle nulls
     }
 
+    // Pop the last array from the list
+    public int[] Pop()
+    {
+        if (data == null || data.Count == 0)
+        {
+            return null;
+        }
+        int lastIndex = data.Count - 1;
+        int[] value = data[lastIndex];
+        data.RemoveAt(lastIndex);
+        return value;
+    }
+
     // Clear the list
     public void Clear()
     {

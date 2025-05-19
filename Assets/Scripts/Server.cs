@@ -17,7 +17,6 @@ public class Server : NetworkBehaviour
     private Dictionary<int, List<int[]>> playersPooledCardsIDs;//Dictionary containing all the players' pools
     private int playerCount=2;
     public List<int[]> centerCardsIDs;//List of all the cards in the center
-    public int[] topCardIDs = new int[2];
     [SerializeField]private int seed = 124;//Seed for the deck suffle
     private int turnCounter=0;
     public int currentPlayer;//The player that is currently playing
@@ -32,11 +31,12 @@ public class Server : NetworkBehaviour
     private float currentTurnTime = 0f;
     private bool timerRunning = false;
     private int connectedPlayerCount=0;
+    private int[] piştiCounts;
 
     private void OnEnable()
     {
         Singleton = this;
-        if(playerCount==0)playerCount=2;
+        if (playerCount == 0) playerCount = 2;
     }
     // Start is called before the first frame update
     void Start()
@@ -77,13 +77,6 @@ public class Server : NetworkBehaviour
         }
     }
 
-    /*[SerializeField]private GameObject multiplayerObjectPrefab;
-    public void InstantiateMultiplayerObject()
-    {
-        GameObject newObject = Instantiate(multiplayerObjectPrefab, new Vector3(960, 540, 0), Quaternion.identity);
-        newObject.GetComponent<NetworkObject>().Spawn();
-    }*/
-
     private int roundCount=0;
     public void StartGame(int tempPlayerCount)
     {
@@ -93,6 +86,11 @@ public class Server : NetworkBehaviour
         playerCount = tempPlayerCount;
         if(connectedPlayerCount == 1)singleDebuggingMode = true;
         else singleDebuggingMode = false;
+
+        points = new int[2];
+        points[0]=0;    points[1]=0;
+        piştiCounts = new int[2];
+        piştiCounts[0]=0;    piştiCounts[1]=0;
 
         Debug.Log("singleDebuggingMode: " + singleDebuggingMode);
 
@@ -169,8 +167,7 @@ public class Server : NetworkBehaviour
         {
             System.Random random = new System.Random(DateTime.Now.Millisecond);
             seed=random.Next();
-            //seed=1234;
-            if(roundCount==1)points = new int[playerCount];
+            
             Debug.Log("NetworkManager State: " + NetworkManager.Singleton.NetworkConfig.NetworkTransport);
             //Invoke("StartGame",0f);
         }
@@ -330,33 +327,26 @@ public class Server : NetworkBehaviour
             Debug.LogWarning("PlayerNumber: " + currentPlayer + " discardedCardID: " + discardedCardID[0] + "_" + discardedCardID[1]);
         }
 
-        int chkobbaPlayer=5;
+        int piştiPlayer=5;
         bool jPistiFlag = false;
-        if(discardedCardIDs[discardedCardIDs.Count-1][1] == 11 && discardedCardIDs[discardedCardIDs.Count-2][1] != 11)
-        {
-            jPistiFlag = true;
-        }
         
         if(discardedCardIDs.Count == 2)
         {
-            Debug.LogWarning("Inside Chkobba");
+            Debug.LogWarning("Inside Pişti");
             //If the last card played is a joker, the player who played it gets a point
-            if(discardedCardIDs[discardedCardIDs.Count-1][1] != 11)
+            if(discardedCardIDs[discardedCardIDs.Count-1][1] == discardedCardIDs[discardedCardIDs.Count-2][1])
             {
-                PlayerChkobba(currentPlayer);
-                chkobbaPlayer = currentPlayer;
-            }
-
-            if(jPistiFlag)
-            {
-                PlayerChkobba(currentPlayer);
-                PlayerChkobba(currentPlayer);
-                chkobbaPlayer = currentPlayer;
-            }
-            
+                Debug.LogWarning("Correct Pişti");
+                if (discardedCardIDs[discardedCardIDs.Count - 1][1] == 11)
+                {
+                    jPistiFlag = true;
+                }
+                PlayerPişti(currentPlayer,jPistiFlag);
+                piştiPlayer = currentPlayer;
+            }            
         }
 
-        networkRelay.PrintPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs), chkobbaPlayer);
+        //networkRelay.PrintPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs), piştiPlayer);
     }
 
     private int endTurnCounter=0;
@@ -444,8 +434,6 @@ public class Server : NetworkBehaviour
             pooledCards = playersPooledCardsIDs;
         }
 
-        // Reset points
-        points = new int[playerCount == 4 ? 2 : playerCount];
 
         // Iterate through each player's or team's pooled cards
         foreach (var kvp in pooledCards)
@@ -504,7 +492,7 @@ public class Server : NetworkBehaviour
         int maxPoints = -1;
         List<int> winnerIDs = new List<int>();
 
-        for (int i = 0; i < (playerCount == 4 ? 2 : playerCount); i++)
+        for (int i = 0; i < 2; i++)
         {
             if (points[i] >= maxPoints)
             {
@@ -569,6 +557,10 @@ public class Server : NetworkBehaviour
         }
 
         Debug.LogWarning(points[0] + "_" + points[1]);
+
+        networkRelay.PrintPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs),5);
+        networkRelay.AddRemainingCardsToPoolClientRPC(lastPlayerToCapture);
+
         SendWinScreen(roundOverText, winnerSide, points[0], points[1]);
 
         if (winnerSide == -1)
@@ -599,9 +591,6 @@ public class Server : NetworkBehaviour
         {
             playersPooledCardsIDs[lastPlayerToCapture].Add(remainingCardsID);
         }
-
-        networkRelay.PrintPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs),5);
-        networkRelay.AddRemainingCardsToPoolClientRPC(lastPlayerToCapture);
     }
 
     public void PrintCenterCards()
@@ -613,23 +602,29 @@ public class Server : NetworkBehaviour
         }
     }
 
-    public void PlayerChkobba(int playerID)
+    public void PlayerPişti(int playerID, bool jPiştiFlag)
     {
-        Debug.LogWarning("Player " + playerID + " Chkobba");
-        if(playerCount==2)
+        Debug.LogWarning("Player " + playerID + " Pişti");
+        if (playerCount == 2)
         {
-            points[playerID]+=10;
+            if (jPiştiFlag) points[playerID] += 20;
+            else points[playerID] += 10;
+            piştiCounts[playerID]++;
         }
 
         if(playerCount==4)
         {
-            if(playerID==0 || playerID==2)
+            if (playerID == 0 || playerID == 2)
             {
-                points[0]+=10;
+                if (jPiştiFlag) points[0] += 20;
+                else points[0] += 10;
+                piştiCounts[0]++;
             }
-            else if(playerID==1 || playerID==3)
+            else if (playerID == 1 || playerID == 3)
             {
-                points[1]+=10;
+                if (jPiştiFlag) points[1] += 20;
+                else points[1] += 10;
+                piştiCounts[1]++;
             }
         }
     }
@@ -692,10 +687,12 @@ public class Server : NetworkBehaviour
         if(selectedHandCard[1] == sumValue || (selectedHandCard[1] == 11 && sumValue != 0))
         {
             RemoveCardsFromCenter(serializableList);
-            networkRelay.SendMoveToClientRPC(selectedHandCard, serializableList, playerNumber);
-            lastPlayerToCapture = playerNumber;
             serializableList.Add(selectedHandCard);
             AddDiscardedCardsToPlayerPool(serializableList, playerNumber);
+            serializableList.Pop();
+            networkRelay.SendMoveToClientRPC(selectedHandCard, serializableList, playerNumber);
+            lastPlayerToCapture = playerNumber;
+
             //EndTurn();
         }
         else

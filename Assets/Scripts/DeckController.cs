@@ -27,7 +27,6 @@ public class DeckController : MonoBehaviour
     private int relativeIndex = 0;
     public int playerCount = 0;
     //private GameObject cardPool;
-    private GameObject chkobbaText;
     
     void Awake()
     {
@@ -902,16 +901,19 @@ public class DeckController : MonoBehaviour
     public void AddCardsToPlayerPool(int playerNumber)
     {
         //Debug.Log("inside AddCardsToPlayerPool: " + gameManager.centerCardsObjects.Count);
-        List<GameObject> centerObjects = new List<GameObject>();
+        List<GameObject> cardObjects = new List<GameObject>();
         int relativePoolIndex = (playerNumber - thisPlayerNumber + playerCount) % playerCount;
-        foreach(Transform child in GameObject.Find("Center").transform)
+        foreach (Transform child in GameObject.Find("Center").transform)
         {
-            GameObject gameObject = child.gameObject;
-            centerObjects.Add(gameObject);
+            GameObject card = child.gameObject;
+            cardObjects.Add(gameObject);
+            card.transform.parent = null; // Unparent the card
+            card.transform.parent = playerPoolTransforms[GetPoolIndex(relativePoolIndex)];
+            gameManager.centerCardsObjects.Remove(card);
         }
 
 
-        BuildPoolMoveListsAndMoveCards(playerPoolTransforms[GetPoolIndex(relativePoolIndex)].position, centerObjects, 10, relativePoolIndex);
+        BuildPoolMoveListsAndMoveCards(playerPoolTransforms[GetPoolIndex(relativePoolIndex)].position, cardObjects, 10, relativePoolIndex);
     }
 
     public void MoveCardsToPlayerPool(List<GameObject> cardObjects, int playerNumber, bool piştiFlag)
