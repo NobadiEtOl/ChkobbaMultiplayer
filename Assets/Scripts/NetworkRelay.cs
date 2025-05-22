@@ -1,10 +1,11 @@
+using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 
 public class NetworkRelay : NetworkBehaviour
 {
-    [SerializeField]private Server server;
+    [SerializeField] private Server server;
     public static NetworkRelay Instance { get; private set; }
 
     private NetworkManagerUI networkManagerUI;
@@ -43,13 +44,13 @@ public class NetworkRelay : NetworkBehaviour
     [ClientRpc(RequireOwnership = true)]
     public void InitializeCardPrefabsClientRPC()
     {
-        GameManager.LocalInstance.InitializeCardPrefabs();
+        StartCoroutine(GameManager.LocalInstance.InitializeCardPrefabs());
     }
 
     [ClientRpc(RequireOwnership = false)]
     public void DealCardPrefabsToPlayersClientRPC(int playerCount, SerializableDictionary serializableDictionary)
     {
-        GameManager.LocalInstance.CardPrefabsToPlayers(playerCount,serializableDictionary);
+        GameManager.LocalInstance.CardPrefabsToPlayers(playerCount, serializableDictionary);
     }
 
     [ClientRpc(RequireOwnership = false)]
@@ -79,13 +80,13 @@ public class NetworkRelay : NetworkBehaviour
     [ClientRpc(RequireOwnership = false)]
     public void ShowWinScreenClientRPC(string message, int winnerSide, int point0, int point1)
     {
-        GameManager.LocalInstance.ShowWinScreen(message,winnerSide,point0,point1);
+        GameManager.LocalInstance.ShowWinScreen(message, winnerSide, point0, point1);
     }
 
     [ClientRpc(RequireOwnership = false)]
     public void GetPlayerNumberClientRPC(int playerNumber)
     {
-        if(DeckController.LocalInstance.thisPlayerNumber == -1)
+        if (DeckController.LocalInstance.thisPlayerNumber == -1)
         {
             DeckController.LocalInstance.thisPlayerNumber = playerNumber;
         }
@@ -104,12 +105,6 @@ public class NetworkRelay : NetworkBehaviour
     }
 
     [ClientRpc(RequireOwnership = false)]
-    public void NotifyClientsTurnStartedClientRPC(float currentTurnTime)
-    {
-        GameManager.LocalInstance.GetTurnTime(currentTurnTime);
-    }
-
-    [ClientRpc(RequireOwnership = false)]
     public void GivePlayerCountClientRPC(int playerCount)
     {
         DeckController.LocalInstance.GetPlayerCount(playerCount);
@@ -117,7 +112,7 @@ public class NetworkRelay : NetworkBehaviour
     [ClientRpc(RequireOwnership = false)]
     public void GetPlayerNumberClientRPC(ulong clientID, int playerNumber)
     {
-        if(NetworkManager.Singleton.LocalClientId == clientID && !IsHost)
+        if (NetworkManager.Singleton.LocalClientId == clientID && !IsHost)
         {
             GameManager.LocalInstance.GetPlayerNumber(playerNumber);
         }
@@ -127,9 +122,9 @@ public class NetworkRelay : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void RemoveCenterCardsServerRPC(SerializableList serializableList)
     {
-        
+
         server.RemoveCardsFromCenter(serializableList);
-        
+
     }
     [ServerRpc(RequireOwnership = false)]
     public void PrintMessageServerRPC(string message)
@@ -141,7 +136,7 @@ public class NetworkRelay : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void SendMoveToServerRPC(int[] selectedHandCard, SerializableList serializableList, int playerNumber, int sumValue)
     {
-        server.GetMove(selectedHandCard,serializableList,playerNumber, sumValue);
+        server.GetMove(selectedHandCard, serializableList, playerNumber, sumValue);
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -166,6 +161,12 @@ public class NetworkRelay : NetworkBehaviour
     public void NotifyTurnIsReadyToEndServerRPC()
     {
         server.EndTurnCheck();
+    }
+    
+    [ServerRpc(RequireOwnership = false)]
+    public void DeckReadyServerRPC()
+    {
+        server.InitialDealCoroutineCheck();
     }
 
 }

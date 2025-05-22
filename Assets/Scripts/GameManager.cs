@@ -10,32 +10,48 @@ using UnityEngine.UIElements;
 
 public class GameManager : NetworkBehaviour
 {
+    //Scripts
     public static GameManager LocalInstance { get; private set; }
     [SerializeField] private DeckController deckController;
-
+    private NetworkRelay networkRelay;
+    //Card Variables
+    [SerializeField] public GameObject cardBack;
     private int[] currentSelectedHandCard;//Represents the card current player chose to play with.
     public List<int[]> centerCards = new List<int[]>();//List of cards in the center
     public List<GameObject> centerCardsObjects = new List<GameObject>();//List of the card objects in the center
     private List<CardInteraction> cardInteractionsScripts;//Reference to the scripts of every card.
     private List<GameObject> cardObjectsToBeDiscarted = new List<GameObject>();
     public static int currentPlayerNo = 0;
-    private NetworkRelay networkRelay;
     private List<int[]> centerCardIDList;
+    public List<int[]> myCards;
     private GameObject winScreen;
     Text roundOverText;
-    public List<int[]> myCards;
     private float turnTimer = 0;
-    //private Text currentPlayerText;
-    //private Text turnTimerText;
     private List<Text> pointTexts = new List<Text>();
-    private List<Transform> timerTransforms = new List<Transform>();
-    [SerializeField] public GameObject cardBack;
     public Sprite cardBackSprite;
     [SerializeField] public GameObject cardIndicator;
     [SerializeField] private List<Transform> playerHandTransforms;
     [SerializeField] private List<Transform> playerPoolTransforms;
     [SerializeField] private List<Transform> playerPiştiPoolTransforms;
     [SerializeField] private Transform centerTransform;
+    bool alreadySubbed = false;
+    private bool movePlayedLocally = false;
+    private GameObject waitingScreen;
+    private GameObject mainScreen;
+
+    public void ResetForNewRound()
+    {
+        currentSelectedHandCard = null;
+        centerCards.Clear();
+        centerCardsObjects.Clear();
+        //if (cardInteractionsScripts != null) cardInteractionsScripts.Clear();
+        cardObjectsToBeDiscarted.Clear();
+        if (centerCardIDList != null) centerCardIDList.Clear();
+        if (myCards != null) myCards.Clear();
+        turnTimer = 0f;
+        movePlayedLocally = false;
+        // Set currentPlayerNo to the correct starting player for the round if needed
+    }
 
     void Awake()
     {
@@ -70,12 +86,18 @@ public class GameManager : NetworkBehaviour
     }
 
     //Gets message from the server to start the deck and the cards
-    public void InitializeCardPrefabs()
+    public IEnumerator InitializeCardPrefabs()
     {
-        GameObject.Find("WaitingScreen").SetActive(false);
-        GameObject.Find("MainScreen").SetActive(false);
-        deckController.DeckStart();
-        if(winScreen.activeSelf)winScreen.SetActive(false);
+        ResetForNewRound();
+        if (waitingScreen.activeSelf) waitingScreen.SetActive(false);
+        if (mainScreen.activeSelf) mainScreen.SetActive(false);
+        yield return StartCoroutine(deckController.DeckStart());
+        if (winScreen.activeSelf) winScreen.SetActive(false);
+    }
+
+    public void DeckReady()
+    {
+        networkRelay.DeckReadyServerRPC();
     }
 
     //Gets all the scripts of the cards from the deckController
@@ -85,7 +107,6 @@ public class GameManager : NetworkBehaviour
         SubscribeToEvents();
     }
 
-    bool alreadySubbed = false;
     //Subscribes to each of the cards events
     private void SubscribeToEvents()
     {
@@ -143,7 +164,6 @@ public class GameManager : NetworkBehaviour
     //Called when the player tries to play the selected card with one or two center cards
     private void CardsPlayed(int[] cardID, GameObject cardObject, int playerNumber)
     {
-        deckController.SetAutoRotateFlagFalse(cardObject);
         CheckIfLegal(playerNumber);
     }
 
@@ -181,8 +201,6 @@ public class GameManager : NetworkBehaviour
 
     }
 
-    private bool movePlayedLocally = false;
-
     //Called when the player decides to put the selected hand card to the center
     private void CardAddedToCenter()
     {
@@ -217,6 +235,7 @@ public class GameManager : NetworkBehaviour
             foreach (int[] cardID in selectedCards)
             {
                 GameObject tempCardObject = GameObject.FindWithTag(cardID[0] + "_" + cardID[1]);
+                tempCardObject.transform.parent = null;
 
                 if (cardID == playedCard)
                 {
@@ -459,6 +478,9 @@ public class GameManager : NetworkBehaviour
         pointTexts.Add(GameObject.Find("PlayerPointText2").GetComponent<Text>());
         GameObject.Find("PlayerPointText2").GetComponent<Text>().text = "0 ";
 
+        waitingScreen = GameObject.Find("WaitingScreen");
+        mainScreen = GameObject.Find("MainScreen");
+
         winScreen = GameObject.Find("WinScreen");
         roundOverText = GameObject.Find("RoundOverText").GetComponent<Text>();
 
@@ -466,7 +488,7 @@ public class GameManager : NetworkBehaviour
 
 
         centerTransform = GameObject.Find("Center").GetComponent<Transform>();
-        deckController.getPlayerHandTransforms(playerHandTransforms, playerPoolTransforms, centerTransform, playerPiştiPoolTransforms);
+        deckController.GetPlayerHandTransforms(playerHandTransforms, playerPoolTransforms, centerTransform, playerPiştiPoolTransforms);
     }
 
     public void SkipTurn()

@@ -10,28 +10,70 @@ using UnityEngine.Tilemaps;
 
 public class Server : NetworkBehaviour
 {
+    public static Server Singleton { get; private set; } // Singleton instance
+    [SerializeField]private NetworkRelay networkRelay; // Reference to the NetworkRelay script
     private List<int[]> deckCardsIDs;//List of all the cardIDs represents the deck  
-    private Dictionary<int, List<int[]>> playersHandCardsIDs;//Dictionary containing all the players' hands
-    public SerializableDictionary playersHandCardsIDsSerialized = new SerializableDictionary();
-    public SerializableList tempSerializableList = new SerializableList();
-    private Dictionary<int, List<int[]>> playersPooledCardsIDs;//Dictionary containing all the players' pools
-    private int playerCount=2;
     public List<int[]> centerCardsIDs;//List of all the cards in the center
-    [SerializeField]private int seed = 124;//Seed for the deck suffle
+    private Dictionary<int, List<int[]>> playersHandCardsIDs;//Dictionary containing all the players' hands
+    private Dictionary<int, List<int[]>> playersPooledCardsIDs;//Dictionary containing all the players' pools
+    private int playerCount; // Number of players in the game for the game mode
+    private int connectedPlayerCount = 0;
+    [SerializeField] private int seed = 0;//Seed for the deck suffle
     private int turnCounter=0;
     public int currentPlayer;//The player that is currently playing
-    //public bool dealFlag = false; //Used to check when the cards should be dealt
-    int[] points;  // To store points for each player
-    public int lastPlayerToCapture=1;
-    public static Server Singleton { get; private set; }
-    [SerializeField]private NetworkRelay networkRelay;
+    int[] points;// To store points for each player
+    private int[] piştiCounts;
+    public int lastPlayerToCapture = -1;
     private int startingPlayerNo=0;
     private float timer=0;
-    private float turnTime = 15f; // 30 seconds per turn
-    private float currentTurnTime = 0f;
-    private bool timerRunning = false;
-    private int connectedPlayerCount=0;
-    private int[] piştiCounts;
+    private float turnTime = 15f; // the time player has before turn skips
+    private int roundCount=0;
+    private int readyToEndTurnCounter=0; //Counter to make sure every connected player is ready to end the turn
+    private bool singleDebuggingMode;
+    public bool winnerPrintFlag = false;
+
+    public void ResetAllServerVariables()
+    {
+        deckCardsIDs = null;
+        playersHandCardsIDs = null;
+        playersPooledCardsIDs = null;
+        centerCardsIDs = null;
+        seed = 0;
+        turnCounter = 0;
+        currentPlayer = 0;
+        points = new int[2];
+        points[0] = 0; points[1] = 0;
+        piştiCounts = new int[2];
+        piştiCounts[0] = 0; piştiCounts[1] = 0;
+        lastPlayerToCapture = -1;
+        startingPlayerNo = 0;
+        timer = 0f;
+        turnTime = 15f;
+        //connectedPlayerCount = 0;
+        roundCount = 0;
+        readyToEndTurnCounter = 0;
+        singleDebuggingMode = false;
+        winnerPrintFlag = false;
+    }
+
+    public void ResetForNewRound()
+    {
+        deckCardsIDs = null;
+        playersHandCardsIDs = null;
+        playersPooledCardsIDs = null;
+        centerCardsIDs = null;
+        seed = 0; // Optionally keep or randomize for each round
+        turnCounter = 0;
+        currentPlayer = 0;
+        lastPlayerToCapture = -1;
+        timer = 0f;
+        turnTime = 15f;
+        //connectedPlayerCount = 0;
+        readyToEndTurnCounter = 0;
+        singleDebuggingMode = false;
+        winnerPrintFlag = false;
+        // DO NOT reset: points, piştiCounts, roundCount, startingPlayerNo
+    }
 
     private void OnEnable()
     {
@@ -42,34 +84,14 @@ public class Server : NetworkBehaviour
     void Start()
     {
         print("server.cs start");
+        ResetAllServerVariables();
         //StartCoroutine(ServerSubsciribe());
 
-    }
-    private IEnumerator ServerSubsciribe()
-    {
-        Debug.LogWarning("Inside ServerSubscribe");
-        // Wait until the network is listening
-        yield return new WaitUntil(() => NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening);
-
-        Debug.Log("NetworkManager is initialized and listening.");
-
-        // Subscribe to the callback
-        NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
     }
 
     void Update()
     {
         timer+=Time.deltaTime;
-        if (timerRunning)
-        {
-            currentTurnTime -= Time.deltaTime;
-
-            if (currentTurnTime <= 0f)
-            {
-                timerRunning = false;
-                //SkipTurn();
-            }
-        }
         if(winnerPrintFlag)
         {
             DecideWinner();
@@ -77,20 +99,15 @@ public class Server : NetworkBehaviour
         }
     }
 
-    private int roundCount=0;
     public void StartGame(int tempPlayerCount)
     {
         timer=0;
-        roundCount++;
-        turnCounter=0;
+        if(roundCount>1)ResetForNewRound();
+
+        turnCounter =0;
         playerCount = tempPlayerCount;
         if(connectedPlayerCount == 1)singleDebuggingMode = true;
         else singleDebuggingMode = false;
-
-        points = new int[2];
-        points[0]=0;    points[1]=0;
-        piştiCounts = new int[2];
-        piştiCounts[0]=0;    piştiCounts[1]=0;
 
         Debug.Log("singleDebuggingMode: " + singleDebuggingMode);
 
@@ -118,26 +135,15 @@ public class Server : NetworkBehaviour
         // Debug before ClientRpc calls
         Debug.Log("About to call ClientRpc functions.");
 
-        // Initialize cardObjects
+        GivePlayerCount();
+
+        // Deal the cards
+        InitializePlayerPools();
         if (networkRelay != null)
         {
             Invoke("CallUpdateCurrentPlayer", 1);
             networkRelay.InitializeCardPrefabsClientRPC();
         }
-        else
-        {
-            Debug.LogError("NetworkRelay is null!");
-        }
-
-        GivePlayerCount();
-
-        currentTurnTime = turnTime+15;
-        timerRunning = true;
-        NotifyClientsTurnStarted(currentTurnTime);
-
-        // Deal the cards
-        InitializePlayerPools();
-        StartCoroutine(InitialDealCoroutine());
     }
 
     public void CallUpdateCurrentPlayer()
@@ -145,9 +151,21 @@ public class Server : NetworkBehaviour
         networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer);
     }
 
+    private int initialDealCoroutineCheckCounter = 0;
+    public void InitialDealCoroutineCheck()
+    {
+        initialDealCoroutineCheckCounter++;
+        if(initialDealCoroutineCheckCounter == connectedPlayerCount)
+        {
+            StartCoroutine(InitialDealCoroutine());
+            initialDealCoroutineCheckCounter = 0;
+        }
+    }
     private IEnumerator InitialDealCoroutine()
     {
-        AudioManager.Instance.PlayAudio(0,5,false);
+        // Initialize cardObjects
+
+        AudioManager.Instance.PlayAudio(0, 5, false);
 
         yield return new WaitForSeconds(3.5f);
 
@@ -188,8 +206,6 @@ public class Server : NetworkBehaviour
         print("DelayedMessageSend");
         networkRelay.PrintMessageServerRPC("message sent");
     }
-
-    public bool winnerPrintFlag = false;
 
     //Add all cards to the deckCardIDs by creating all necessary IDs.
     private void SaveAllCards()
@@ -278,11 +294,11 @@ public class Server : NetworkBehaviour
         }
 
         //Sends players hand to the gameManger so that card objects be given to the players
-        playersHandCardsIDsSerialized = new SerializableDictionary(playersHandCardsIDs);
-        Delayed_DealCardPrefabsToPlayers();
+        SerializableDictionary playersHandCardsIDsSerialized = new SerializableDictionary(playersHandCardsIDs);
+        Delayed_DealCardPrefabsToPlayers(playersHandCardsIDsSerialized);
     }
 
-    private void Delayed_DealCardPrefabsToPlayers()
+    private void Delayed_DealCardPrefabsToPlayers(SerializableDictionary playersHandCardsIDsSerialized)
     {
         if(IsServer)networkRelay.DealCardPrefabsToPlayersClientRPC(playerCount, playersHandCardsIDsSerialized);
     }
@@ -297,21 +313,19 @@ public class Server : NetworkBehaviour
             int[] tempCardID = deckCardsIDs[deckCardsIDs.Count-1];
             centerCardsIDs.Add(tempCardID);
             deckCardsIDs.RemoveAt(deckCardsIDs.Count-1);
-            //if(i==3)topCardIDs=tempCardID;
         }
         //Sends center cards to the gameManger so that card objects be put to the center
-        tempSerializableList = new SerializableList(centerCardsIDs);
-        networkRelay.UpdateCenterCardIDListClientRPC(tempSerializableList);
-        //tempSerializableList.PrintAll();
-        //Invoke(nameof(Delayed_DealCardPrefabsToCenter),0.5f);
-        Delayed_DealCardPrefabsToCenter();
-        //Instance is the probable cause of my problems
+        SerializableList serializableList = new SerializableList(centerCardsIDs);
+        networkRelay.UpdateCenterCardIDListClientRPC(serializableList);
+
+        Delayed_DealCardPrefabsToCenter(serializableList);
+
     }
 
     //******Check if the centerCardIDList in the game manager
     //is updated correctly, if so you dont need to send tempSerializableList
     //to the game mananger and you can use centerCardIDList instead
-    private void Delayed_DealCardPrefabsToCenter()
+    private void Delayed_DealCardPrefabsToCenter(SerializableList tempSerializableList)
     {
         if(IsServer)networkRelay.DealCardPrefabsToCenterClientRPC(tempSerializableList);
     }
@@ -349,19 +363,17 @@ public class Server : NetworkBehaviour
         //networkRelay.PrintPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs), piştiPlayer);
     }
 
-    private int endTurnCounter=0;
-    private bool singleDebuggingMode;
     public void EndTurnCheck()
     {
-        if(!singleDebuggingMode)
-        {
-            endTurnCounter++;
-            if(endTurnCounter == connectedPlayerCount)
+        //if(!singleDebuggingMode)
+        //{
+            readyToEndTurnCounter++;
+            if(readyToEndTurnCounter == connectedPlayerCount)
             {
                 EndTurn();
-                endTurnCounter = 0;
+                readyToEndTurnCounter = 0;
             }
-        }
+        //}
     }
     //Called at the end of each turn
     public void EndTurn()
@@ -387,21 +399,11 @@ public class Server : NetworkBehaviour
         currentPlayer = (currentPlayer+1)%playerCount;
 
         networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer);
-        print("TurnCounter:"  + turnCounter);
-
-        currentTurnTime = turnTime;
-        timerRunning = true;
-        NotifyClientsTurnStarted(currentTurnTime);
-        //PrintCenterCards();
     }
 
     private void GivePlayerCount()
     {
         networkRelay.GivePlayerCountClientRPC(playerCount);
-    }
-    private void NotifyClientsTurnStarted(float currentTurnTime)
-    {
-        networkRelay.NotifyClientsTurnStartedClientRPC(currentTurnTime);
     }
 
     public void SkipTurn()
@@ -412,6 +414,7 @@ public class Server : NetworkBehaviour
     private void DecideWinner()
     {
         AddRemainingCardsToPlayerPool();
+        roundCount++;
         string roundOverText = "";
 
         // Variables to track rule comparisons
@@ -628,7 +631,6 @@ public class Server : NetworkBehaviour
             }
         }
     }
-
     public void RemoveCardsFromCenter(SerializableList serializableList)
     {
         List<int[]> cardsToRemove = serializableList.ToList();
@@ -699,7 +701,7 @@ public class Server : NetworkBehaviour
         {
             AddCardIDToCenter(selectedHandCard);
         }
-        if(singleDebuggingMode)EndTurn();
+        //if(singleDebuggingMode)EndTurn();
     }
 
     public void AddCardIDToCenter(int[] cardID)
@@ -714,12 +716,6 @@ public class Server : NetworkBehaviour
     public int SendPlayerNumber()
     {
         return NetworkManager.Singleton.ConnectedClients.Count-1;
-    }
-
-    private void OnClientConnected(ulong clientId)
-    {
-        Debug.Log($"Client connected with ID: {clientId}");
-        //AnotherPlayerConnected();
     }
 
     public void AnotherPlayerConnected(ulong clientId)

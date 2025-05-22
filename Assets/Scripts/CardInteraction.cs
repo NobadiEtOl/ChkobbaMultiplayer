@@ -192,7 +192,9 @@ public class CardInteraction : MonoBehaviour
             {
                 // Invoke OnCardsPlayed
                 //Debug.Log("OnCardsPlayed invoked!");
+                autoRotateFlag = false; // Stop auto-rotation when the card is played
                 OnCardsPlayed?.Invoke(this.cardID, this.gameObject, GameManager.currentPlayerNo);
+                
                 if (activeCardIndicator != null)
                 {
                     activeCardIndicator.SetActive(false); // Deactivate the previous card indicator
