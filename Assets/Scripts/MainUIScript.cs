@@ -67,7 +67,7 @@ public class MainUIScript : MonoBehaviour
         profileScript.ResetProfilePicShowcase();
     }
 
-    public void OpenWaitingScreenUI(string color, string playerCount)
+    public void OpenWaitingScreenUI(string color, string playerCount, string joinCode)
     {
         if(startingScreenUI.activeSelf)startingScreenUI.SetActive(false);
         waitingScreenUI.SetActive(true);
@@ -85,19 +85,21 @@ public class MainUIScript : MonoBehaviour
         }
         else if(color == "blue")
         {
-            if(playerCount == "2")
+            if (playerCount == "2")
             {
                 currentMode1v1[1].SetActive(true);
+                currentMode1v1[1].transform.GetChild(0).gameObject.GetComponent<Text>().text = joinCode;
             }
-            else if(playerCount == "4")
+            else if (playerCount == "4")
             {
                 currentMode2v2[1].SetActive(true);
+                currentMode2v2[1].transform.GetChild(0).gameObject.GetComponent<Text>().text = joinCode;
             }
         }
         else if(color == "yellow")
         {
             currentModeYellow.SetActive(true);
-            currentModeYellow.transform.GetChild(0).gameObject.GetComponent<Text>().text = playerCount;
+            currentModeYellow.transform.GetChild(0).gameObject.GetComponent<Text>().text = joinCode;
         }
     }
 }

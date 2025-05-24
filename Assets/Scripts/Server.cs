@@ -414,6 +414,7 @@ public class Server : NetworkBehaviour
     private void DecideWinner()
     {
         AddRemainingCardsToPlayerPool();
+        networkRelay.AddRemainingCardsToPoolClientRPC(lastPlayerToCapture);
         roundCount++;
         string roundOverText = "";
 
@@ -562,7 +563,6 @@ public class Server : NetworkBehaviour
         Debug.LogWarning(points[0] + "_" + points[1]);
 
         networkRelay.PrintPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs),5);
-        networkRelay.AddRemainingCardsToPoolClientRPC(lastPlayerToCapture);
 
         SendWinScreen(roundOverText, winnerSide, points[0], points[1]);
 
@@ -592,6 +592,7 @@ public class Server : NetworkBehaviour
     {
         foreach(int[] remainingCardsID in centerCardsIDs)
         {
+            Debug.LogWarning("Adding remaining card to player pool: " + remainingCardsID[0] + "_" + remainingCardsID[1]);
             playersPooledCardsIDs[lastPlayerToCapture].Add(remainingCardsID);
         }
     }

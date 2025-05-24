@@ -6,7 +6,7 @@ public class CardInteraction : MonoBehaviour
 {
     private int[] cardID = new int[2];
     public static bool isOneCardSelected = false;
-    private static CardInteraction currentlySelectedCard = null; // Tracks the currently selected card
+    public static CardInteraction currentlySelectedCard = null; // Tracks the currently selected card
     public bool isPlayable = false;
 
     private Vector3 originalScreenPosition; // Original position in screen space
@@ -34,58 +34,6 @@ public class CardInteraction : MonoBehaviour
             RotateCardWithLerp();
         }
 
-        // Handle touch input
-        if (Input.touchCount > 0)
-        {
-            Touch touch = Input.GetTouch(0); // Get the first touch
-            Vector3 touchPosition = touch.position; // Use screen position directly
-
-            switch (touch.phase)
-            {
-                case TouchPhase.Began:
-                    DetectTouchedCard(touchPosition);
-                    break;
-
-                case TouchPhase.Moved:
-                    if (currentlySelectedCard == this) // Only move the selected card
-                    {
-                        OnTouchDrag(touchPosition);
-                    }
-                    break;
-
-                case TouchPhase.Ended:
-                case TouchPhase.Canceled:
-                    if (currentlySelectedCard == this) // Only release the selected card
-                    {
-                        OnTouchUp();
-                        currentlySelectedCard = null; // Clear the selected card
-                    }
-                    break;
-            }
-        }
-
-        // Handle mouse input
-        if (Input.GetMouseButtonDown(0)) // Left mouse button pressed
-        {
-            Vector3 mousePosition = Input.mousePosition; // Get mouse position
-            DetectTouchedCard(mousePosition);
-        }
-        else if (Input.GetMouseButton(0)) // Left mouse button held down
-        {
-            Vector3 mousePosition = Input.mousePosition; // Get mouse position
-            if (currentlySelectedCard == this) // Only move the selected card
-            {
-                OnTouchDrag(mousePosition);
-            }
-        }
-        else if (Input.GetMouseButtonUp(0)) // Left mouse button released
-        {
-            if (currentlySelectedCard == this) // Only release the selected card
-            {
-                OnTouchUp();
-                currentlySelectedCard = null; // Clear the selected card
-            }
-        }
     }
     private bool isRotating = false; // Flag to control rotation
     private float rotationProgress = 0f; // Tracks the progress of the rotation
@@ -126,7 +74,7 @@ public class CardInteraction : MonoBehaviour
         }
     }
 
-    private void DetectTouchedCard(Vector3 touchPosition)
+    public void DetectTouchedCard(Vector3 touchPosition)
     {
         // Convert touch position to a ray
         Ray ray = Camera.main.ScreenPointToRay(touchPosition);
@@ -141,33 +89,41 @@ public class CardInteraction : MonoBehaviour
         }
     }
 
-    private void OnCardTouched(Vector3 touchPosition)
+    public void OnCardTouched(Vector3 touchPosition)
     {
+        Debug.Log("OnCardTouched called for card: " + gameObject.name);
         // Ensure only one card is selected at a time
         if (currentlySelectedCard != null && currentlySelectedCard != this)
             return;
 
-        // This method is called when the card is touched or clicked
-        //Debug.Log($"Touched Object: {gameObject.name}");
+        if (gameObject.transform.parent.name == "PlayerPool1" || gameObject.transform.parent.name == "PlayerPiştiPool1")
+        {
+            DeckController.LocalInstance.ShowcasePlayerPoolCards();
+        }
 
-        // Store the original screen position for snap back
-        originalScreenPosition = Camera.main.WorldToScreenPoint(transform.position);
+        else
+        {
+            // Store the original screen position for snap back
+            originalScreenPosition = Camera.main.WorldToScreenPoint(transform.position);
 
-        // Activate the card's indicator and deactivate others
-        SelectCard();
+            // Activate the card's indicator and deactivate others
+            SelectCard();
 
-        // Calculate the offset between the touch position and the card's screen position
-        offset = originalScreenPosition - new Vector3(touchPosition.x, touchPosition.y, 0);
+            // Calculate the offset between the touch position and the card's screen position
+            offset = originalScreenPosition - new Vector3(touchPosition.x, touchPosition.y, 0);
 
-        // Set this card as the currently selected card
-        currentlySelectedCard = this;
+            // Set this card as the currently selected card
+            currentlySelectedCard = this;
 
-        // Invoke OnCardSelected
-        OnCardSelected?.Invoke(this.cardID);
+            // Invoke OnCardSelected
+            OnCardSelected?.Invoke(this.cardID);
+        }
+
     }
 
-    private void OnTouchDrag(Vector3 touchPosition)
+    public void OnTouchDrag(Vector3 touchPosition)
     {
+        Debug.Log("OnTouchDrag called for card: " + gameObject.name);
         if (isDragging)
         {
             // Move the card using the screen position and offset
@@ -176,8 +132,9 @@ public class CardInteraction : MonoBehaviour
         }
     }
 
-    private void OnTouchUp()
+    public void OnTouchUp()
     {
+        Debug.Log("OnTouchUp called for card: " + gameObject.name);
         if (!isDragging) return;
 
         isDragging = false;

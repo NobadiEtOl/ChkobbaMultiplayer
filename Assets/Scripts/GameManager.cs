@@ -72,6 +72,89 @@ public class GameManager : NetworkBehaviour
         networkRelay.NotifyCientConnectedServerRPC(NetworkManager.Singleton.LocalClientId);// Tells the server that a client is started
     }
 
+    private CardInteraction tempCard;
+    void Update()
+    {
+        // Handle touch input (mobile)
+        /*if (Input.touchCount > 0)
+        {
+            Touch touch = Input.GetTouch(0);
+            Vector3 touchPosition = touch.position;
+
+            Ray ray = Camera.main.ScreenPointToRay(touchPosition);
+            if (Physics.Raycast(ray, out RaycastHit hit))
+            {
+                CardInteraction card = hit.collider.GetComponent<CardInteraction>();
+                if (card != null)
+                {
+                    switch (touch.phase)
+                    {
+                        case TouchPhase.Began:
+                            card.OnCardTouched(touchPosition);
+                            break;
+                        case TouchPhase.Moved:
+                            if (CardInteraction.currentlySelectedCard == card)
+                            {
+                                card.OnTouchDrag(touchPosition); // If you have this method/event
+                            }
+                            break;
+                        case TouchPhase.Ended:
+                        case TouchPhase.Canceled:
+                            if (CardInteraction.currentlySelectedCard == card)
+                            {
+                                card.OnTouchUp(); // If you have this method/event
+                                CardInteraction.currentlySelectedCard = null; // Reset the currently selected card
+                            }
+                            break;
+                    }
+                }
+            }
+        }*/
+        // Handle mouse input (editor/desktop)
+        if (Input.GetMouseButtonDown(0) || Input.GetMouseButton(0))
+        {
+            Debug.LogWarning("OnClicked");
+            Vector3 mousePosition = Input.mousePosition;
+            Ray ray = Camera.main.ScreenPointToRay(mousePosition);
+            if (Physics.Raycast(ray, out RaycastHit hit))
+            {
+                Debug.LogWarning("OnCardTouchedIN");
+                CardInteraction card = hit.collider.GetComponent<CardInteraction>();
+                if (Input.GetMouseButtonDown(0) && card != null)
+                {
+                    card.OnCardTouched(mousePosition);
+                    tempCard = card; // Store the card for later use
+                }
+                else if(card == null && Input.GetMouseButtonDown(0))
+                {
+                    Debug.LogError("CardInteraction is null, trying to stop showcase player pool cards");
+                    deckController.TryStopShowcasePlayerPoolCards();
+                }
+                else if (Input.GetMouseButton(0) && tempCard != null)
+                {
+                    Debug.LogWarning("OnTouchDrag");
+                    if (CardInteraction.currentlySelectedCard == tempCard)
+                    {
+                        Debug.LogWarning("OnTouchDragIN");
+                        tempCard.OnTouchDrag(mousePosition); // If you have this method/event
+                    }
+                }
+            }
+        }
+
+        else if (Input.GetMouseButtonUp(0))
+        {
+            Debug.LogWarning("OnTouchUp");
+            if (CardInteraction.currentlySelectedCard != null)
+            {
+                Debug.LogWarning("OnTouchUpIN");
+                CardInteraction.currentlySelectedCard.OnTouchUp();
+                CardInteraction.currentlySelectedCard = null;
+                tempCard = null; // Reset the stored card
+            }
+        }
+    }
+
     void FixedUpdate()
     {
         if (turnTimer > 15)
@@ -381,8 +464,6 @@ public class GameManager : NetworkBehaviour
                 else AudioManager.Instance.PlayAudio(1, 0.5f, false);
             }
         }
-
-        //deckController.ResetCards();
     }
 
     private void UpdatePointText(int point0, int point1)

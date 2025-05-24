@@ -76,7 +76,7 @@ public class NetworkManagerUI : MonoBehaviour
 
     public async Task<string> StartHostWithRelay(int playerCount,bool privateFlag)
     {
-        if(privateFlag)mainUIScript.OpenWaitingScreenUI("blue", playerCount.ToString());
+        
 
         var initialOptions = new InitializationOptions();
 
@@ -98,6 +98,8 @@ public class NetworkManagerUI : MonoBehaviour
         joinCodeVar = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
         joinCodeText.text = joinCodeVar;
 
+        if(privateFlag)mainUIScript.OpenWaitingScreenUI("blue", playerCount.ToString(), joinCodeVar);
+
         CreateLobbyOptions options = new CreateLobbyOptions
         {
             IsPrivate = privateFlag, // <--- This makes the lobby joinable only by code
@@ -116,7 +118,7 @@ public class NetworkManagerUI : MonoBehaviour
     public async Task<bool> StartClientWithRelay()
     {
         string inputJoinCode = inputField.text;
-        mainUIScript.OpenWaitingScreenUI("yellow", inputJoinCode);
+        mainUIScript.OpenWaitingScreenUI("yellow", "2",inputJoinCode);
 
         var initialOptions = new InitializationOptions();
 
@@ -174,7 +176,7 @@ public class NetworkManagerUI : MonoBehaviour
 
     public async Task FindLobbiesAndStartHostIfNoneExist(int playerCount)
     {
-        mainUIScript.OpenWaitingScreenUI("red", playerCount.ToString());
+        mainUIScript.OpenWaitingScreenUI("red", playerCount.ToString(),"abc");
 
         var initialOptions = new InitializationOptions();
 

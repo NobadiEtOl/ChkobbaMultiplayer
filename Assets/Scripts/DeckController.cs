@@ -649,10 +649,11 @@ public class DeckController : MonoBehaviour
     }
     
     private Dictionary<GameObject, (Vector3 pos, Quaternion rot, Vector3 scale)> poolCardOriginalTransforms = new Dictionary<GameObject, (Vector3, Quaternion, Vector3)>();
-
+    private bool isShowcasing = false;
     [ContextMenu("Showcase Player Pool Cards")]
     public void ShowcasePlayerPoolCards()
     {
+        isShowcasing = true;
         int poolIndex = 0;
         var poolTransform = playerPoolTransforms[poolIndex];
         var piştiPoolTransform = playerPiştiPoolTransforms[poolIndex];
@@ -697,7 +698,7 @@ public class DeckController : MonoBehaviour
             float baseZ = centerTransform.position.z - 1200;
             for (int i = 0; i < poolCards.Count; i++)
             {
-                Quaternion rotation = Quaternion.Euler(-centerRotation.x, centerRotation.y, centerRotation.z);
+                Quaternion rotation = Quaternion.Euler(90, 0, 0);
                 Vector3 targetPosition = new Vector3(spacing * (i - offsetMult), (i*10)+centerTransform.position.y+5000, baseZ);
                 Vector3 targetScale = new Vector3(1250, 1250, 1250);
                 MoveCard(targetPosition, poolCards[i], 10, rotation, targetScale, false);
@@ -720,8 +721,8 @@ public class DeckController : MonoBehaviour
                 {
                     int cardIdx = pair * 2 + j;
                     Quaternion rotation = Quaternion.identity;
-                    if(j == 1)rotation = Quaternion.Euler(-centerRotation.x, centerRotation.y, centerRotation.z);
-                    else if(j == 0)rotation = Quaternion.Euler(-centerRotation.x, centerRotation.y, centerRotation.z+90);
+                    if(j == 1)rotation = Quaternion.Euler(90, 0, 0);
+                    else if(j == 0)rotation = Quaternion.Euler(90, 90, 0);
                     Vector3 targetPosition = new Vector3(
                         pairSpacing * (pair - offsetMult) + (j - 10f) * cardSpacingInPair,
                         (j*10)+centerTransform.position.y+5000,
@@ -737,6 +738,7 @@ public class DeckController : MonoBehaviour
     [ContextMenu("Stop Showcase Player Pool Cards")]
     public void StopShowcasePlayerPoolCards()
     {
+        isShowcasing = false;
         int poolIndex = 0;
         var poolTransform = playerPoolTransforms[poolIndex];
         var piştiPoolTransform = playerPiştiPoolTransforms[poolIndex];
@@ -760,6 +762,202 @@ public class DeckController : MonoBehaviour
             }
         }
         poolCardOriginalTransforms.Clear();
+    }
+
+    [ContextMenu("Showcase All Cards")]
+    public void AllCardsShowcase()
+    {
+        if (playerCount == 2)
+        {
+            ShowcasePools1v1();
+        }
+        else if (playerCount == 4)
+        {
+            ShowcasePools2v2();
+        }
+    }
+
+    private void ShowcasePools1v1()
+    {
+        int cardsPerRow = 7;
+        float cardSpacing = 420f;
+        float rowSpacing = 1250f;
+        float cardScale = 1250f;
+        float piştiGap = 1.5f * rowSpacing;
+
+        // Get screen positions for left (my side) and right (opponent)
+        Vector3 leftScreen = new Vector3(Screen.width * 0.25f, Screen.height * 0.75f, 3000f);
+        Vector3 rightScreen = new Vector3(Screen.width * 0.75f, Screen.height * 0.75f, 3000f);
+
+        Vector3 leftWorld = Camera.main.ScreenToWorldPoint(leftScreen);
+        Vector3 rightWorld = Camera.main.ScreenToWorldPoint(rightScreen);
+
+        // Determine my and opponent indices
+        int myPoolIndex = GetPoolIndex(0);
+        int oppPoolIndex = GetPoolIndex(1);
+
+        // --- My side ---
+        List<GameObject> myPiştiCards = new List<GameObject>();
+        foreach (Transform t in playerPiştiPoolTransforms[myPoolIndex]) myPiştiCards.Add(t.gameObject);
+
+        List<GameObject> myPoolCards = new List<GameObject>();
+        foreach (Transform t in playerPoolTransforms[myPoolIndex]) myPoolCards.Add(t.gameObject);
+
+        // Layout my pişti cards (top)
+        int myPiştiRows = Mathf.CeilToInt(myPiştiCards.Count / (float)cardsPerRow);
+        if (myPiştiCards.Count > 0)
+        {
+            for (int i = 0; i < myPiştiCards.Count; i++)
+            {
+                int row = i / cardsPerRow;
+                int col = i % cardsPerRow;
+                Vector3 pos = leftWorld + new Vector3((col - (cardsPerRow-1)/2f) * cardSpacing, 100 + i, -row * rowSpacing);
+                MoveCard(pos, myPiştiCards[i], 10, Quaternion.Euler(90, 0, 0), new Vector3(cardScale, cardScale, cardScale), false);
+            }
+        }
+
+        // Layout my pool cards (below pişti if present, else at top)
+        float myPoolZOffset = (myPiştiCards.Count > 0) ? (-myPiştiRows * rowSpacing - piştiGap) : 0f;
+        for (int i = 0; i < myPoolCards.Count; i++)
+        {
+            int row = i / cardsPerRow;
+            int col = i % cardsPerRow;
+            Vector3 pos = leftWorld + new Vector3(
+                (col - (cardsPerRow-1)/2f) * cardSpacing,
+                100 + i,
+                myPoolZOffset - row * rowSpacing
+            );
+            MoveCard(pos, myPoolCards[i], 10, Quaternion.Euler(90, 0, 0), new Vector3(cardScale, cardScale, cardScale), false);
+        }
+
+        // --- Opponent side ---
+        List<GameObject> oppPiştiCards = new List<GameObject>();
+        foreach (Transform t in playerPiştiPoolTransforms[oppPoolIndex]) oppPiştiCards.Add(t.gameObject);
+
+        List<GameObject> oppPoolCards = new List<GameObject>();
+        foreach (Transform t in playerPoolTransforms[oppPoolIndex]) oppPoolCards.Add(t.gameObject);
+
+        int oppPiştiRows = Mathf.CeilToInt(oppPiştiCards.Count / (float)cardsPerRow);
+        if (oppPiştiCards.Count > 0)
+        {
+            for (int i = 0; i < oppPiştiCards.Count; i++)
+            {
+                int row = i / cardsPerRow;
+                int col = i % cardsPerRow;
+                Vector3 pos = rightWorld + new Vector3((col - (cardsPerRow-1)/2f) * cardSpacing, 100 + i, -row * rowSpacing);
+                MoveCard(pos, oppPiştiCards[i], 10, Quaternion.Euler(90, 0, 0), new Vector3(cardScale, cardScale, cardScale), false);
+            }
+        }
+
+        float oppPoolZOffset = (oppPiştiCards.Count > 0) ? (-oppPiştiRows * rowSpacing - piştiGap) : 0f;
+        for (int i = 0; i < oppPoolCards.Count; i++)
+        {
+            int row = i / cardsPerRow;
+            int col = i % cardsPerRow;
+            Vector3 pos = rightWorld + new Vector3(
+                (col - (cardsPerRow-1)/2f) * cardSpacing,
+                100 + i,
+                oppPoolZOffset - row * rowSpacing
+            );
+            MoveCard(pos, oppPoolCards[i], 10, Quaternion.Euler(90, 0, 0), new Vector3(cardScale, cardScale, cardScale), false);
+        }
+    }
+
+    private void ShowcasePools2v2()
+    {
+        int cardsPerRow = 7;
+        float cardSpacing = 420f;
+        float rowSpacing = 1250f;
+        float cardScale = 1250f;
+        float piştiGap = 1.5f * rowSpacing;
+
+        // Get screen positions for left (my team) and right (opponent team)
+        Vector3 leftScreen = new Vector3(Screen.width * 0.25f, Screen.height * 0.75f, 3000f);
+        Vector3 rightScreen = new Vector3(Screen.width * 0.75f, Screen.height * 0.75f, 3000f);
+
+        Vector3 leftWorld = Camera.main.ScreenToWorldPoint(leftScreen);
+        Vector3 rightWorld = Camera.main.ScreenToWorldPoint(rightScreen);
+
+        // My team: player 0 and 2
+        List<GameObject> myTeamPiştiCards = new List<GameObject>();
+        List<GameObject> myTeamPoolCards = new List<GameObject>();
+        foreach (int idx in new int[] { GetPoolIndex(0), GetPoolIndex(2) })
+        {
+            foreach (Transform t in playerPiştiPoolTransforms[idx]) myTeamPiştiCards.Add(t.gameObject);
+            foreach (Transform t in playerPoolTransforms[idx]) myTeamPoolCards.Add(t.gameObject);
+        }
+
+        // Opponent team: player 1 and 3
+        List<GameObject> oppTeamPiştiCards = new List<GameObject>();
+        List<GameObject> oppTeamPoolCards = new List<GameObject>();
+        foreach (int idx in new int[] { GetPoolIndex(1), GetPoolIndex(3) })
+        {
+            foreach (Transform t in playerPiştiPoolTransforms[idx]) oppTeamPiştiCards.Add(t.gameObject);
+            foreach (Transform t in playerPoolTransforms[idx]) oppTeamPoolCards.Add(t.gameObject);
+        }
+
+        // Layout my team pişti cards (top)
+        int myTeamPiştiRows = Mathf.CeilToInt(myTeamPiştiCards.Count / (float)cardsPerRow);
+        if (myTeamPiştiCards.Count > 0)
+        {
+            for (int i = 0; i < myTeamPiştiCards.Count; i++)
+            {
+                int row = i / cardsPerRow;
+                int col = i % cardsPerRow;
+                Vector3 pos = leftWorld + new Vector3((col - (cardsPerRow-1)/2f) * cardSpacing, 100 + i, -row * rowSpacing);
+                MoveCard(pos, myTeamPiştiCards[i], 10, Quaternion.Euler(90, 0, 0), new Vector3(cardScale, cardScale, cardScale), false);
+            }
+        }
+
+        // Layout my team pool cards (below pişti if present, else at top)
+        float myTeamPoolZOffset = (myTeamPiştiCards.Count > 0) ? (-myTeamPiştiRows * rowSpacing - piştiGap) : 0f;
+        for (int i = 0; i < myTeamPoolCards.Count; i++)
+        {
+            int row = i / cardsPerRow;
+            int col = i % cardsPerRow;
+            Vector3 pos = leftWorld + new Vector3(
+                (col - (cardsPerRow-1)/2f) * cardSpacing,
+                100 + i,
+                myTeamPoolZOffset - row * rowSpacing
+            );
+            MoveCard(pos, myTeamPoolCards[i], 10, Quaternion.Euler(90, 0, 0), new Vector3(cardScale, cardScale, cardScale), false);
+        }
+
+        // Layout opponent team pişti cards (top)
+        int oppTeamPiştiRows = Mathf.CeilToInt(oppTeamPiştiCards.Count / (float)cardsPerRow);
+        if (oppTeamPiştiCards.Count > 0)
+        {
+            for (int i = 0; i < oppTeamPiştiCards.Count; i++)
+            {
+                int row = i / cardsPerRow;
+                int col = i % cardsPerRow;
+                Vector3 pos = rightWorld + new Vector3((col - (cardsPerRow-1)/2f) * cardSpacing, 100 + i, -row * rowSpacing);
+                MoveCard(pos, oppTeamPiştiCards[i], 10, Quaternion.Euler(90, 0, 0), new Vector3(cardScale, cardScale, cardScale), false);
+            }
+        }
+
+        // Layout opponent team pool cards (below pişti if present, else at top)
+        float oppTeamPoolZOffset = (oppTeamPiştiCards.Count > 0) ? (-oppTeamPiştiRows * rowSpacing - piştiGap) : 0f;
+        for (int i = 0; i < oppTeamPoolCards.Count; i++)
+        {
+            int row = i / cardsPerRow;
+            int col = i % cardsPerRow;
+            Vector3 pos = rightWorld + new Vector3(
+                (col - (cardsPerRow-1)/2f) * cardSpacing,
+                100 + i,
+                oppTeamPoolZOffset - row * rowSpacing
+            );
+            MoveCard(pos, oppTeamPoolCards[i], 10, Quaternion.Euler(90, 0, 0), new Vector3(cardScale, cardScale, cardScale), false);
+        }
+    }
+    
+
+    public void TryStopShowcasePlayerPoolCards()
+    {
+        if (isShowcasing)
+        {
+            StopShowcasePlayerPoolCards();
+        }
     }
 
     public void MoveCard(Vector3 endPos, GameObject cardObject, float speed, Quaternion rotation, Vector3 scales, bool audioFlag = true)
@@ -848,13 +1046,14 @@ public class DeckController : MonoBehaviour
         cardObject.transform.rotation = endRotation;
     }
 
-    public IEnumerator ChainMoveCards(List<Vector3> positions, List<GameObject> cardObject, float speed, List<Quaternion> rotations, List<Vector3> scales,bool endTurnFlag=false)
+    public IEnumerator ChainMoveCards(List<Vector3> positions, List<GameObject> cardObject, float speed, List<Quaternion> rotations, List<Vector3> scales,bool endTurnFlag=false, bool lastMove=false)
     {
         yield return StartCoroutine(ChainMoveCardsCoroutine(positions, cardObject, speed, rotations, scales));
-        if(endTurnFlag)gameManager.TellServerTurnEnded();
+        if(lastMove)AllCardsShowcase();
+        if (endTurnFlag) gameManager.TellServerTurnEnded();
     }
     
-    public void BuildPoolMoveListsAndMoveCards(Vector3 position, List<GameObject> cardObjects, float speed, int poolIndex, bool piştiFlag = false)
+    public void BuildPoolMoveListsAndMoveCards(Vector3 position, List<GameObject> cardObjects, float speed, int poolIndex, bool piştiFlag = false, bool lastMove=false)
     {
         List<Vector3> positions = new List<Vector3>();
         List<Quaternion> rotations = new List<Quaternion>();
@@ -879,7 +1078,7 @@ public class DeckController : MonoBehaviour
             }
         }
 
-        StartCoroutine(ChainMoveCards(positions, cardObjects, speed, rotations, scales, true));
+        StartCoroutine(ChainMoveCards(positions, cardObjects, speed, rotations, scales, true,lastMove));
     }
 
     private IEnumerator ChkobbaCoroutine()
@@ -953,10 +1152,15 @@ public class DeckController : MonoBehaviour
         //Debug.Log("inside AddCardsToPlayerPool: " + gameManager.centerCardsObjects.Count);
         List<GameObject> cardObjects = new List<GameObject>();
         int relativePoolIndex = (playerNumber - thisPlayerNumber + playerCount) % playerCount;
-        foreach (Transform child in GameObject.Find("Center").transform)
+
+        var children = new List<Transform>();
+        foreach (Transform child in GameObject.Find("Center").transform) { children.Add(child); }
+            
+        foreach (Transform child in children)
         {
+            Debug.LogWarning("Child: " + child.name);
             GameObject card = child.gameObject;
-            cardObjects.Add(gameObject);
+            cardObjects.Add(card);
             card.transform.parent = null; // Unparent the card
             card.transform.parent = playerPoolTransforms[GetPoolIndex(relativePoolIndex)];
             gameManager.centerCardsObjects.Remove(card);
@@ -964,7 +1168,7 @@ public class DeckController : MonoBehaviour
         }
 
 
-        BuildPoolMoveListsAndMoveCards(playerPoolTransforms[GetPoolIndex(relativePoolIndex)].position, cardObjects, 10, relativePoolIndex);
+        BuildPoolMoveListsAndMoveCards(playerPoolTransforms[GetPoolIndex(relativePoolIndex)].position, cardObjects, 10, relativePoolIndex,false,true);
     }
 
     public void MoveCardsToPlayerPool(List<GameObject> cardObjects, int playerNumber, bool piştiFlag)
