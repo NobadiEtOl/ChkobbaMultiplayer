@@ -11,7 +11,7 @@ using UnityEngine.Tilemaps;
 public class Server : NetworkBehaviour
 {
     public static Server Singleton { get; private set; } // Singleton instance
-    [SerializeField]private NetworkRelay networkRelay; // Reference to the NetworkRelay script
+    [SerializeField] private NetworkRelay networkRelay; // Reference to the NetworkRelay script
     private List<int[]> deckCardsIDs;//List of all the cardIDs represents the deck  
     public List<int[]> centerCardsIDs;//List of all the cards in the center
     private Dictionary<int, List<int[]>> playersHandCardsIDs;//Dictionary containing all the players' hands
@@ -19,16 +19,16 @@ public class Server : NetworkBehaviour
     private int playerCount; // Number of players in the game for the game mode
     private int connectedPlayerCount = 0;
     [SerializeField] private int seed = 0;//Seed for the deck suffle
-    private int turnCounter=0;
+    private int turnCounter = 0;
     public int currentPlayer;//The player that is currently playing
     int[] points;// To store points for each player
     private int[] piştiCounts;
     public int lastPlayerToCapture = -1;
-    private int startingPlayerNo=0;
-    private float timer=0;
+    private int startingPlayerNo = 0;
+    private float timer = 0;
     private float turnTime = 15f; // the time player has before turn skips
-    private int roundCount=0;
-    private int readyToEndTurnCounter=0; //Counter to make sure every connected player is ready to end the turn
+    private int roundCount = 0;
+    private int readyToEndTurnCounter = 0; //Counter to make sure every connected player is ready to end the turn
     private bool singleDebuggingMode;
     public bool winnerPrintFlag = false;
 
@@ -91,8 +91,8 @@ public class Server : NetworkBehaviour
 
     void Update()
     {
-        timer+=Time.deltaTime;
-        if(winnerPrintFlag)
+        timer += Time.deltaTime;
+        if (winnerPrintFlag)
         {
             DecideWinner();
             winnerPrintFlag = false;
@@ -101,12 +101,12 @@ public class Server : NetworkBehaviour
 
     public void StartGame(int tempPlayerCount)
     {
-        timer=0;
-        if(roundCount>1)ResetForNewRound();
+        timer = 0;
+        if (roundCount > 1) ResetForNewRound();
 
-        turnCounter =0;
+        turnCounter = 0;
         playerCount = tempPlayerCount;
-        if(connectedPlayerCount == 1)singleDebuggingMode = true;
+        if (connectedPlayerCount == 1) singleDebuggingMode = true;
         else singleDebuggingMode = false;
 
         Debug.Log("singleDebuggingMode: " + singleDebuggingMode);
@@ -116,14 +116,14 @@ public class Server : NetworkBehaviour
             Debug.LogError("StartGame() called on a non-server instance!");
             return;
         }
-        if(networkRelay==null)
+        if (networkRelay == null)
         {
             Debug.LogError("Network relay script empty");
         }
         ServerStart();
 
         // Define current player and update Client
-        currentPlayer = startingPlayerNo%playerCount;
+        currentPlayer = startingPlayerNo % playerCount;
         startingPlayerNo++;
         Debug.LogWarning("Current player: " + currentPlayer);
         Debug.LogWarning("Starting player: " + startingPlayerNo);
@@ -155,7 +155,7 @@ public class Server : NetworkBehaviour
     public void InitialDealCoroutineCheck()
     {
         initialDealCoroutineCheckCounter++;
-        if(initialDealCoroutineCheckCounter == connectedPlayerCount)
+        if (initialDealCoroutineCheckCounter == connectedPlayerCount)
         {
             StartCoroutine(InitialDealCoroutine());
             initialDealCoroutineCheckCounter = 0;
@@ -177,21 +177,21 @@ public class Server : NetworkBehaviour
     }
     private void ServerStart()
     {
-        if(!IsServer)
+        if (!IsServer)
         {
             print("Server no open");
         }
         else
         {
             System.Random random = new System.Random(DateTime.Now.Millisecond);
-            seed=random.Next();
-            
+            seed = random.Next();
+
             Debug.Log("NetworkManager State: " + NetworkManager.Singleton.NetworkConfig.NetworkTransport);
             //Invoke("StartGame",0f);
         }
 
         if (networkRelay != null)
-        {   
+        {
             print("networkRelay is not null");
             DelayedMessageSend();
         }
@@ -241,23 +241,23 @@ public class Server : NetworkBehaviour
     {
         System.Random rng = new System.Random(seed);
         int count = deckCardsIDs.Count;
-        
+
         for (int i = 0; i < count - 1; i++)
         {
             int r = rng.Next(i, count);  // Random number from i to count - 1
             int[] temp = deckCardsIDs[i];
             deckCardsIDs[i] = deckCardsIDs[r];
-           deckCardsIDs [r] = temp;
+            deckCardsIDs[r] = temp;
         }
         //Debug.Log("Deck shuffled with seed: " + seed);
     }
-    
+
     //Add a new List<int[]> to the dictionary for each player representing the player pools.
     private void InitializePlayerPools()
     {
         playersPooledCardsIDs = new Dictionary<int, List<int[]>>();
 
-        for(int i=0; i<playerCount; i++)
+        for (int i = 0; i < playerCount; i++)
         {
             playersPooledCardsIDs[i] = new List<int[]>();
         }
@@ -269,7 +269,7 @@ public class Server : NetworkBehaviour
         Debug.LogWarning("InitializePlayersHands called");
         playersHandCardsIDs = new Dictionary<int, List<int[]>>();
 
-        for(int i=0; i<playerCount; i++)
+        for (int i = 0; i < playerCount; i++)
         {
             playersHandCardsIDs[i] = new List<int[]>();
         }
@@ -280,14 +280,14 @@ public class Server : NetworkBehaviour
     private void DealCardsToPlayerHands()
     {
         InitializePlayersHands();//With each new deal players has to start with a fresh hand
-        for(int i=0; i<4; i++)
+        for (int i = 0; i < 4; i++)
         {
-            for(int j=0; j<playerCount; j++)
+            for (int j = 0; j < playerCount; j++)
             {
                 //Removes from the deck and adds to players hand
-                int[] tempCardID = deckCardsIDs[deckCardsIDs.Count-1];
+                int[] tempCardID = deckCardsIDs[deckCardsIDs.Count - 1];
                 playersHandCardsIDs[j].Add(tempCardID);
-                deckCardsIDs.RemoveAt(deckCardsIDs.Count-1);
+                deckCardsIDs.RemoveAt(deckCardsIDs.Count - 1);
                 //print(tempCardID[0] + "_" + tempCardID[1]);
                 //Add functions to run animations
             }
@@ -300,19 +300,19 @@ public class Server : NetworkBehaviour
 
     private void Delayed_DealCardPrefabsToPlayers(SerializableDictionary playersHandCardsIDsSerialized)
     {
-        if(IsServer)networkRelay.DealCardPrefabsToPlayersClientRPC(playerCount, playersHandCardsIDsSerialized);
+        if (IsServer) networkRelay.DealCardPrefabsToPlayersClientRPC(playerCount, playersHandCardsIDsSerialized);
     }
 
     //Chooses the cards to be dealth to the center
     private void DealCardsToCenter()
     {
         centerCardsIDs = new List<int[]>();
-        for(int i=0; i<4; i++)
+        for (int i = 0; i < 4; i++)
         {
             //Removes from the deck and adds to center
-            int[] tempCardID = deckCardsIDs[deckCardsIDs.Count-1];
+            int[] tempCardID = deckCardsIDs[deckCardsIDs.Count - 1];
             centerCardsIDs.Add(tempCardID);
-            deckCardsIDs.RemoveAt(deckCardsIDs.Count-1);
+            deckCardsIDs.RemoveAt(deckCardsIDs.Count - 1);
         }
         //Sends center cards to the gameManger so that card objects be put to the center
         SerializableList serializableList = new SerializableList(centerCardsIDs);
@@ -327,37 +327,37 @@ public class Server : NetworkBehaviour
     //to the game mananger and you can use centerCardIDList instead
     private void Delayed_DealCardPrefabsToCenter(SerializableList tempSerializableList)
     {
-        if(IsServer)networkRelay.DealCardPrefabsToCenterClientRPC(tempSerializableList);
+        if (IsServer) networkRelay.DealCardPrefabsToCenterClientRPC(tempSerializableList);
     }
 
     //Add played cards to the current players pool.
     public void AddDiscardedCardsToPlayerPool(SerializableList serializableList, int playerNumber)
     {
-        
+
         List<int[]> discardedCardIDs = serializableList.ToList();
-        foreach(int[] discardedCardID in discardedCardIDs)
+        foreach (int[] discardedCardID in discardedCardIDs)
         {
             playersPooledCardsIDs[playerNumber].Add(discardedCardID);
             Debug.LogWarning("PlayerNumber: " + currentPlayer + " discardedCardID: " + discardedCardID[0] + "_" + discardedCardID[1]);
         }
 
-        int piştiPlayer=5;
+        int piştiPlayer = 5;
         bool jPistiFlag = false;
-        
-        if(discardedCardIDs.Count == 2)
+
+        if (discardedCardIDs.Count == 2)
         {
             Debug.LogWarning("Inside Pişti");
             //If the last card played is a joker, the player who played it gets a point
-            if(discardedCardIDs[discardedCardIDs.Count-1][1] == discardedCardIDs[discardedCardIDs.Count-2][1])
+            if (discardedCardIDs[discardedCardIDs.Count - 1][1] == discardedCardIDs[discardedCardIDs.Count - 2][1])
             {
                 Debug.LogWarning("Correct Pişti");
                 if (discardedCardIDs[discardedCardIDs.Count - 1][1] == 11)
                 {
                     jPistiFlag = true;
                 }
-                PlayerPişti(currentPlayer,jPistiFlag);
+                PlayerPişti(currentPlayer, jPistiFlag);
                 piştiPlayer = currentPlayer;
-            }            
+            }
         }
 
         //networkRelay.PrintPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs), piştiPlayer);
@@ -367,27 +367,27 @@ public class Server : NetworkBehaviour
     {
         //if(!singleDebuggingMode)
         //{
-            readyToEndTurnCounter++;
-            if(readyToEndTurnCounter == connectedPlayerCount)
-            {
-                EndTurn();
-                readyToEndTurnCounter = 0;
-            }
+        readyToEndTurnCounter++;
+        if (readyToEndTurnCounter == connectedPlayerCount)
+        {
+            EndTurn();
+            readyToEndTurnCounter = 0;
+        }
         //}
     }
     //Called at the end of each turn
     public void EndTurn()
     {
         //Debug.LogWarning("InsideEndTurn");
-        if(turnCounter == 47)
-        {   
+        if (turnCounter == 47)
+        {
             //Round ends and a winner is decided after each card is played
             DecideWinner();
         }
-        else if(turnCounter%(playerCount*4)==(playerCount*4)-1)
+        else if (turnCounter % (playerCount * 4) == (playerCount * 4) - 1)
         {
             //If each player played their 4 cards new cards are dealt
-            Invoke("DealCardsToPlayerHands",1f);
+            Invoke("DealCardsToPlayerHands", 1f);
         }
         NextTurn();
     }
@@ -396,7 +396,7 @@ public class Server : NetworkBehaviour
     {
         turnCounter++;
 
-        currentPlayer = (currentPlayer+1)%playerCount;
+        currentPlayer = (currentPlayer + 1) % playerCount;
 
         networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer);
     }
@@ -562,7 +562,7 @@ public class Server : NetworkBehaviour
 
         Debug.LogWarning(points[0] + "_" + points[1]);
 
-        networkRelay.PrintPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs),5);
+        networkRelay.PrintPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs), 5);
 
         SendWinScreen(roundOverText, winnerSide, points[0], points[1]);
 
@@ -573,8 +573,8 @@ public class Server : NetworkBehaviour
     }
 
     private void StartGameAutomatic()
-    {   
-        if(timer>=11)
+    {
+        if (timer >= 11)
         {
             StartGame(playerCount);
             Debug.LogWarning("StartGameAutomatic called");
@@ -582,7 +582,7 @@ public class Server : NetworkBehaviour
 
     }
 
-    private void SendWinScreen(string message,int winnerSide, int point0, int point1)
+    private void SendWinScreen(string message, int winnerSide, int point0, int point1)
     {
         networkRelay.ShowWinScreenClientRPC(message, winnerSide, point0, point1);
     }
@@ -590,7 +590,7 @@ public class Server : NetworkBehaviour
     //Add remaining cards in the center to the pool of the player who last captured a card.
     public void AddRemainingCardsToPlayerPool()
     {
-        foreach(int[] remainingCardsID in centerCardsIDs)
+        foreach (int[] remainingCardsID in centerCardsIDs)
         {
             Debug.LogWarning("Adding remaining card to player pool: " + remainingCardsID[0] + "_" + remainingCardsID[1]);
             playersPooledCardsIDs[lastPlayerToCapture].Add(remainingCardsID);
@@ -600,7 +600,7 @@ public class Server : NetworkBehaviour
     public void PrintCenterCards()
     {
         print("CenterCards:");
-        foreach(int[] cardID in centerCardsIDs)
+        foreach (int[] cardID in centerCardsIDs)
         {
             print(cardID[0] + "_" + cardID[1]);
         }
@@ -616,7 +616,7 @@ public class Server : NetworkBehaviour
             piştiCounts[playerID]++;
         }
 
-        if(playerCount==4)
+        if (playerCount == 4)
         {
             if (playerID == 0 || playerID == 2)
             {
@@ -669,13 +669,13 @@ public class Server : NetworkBehaviour
 
     public static void PrintList(List<int[]> list)
     {
-        if(list == null || list.Count == 0)
+        if (list == null || list.Count == 0)
         {
             //Debug.Log("List is empty");
             return;
         }
-        int counter=0;
-        foreach(var array in list)
+        int counter = 0;
+        foreach (var array in list)
         {
             //Debug.Log("---------------------"); 
             //Debug.Log("Array[" + counter + "]: [" + array[0] + "," + array[1] + "]");
@@ -687,7 +687,7 @@ public class Server : NetworkBehaviour
     {
         Debug.LogWarning("GetMove called with selectedHandCard: " + selectedHandCard[0] + "_" + selectedHandCard[1]);
 
-        if(selectedHandCard[1] == sumValue || (selectedHandCard[1] == 11 && sumValue != 0))
+        if (selectedHandCard[1] == sumValue || (selectedHandCard[1] == 11 && sumValue != 0))
         {
             RemoveCardsFromCenter(serializableList);
             serializableList.Add(selectedHandCard);
@@ -716,7 +716,7 @@ public class Server : NetworkBehaviour
 
     public int SendPlayerNumber()
     {
-        return NetworkManager.Singleton.ConnectedClients.Count-1;
+        return NetworkManager.Singleton.ConnectedClients.Count - 1;
     }
 
     public void AnotherPlayerConnected(ulong clientId)
@@ -727,13 +727,13 @@ public class Server : NetworkBehaviour
         Debug.Log("connectedPlayerCount: " + connectedPlayerCount);
         Debug.Log("playerCount: " + playerCount);
 
-        if(playerCount == connectedPlayerCount)
+        if (playerCount == connectedPlayerCount)
         {
-            if(playerCount == 2)
+            if (playerCount == 2)
             {
                 StartGameAfterDelayTwoPlayer();
             }
-            else if(playerCount == 4)
+            else if (playerCount == 4)
             {
                 StartGameAfterDelayFourPlayer();
             }
@@ -741,7 +741,7 @@ public class Server : NetworkBehaviour
     }
     public void StartGameAfterDelayFourPlayer()
     {
-        Invoke("StartGameDelayedFourPlayer",3f);
+        Invoke("StartGameDelayedFourPlayer", 3f);
     }
     [ContextMenu("StartGameDelayedFourPlayer")]
     private void StartGameDelayedFourPlayer()
@@ -750,7 +750,7 @@ public class Server : NetworkBehaviour
     }
     public void StartGameAfterDelayTwoPlayer()
     {
-        Invoke("StartGameDelayedTwoPlayer",3f);
+        Invoke("StartGameDelayedTwoPlayer", 3f);
     }
     [ContextMenu("StartGameDelayedTwoPlayer")]
     private void StartGameDelayedTwoPlayer()
@@ -766,6 +766,27 @@ public class Server : NetworkBehaviour
     [ContextMenu("PrintPlayerPools")]
     public void CallPrintPlayerPools()
     {
-        networkRelay.PrintPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs),5);
+        networkRelay.PrintPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs), 5);
+    }
+    
+    /// <summary>
+    /// Swaps cards between two players in the server's hand data.
+    /// </summary>
+    public void SwapCardsBetweenPlayersOnServer(int playerANo, int cardAIndex, int playerBNo, int cardBIndex)
+    {
+        if (playersHandCardsIDs == null) return;
+        if (!playersHandCardsIDs.ContainsKey(playerANo) || !playersHandCardsIDs.ContainsKey(playerBNo)) return;
+
+        var handA = playersHandCardsIDs[playerANo];
+        var handB = playersHandCardsIDs[playerBNo];
+
+        if (handA.Count <= cardAIndex || handB.Count <= cardBIndex) return;
+
+        // Swap the cards in the server's hand data
+        int[] temp = handA[cardAIndex];
+        handA[cardAIndex] = handB[cardBIndex];
+        handB[cardBIndex] = temp;
+
+        Debug.LogWarning($"Server swapped card {cardAIndex} of player {playerANo} with card {cardBIndex} of player {playerBNo}");
     }
 }   

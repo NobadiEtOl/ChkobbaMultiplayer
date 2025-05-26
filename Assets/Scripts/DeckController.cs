@@ -11,10 +11,10 @@ using UnityEngine;
 using UnityEngine.UIElements;
 
 public class DeckController : MonoBehaviour
-{   
+{
     public static DeckController LocalInstance;
     public int thisPlayerNumber;
-    [SerializeField]private GameManager gameManager;
+    [SerializeField] private GameManager gameManager;
     [SerializeField] private List<GameObject> cardPrefabsList;//Prefabs of all the cards.
     private Dictionary<string, GameObject> cardPrefabs;//A dictionary to keep track of each card prefabs with its ID
     private Dictionary<string, GameObject> deckPool;//A dictionary of card ID and a list of all the instantiated cards
@@ -26,11 +26,11 @@ public class DeckController : MonoBehaviour
     private List<Transform> playerPiştiPoolTransforms = new List<Transform>();
     private int relativeIndex = 0;
     public int playerCount = 0;
-    int offset=150; 
-    int offsetCounter0=-1;
-    int offsetCounter1=-1;
-    int offsetCounter2=-1;
-    private int zOffsetCounter=0;
+    int offset = 150;
+    int offsetCounter0 = -1;
+    int offsetCounter1 = -1;
+    int offsetCounter2 = -1;
+    private int zOffsetCounter = 0;
     //private GameObject cardPool;
 
     void Awake()
@@ -45,7 +45,7 @@ public class DeckController : MonoBehaviour
     }
 
     void Start()
-    {   
+    {
         InitialDeckSetUp();
     }
 
@@ -119,8 +119,8 @@ public class DeckController : MonoBehaviour
         }
 
         else yield return StartCoroutine(ResetCards());
-        
-        
+
+
     }
 
     [ContextMenu("Reset Cards")]
@@ -136,13 +136,13 @@ public class DeckController : MonoBehaviour
         // Move deckTransform to the center position
         deckTransform.position = centerTransform.position;
         deckTransform.rotation = centerTransform.rotation;
-        
+
         List<GameObject> tempCardObjectList = new List<GameObject>();
 
         foreach (var card in cardObjectList)
         {
             if (orderedCardObjectList.Contains(card)) ;
-            else tempCardObjectList.Add(card); 
+            else tempCardObjectList.Add(card);
         }
 
         foreach (var card in orderedCardObjectList)
@@ -172,7 +172,7 @@ public class DeckController : MonoBehaviour
         orderedCardObjectList.Clear();
 
         List<Vector3> positions = Enumerable.Repeat(deckTransform.position, 52).ToList();
-        List<Quaternion> rotations = Enumerable.Repeat(Quaternion.Euler(deckTransform.rotation.x-90, deckTransform.rotation.y, deckTransform.rotation.z), 52).ToList();
+        List<Quaternion> rotations = Enumerable.Repeat(Quaternion.Euler(deckTransform.rotation.x - 90, deckTransform.rotation.y, deckTransform.rotation.z), 52).ToList();
         List<Vector3> scales = Enumerable.Repeat(new Vector3(1000, 1000, 1000), 52).ToList();
 
         yield return StartCoroutine(ChainMoveCards(positions, cardObjectList, 30, rotations, scales));
@@ -228,7 +228,7 @@ public class DeckController : MonoBehaviour
         var scales = new List<Vector3>(); // List to store scales
 
         for (int n = 0; n < 2; n++)
-        {   
+        {
             int i = (startingPlayerNoCounter + n) % 2;
             relativeIndex = (i - thisPlayerNumber + playerCount) % playerCount;
             Debug.LogWarning("relativeIndex: " + relativeIndex);
@@ -261,12 +261,12 @@ public class DeckController : MonoBehaviour
                 {
                     case 0: // Bottom (Player 0)
                         offset = new Vector3(randomOffset1 * randomOffset2, j * 5, randomOffset1 * randomOffset2);
-                        rotation = Quaternion.Euler(centerRotation.x,centerRotation.y + (randomOffset1*3),centerRotation.z);
+                        rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + (randomOffset1 * 3), centerRotation.z);
                         //scales.Add(new Vector3(800, 800, 800));
                         break;
                     case 1: // Top (Player 2)
                         offset = new Vector3(randomOffset1 * randomOffset2, j * 5, randomOffset1 * randomOffset2);
-                        rotation = Quaternion.Euler(centerRotation.x,centerRotation.y + (randomOffset1*3),centerRotation.z);
+                        rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + (randomOffset1 * 3), centerRotation.z);
                         //scales.Add(new Vector3(600, 600, 600));
                         break;
                 }
@@ -318,22 +318,22 @@ public class DeckController : MonoBehaviour
                 {
                     case 0: // Bottom (Player 0)
                         offset = new Vector3(randomOffset1 * randomOffset2, j * 5, randomOffset1 * randomOffset2);
-                        rotation = Quaternion.Euler(centerRotation.x,centerRotation.y + (randomOffset1*3),centerRotation.z);
+                        rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + (randomOffset1 * 3), centerRotation.z);
                         //scales.Add(new Vector3(800, 800, 800));
                         break;
                     case 1: // Right (Player 1)
                         offset = new Vector3(randomOffset1 * randomOffset2, j * 5, randomOffset1 * randomOffset2);
-                        rotation = Quaternion.Euler(centerRotation.x,centerRotation.y + 90 + (randomOffset1*3),centerRotation.z);
+                        rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + 90 + (randomOffset1 * 3), centerRotation.z);
                         //scales.Add(new Vector3(700, 700, 700));
                         break;
                     case 2: // Top (Player 2)
                         offset = new Vector3(randomOffset1 * randomOffset2, j * 5, randomOffset1 * randomOffset2);
-                        rotation = Quaternion.Euler(centerRotation.x,centerRotation.y + (randomOffset1*3),centerRotation.z);
+                        rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + (randomOffset1 * 3), centerRotation.z);
                         //scales.Add(new Vector3(600, 600, 600));
                         break;
                     case 3: // Left (Player 3)
                         offset = new Vector3(randomOffset1 * randomOffset2, j * 5, randomOffset1 * randomOffset2);
-                        rotation = Quaternion.Euler(centerRotation.x,centerRotation.y + 90 + (randomOffset1*3),centerRotation.z);
+                        rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + 90 + (randomOffset1 * 3), centerRotation.z);
                         //scales.Add(new Vector3(700, 700, 700));
                         break;
                 }
@@ -372,15 +372,15 @@ public class DeckController : MonoBehaviour
                 Vector3 centerRotation = centerTransform.rotation.eulerAngles;
                 //positions.Add(new Vector3(centerPosition.x, centerPosition.y, centerPosition.z + i * -10));
                 //else positions.Add(new Vector3(centerPosition.x, centerPosition.y, centerPosition.z - 10 + i * -10 ));
-                
-                
+
+
                 gameManager.centerCardsObjects.Add(tempCenterCard);
                 gameManager.centerCards.Add(cardID);
 
                 if (i == 3)
                 {
-                    rotations.Add(Quaternion.Euler(centerRotation.x+180, centerRotation.y, UnityEngine.Random.Range(-12, 12)));
-                    positions.Add(new Vector3(centerPosition.x, centerPosition.y+10, centerPosition.z));
+                    rotations.Add(Quaternion.Euler(centerRotation.x + 180, centerRotation.y, UnityEngine.Random.Range(-12, 12)));
+                    positions.Add(new Vector3(centerPosition.x, centerPosition.y + 10, centerPosition.z));
                 }
                 else
                 {
@@ -393,7 +393,7 @@ public class DeckController : MonoBehaviour
 
         StartCoroutine(ChainMoveCards(positions, cardObjects, 10, rotations, scales));
     }
-    
+
     private void SendCardInteractionsToGameManager()
     {
         gameManager.GetCardInteractionScripts(cardInteractionList);
@@ -431,12 +431,12 @@ public class DeckController : MonoBehaviour
             Vector3 centerPosition = centerTransform.position;
             Vector3 centerRotation = centerTransform.rotation.eulerAngles;
 
-            rotations.Add(Quaternion.Euler(centerRotation.x+180, centerRotation.y, UnityEngine.Random.Range(-12, 12)));
+            rotations.Add(Quaternion.Euler(centerRotation.x + 180, centerRotation.y, UnityEngine.Random.Range(-12, 12)));
             placedCard.transform.parent = centerTransform;
 
             // Use centerTransform for positioning
             positions.Add(new Vector3(centerPosition.x, centerPosition.y + 10 * GameManager.LocalInstance.centerCardsObjects.Count, centerPosition.z));
-            scales.Add(new Vector3(1200,1200,1200));
+            scales.Add(new Vector3(1200, 1200, 1200));
 
             gameManager.centerCards.Add(cardID);
             gameManager.centerCardsObjects.Add(placedCard);
@@ -452,14 +452,14 @@ public class DeckController : MonoBehaviour
     {
         if (playerCount == 2)
         {
-            for(int i = 0; i < 2; i++)
+            for (int i = 0; i < 2; i++)
             {
                 UpdateCurrentPlayerHandLayoutTwoPlayers(i);
             }
         }
         else if (playerCount == 4)
         {
-            for(int i = 0; i < 4; i++)
+            for (int i = 0; i < 4; i++)
             {
                 UpdateCurrentPlayerHandLayoutFourPlayers(i);
             }
@@ -468,7 +468,7 @@ public class DeckController : MonoBehaviour
 
     private void UpdateCurrentPlayerHandLayoutTwoPlayers(int playerNumber = -1)
     {
-        if(playerNumber == 1) playerNumber = 2;
+        if (playerNumber == 1) playerNumber = 2;
 
         // Define the spacing for the layout
         float spacing = 150;
@@ -486,7 +486,7 @@ public class DeckController : MonoBehaviour
         }
 
 
-        if(currentPlayerHand.childCount == 1)
+        if (currentPlayerHand.childCount == 1)
         {
             return;
         }
@@ -520,19 +520,19 @@ public class DeckController : MonoBehaviour
             {
                 case 0: // Bottom (Player 0)
                     offset = new Vector3(spacing * 15f * (i - offsetMult), 1000, 100);
-                    rotation = Quaternion.Euler(-centerRotation.x,centerRotation.y,centerRotation.z);
+                    rotation = Quaternion.Euler(-centerRotation.x, centerRotation.y, centerRotation.z);
                     currentScale = new Vector3(1250, 1250, 1250);
                     break;
                 case 2: // Top (Player 2)
-                    offset = new Vector3(spacing * 3f * (i - offsetMult), 1000+(i*10), 0);
-                    rotation = Quaternion.Euler(-centerRotation.x,centerRotation.y,centerRotation.z);
+                    offset = new Vector3(spacing * 3f * (i - offsetMult), 1000 + (i * 10), 0);
+                    rotation = Quaternion.Euler(centerRotation.x, centerRotation.y, centerRotation.z);
                     break;
             }
 
             Vector3 targetPosition = playerHandTransforms[playerNumber].position + offset;
             MoveCard(targetPosition, playerCards[i], 10, rotation, currentScale);
         }
-        if(playerNumber == 0) StartCoroutine(SetAutoRotateFlagTrue(playerCards));
+        if (playerNumber == 0) StartCoroutine(SetAutoRotateFlagTrue(playerCards));
         //Debug.LogWarning(playerNumber);
     }
 
@@ -554,7 +554,7 @@ public class DeckController : MonoBehaviour
         }
 
 
-        if(currentPlayerHand.childCount == 1)
+        if (currentPlayerHand.childCount == 1)
         {
             return;
         }
@@ -587,30 +587,30 @@ public class DeckController : MonoBehaviour
             {
                 case 0: // Bottom (Player 0)
                     offset = new Vector3(spacing * 15f * (i - offsetMult), 1000, 0);
-                    rotation = Quaternion.Euler(-centerRotation.x,centerRotation.y,centerRotation.z);
+                    rotation = Quaternion.Euler(-centerRotation.x, centerRotation.y, centerRotation.z);
                     currentScale = new Vector3(1250, 1250, 1250);
                     break;
                 case 1: // Right (Player 1)
-                    offset = new Vector3(0, i*10, spacing * 3f * (i - offsetMult));
-                    rotation = Quaternion.Euler(-centerRotation.x,centerRotation.y+90,centerRotation.z);
+                    offset = new Vector3(0, i * 10, spacing * 3f * (i - offsetMult));
+                    rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + 90, centerRotation.z);
                     break;
                 case 2: // Top (Player 2)
-                    offset = new Vector3(spacing * 3f * (i - offsetMult), i*10, 0);
-                    rotation = Quaternion.Euler(-centerRotation.x,centerRotation.y,centerRotation.z);
+                    offset = new Vector3(spacing * 3f * (i - offsetMult), i * 10, 0);
+                    rotation = Quaternion.Euler(centerRotation.x, centerRotation.y, centerRotation.z);
                     break;
                 case 3: // Left (Player 3)
-                    offset = new Vector3(0, i*10, spacing * 3f * (i - offsetMult));
-                    rotation = Quaternion.Euler(-centerRotation.x,centerRotation.y+90,centerRotation.z);
+                    offset = new Vector3(0, i * 10, spacing * 3f * (i - offsetMult));
+                    rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + 90, centerRotation.z);
                     break;
             }
 
             Vector3 targetPosition = playerHandTransforms[playerNumber].position + offset;
             MoveCard(targetPosition, playerCards[i], 10, rotation, currentScale);
         }
-        if(playerNumber == 0) StartCoroutine(SetAutoRotateFlagTrue(playerCards));
+        if (playerNumber == 0) StartCoroutine(SetAutoRotateFlagTrue(playerCards));
         //Debug.LogWarning(playerNumber);
     }
-    
+
     public IEnumerator SetAutoRotateFlagTrue(List<GameObject> cardObjects)
     {
         //Debug.LogWarning("CardInteraction not found for the specified GameObject.");
@@ -632,7 +632,7 @@ public class DeckController : MonoBehaviour
     public void SetAutoRotateFlagFalse(GameObject cardObject)
     {
         //Debug.LogWarning("CardInteraction not found for the specified GameObject.");
-        
+
         foreach (var cardInteraction in cardInteractionList)
         {
             if (cardInteraction.gameObject == cardObject)
@@ -641,13 +641,13 @@ public class DeckController : MonoBehaviour
                 return;
             }
         }
-        
-        
+
+
 
         //Debug.LogWarning("CardInteraction not found for the specified GameObject.");
-        
+
     }
-    
+
     private Dictionary<GameObject, (Vector3 pos, Quaternion rot, Vector3 scale)> poolCardOriginalTransforms = new Dictionary<GameObject, (Vector3, Quaternion, Vector3)>();
     private bool isShowcasing = false;
     [ContextMenu("Showcase Player Pool Cards")]
@@ -699,7 +699,7 @@ public class DeckController : MonoBehaviour
             for (int i = 0; i < poolCards.Count; i++)
             {
                 Quaternion rotation = Quaternion.Euler(90, 0, 0);
-                Vector3 targetPosition = new Vector3(spacing * (i - offsetMult), (i*10)+centerTransform.position.y+5000, baseZ);
+                Vector3 targetPosition = new Vector3(spacing * (i - offsetMult), (i * 10) + centerTransform.position.y + 5000, baseZ);
                 Vector3 targetScale = new Vector3(1250, 1250, 1250);
                 MoveCard(targetPosition, poolCards[i], 10, rotation, targetScale, false);
             }
@@ -721,11 +721,11 @@ public class DeckController : MonoBehaviour
                 {
                     int cardIdx = pair * 2 + j;
                     Quaternion rotation = Quaternion.identity;
-                    if(j == 1)rotation = Quaternion.Euler(90, 0, 0);
-                    else if(j == 0)rotation = Quaternion.Euler(90, 90, 0);
+                    if (j == 1) rotation = Quaternion.Euler(90, 0, 0);
+                    else if (j == 0) rotation = Quaternion.Euler(90, 90, 0);
                     Vector3 targetPosition = new Vector3(
                         pairSpacing * (pair - offsetMult) + (j - 10f) * cardSpacingInPair,
-                        (j*10)+centerTransform.position.y+5000,
+                        (j * 10) + centerTransform.position.y + 5000,
                         baseZ
                     );
                     Vector3 targetScale = new Vector3(1250, 1250, 1250);
@@ -811,7 +811,7 @@ public class DeckController : MonoBehaviour
             {
                 int row = i / cardsPerRow;
                 int col = i % cardsPerRow;
-                Vector3 pos = leftWorld + new Vector3((col - (cardsPerRow-1)/2f) * cardSpacing, 100 + i, -row * rowSpacing);
+                Vector3 pos = leftWorld + new Vector3((col - (cardsPerRow - 1) / 2f) * cardSpacing, 100 + i, -row * rowSpacing);
                 MoveCard(pos, myPiştiCards[i], 10, Quaternion.Euler(90, 0, 0), new Vector3(cardScale, cardScale, cardScale), false);
             }
         }
@@ -823,7 +823,7 @@ public class DeckController : MonoBehaviour
             int row = i / cardsPerRow;
             int col = i % cardsPerRow;
             Vector3 pos = leftWorld + new Vector3(
-                (col - (cardsPerRow-1)/2f) * cardSpacing,
+                (col - (cardsPerRow - 1) / 2f) * cardSpacing,
                 100 + i,
                 myPoolZOffset - row * rowSpacing
             );
@@ -844,7 +844,7 @@ public class DeckController : MonoBehaviour
             {
                 int row = i / cardsPerRow;
                 int col = i % cardsPerRow;
-                Vector3 pos = rightWorld + new Vector3((col - (cardsPerRow-1)/2f) * cardSpacing, 100 + i, -row * rowSpacing);
+                Vector3 pos = rightWorld + new Vector3((col - (cardsPerRow - 1) / 2f) * cardSpacing, 100 + i, -row * rowSpacing);
                 MoveCard(pos, oppPiştiCards[i], 10, Quaternion.Euler(90, 0, 0), new Vector3(cardScale, cardScale, cardScale), false);
             }
         }
@@ -855,7 +855,7 @@ public class DeckController : MonoBehaviour
             int row = i / cardsPerRow;
             int col = i % cardsPerRow;
             Vector3 pos = rightWorld + new Vector3(
-                (col - (cardsPerRow-1)/2f) * cardSpacing,
+                (col - (cardsPerRow - 1) / 2f) * cardSpacing,
                 100 + i,
                 oppPoolZOffset - row * rowSpacing
             );
@@ -904,7 +904,7 @@ public class DeckController : MonoBehaviour
             {
                 int row = i / cardsPerRow;
                 int col = i % cardsPerRow;
-                Vector3 pos = leftWorld + new Vector3((col - (cardsPerRow-1)/2f) * cardSpacing, 100 + i, -row * rowSpacing);
+                Vector3 pos = leftWorld + new Vector3((col - (cardsPerRow - 1) / 2f) * cardSpacing, 100 + i, -row * rowSpacing);
                 MoveCard(pos, myTeamPiştiCards[i], 10, Quaternion.Euler(90, 0, 0), new Vector3(cardScale, cardScale, cardScale), false);
             }
         }
@@ -916,7 +916,7 @@ public class DeckController : MonoBehaviour
             int row = i / cardsPerRow;
             int col = i % cardsPerRow;
             Vector3 pos = leftWorld + new Vector3(
-                (col - (cardsPerRow-1)/2f) * cardSpacing,
+                (col - (cardsPerRow - 1) / 2f) * cardSpacing,
                 100 + i,
                 myTeamPoolZOffset - row * rowSpacing
             );
@@ -931,7 +931,7 @@ public class DeckController : MonoBehaviour
             {
                 int row = i / cardsPerRow;
                 int col = i % cardsPerRow;
-                Vector3 pos = rightWorld + new Vector3((col - (cardsPerRow-1)/2f) * cardSpacing, 100 + i, -row * rowSpacing);
+                Vector3 pos = rightWorld + new Vector3((col - (cardsPerRow - 1) / 2f) * cardSpacing, 100 + i, -row * rowSpacing);
                 MoveCard(pos, oppTeamPiştiCards[i], 10, Quaternion.Euler(90, 0, 0), new Vector3(cardScale, cardScale, cardScale), false);
             }
         }
@@ -943,14 +943,14 @@ public class DeckController : MonoBehaviour
             int row = i / cardsPerRow;
             int col = i % cardsPerRow;
             Vector3 pos = rightWorld + new Vector3(
-                (col - (cardsPerRow-1)/2f) * cardSpacing,
+                (col - (cardsPerRow - 1) / 2f) * cardSpacing,
                 100 + i,
                 oppTeamPoolZOffset - row * rowSpacing
             );
             MoveCard(pos, oppTeamPoolCards[i], 10, Quaternion.Euler(90, 0, 0), new Vector3(cardScale, cardScale, cardScale), false);
         }
     }
-    
+
 
     public void TryStopShowcasePlayerPoolCards()
     {
@@ -1012,7 +1012,7 @@ public class DeckController : MonoBehaviour
     }
 
 
-    public void RotateCard(Quaternion endRotation, GameObject cardObject, float speed=20)
+    public void RotateCard(Quaternion endRotation, GameObject cardObject, float speed = 20)
     {
         // Start the coroutine to rotate the card
         StartCoroutine(RotateCardCoroutine(endRotation, cardObject, speed));
@@ -1046,14 +1046,15 @@ public class DeckController : MonoBehaviour
         cardObject.transform.rotation = endRotation;
     }
 
-    public IEnumerator ChainMoveCards(List<Vector3> positions, List<GameObject> cardObject, float speed, List<Quaternion> rotations, List<Vector3> scales,bool endTurnFlag=false, bool lastMove=false)
+    public IEnumerator ChainMoveCards(List<Vector3> positions, List<GameObject> cardObject, float speed, List<Quaternion> rotations, List<Vector3> scales, bool endTurnFlag = false, bool lastMove = false, bool updateFlag = true)
     {
         yield return StartCoroutine(ChainMoveCardsCoroutine(positions, cardObject, speed, rotations, scales));
-        if(lastMove)AllCardsShowcase();
+        if (lastMove) AllCardsShowcase();
         if (endTurnFlag) gameManager.TellServerTurnEnded();
+        if (updateFlag) UpdateCurrentPlayerHandLayout();
     }
-    
-    public void BuildPoolMoveListsAndMoveCards(Vector3 position, List<GameObject> cardObjects, float speed, int poolIndex, bool piştiFlag = false, bool lastMove=false)
+
+    public void BuildPoolMoveListsAndMoveCards(Vector3 position, List<GameObject> cardObjects, float speed, int poolIndex, bool piştiFlag = false, bool lastMove = false)
     {
         List<Vector3> positions = new List<Vector3>();
         List<Quaternion> rotations = new List<Quaternion>();
@@ -1062,7 +1063,7 @@ public class DeckController : MonoBehaviour
         {
             Vector3 tempRotation = playerPoolTransforms[poolIndex].transform.rotation.eulerAngles;
             positions.Add(position);
-            Quaternion rotation = Quaternion.Euler(tempRotation.x-90, tempRotation.y, tempRotation.z+UnityEngine.Random.Range(170f, 190f));
+            Quaternion rotation = Quaternion.Euler(tempRotation.x - 90, tempRotation.y, tempRotation.z + UnityEngine.Random.Range(170f, 190f));
             rotations.Add(rotation);
             scales.Add(new Vector3(1000, 1000, 1000)); // Set scale for all cards
 
@@ -1071,14 +1072,14 @@ public class DeckController : MonoBehaviour
                 if (i == cardObjects.Count - 1)
                 {
                     positions[i] = new Vector3(position.x + 100 + GetChkobbaZOffset(), position.y, position.z - GetChkobbaZOffset() + 10);
-                    rotations[i] = Quaternion.Euler(tempRotation.x+90, tempRotation.y, tempRotation.z+UnityEngine.Random.Range(170f, 190f)+90);
+                    rotations[i] = Quaternion.Euler(tempRotation.x + 90, tempRotation.y, tempRotation.z + UnityEngine.Random.Range(170f, 190f) + 90);
                     //Debug.LogWarning(poolIndex);
                 }
                 StartCoroutine(ChkobbaCoroutine());
             }
         }
 
-        StartCoroutine(ChainMoveCards(positions, cardObjects, speed, rotations, scales, true,lastMove));
+        StartCoroutine(ChainMoveCards(positions, cardObjects, speed, rotations, scales, true, lastMove));
     }
 
     private IEnumerator ChkobbaCoroutine()
@@ -1092,25 +1093,25 @@ public class DeckController : MonoBehaviour
 
     private int GetChkobbaYOffset(int poolIndex)
     {
-        if(poolIndex==0)
+        if (poolIndex == 0)
         {
             offsetCounter0++;
-            return (offset*offsetCounter0)-200;
+            return (offset * offsetCounter0) - 200;
 
         }
-        else if(poolIndex==1)
+        else if (poolIndex == 1)
         {
             offsetCounter1++;
-            return -(offset*offsetCounter1)+200;
+            return -(offset * offsetCounter1) + 200;
         }
-        else if(poolIndex==2)
+        else if (poolIndex == 2)
         {
             offsetCounter2++;
-            return -(offset*offsetCounter2)+200;
+            return -(offset * offsetCounter2) + 200;
         }
         else return 0;
     }
-    
+
     private int GetChkobbaZOffset()
     {
         zOffsetCounter++;
@@ -1122,11 +1123,10 @@ public class DeckController : MonoBehaviour
     {
         //if(cardObjects.Count<20)yield return new WaitForSeconds(2f - (cardObjects.Count*0.1f));
         //else yield return new WaitForSeconds(0.2f);
-        for(int i = 0; i < cardObjects.Count; i++)
+        for (int i = 0; i < cardObjects.Count; i++)
         {
-            yield return StartCoroutine(MoveCardCoroutine(positions[i], cardObjects[i], speed + (i*0.25f), rotations[i],scales[i]));
+            yield return StartCoroutine(MoveCardCoroutine(positions[i], cardObjects[i], speed + (i * 0.25f), rotations[i], scales[i]));
         }
-        UpdateCurrentPlayerHandLayout();
     }
     public void SetPlayerNumber(int playerNumber)
     {
@@ -1155,7 +1155,7 @@ public class DeckController : MonoBehaviour
 
         var children = new List<Transform>();
         foreach (Transform child in GameObject.Find("Center").transform) { children.Add(child); }
-            
+
         foreach (Transform child in children)
         {
             Debug.LogWarning("Child: " + child.name);
@@ -1168,7 +1168,7 @@ public class DeckController : MonoBehaviour
         }
 
 
-        BuildPoolMoveListsAndMoveCards(playerPoolTransforms[GetPoolIndex(relativePoolIndex)].position, cardObjects, 10, relativePoolIndex,false,true);
+        BuildPoolMoveListsAndMoveCards(playerPoolTransforms[GetPoolIndex(relativePoolIndex)].position, cardObjects, 10, relativePoolIndex, false, true);
     }
 
     public void MoveCardsToPlayerPool(List<GameObject> cardObjects, int playerNumber, bool piştiFlag)
@@ -1184,7 +1184,7 @@ public class DeckController : MonoBehaviour
                 gameManager.centerCardsObjects.Remove(card);
                 orderedCardObjectList.Add(card);
             }
-            BuildPoolMoveListsAndMoveCards(playerPiştiPoolTransforms[GetPoolIndex(relativePoolIndex)].position, cardObjects, 10, GetPoolIndex(relativePoolIndex),piştiFlag);
+            BuildPoolMoveListsAndMoveCards(playerPiştiPoolTransforms[GetPoolIndex(relativePoolIndex)].position, cardObjects, 10, GetPoolIndex(relativePoolIndex), piştiFlag);
         }
 
         else
@@ -1201,15 +1201,15 @@ public class DeckController : MonoBehaviour
 
     private int GetPoolIndex(int relativePoolIndex)
     {
-        int poolIndex=0;
-        if(playerCount==4)
+        int poolIndex = 0;
+        if (playerCount == 4)
         {
-            poolIndex=relativePoolIndex;
+            poolIndex = relativePoolIndex;
         }
-        else if(playerCount==2)
+        else if (playerCount == 2)
         {
-            if(relativePoolIndex==0)poolIndex=0;
-            else if(relativePoolIndex==1)poolIndex=2;
+            if (relativePoolIndex == 0) poolIndex = 0;
+            else if (relativePoolIndex == 1) poolIndex = 2;
         }
 
         return poolIndex;
@@ -1217,7 +1217,7 @@ public class DeckController : MonoBehaviour
 
     public void GetPlayerCount(int playerC)
     {
-        playerCount=playerC;
+        playerCount = playerC;
     }
 
     private void InitialDeckSetUp()
@@ -1225,7 +1225,7 @@ public class DeckController : MonoBehaviour
         cardPrefabs = new Dictionary<string, GameObject>();
         deckPool = new Dictionary<string, GameObject>();
     }
-    
+
     public void GetPlayerHandTransforms(List<Transform> playerHTransforms, List<Transform> playerPTransforms, Transform cTransform, List<Transform> playerPiştiTransforms)
     {
         playerHandTransforms.Clear();
@@ -1248,6 +1248,212 @@ public class DeckController : MonoBehaviour
         }
 
         centerTransform = cTransform;
+    }
+
+    /// <summary>
+    /// Animates peeking at a specific card in an opponent's hand, using relative index for correct perspective.
+    /// </summary>
+    public void PeekOpponentCard(int opponentPlayerNo, int cardIndex)
+    {
+        Debug.LogWarning($"PeekOpponentCard called for opponent {opponentPlayerNo} at card index {cardIndex}");
+        int myNo = thisPlayerNumber;
+        int playerCount = this.playerCount;
+        int relativeIndex = (opponentPlayerNo - myNo + playerCount) % playerCount;
+
+        // Get the hand transform for the opponent in my perspective
+        Transform handTransform = playerHandTransforms[GetPoolIndex(relativeIndex)];
+
+        // Get the card GameObject at the specified index
+        if (handTransform.childCount <= cardIndex + 2) // +2 for pool/extra children
+            return;
+
+        // Skip pool/extra children if needed
+        int actualIndex = 0;
+        int found = 0;
+        foreach (Transform child in handTransform)
+        {
+            if (actualIndex > 1) // skip pool/extra
+            {
+                if (found == cardIndex)
+                {
+                    GameObject card = child.gameObject;
+                    StartCoroutine(PeekCardAnimation(card));
+                    break;
+                }
+                found++;
+            }
+            actualIndex++;
+        }
+    }
+
+    /// <summary>
+    /// Coroutine to animate the peek effect on a card.
+    /// </summary>
+    private IEnumerator PeekCardAnimation(GameObject card)
+    {
+        Quaternion originalRot = card.transform.rotation;
+        Vector3 originalPos = card.transform.position;
+
+        // Animate: rotate X to 90, move Y to 2000
+        Quaternion peekRot = Quaternion.Euler(90, originalRot.eulerAngles.y, originalRot.eulerAngles.z);
+        Vector3 peekPos = new Vector3(originalPos.x, 2000, originalPos.z);
+
+        float duration = 0.5f;
+        float t = 0f;
+        while (t < duration)
+        {
+            card.transform.rotation = Quaternion.Lerp(originalRot, peekRot, t / duration);
+            card.transform.position = Vector3.Lerp(originalPos, peekPos, t / duration);
+            t += Time.deltaTime;
+            yield return null;
+        }
+        card.transform.rotation = peekRot;
+        card.transform.position = peekPos;
+
+        // Hold for a moment
+        yield return new WaitForSeconds(1.0f);
+
+        // Animate back
+        t = 0f;
+        while (t < duration)
+        {
+            card.transform.rotation = Quaternion.Lerp(peekRot, originalRot, t / duration);
+            card.transform.position = Vector3.Lerp(peekPos, originalPos, t / duration);
+            t += Time.deltaTime;
+            yield return null;
+        }
+        card.transform.rotation = originalRot;
+        card.transform.position = originalPos;
+    }
+
+    public int GetRandomHandCardIndex(int absolutePlayerNo)
+    {
+        // Use relative index logic to get the correct hand transform for this player from my perspective
+        int myNo = thisPlayerNumber;
+        int playerCount = this.playerCount;
+        int relativeIndex = (absolutePlayerNo - myNo + playerCount) % playerCount;
+
+        // Get the hand transform for the opponent in my perspective
+        Transform handTransform = playerHandTransforms[GetPoolIndex(relativeIndex)];
+
+        // Count only the actual hand cards (skip pool/extra children if needed)
+        List<Transform> handCards = new List<Transform>();
+        foreach (Transform child in handTransform)
+        {
+            // You may want to filter out non-hand cards here if needed
+            if(!child.gameObject.name.Contains("Player"))handCards.Add(child);
+        }
+
+        if (handCards.Count == 0)
+            return -1; // No cards to pick
+
+        // Pick a random card index
+        return UnityEngine.Random.Range(0, handCards.Count);
+    }
+
+    /// <summary>
+    /// Swaps cards between two players at the given indices, animating the swap for both players' perspectives.
+    /// </summary>
+    public IEnumerator SwapCardsBetweenPlayers(int playerANo, int cardAIndex, int playerBNo, int cardBIndex)
+    {
+        Debug.LogWarning($"SwapCardsBetweenPlayers called: Player {playerANo} card {cardAIndex} <-> Player {playerBNo} card {cardBIndex}");
+        int myNo = thisPlayerNumber;
+        int playerCount = this.playerCount;
+
+        // Get relative indices for both players from my perspective
+        int relA = (playerANo - myNo + playerCount) % playerCount;
+        int relB = (playerBNo - myNo + playerCount) % playerCount;
+
+        Transform handA = playerHandTransforms[GetPoolIndex(relA)];
+        Transform handB = playerHandTransforms[GetPoolIndex(relB)];
+
+        GameObject cardA = GetHandCardByIndex(handA, cardAIndex);
+        GameObject cardB = GetHandCardByIndex(handB, cardBIndex);
+
+        cardA.GetComponent<CardInteraction>().autoRotateFlag = false;
+
+        if (cardA == null || cardB == null)
+        {
+            Debug.LogWarning($"SwapCardsBetweenPlayers: One or both cards not found. Player {playerANo} card {cardAIndex} or Player {playerBNo} card {cardBIndex}.");
+            yield return null;
+        }
+
+        // Store target positions and rotations
+        Vector3 posA = cardA.transform.position;
+        Vector3 posB = cardB.transform.position;
+        Quaternion rotA = cardA.transform.rotation;
+        Quaternion rotB = cardB.transform.rotation;
+        Vector3 scaleA = cardA.transform.localScale;
+        Vector3 scaleB = cardB.transform.localScale;
+
+        // Animate the swap
+        List<Vector3> positions = new List<Vector3> { posB, posA };
+        List<GameObject> cards = new List<GameObject> { cardA, cardB };
+        List<Quaternion> rotations = new List<Quaternion> { rotB, rotA };
+        List<Vector3> scales = new List<Vector3> { scaleB, scaleA };
+        Vector3 centerA = centerTransform.position; //+ new Vector3(1000, 0, 0);
+        Vector3 centerB = centerTransform.position;//+ new Vector3(-1000, 0, 0);
+
+        float speed = 1f; // Adjust speed as needed
+
+        MoveCard(centerB, cardB, speed, rotA, scaleB);
+        MoveCard(centerA, cardA, speed, rotA, scaleB);
+        
+        
+
+        yield return new WaitForSeconds(0.8f); // Small delay to ensure both cards are ready for the next move
+
+        speed = 5f;
+
+        StartCoroutine(MoveCardCoroutine(posB, cardA, speed, rotB, scaleB));
+        yield return StartCoroutine(MoveCardCoroutine(posA, cardB, speed, rotA, scaleA));
+
+        cardB.GetComponent<CardInteraction>().autoRotateFlag = true;
+        
+        // Swap parents
+        cardA.transform.SetParent(handB, true);
+        cardB.transform.SetParent(handA, true);
+
+        // Optionally, update layout after animation if needed
+        // StartCoroutine(DelayedLayoutUpdate());
+    }
+
+    IEnumerator WaitForBoth(IEnumerator a, IEnumerator b)
+    {
+        bool aDone = false, bDone = false;
+        IEnumerator Wrap(IEnumerator routine, Action onDone)
+        {
+            yield return StartCoroutine(routine);
+            onDone();
+        }
+        yield return StartCoroutine(Wrap(a, () => aDone = true));
+        yield return StartCoroutine(Wrap(b, () => bDone = true));
+        while (!aDone || !bDone) yield return null;
+    }
+
+    // Optionally, if you want to update layout after the animation
+    private IEnumerator DelayedLayoutUpdate()
+    {
+        yield return new WaitForSeconds(1f);
+        UpdateCurrentPlayerHandLayout();
+    }
+
+    /// <summary>
+    /// Gets the hand card GameObject at the given index, skipping pool/extra children.
+    /// </summary>
+    private GameObject GetHandCardByIndex(Transform handTransform, int index)
+    {
+        int actualIndex = 0;
+        foreach (Transform child in handTransform)
+        {
+            if (actualIndex > 1) // skip pool/extra
+            {
+                if ((actualIndex - 2) == index)
+                    return child.gameObject;
+            }
+            actualIndex++;
+        }
+        return null;
     }
 }
 

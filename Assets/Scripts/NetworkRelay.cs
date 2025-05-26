@@ -118,7 +118,33 @@ public class NetworkRelay : NetworkBehaviour
         }
     }
 
+    [ClientRpc]
+    public void UsePeekOpponentCardPowerClientRPC(int opponentPlayerNo, int cardIndex)
+    {
+        GameManager.LocalInstance.OnPeekOpponentCardSynced(opponentPlayerNo, cardIndex);
+    }
+
+    [ClientRpc]
+    public void UseSwapCardWithOpponentPowerClientRPC(int myPlayerNo, int myCardIndex, int opponentPlayerNo, int oppCardIndex)
+    {
+        GameManager.LocalInstance.OnSwapCardWithOpponentSynced(myPlayerNo, myCardIndex, opponentPlayerNo, oppCardIndex);
+    }
+
     //ServerRPC
+    [ServerRpc(RequireOwnership = false)]
+    public void UseSwapCardWithOpponentPowerServerRPC(int myPlayerNo, int myCardIndex, int opponentPlayerNo, int oppCardIndex)
+    {
+        server.SwapCardsBetweenPlayersOnServer(myPlayerNo, myCardIndex, opponentPlayerNo, oppCardIndex);
+
+        UseSwapCardWithOpponentPowerClientRPC(myPlayerNo, myCardIndex, opponentPlayerNo, oppCardIndex);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void UsePeekOpponentCardPowerServerRPC(int opponentPlayerNo, int cardIndex)
+    {
+        UsePeekOpponentCardPowerClientRPC(opponentPlayerNo, cardIndex);
+    }
+
     [ServerRpc(RequireOwnership = false)]
     public void RemoveCenterCardsServerRPC(SerializableList serializableList)
     {

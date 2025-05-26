@@ -125,7 +125,7 @@ public class GameManager : NetworkBehaviour
                     card.OnCardTouched(mousePosition);
                     tempCard = card; // Store the card for later use
                 }
-                else if(card == null && Input.GetMouseButtonDown(0))
+                else if (card == null && Input.GetMouseButtonDown(0))
                 {
                     Debug.LogError("CardInteraction is null, trying to stop showcase player pool cards");
                     deckController.TryStopShowcasePlayerPoolCards();
@@ -169,6 +169,7 @@ public class GameManager : NetworkBehaviour
     }
 
     //Gets message from the server to start the deck and the cards
+    [ContextMenu("Initialize Card Prefabs")]
     public IEnumerator InitializeCardPrefabs()
     {
         ResetForNewRound();
@@ -338,14 +339,14 @@ public class GameManager : NetworkBehaviour
 
             bool piştiHappened = false;
 
-            if(selectedCards.Count == 2)
+            if (selectedCards.Count == 2)
             {
-                if(selectedCards[selectedCards.Count-1][1] != 11)
+                if (selectedCards[selectedCards.Count - 1][1] != 11)
                 {
                     piştiHappened = true;
                 }
 
-                else if(selectedCards[selectedCards.Count-1][1] != 11 && selectedCards[selectedCards.Count-2][1] != 11)
+                else if (selectedCards[selectedCards.Count - 1][1] != 11 && selectedCards[selectedCards.Count - 2][1] != 11)
                 {
                     piştiHappened = true;
                 }
@@ -601,6 +602,80 @@ public class GameManager : NetworkBehaviour
         playerPiştiPoolTransforms.Add(GameObject.Find("PlayerPiştiPool2").GetComponent<Transform>());
         playerPiştiPoolTransforms.Add(GameObject.Find("PlayerPiştiPool3").GetComponent<Transform>());
         playerPiştiPoolTransforms.Add(GameObject.Find("PlayerPiştiPool4").GetComponent<Transform>());
+    }
+
+    /// <summary>
+    /// Activates the "peek at a random opponent card" super power locally and sends the move to the server.
+    /// </summary>
+    public void UsePeekOpponentCardPower()
+    {
+        Debug.Log("Using Peek Opponent Card Power");
+        int opponentPlayerNo = GetRandomOpponentPlayerNo();
+        int cardIndex = deckController.GetRandomHandCardIndex(opponentPlayerNo);
+
+        // Locally show the effect
+        deckController.PeekOpponentCard(opponentPlayerNo, cardIndex);
+
+        // Send to server for sync
+        networkRelay.UsePeekOpponentCardPowerServerRPC(opponentPlayerNo, cardIndex);
+    }
+
+    /// <summary>
+    /// Called by the server to sync the peek effect to all clients.
+    /// </summary>
+    public void OnPeekOpponentCardSynced(int opponentPlayerNo, int cardIndex)
+    {
+        deckController.PeekOpponentCard(opponentPlayerNo, cardIndex);
+    }
+
+    /// <summary>
+    /// Returns a random opponent player number (not self or teammate in 2v2).
+    /// </summary>
+    private int GetRandomOpponentPlayerNo()
+    {
+        List<int> possibleOpponents = new List<int>();
+        int myNo = deckController.thisPlayerNumber;
+        int playerCount = deckController.playerCount;
+
+        if (playerCount == 2)
+        {
+            possibleOpponents.Add((myNo + 1) % 2);
+        }
+        else if (playerCount == 4)
+        {
+            // In 2v2, teammates are 0/2 and 1/3
+            if (myNo == 0 || myNo == 2)
+                possibleOpponents.AddRange(new int[] { 1, 3 });
+            else
+                possibleOpponents.AddRange(new int[] { 0, 2 });
+        }
+        return possibleOpponents[UnityEngine.Random.Range(0, possibleOpponents.Count)];
+    }
+    
+    /// <summary>
+    /// Activates the "swap a card with an opponent" super power locally and sends the move to the server.
+    /// </summary>
+    public void UseSwapCardWithOpponentPower()
+    {
+        Debug.Log("Using Swap Card With Opponent Power");
+        int myPlayerNo = deckController.thisPlayerNumber;
+        int opponentPlayerNo = GetRandomOpponentPlayerNo();
+        int myCardIndex = deckController.GetRandomHandCardIndex(myPlayerNo);
+        int oppCardIndex = deckController.GetRandomHandCardIndex(opponentPlayerNo);
+
+        // Locally show the effect and swap
+        StartCoroutine(deckController.SwapCardsBetweenPlayers(myPlayerNo, myCardIndex, opponentPlayerNo, oppCardIndex));
+
+        // Send to server for sync
+        //snetworkRelay.UseSwapCardWithOpponentPowerServerRPC(myPlayerNo, myCardIndex, opponentPlayerNo, oppCardIndex);
+    }
+
+    /// <summary>
+    /// Called by the server to sync the swap effect to all clients.
+    /// </summary>
+    public void OnSwapCardWithOpponentSynced(int myPlayerNo, int myCardIndex, int opponentPlayerNo, int oppCardIndex)
+    {
+        deckController.SwapCardsBetweenPlayers(myPlayerNo, myCardIndex, opponentPlayerNo, oppCardIndex);
     }
 
 }
