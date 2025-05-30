@@ -764,20 +764,41 @@ public class DeckController : MonoBehaviour
         poolCardOriginalTransforms.Clear();
     }
 
-    [ContextMenu("Showcase All Cards")]
+    [ContextMenu("Showcase All Piştis and Point Cards")]
     public void AllCardsShowcase()
     {
         if (playerCount == 2)
         {
-            ShowcasePools1v1();
+            ShowcasePiştisAndPoints1v1();
         }
         else if (playerCount == 4)
         {
-            ShowcasePools2v2();
+            ShowcasePiştisAndPoints2v2();
         }
     }
 
-    private void ShowcasePools1v1()
+    // Helper: Returns true if the card is a point card
+    private bool IsPointCard(GameObject card)
+    {
+        // Card tag is expected to be "kind_value"
+        var tagParts = card.tag.Split('_');
+        if (tagParts.Length != 2) return false;
+        int kind, value;
+        if (!int.TryParse(tagParts[0], out kind) || !int.TryParse(tagParts[1], out value)) return false;
+
+        // Aces
+        if (value == 1) return true;
+        // Jacks
+        if (value == 11) return true;
+        // 2 of clubs (kind==1, value==2)
+        if (kind == 1 && value == 2) return true;
+        // 10 of diamonds (kind==2, value==10)
+        if (kind == 2 && value == 10) return true;
+
+        return false;
+    }
+
+    private void ShowcasePiştisAndPoints1v1()
     {
         int cardsPerRow = 7;
         float cardSpacing = 420f;
@@ -800,8 +821,9 @@ public class DeckController : MonoBehaviour
         List<GameObject> myPiştiCards = new List<GameObject>();
         foreach (Transform t in playerPiştiPoolTransforms[myPoolIndex]) myPiştiCards.Add(t.gameObject);
 
-        List<GameObject> myPoolCards = new List<GameObject>();
-        foreach (Transform t in playerPoolTransforms[myPoolIndex]) myPoolCards.Add(t.gameObject);
+        List<GameObject> myPointCards = new List<GameObject>();
+        foreach (Transform t in playerPoolTransforms[myPoolIndex])
+            if (IsPointCard(t.gameObject)) myPointCards.Add(t.gameObject);
 
         // Layout my pişti cards (top)
         int myPiştiRows = Mathf.CeilToInt(myPiştiCards.Count / (float)cardsPerRow);
@@ -816,26 +838,27 @@ public class DeckController : MonoBehaviour
             }
         }
 
-        // Layout my pool cards (below pişti if present, else at top)
-        float myPoolZOffset = (myPiştiCards.Count > 0) ? (-myPiştiRows * rowSpacing - piştiGap) : 0f;
-        for (int i = 0; i < myPoolCards.Count; i++)
+        // Layout my point cards (below pişti if present, else at top)
+        float myPointZOffset = (myPiştiCards.Count > 0) ? (-myPiştiRows * rowSpacing - piştiGap) : 0f;
+        for (int i = 0; i < myPointCards.Count; i++)
         {
             int row = i / cardsPerRow;
             int col = i % cardsPerRow;
             Vector3 pos = leftWorld + new Vector3(
                 (col - (cardsPerRow - 1) / 2f) * cardSpacing,
                 100 + i,
-                myPoolZOffset - row * rowSpacing
+                myPointZOffset - row * rowSpacing
             );
-            MoveCard(pos, myPoolCards[i], 10, Quaternion.Euler(90, 0, 0), new Vector3(cardScale, cardScale, cardScale), false);
+            MoveCard(pos, myPointCards[i], 10, Quaternion.Euler(90, 0, 0), new Vector3(cardScale, cardScale, cardScale), false);
         }
 
         // --- Opponent side ---
         List<GameObject> oppPiştiCards = new List<GameObject>();
         foreach (Transform t in playerPiştiPoolTransforms[oppPoolIndex]) oppPiştiCards.Add(t.gameObject);
 
-        List<GameObject> oppPoolCards = new List<GameObject>();
-        foreach (Transform t in playerPoolTransforms[oppPoolIndex]) oppPoolCards.Add(t.gameObject);
+        List<GameObject> oppPointCards = new List<GameObject>();
+        foreach (Transform t in playerPoolTransforms[oppPoolIndex])
+            if (IsPointCard(t.gameObject)) oppPointCards.Add(t.gameObject);
 
         int oppPiştiRows = Mathf.CeilToInt(oppPiştiCards.Count / (float)cardsPerRow);
         if (oppPiştiCards.Count > 0)
@@ -849,21 +872,21 @@ public class DeckController : MonoBehaviour
             }
         }
 
-        float oppPoolZOffset = (oppPiştiCards.Count > 0) ? (-oppPiştiRows * rowSpacing - piştiGap) : 0f;
-        for (int i = 0; i < oppPoolCards.Count; i++)
+        float oppPointZOffset = (oppPiştiCards.Count > 0) ? (-oppPiştiRows * rowSpacing - piştiGap) : 0f;
+        for (int i = 0; i < oppPointCards.Count; i++)
         {
             int row = i / cardsPerRow;
             int col = i % cardsPerRow;
             Vector3 pos = rightWorld + new Vector3(
                 (col - (cardsPerRow - 1) / 2f) * cardSpacing,
                 100 + i,
-                oppPoolZOffset - row * rowSpacing
+                oppPointZOffset - row * rowSpacing
             );
-            MoveCard(pos, oppPoolCards[i], 10, Quaternion.Euler(90, 0, 0), new Vector3(cardScale, cardScale, cardScale), false);
+            MoveCard(pos, oppPointCards[i], 10, Quaternion.Euler(90, 0, 0), new Vector3(cardScale, cardScale, cardScale), false);
         }
     }
 
-    private void ShowcasePools2v2()
+    private void ShowcasePiştisAndPoints2v2()
     {
         int cardsPerRow = 7;
         float cardSpacing = 420f;
@@ -880,20 +903,22 @@ public class DeckController : MonoBehaviour
 
         // My team: player 0 and 2
         List<GameObject> myTeamPiştiCards = new List<GameObject>();
-        List<GameObject> myTeamPoolCards = new List<GameObject>();
+        List<GameObject> myTeamPointCards = new List<GameObject>();
         foreach (int idx in new int[] { GetPoolIndex(0), GetPoolIndex(2) })
         {
             foreach (Transform t in playerPiştiPoolTransforms[idx]) myTeamPiştiCards.Add(t.gameObject);
-            foreach (Transform t in playerPoolTransforms[idx]) myTeamPoolCards.Add(t.gameObject);
+            foreach (Transform t in playerPoolTransforms[idx])
+                if (IsPointCard(t.gameObject)) myTeamPointCards.Add(t.gameObject);
         }
 
         // Opponent team: player 1 and 3
         List<GameObject> oppTeamPiştiCards = new List<GameObject>();
-        List<GameObject> oppTeamPoolCards = new List<GameObject>();
+        List<GameObject> oppTeamPointCards = new List<GameObject>();
         foreach (int idx in new int[] { GetPoolIndex(1), GetPoolIndex(3) })
         {
             foreach (Transform t in playerPiştiPoolTransforms[idx]) oppTeamPiştiCards.Add(t.gameObject);
-            foreach (Transform t in playerPoolTransforms[idx]) oppTeamPoolCards.Add(t.gameObject);
+            foreach (Transform t in playerPoolTransforms[idx])
+                if (IsPointCard(t.gameObject)) oppTeamPointCards.Add(t.gameObject);
         }
 
         // Layout my team pişti cards (top)
@@ -909,18 +934,18 @@ public class DeckController : MonoBehaviour
             }
         }
 
-        // Layout my team pool cards (below pişti if present, else at top)
-        float myTeamPoolZOffset = (myTeamPiştiCards.Count > 0) ? (-myTeamPiştiRows * rowSpacing - piştiGap) : 0f;
-        for (int i = 0; i < myTeamPoolCards.Count; i++)
+        // Layout my team point cards (below pişti if present, else at top)
+        float myTeamPointZOffset = (myTeamPiştiCards.Count > 0) ? (-myTeamPiştiRows * rowSpacing - piştiGap) : 0f;
+        for (int i = 0; i < myTeamPointCards.Count; i++)
         {
             int row = i / cardsPerRow;
             int col = i % cardsPerRow;
             Vector3 pos = leftWorld + new Vector3(
                 (col - (cardsPerRow - 1) / 2f) * cardSpacing,
                 100 + i,
-                myTeamPoolZOffset - row * rowSpacing
+                myTeamPointZOffset - row * rowSpacing
             );
-            MoveCard(pos, myTeamPoolCards[i], 10, Quaternion.Euler(90, 0, 0), new Vector3(cardScale, cardScale, cardScale), false);
+            MoveCard(pos, myTeamPointCards[i], 10, Quaternion.Euler(90, 0, 0), new Vector3(cardScale, cardScale, cardScale), false);
         }
 
         // Layout opponent team pişti cards (top)
@@ -936,18 +961,18 @@ public class DeckController : MonoBehaviour
             }
         }
 
-        // Layout opponent team pool cards (below pişti if present, else at top)
-        float oppTeamPoolZOffset = (oppTeamPiştiCards.Count > 0) ? (-oppTeamPiştiRows * rowSpacing - piştiGap) : 0f;
-        for (int i = 0; i < oppTeamPoolCards.Count; i++)
+        // Layout opponent team point cards (below pişti if present, else at top)
+        float oppTeamPointZOffset = (oppTeamPiştiCards.Count > 0) ? (-oppTeamPiştiRows * rowSpacing - piştiGap) : 0f;
+        for (int i = 0; i < oppTeamPointCards.Count; i++)
         {
             int row = i / cardsPerRow;
             int col = i % cardsPerRow;
             Vector3 pos = rightWorld + new Vector3(
                 (col - (cardsPerRow - 1) / 2f) * cardSpacing,
                 100 + i,
-                oppTeamPoolZOffset - row * rowSpacing
+                oppTeamPointZOffset - row * rowSpacing
             );
-            MoveCard(pos, oppTeamPoolCards[i], 10, Quaternion.Euler(90, 0, 0), new Vector3(cardScale, cardScale, cardScale), false);
+            MoveCard(pos, oppTeamPointCards[i], 10, Quaternion.Euler(90, 0, 0), new Vector3(cardScale, cardScale, cardScale), false);
         }
     }
 

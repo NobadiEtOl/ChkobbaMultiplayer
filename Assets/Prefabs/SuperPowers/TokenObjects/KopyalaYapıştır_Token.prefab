@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 1211842771313687162}
   - component: {fileID: 3931491671187450550}
   m_Layer: 0
-  m_Name: "De\u011Fi\u015FToku\u015F_Token"
+  m_Name: "KopyalaYap\u0131\u015Ft\u0131r_Token"
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -45,7 +45,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 890940bbc59c3f649b9e0d4f17919f87, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  power: {fileID: 11400000, guid: 0ae0a7f8daa78004982a775c0d21d235, type: 2}
+  power: {fileID: 11400000, guid: 9d12283c360118e41b3162df6d52c658, type: 2}
 --- !u!212 &3931491671187450550
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -87,7 +87,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Sprite: {fileID: 21300000, guid: b3da576530fd41f438c90b1c6c426faa, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 4c35a7cdcb1fe0642bfc7bd950c0a557, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0

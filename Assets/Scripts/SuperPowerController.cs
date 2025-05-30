@@ -27,6 +27,7 @@ public class Oynayamazsın : SuperPower
     public override void ActivatePower()
     {
         Debug.Log("Oynayamazsın activated!");
+        GameManager.LocalInstance.ActivateBlockNextPlayerPower();
     }
 }
 
@@ -37,6 +38,36 @@ public class DeğişTokuş : SuperPower
     {
         Debug.Log("Değiş Tokuş activated!");
         GameManager.LocalInstance.UseSwapCardWithOpponentPower();
+    }
+}
+
+[CreateAssetMenu(menuName = "SuperPower/Kapkaç")]
+public class Kapkaç : SuperPower
+{
+    public override void ActivatePower()
+    {
+        Debug.Log("Kapkaç activated!");
+        GameManager.LocalInstance.ActivateKapkacPower();
+    }
+}
+
+[CreateAssetMenu(menuName = "SuperPower/ValeArar")]
+public class ValeArar : SuperPower
+{
+    public override void ActivatePower()
+    {
+        Debug.Log("ValeArar activated!");
+        GameManager.LocalInstance.ActivateValeArarPower();
+    }
+}
+
+[CreateAssetMenu(menuName = "SuperPower/KopyalaYapistir")]
+public class KopyalaYapistir : SuperPower
+{
+    public override void ActivatePower()
+    {
+        Debug.Log("KopyalaYapıstır activated!");
+        GameManager.LocalInstance.ActivateKopyalaYapistirPower();
     }
 }
 

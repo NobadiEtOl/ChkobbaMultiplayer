@@ -50,7 +50,25 @@ public class GameManager : NetworkBehaviour
         if (myCards != null) myCards.Clear();
         turnTimer = 0f;
         movePlayedLocally = false;
-        // Set currentPlayerNo to the correct starting player for the round if needed
+        // Set currentPlayerNo to the
+
+        if (roundCount != 0)
+        {
+            foreach (var cardScript in cardInteractionsScripts)
+            {
+                if (cardScript != null && cardScript.gameObject != null)
+                {
+                    string[] tagParts = cardScript.gameObject.tag.Split('_');
+                    if (tagParts.Length == 2 && int.TryParse(tagParts[1], out int value) && value == 11)
+                    {
+                        var indicator = cardScript.transform.Find("CardIndicator(Clone)");
+                        if (indicator != null)
+                            indicator.gameObject.SetActive(false);
+                    }
+                }
+            }
+        }
+
     }
 
     void Awake()
@@ -149,7 +167,7 @@ public class GameManager : NetworkBehaviour
             {
                 Debug.LogWarning("OnTouchUpIN");
                 CardInteraction.currentlySelectedCard.OnTouchUp();
-                CardInteraction.currentlySelectedCard = null;
+                //CardInteraction.currentlySelectedCard = null;
                 tempCard = null; // Reset the stored card
             }
         }
@@ -168,11 +186,13 @@ public class GameManager : NetworkBehaviour
         }
     }
 
+    private int roundCount = 0;
     //Gets message from the server to start the deck and the cards
     [ContextMenu("Initialize Card Prefabs")]
     public IEnumerator InitializeCardPrefabs()
     {
         ResetForNewRound();
+        roundCount++;
         if (waitingScreen.activeSelf) waitingScreen.SetActive(false);
         if (mainScreen.activeSelf) mainScreen.SetActive(false);
         yield return StartCoroutine(deckController.DeckStart());
@@ -268,7 +288,38 @@ public class GameManager : NetworkBehaviour
 
         int sumValue = centerCards.Count > 0 ? centerCards[centerCards.Count - 1][1] : 0;
 
-        if (currentSelectedHandCard[1] == sumValue || (currentSelectedHandCard[1] == 11 && sumValue != 0))
+        // Kapkaç logic: If this player has Kapkaç, force their card to act as value 11 and capture
+        if (kapkacPlayerNo == playerNumber && kapkacCount > 0)
+        {
+            Debug.LogWarning($"Player {playerNumber}'s move is affected by Kapkaç!");
+            // Force the played card to act as value 11 (Jack)
+            int[] kapkacCard = (int[])currentSelectedHandCard.Clone();
+            kapkacCard[1] = 11;
+
+            SerializableList tempSerializableList = new SerializableList(centerCards);
+
+            DiscardPlayedCards(kapkacCard, tempSerializableList, playerNumber, currentSelectedHandCard[1]); // Use the original value for Kapkaç
+            movePlayedLocally = true;
+            kapkacCount--;
+            if (kapkacCount == 0) kapkacPlayerNo = -1;
+            networkRelay.SendMoveToServerRPC(kapkacCard, serializableList, playerNumber, 11); // Use 11 to indicate Jack
+            myCards.Remove(currentSelectedHandCard);
+            return;
+        }
+
+        if (blockedPlayerNo == playerNumber && blockCount > 0)
+        {
+            Debug.LogWarning($"Player {playerNumber}'s move is blocked by Oynayamazsın!");
+            DiscardHandCards(currentSelectedHandCard); // Always add to center
+            movePlayedLocally = true;
+            blockCount--;
+            if (blockCount == 0) blockedPlayerNo = -1;
+            networkRelay.SendMoveToServerRPC(currentSelectedHandCard, new SerializableList(centerCards), playerNumber, -999); // Use -999 or another value to indicate block
+            myCards.Remove(currentSelectedHandCard);
+            return;
+        }
+
+        else if (currentSelectedHandCard[1] == sumValue || (currentSelectedHandCard[1] == 11 && sumValue != 0))
         {
             DiscardPlayedCards(currentSelectedHandCard, serializableList, playerNumber);
             movePlayedLocally = true;
@@ -306,8 +357,12 @@ public class GameManager : NetworkBehaviour
         }
     }
 
-    public void DiscardPlayedCards(int[] playedCard, SerializableList serializedList, int playerNumber)
+    public void DiscardPlayedCards(int[] playedCard, SerializableList serializedList, int playerNumber, int KKvalue = 0)
     {
+        if (KKvalue != 0)
+        {
+            playedCard[1] = KKvalue; // Set the value to 11 if Kapkaç is used
+        }
         Debug.Log("Discarding played cards: " + movePlayedLocally);
         if (!movePlayedLocally)
         {
@@ -651,7 +706,7 @@ public class GameManager : NetworkBehaviour
         }
         return possibleOpponents[UnityEngine.Random.Range(0, possibleOpponents.Count)];
     }
-    
+
     /// <summary>
     /// Activates the "swap a card with an opponent" super power locally and sends the move to the server.
     /// </summary>
@@ -676,6 +731,107 @@ public class GameManager : NetworkBehaviour
     public void OnSwapCardWithOpponentSynced(int myPlayerNo, int myCardIndex, int opponentPlayerNo, int oppCardIndex)
     {
         deckController.SwapCardsBetweenPlayers(myPlayerNo, myCardIndex, opponentPlayerNo, oppCardIndex);
+    }
+
+    private int blockedPlayerNo = -1;
+    private int blockCount = 0;
+
+    public void ActivateBlockNextPlayerPower()
+    {
+        // Block the next player for one turn
+        blockedPlayerNo = (deckController.thisPlayerNumber + 1) % deckController.playerCount;
+        blockCount = 1;
+        Debug.LogWarning($"Player {blockedPlayerNo} will be blocked on their next move!");
+        // Optionally, sync this state to the server/other clients if needed
+    }
+
+    private int kapkacPlayerNo = -1;
+    private int kapkacCount = 0;
+    public void ActivateKapkacPower()
+    {
+        kapkacPlayerNo = deckController.thisPlayerNumber;
+        kapkacCount = 1;
+        Debug.LogWarning($"Player {kapkacPlayerNo} will have Kapkaç effect on their next move!");
+        // Optionally, sync this state to the server/other clients if needed
+    }
+
+    public void ActivateValeArarPower()
+    {
+        Debug.Log("ValeArar power activated! Showing indicators for all Jacks.");
+        foreach (var cardScript in cardInteractionsScripts)
+        {
+            // Assuming cardID[1] is the value, and 11 is Jack
+            if (cardScript != null && cardScript.gameObject != null)
+            {
+                string[] tagParts = cardScript.gameObject.tag.Split('_');
+                if (tagParts.Length == 2 && int.TryParse(tagParts[1], out int value) && value == 11)
+                {
+                    // Activate the indicator for this card
+                    var indicator = cardScript.transform.Find("SelectedCardIndicator(Clone)");
+                    if (indicator != null)
+                        indicator.gameObject.SetActive(true);
+                }
+            }
+        }
+    }
+
+    public void DeactivateValeArarPower()
+    {
+        Debug.Log("Deactivating ValeArar power: hiding indicators for all Jacks.");
+        foreach (var cardScript in cardInteractionsScripts)
+        {
+            if (cardScript != null && cardScript.gameObject != null)
+            {
+                string[] tagParts = cardScript.gameObject.tag.Split('_');
+                if (tagParts.Length == 2 && int.TryParse(tagParts[1], out int value) && value == 11)
+                {
+                    var indicator = cardScript.transform.Find("SelectedCardIndicator(Clone)");
+                    if (indicator != null)
+                        indicator.gameObject.SetActive(false);
+                }
+            }
+        }
+    }
+
+
+    private CardInteraction kopyalaSourceCard = null;
+    public bool isKopyalaActive = false;
+    // Call this when the power is activated
+    public void ActivateKopyalaYapistirPower()
+    {
+        Debug.Log("KopyalaYapıstır activated! Select a card to copy to.");
+        isKopyalaActive = true;
+        kopyalaSourceCard = CardInteraction.currentlySelectedCard;
+        if (kopyalaSourceCard == null)
+            Debug.LogWarning("KopyalaYapıstır: No source card selected when activating power!");
+    }
+
+    // Call this from CardInteraction when a card is clicked and isKopyalaActive is true
+    public void TryKopyalaYapistir(CardInteraction targetCard)
+    {
+        Debug.Log("Trying KopyalaYapıstır on: " + targetCard.gameObject.name);
+        if (!isKopyalaActive || kopyalaSourceCard == null || targetCard == null || targetCard == kopyalaSourceCard)
+            return;
+
+        Debug.Log($"KopyalaYapıstır: {kopyalaSourceCard.gameObject.name} -> {targetCard.gameObject.name}");
+        // Store original data if not already stored
+        targetCard.StoreOriginalCardData();
+
+        // Copy suit, value, and sprite
+        targetCard.SetCardIDAndSprite(kopyalaSourceCard.GetCardID(), kopyalaSourceCard.GetComponent<SpriteRenderer>().sprite);
+
+        Debug.Log($"KopyalaYapıstır: {kopyalaSourceCard.gameObject.name} copied to {targetCard.gameObject.name}");
+
+        // Reset state
+        isKopyalaActive = false;
+        kopyalaSourceCard = null;
+    }
+
+    // Call this at the end of the round to reset all cards
+    public void ResetAllKopyalaCards()
+    {
+        foreach (var cardScript in cardInteractionsScripts)
+            cardScript.ResetToOriginalCard();
     }
 
 }

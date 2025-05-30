@@ -20,6 +20,16 @@ public class CardInteraction : MonoBehaviour
 
     // New variable to control auto-rotation
     public bool autoRotateFlag = false;
+    public static Dictionary<string, CardInteraction> cardLookup = new Dictionary<string, CardInteraction>();
+
+    // In CardInteraction.cs
+    public string uniqueCardInstanceID; // e.g., a GUID
+
+    void Awake() {
+        uniqueCardInstanceID = System.Guid.NewGuid().ToString();
+        // Optionally: Register this card in a static dictionary for lookup
+        cardLookup[uniqueCardInstanceID] = this;
+    }
 
     void Start()
     {
@@ -53,12 +63,12 @@ public class CardInteraction : MonoBehaviour
             startRotation = transform.rotation;
             float randomAngle = UnityEngine.Random.Range(10f, 25f); // Slight random angle
             if (!rotateDirection) randomAngle = -randomAngle; // Reverse direction if needed
-            endRotation = Quaternion.Euler(90 + randomAngle/10, 0, 0 + randomAngle/2);
+            endRotation = Quaternion.Euler(90 + randomAngle / 10, 0, 0 + randomAngle / 2);
         }
 
         // Increment the rotation progress
-        if(startRotation.eulerAngles.x == 90)rotationProgress += Time.deltaTime;
-        else rotationProgress += Time.deltaTime/7;
+        if (startRotation.eulerAngles.x == 90) rotationProgress += Time.deltaTime;
+        else rotationProgress += Time.deltaTime / 7;
 
         // Smoothly interpolate between the start and end rotations
         transform.rotation = Quaternion.Lerp(startRotation, endRotation, rotationProgress);
@@ -93,7 +103,7 @@ public class CardInteraction : MonoBehaviour
     {
         Debug.Log("OnCardTouched called for card: " + gameObject.name);
         // Ensure only one card is selected at a time
-        if (currentlySelectedCard != null && currentlySelectedCard != this)
+        if (currentlySelectedCard == this)
             return;
 
         if (gameObject.transform.parent.name == "PlayerPool1" || gameObject.transform.parent.name == "PlayerPiştiPool1")
@@ -117,6 +127,13 @@ public class CardInteraction : MonoBehaviour
 
             // Invoke OnCardSelected
             OnCardSelected?.Invoke(this.cardID);
+        }
+        
+        if (GameManager.LocalInstance != null && GameManager.LocalInstance.isKopyalaActive)
+        {
+            Debug.Log("Kopyala active, trying to copy card: " + gameObject.name);
+            GameManager.LocalInstance.TryKopyalaYapistir(this);
+            return;
         }
 
     }
@@ -151,7 +168,7 @@ public class CardInteraction : MonoBehaviour
                 //Debug.Log("OnCardsPlayed invoked!");
                 autoRotateFlag = false; // Stop auto-rotation when the card is played
                 OnCardsPlayed?.Invoke(this.cardID, this.gameObject, GameManager.currentPlayerNo);
-                
+
                 if (activeCardIndicator != null)
                 {
                     activeCardIndicator.SetActive(false); // Deactivate the previous card indicator
@@ -189,7 +206,7 @@ public class CardInteraction : MonoBehaviour
         isOneCardSelected = true;
     }
 
-    private int[] GetCardID()
+    public int[] GetCardID()
     {
         string[] tagStrings = gameObject.tag.Split('_');
         int[] cardID = { 0, 0 };
@@ -245,4 +262,37 @@ public class CardInteraction : MonoBehaviour
         cardBackTransform.localRotation = cardBack.transform.rotation;
         cardBackTransform.localScale = new Vector3(1, 1, 1);
     }
+
+    // Add at the top of the class:
+    private int[] originalCardID = null;
+    private Sprite originalSprite = null;
+
+    // Call this in InitializeCard() after setting cardID and sprite:
+    public void StoreOriginalCardData()
+    {
+        if (originalCardID == null)
+            originalCardID = (int[])cardID.Clone();
+        if (originalSprite == null)
+            originalSprite = GetComponent<SpriteRenderer>().sprite;
+    }
+
+    // Call this to reset the card to its original state:
+    public void ResetToOriginalCard()
+    {
+        if (originalCardID != null)
+        {
+            cardID = (int[])originalCardID.Clone();
+            gameObject.tag = cardID[0] + "_" + cardID[1];
+        }
+        if (originalSprite != null)
+            GetComponent<SpriteRenderer>().sprite = originalSprite;
+    }
+
+    public void SetCardIDAndSprite(int[] newCardID, Sprite newSprite)
+    {
+        cardID = (int[])newCardID.Clone();
+        gameObject.tag = cardID[0] + "_" + cardID[1];
+        GetComponent<SpriteRenderer>().sprite = newSprite;
+    }
+    
 }
