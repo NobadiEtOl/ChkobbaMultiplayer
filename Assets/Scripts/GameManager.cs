@@ -16,14 +16,14 @@ public class GameManager : NetworkBehaviour
     private NetworkRelay networkRelay;
     //Card Variables
     [SerializeField] public GameObject cardBack;
-    private int[] currentSelectedHandCard;//Represents the card current player chose to play with.
-    public List<int[]> centerCards = new List<int[]>();//List of cards in the center
+    private string currentSelectedHandCard;//Represents the card current player chose to play with.
+    public Dictionary<string, int[]> centerCards = new Dictionary<string, int[]>();//List of cards in the center
     public List<GameObject> centerCardsObjects = new List<GameObject>();//List of the card objects in the center
     private List<CardInteraction> cardInteractionsScripts;//Reference to the scripts of every card.
     private List<GameObject> cardObjectsToBeDiscarted = new List<GameObject>();
     public static int currentPlayerNo = 0;
-    private List<int[]> centerCardIDList;
-    public List<int[]> myCards;
+    private List<string> centerCardIDList;
+    public List<string> myCards;
     private GameObject winScreen;
     Text roundOverText;
     private float turnTimer = 0;
@@ -228,13 +228,13 @@ public class GameManager : NetworkBehaviour
     public void CardPrefabsToPlayers(int playerCount, SerializableDictionary serializableDictionary)
     {
         //Converts serializablelist to a normal dictionary
-        Dictionary<int, List<int[]>> playerHands = serializableDictionary.ToDictionary();
+        Dictionary<int, List<string>> playerHands = serializableDictionary.ToDictionary();
 
         //Informs the deckController to deal the players' cards
         StartCoroutine(DelayedDealPlayers(playerCount, playerHands));
     }
 
-    private IEnumerator DelayedDealPlayers(int playerCount, Dictionary<int, List<int[]>> playerHands)
+    private IEnumerator DelayedDealPlayers(int playerCount, Dictionary<int, List<string>> playerHands)
     {
         //Needed so that hands dont get updated before the previous ordeals are done
         yield return new WaitForSeconds(1.5f);
@@ -243,10 +243,10 @@ public class GameManager : NetworkBehaviour
     }
 
     //Gets message from the server to start dealing cards to center
-    public void CardPrefabsToCenter(SerializableList serializableList)
+    public void CardPrefabsToCenter(SerializableCard serializableCard)
     {
         //Converts serializablelist to a normal list
-        List<int[]> centerCardIDs = serializableList.ToList();
+        List<string> centerCardIDs = serializableCard.ToDictionary().Keys.ToList();
 
         //Informs the deckController to deal the center cards
         if (deckController) deckController.DealCenter(centerCardIDs);
@@ -254,7 +254,7 @@ public class GameManager : NetworkBehaviour
     }
 
     //Called when a card is selected in the player's hand
-    private void CardSelected(int[] cardID)
+    private void CardSelected(string cardID)
     {
         currentSelectedHandCard = cardID;
     }
@@ -266,7 +266,7 @@ public class GameManager : NetworkBehaviour
     }
 
     //Called when the player tries to play the selected card with one or two center cards
-    private void CardsPlayed(int[] cardID, GameObject cardObject, int playerNumber)
+    private void CardsPlayed(string cardID, GameObject cardObject, int playerNumber)
     {
         CheckIfLegal(playerNumber);
     }
@@ -276,61 +276,62 @@ public class GameManager : NetworkBehaviour
     {
         //if(currentSelectedHandCard[0] == 0 || currentSelectedHandCard[1]==0)return false;
 
-        List<int[]> cardsToRemove = new List<int[]>();
+        Dictionary<string, int[]> cardsToRemove = new Dictionary<string, int[]>();
 
         // Iterate over the selected center cards and add them to the removal list
-        foreach (int[] cardToBeRemoved in centerCards)
+        foreach (var cardToBeRemoved in centerCards)
         {
-            cardsToRemove.Add(cardToBeRemoved);
+            cardsToRemove.Add(cardToBeRemoved.Key, cardToBeRemoved.Value);
         }
 
-        SerializableList serializableList = new SerializableList(centerCards);
+        SerializableCard serializableCard = new SerializableCard(centerCards);
 
-        int sumValue = centerCards.Count > 0 ? centerCards[centerCards.Count - 1][1] : 0;
+        int sumValue = centerCards.Count > 0 ? centerCards.Last().Value[1] : 0;
+        int cardValue = CardInteraction.cardLookup[currentSelectedHandCard].GetCardID()[1];
 
         // Kapkaç logic: If this player has Kapkaç, force their card to act as value 11 and capture
         if (kapkacPlayerNo == playerNumber && kapkacCount > 0)
         {
             Debug.LogWarning($"Player {playerNumber}'s move is affected by Kapkaç!");
             // Force the played card to act as value 11 (Jack)
-            int[] kapkacCard = (int[])currentSelectedHandCard.Clone();
-            kapkacCard[1] = 11;
+            string kapkacCard = (string)currentSelectedHandCard.Clone();
+            //var kapkacCard = CardInteraction.cardLookup[kapkacCardID].GetCardID();
+            // kapkacCard[1] = 11;
 
-            SerializableList tempSerializableList = new SerializableList(centerCards);
+            SerializableCard tempSerializableList = new SerializableCard(centerCards);
 
             DiscardPlayedCards(kapkacCard, tempSerializableList, playerNumber, currentSelectedHandCard[1]); // Use the original value for Kapkaç
             movePlayedLocally = true;
             kapkacCount--;
             if (kapkacCount == 0) kapkacPlayerNo = -1;
-            networkRelay.SendMoveToServerRPC(kapkacCard, serializableList, playerNumber, 11); // Use 11 to indicate Jack
+            networkRelay.SendMoveToServerRPC(kapkacCard, serializableCard, playerNumber, 11); // Use 11 to indicate Jack
             myCards.Remove(currentSelectedHandCard);
             return;
         }
-
+    
         if (blockedPlayerNo == playerNumber && blockCount > 0)
         {
             Debug.LogWarning($"Player {playerNumber}'s move is blocked by Oynayamazsın!");
-            DiscardHandCards(currentSelectedHandCard); // Always add to center
+            DiscardHandCards(currentSelectedHandCard, CardInteraction.cardLookup[currentSelectedHandCard].GetCardID()); // Always add to center
             movePlayedLocally = true;
             blockCount--;
             if (blockCount == 0) blockedPlayerNo = -1;
-            networkRelay.SendMoveToServerRPC(currentSelectedHandCard, new SerializableList(centerCards), playerNumber, -999); // Use -999 or another value to indicate block
+            networkRelay.SendMoveToServerRPC(currentSelectedHandCard, new SerializableCard(centerCards), playerNumber, -999); // Use -999 or another value to indicate block
             myCards.Remove(currentSelectedHandCard);
             return;
         }
-
-        else if (currentSelectedHandCard[1] == sumValue || (currentSelectedHandCard[1] == 11 && sumValue != 0))
+        else if (cardValue == sumValue || (cardValue == 11 && sumValue != 0))
         {
-            DiscardPlayedCards(currentSelectedHandCard, serializableList, playerNumber);
+            DiscardPlayedCards(currentSelectedHandCard, serializableCard, playerNumber);
             movePlayedLocally = true;
         }
         else
         {
-            DiscardHandCards(currentSelectedHandCard);
+            DiscardHandCards(currentSelectedHandCard, CardInteraction.cardLookup[currentSelectedHandCard].GetCardID());
             movePlayedLocally = true;
         }
 
-        networkRelay.SendMoveToServerRPC(currentSelectedHandCard, serializableList, playerNumber, sumValue);
+        networkRelay.SendMoveToServerRPC(currentSelectedHandCard, serializableCard, playerNumber, sumValue);
         myCards.Remove(currentSelectedHandCard);
 
 
@@ -339,17 +340,17 @@ public class GameManager : NetworkBehaviour
     //Called when the player decides to put the selected hand card to the center
     private void CardAddedToCenter()
     {
-        networkRelay.AddCenterCardServerRPC(currentSelectedHandCard);
+        networkRelay.AddCenterCardServerRPC(currentSelectedHandCard, CardInteraction.cardLookup[currentSelectedHandCard].GetCardID());
         myCards.Remove(currentSelectedHandCard);
         currentSelectedHandCard = null;
     }
 
-    public void GetCardThatCaptured(int[] playedCard, SerializableList serializedList, int playerNumber)
+    public void GetCardThatCaptured(string playedCard, SerializableCard serializedCard, int playerNumber)
     {
         Debug.Log("Discarding hand cards: " + movePlayedLocally);
         if (!movePlayedLocally)
         {
-            DiscardPlayedCards(playedCard, serializedList, playerNumber);
+            DiscardPlayedCards(playedCard, serializedCard, playerNumber);
         }
         else
         {
@@ -357,23 +358,23 @@ public class GameManager : NetworkBehaviour
         }
     }
 
-    public void DiscardPlayedCards(int[] playedCard, SerializableList serializedList, int playerNumber, int KKvalue = 0)
+    public void DiscardPlayedCards(string playedCard, SerializableCard serializedCard, int playerNumber, int KKvalue = 0)
     {
         if (KKvalue != 0)
         {
-            playedCard[1] = KKvalue; // Set the value to 11 if Kapkaç is used
+            CardInteraction.cardLookup[playedCard].GetCardID()[1] = KKvalue; // Set the value to 11 if Kapkaç is used
         }
         Debug.Log("Discarding played cards: " + movePlayedLocally);
         if (!movePlayedLocally)
         {
-            List<int[]> selectedCenterCards = serializedList.ToList();
-            List<int[]> selectedCards = new List<int[]>(selectedCenterCards);
+            List<string> selectedCenterCards = serializedCard.ToDictionary().Keys.ToList();
+            List<string> selectedCards = new List<string>(selectedCenterCards);
             selectedCards.Add(playedCard);
             cardObjectsToBeDiscarted.Clear();
 
-            foreach (int[] cardID in selectedCards)
+            foreach (string cardID in selectedCards)
             {
-                GameObject tempCardObject = GameObject.FindWithTag(cardID[0] + "_" + cardID[1]);
+                GameObject tempCardObject = CardInteraction.cardLookup[cardID].gameObject;
                 tempCardObject.transform.parent = null;
 
                 if (cardID == playedCard)
@@ -409,9 +410,12 @@ public class GameManager : NetworkBehaviour
 
             deckController.MoveCardsToPlayerPool(cardObjectsToBeDiscarted, playerNumber, piştiHappened);
 
-            foreach (int[] selectedCardId in selectedCenterCards)
+            foreach (string uniqueCardId in selectedCenterCards)
             {
-                centerCards = centerCards.Where(card => !(card[0] == selectedCardId[0] && card[1] == selectedCardId[1])).ToList();
+                var selectedCardId = CardInteraction.cardLookup[uniqueCardId].GetCardID();
+                centerCards = centerCards
+                    .Where(card => !(card.Value[0] == selectedCardId[0] && card.Value[1] == selectedCardId[1]))
+                    .ToDictionary(card => card.Key, card => card.Value);
             }
 
             PrintCenterCards();
@@ -420,17 +424,17 @@ public class GameManager : NetworkBehaviour
         {
             movePlayedLocally = false;
             CardInteraction.isOneCardSelected = false;
-            currentSelectedHandCard = new int[] { 0, 0 };
+            currentSelectedHandCard = null;
             centerCards.Clear();
         }
     }
 
-    public void GetCardAddedToCenter(int[] cardID)
+    public void GetCardAddedToCenter(string uniqueCardID,int[] cardID)
     {
         Debug.Log("Discarding hand cards: " + movePlayedLocally);
         if (!movePlayedLocally)
         {
-            DiscardHandCards(cardID);
+            DiscardHandCards(uniqueCardID, cardID);
         }
         else
         {
@@ -439,10 +443,10 @@ public class GameManager : NetworkBehaviour
     }
 
     //To remove the played card from the hand when it played to the center
-    public void DiscardHandCards(int[] cardID)
+    public void DiscardHandCards(string uniqueCardID, int[] cardID)
     {
         //UI
-        deckController.DiscardHandCardToCenter(cardID);
+        deckController.DiscardHandCardToCenter(uniqueCardID, cardID);
     }
 
     public void UpdateCurrentPlayer(int playerNumber)
@@ -450,11 +454,9 @@ public class GameManager : NetworkBehaviour
         currentPlayerNo = playerNumber;
     }
 
-    public void UpdateCenterCardIDList(SerializableList serializableList)
+    public void UpdateCenterCardIDList(SerializableCard serializableCard)
     {
-        List<int[]> tempCenterList = serializableList.ToList();
-        centerCardIDList = tempCenterList;
-        Server.PrintList(centerCardIDList);
+        centerCardIDList = serializableCard.ToDictionary().Keys.ToList();
     }
 
     public static string TurnCardIdToString(int[] tempCardID)
@@ -464,23 +466,23 @@ public class GameManager : NetworkBehaviour
 
     public void PrintCenterCards()
     {
-        foreach (int[] centerCardID in centerCards)
+        foreach (var centerCardID in centerCards)
         {
-            print(centerCardID[0]);
-            print(centerCardID[1]);
+            print(centerCardID.Value[0]);
+            print(centerCardID.Value[1]);
         }
     }
 
     //!!!! Maybe can be deleted later or deactivated.
     public void PrintPlayerPools(SerializableDictionary serializableDictionary, int chkobbaPlayer)
     {
-        Dictionary<int, List<int[]>> playersPooledCardsIDs = serializableDictionary.ToDictionary();
+        Dictionary<int, List<string>> playersPooledCardsIDs = serializableDictionary.ToDictionary();
 
         foreach (var kvp in playersPooledCardsIDs)
         {
             int playerKey = kvp.Key;
             Debug.Log("Player " + playerKey);
-            List<int[]> cardList = kvp.Value;
+            List<string> cardList = kvp.Value;
 
             foreach (var card in cardList)
             {
@@ -549,7 +551,7 @@ public class GameManager : NetworkBehaviour
 
     private void PlayAfterTimeOut()
     {
-        int[] playableCardID = { 0, 0 };
+        /*int[] playableCardID = { 0, 0 };
 
         List<int[]> myCards = new List<int[]>();
 
@@ -585,7 +587,7 @@ public class GameManager : NetworkBehaviour
         {
             currentSelectedHandCard = playableCardID;
             CheckIfLegal(currentPlayerNo);
-        }
+        }*/
     }
 
     public void GetTurnTime(float turnTime)

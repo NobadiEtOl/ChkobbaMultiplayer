@@ -14,8 +14,8 @@ public class CardInteraction : MonoBehaviour
     private bool isDragging = false;
     private float snapBackThreshold = 250f;
     private GameObject selectedCardIndicator;
-    public event Action<int[]> OnCardSelected;
-    public event Action<int[], GameObject, int> OnCardsPlayed;
+    public event Action<string> OnCardSelected;
+    public event Action<string, GameObject, int> OnCardsPlayed;
     private static GameObject activeCardIndicator = null; // Tracks the currently active card indicator
 
     // New variable to control auto-rotation
@@ -25,15 +25,29 @@ public class CardInteraction : MonoBehaviour
     // In CardInteraction.cs
     public string uniqueCardInstanceID; // e.g., a GUID
 
-    void Awake() {
-        uniqueCardInstanceID = System.Guid.NewGuid().ToString();
-        // Optionally: Register this card in a static dictionary for lookup
-        cardLookup[uniqueCardInstanceID] = this;
+    public int[] GetCardID()
+    {
+        // Return a copy of the cardID to prevent external modification
+        return (int[])cardID.Clone();
+    }
+    public void SetUniqueID(string uniqueId, int[] cardID)
+    {
+        uniqueCardInstanceID = uniqueId;
+        CardInteraction.cardLookup[uniqueCardInstanceID] = this;
+        this.cardID = (int[])cardID.Clone();
+        Debug.Log($"Card {gameObject.name} set with unique ID: {uniqueCardInstanceID}");
+        InitializeCard();
+    }
+
+    public void SetCardID(int[] id)
+    {
+        cardID = (int[])id.Clone();
+        gameObject.tag = cardID[0] + "_" + cardID[1];
     }
 
     void Start()
     {
-        InitializeCard();
+        //InitializeCard();
     }
 
     void Update()
@@ -126,9 +140,9 @@ public class CardInteraction : MonoBehaviour
             currentlySelectedCard = this;
 
             // Invoke OnCardSelected
-            OnCardSelected?.Invoke(this.cardID);
+            OnCardSelected?.Invoke(this.uniqueCardInstanceID);
         }
-        
+
         if (GameManager.LocalInstance != null && GameManager.LocalInstance.isKopyalaActive)
         {
             Debug.Log("Kopyala active, trying to copy card: " + gameObject.name);
@@ -167,7 +181,7 @@ public class CardInteraction : MonoBehaviour
                 // Invoke OnCardsPlayed
                 //Debug.Log("OnCardsPlayed invoked!");
                 autoRotateFlag = false; // Stop auto-rotation when the card is played
-                OnCardsPlayed?.Invoke(this.cardID, this.gameObject, GameManager.currentPlayerNo);
+                OnCardsPlayed?.Invoke(this.uniqueCardInstanceID, this.gameObject, GameManager.currentPlayerNo);
 
                 if (activeCardIndicator != null)
                 {
@@ -206,32 +220,9 @@ public class CardInteraction : MonoBehaviour
         isOneCardSelected = true;
     }
 
-    public int[] GetCardID()
+    public void InitializeCard()
     {
-        string[] tagStrings = gameObject.tag.Split('_');
-        int[] cardID = { 0, 0 };
-
-        if (tagStrings.Length != 2)
-        {
-            //Debug.LogError("Invalid tag format! Expected 'Kind_Value'.");
-        }
-
-        if (!int.TryParse(tagStrings[0], out cardID[0]) || cardID[0] <= 0)
-        {
-            //Debug.LogError($"Invalid card kind: {tagStrings[0]}");
-        }
-
-        if (!int.TryParse(tagStrings[1], out cardID[1]) || cardID[1] <= 0 || cardID[1] > 13)
-        {
-            //Debug.LogError($"Invalid card value: {tagStrings[1]}");
-        }
-
-        return cardID;
-    }
-
-    private void InitializeCard()
-    {
-        cardID = GetCardID();
+        //cardID = GetCardID();
         gameObject.tag = cardID[0] + "_" + cardID[1];
 
         transform.localScale = new Vector3(1000, 1000, 1000);
@@ -294,5 +285,5 @@ public class CardInteraction : MonoBehaviour
         gameObject.tag = cardID[0] + "_" + cardID[1];
         GetComponent<SpriteRenderer>().sprite = newSprite;
     }
-    
+
 }

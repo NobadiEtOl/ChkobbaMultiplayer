@@ -12,10 +12,11 @@ public class Server : NetworkBehaviour
 {
     public static Server Singleton { get; private set; } // Singleton instance
     [SerializeField] private NetworkRelay networkRelay; // Reference to the NetworkRelay script
-    private List<int[]> deckCardsIDs;//List of all the cardIDs represents the deck  
-    public List<int[]> centerCardsIDs;//List of all the cards in the center
-    private Dictionary<int, List<int[]>> playersHandCardsIDs;//Dictionary containing all the players' hands
-    private Dictionary<int, List<int[]>> playersPooledCardsIDs;//Dictionary containing all the players' pools
+    private Dictionary<int, List<string>> playersHandCardsIDs;//Dictionary containing all the players' hands
+    private Dictionary<int, List<string>> playersPooledCardsIDs;//Dictionary containing all the players' pools
+    private Dictionary<string, int[]> deckCardsDict; // replaces deckCardsIDs
+    public Dictionary<string, int[]> centerCardsDict; // replaces centerCardsIDs
+    private Dictionary<string, int[]> allCardLookup = new Dictionary<string, int[]>();
     private int playerCount; // Number of players in the game for the game mode
     private int connectedPlayerCount = 0;
     [SerializeField] private int seed = 0;//Seed for the deck suffle
@@ -34,10 +35,10 @@ public class Server : NetworkBehaviour
 
     public void ResetAllServerVariables()
     {
-        deckCardsIDs = null;
+        deckCardsDict = null;
+        centerCardsDict = null;
         playersHandCardsIDs = null;
         playersPooledCardsIDs = null;
-        centerCardsIDs = null;
         seed = 0;
         turnCounter = 0;
         currentPlayer = 0;
@@ -58,10 +59,10 @@ public class Server : NetworkBehaviour
 
     public void ResetForNewRound()
     {
-        deckCardsIDs = null;
+        deckCardsDict = null;
+        centerCardsDict = null;
         playersHandCardsIDs = null;
         playersPooledCardsIDs = null;
-        centerCardsIDs = null;
         seed = 0; // Optionally keep or randomize for each round
         turnCounter = 0;
         currentPlayer = 0;
@@ -210,56 +211,65 @@ public class Server : NetworkBehaviour
     //Add all cards to the deckCardIDs by creating all necessary IDs.
     private void SaveAllCards()
     {
-        deckCardsIDs = new List<int[]>();
-        //Club cards (kind=1, value=1 to 13)
+        deckCardsDict = new Dictionary<string, int[]>();
+        int cardIndex = 0;
+        // Club cards (kind=1, value=1 to 13)
         for (int value = 1; value <= 13; value++)
         {
-            deckCardsIDs.Add(new int[] { 1, value });
+            string uniqueID = "card_" + cardIndex++;
+            deckCardsDict.Add(uniqueID, new int[] { 1, value });
+        }
+        // Diamond cards (kind=2, value=1 to 13)
+        for (int value = 1; value <= 13; value++)
+        {
+            string uniqueID = "card_" + cardIndex++;
+            deckCardsDict.Add(uniqueID, new int[] { 1, value });
+        }
+        // Heart cards (kind=3, value=1 to 13)
+        for (int value = 1; value <= 13; value++)
+        {
+            string uniqueID = "card_" + cardIndex++;
+            deckCardsDict.Add(uniqueID, new int[] { 1, value });
+        }
+        // Spade cards (kind=4, value=1 to 13)
+        for (int value = 1; value <= 13; value++)
+        {
+            string uniqueID = "card_" + cardIndex++;
+            deckCardsDict.Add(uniqueID, new int[] { 1, value });
         }
 
-        //Diamond cards (kind=2, value=1 to 13)
-        for (int value = 1; value <= 13; value++)
-        {
-            deckCardsIDs.Add(new int[] { 2, value });
-        }
-
-        //Heart cards (kind=3, value=1 to 13)
-        for (int value = 1; value <= 13; value++)
-        {
-            deckCardsIDs.Add(new int[] { 3, value });
-        }
-
-        //Spade cards (kind=4, value=1 to 13)
-        for (int value = 1; value <= 13; value++)
-        {
-            deckCardsIDs.Add(new int[] { 4, value });
-        }
+        allCardLookup = new Dictionary<string, int[]>(deckCardsDict);
     }
 
     //Suffle the deck according to the seed
     private void SuffleCards(int seed)
     {
         System.Random rng = new System.Random(seed);
-        int count = deckCardsIDs.Count;
-
+        var deckList = new List<KeyValuePair<string, int[]>>(deckCardsDict);
+        int count = deckList.Count;
         for (int i = 0; i < count - 1; i++)
         {
-            int r = rng.Next(i, count);  // Random number from i to count - 1
-            int[] temp = deckCardsIDs[i];
-            deckCardsIDs[i] = deckCardsIDs[r];
-            deckCardsIDs[r] = temp;
+            int r = rng.Next(i, count);
+            var temp = deckList[i];
+            deckList[i] = deckList[r];
+            deckList[r] = temp;
         }
-        //Debug.Log("Deck shuffled with seed: " + seed);
+        // Rebuild the dictionary in shuffled order
+        deckCardsDict = new Dictionary<string, int[]>();
+        foreach (var kvp in deckList)
+        {
+            deckCardsDict[kvp.Key] = kvp.Value;
+        }
     }
 
     //Add a new List<int[]> to the dictionary for each player representing the player pools.
     private void InitializePlayerPools()
     {
-        playersPooledCardsIDs = new Dictionary<int, List<int[]>>();
+        playersPooledCardsIDs = new Dictionary<int, List<string>>();
 
         for (int i = 0; i < playerCount; i++)
         {
-            playersPooledCardsIDs[i] = new List<int[]>();
+            playersPooledCardsIDs[i] = new List<string>();
         }
     }
 
@@ -267,11 +277,11 @@ public class Server : NetworkBehaviour
     private void InitializePlayersHands()
     {
         Debug.LogWarning("InitializePlayersHands called");
-        playersHandCardsIDs = new Dictionary<int, List<int[]>>();
+        playersHandCardsIDs = new Dictionary<int, List<string>>();
 
         for (int i = 0; i < playerCount; i++)
         {
-            playersHandCardsIDs[i] = new List<int[]>();
+            playersHandCardsIDs[i] = new List<string>();
         }
         Debug.LogWarning("InitializePlayersHands finished");
     }
@@ -284,12 +294,13 @@ public class Server : NetworkBehaviour
         {
             for (int j = 0; j < playerCount; j++)
             {
-                //Removes from the deck and adds to players hand
-                int[] tempCardID = deckCardsIDs[deckCardsIDs.Count - 1];
-                playersHandCardsIDs[j].Add(tempCardID);
-                deckCardsIDs.RemoveAt(deckCardsIDs.Count - 1);
-                //print(tempCardID[0] + "_" + tempCardID[1]);
-                //Add functions to run animations
+                // Remove from the deck and add to player's hand
+                var lastCard = deckCardsDict.Last();
+                string uniqueID = lastCard.Key;
+                int[] cardID = lastCard.Value;
+
+                playersHandCardsIDs[j].Add(uniqueID);
+                deckCardsDict.Remove(uniqueID);
             }
         }
 
@@ -306,52 +317,56 @@ public class Server : NetworkBehaviour
     //Chooses the cards to be dealth to the center
     private void DealCardsToCenter()
     {
-        centerCardsIDs = new List<int[]>();
+        centerCardsDict = new Dictionary<string, int[]>();
+        var deckEnum = deckCardsDict.GetEnumerator();
         for (int i = 0; i < 4; i++)
         {
-            //Removes from the deck and adds to center
-            int[] tempCardID = deckCardsIDs[deckCardsIDs.Count - 1];
-            centerCardsIDs.Add(tempCardID);
-            deckCardsIDs.RemoveAt(deckCardsIDs.Count - 1);
+            if (!deckEnum.MoveNext()) break;
+            var kvp = deckEnum.Current;
+            centerCardsDict[kvp.Key] = kvp.Value;
         }
-        //Sends center cards to the gameManger so that card objects be put to the center
-        SerializableList serializableList = new SerializableList(centerCardsIDs);
-        networkRelay.UpdateCenterCardIDListClientRPC(serializableList);
-
-        Delayed_DealCardPrefabsToCenter(serializableList);
-
+        // Remove from deck
+        foreach (var key in centerCardsDict.Keys)
+        {
+            deckCardsDict.Remove(key);
+        }
+        // Send to clients
+        SerializableCard serializableCard = new SerializableCard(centerCardsDict);
+        networkRelay.UpdateCenterCardIDListClientRPC(serializableCard);
+        Delayed_DealCardPrefabsToCenter(serializableCard);
     }
 
     //******Check if the centerCardIDList in the game manager
     //is updated correctly, if so you dont need to send tempSerializableList
     //to the game mananger and you can use centerCardIDList instead
-    private void Delayed_DealCardPrefabsToCenter(SerializableList tempSerializableList)
+    private void Delayed_DealCardPrefabsToCenter(SerializableCard tempSerializableCard)
     {
-        if (IsServer) networkRelay.DealCardPrefabsToCenterClientRPC(tempSerializableList);
+        if (IsServer) networkRelay.DealCardPrefabsToCenterClientRPC(tempSerializableCard);
     }
 
     //Add played cards to the current players pool.
-    public void AddDiscardedCardsToPlayerPool(SerializableList serializableList, int playerNumber)
+    public void AddDiscardedCardsToPlayerPool(SerializableCard serializableCard, int playerNumber)
     {
-
-        List<int[]> discardedCardIDs = serializableList.ToList();
-        foreach (int[] discardedCardID in discardedCardIDs)
+        var discardedDict = serializableCard.ToDictionary();
+        foreach (var kvp in discardedDict)
         {
-            playersPooledCardsIDs[playerNumber].Add(discardedCardID);
-            Debug.LogWarning("PlayerNumber: " + currentPlayer + " discardedCardID: " + discardedCardID[0] + "_" + discardedCardID[1]);
+            // kvp.Key is uniqueID, kvp.Value is int[] cardID
+            playersPooledCardsIDs[playerNumber].Add(kvp.Key);
+            Debug.LogWarning("PlayerNumber: " + playerNumber + " discardedCardID: " + kvp.Value[0] + "_" + kvp.Value[1]);
         }
 
         int piştiPlayer = 5;
         bool jPistiFlag = false;
 
-        if (discardedCardIDs.Count == 2)
+        if (discardedDict.Count == 2)
         {
             Debug.LogWarning("Inside Pişti");
-            //If the last card played is a joker, the player who played it gets a point
-            if (discardedCardIDs[discardedCardIDs.Count - 1][1] == discardedCardIDs[discardedCardIDs.Count - 2][1])
+            var values = new List<int[]>(discardedDict.Values);
+            // If the last two cards have the same value, it's a pişti
+            if (values[values.Count - 1][1] == values[values.Count - 2][1])
             {
                 Debug.LogWarning("Correct Pişti");
-                if (discardedCardIDs[discardedCardIDs.Count - 1][1] == 11)
+                if (values[values.Count - 1][1] == 11)
                 {
                     jPistiFlag = true;
                 }
@@ -422,12 +437,12 @@ public class Server : NetworkBehaviour
         int maxCardCount = 0;
         List<int> playerWithMostCards = new List<int>();
 
-        Dictionary<int, List<int[]>> pooledCards;
+        Dictionary<int, List<string>> pooledCards;
 
         if (playerCount == 4)
         {
             // Combine card pools for teams
-            pooledCards = new Dictionary<int, List<int[]>>
+            pooledCards = new Dictionary<int, List<string>>
             {
                 { 0, playersPooledCardsIDs[0].Concat(playersPooledCardsIDs[2]).ToList() },
                 { 1, playersPooledCardsIDs[1].Concat(playersPooledCardsIDs[3]).ToList() }
@@ -443,7 +458,7 @@ public class Server : NetworkBehaviour
         foreach (var kvp in pooledCards)
         {
             int playerID = kvp.Key;
-            List<int[]> cardList = kvp.Value;
+            List<string> cardList = kvp.Value;
 
             // Rule 1: Count cards
             int cardCount = cardList.Count;
@@ -464,8 +479,9 @@ public class Server : NetworkBehaviour
             // Calculate points based on card values
             foreach (var card in cardList)
             {
-                int kind = card[0];
-                int value = card[1];
+                int[] cardID = allCardLookup[card]; // card is uniqueID
+                int kind = cardID[0];
+                int value = cardID[1];
 
                 if (value == 1) // Ace
                 {
@@ -590,19 +606,23 @@ public class Server : NetworkBehaviour
     //Add remaining cards in the center to the pool of the player who last captured a card.
     public void AddRemainingCardsToPlayerPool()
     {
-        foreach (int[] remainingCardsID in centerCardsIDs)
+        if (centerCardsDict == null) return;
+        foreach (var kvp in centerCardsDict)
         {
-            Debug.LogWarning("Adding remaining card to player pool: " + remainingCardsID[0] + "_" + remainingCardsID[1]);
-            playersPooledCardsIDs[lastPlayerToCapture].Add(remainingCardsID);
+            Debug.LogWarning("Adding remaining card to player pool: " + kvp.Value[0] + "_" + kvp.Value[1]);
+            playersPooledCardsIDs[lastPlayerToCapture].Add(kvp.Key);
         }
     }
 
     public void PrintCenterCards()
     {
         print("CenterCards:");
-        foreach (int[] cardID in centerCardsIDs)
+        if (centerCardsDict != null)
         {
-            print(cardID[0] + "_" + cardID[1]);
+            foreach (var kvp in centerCardsDict)
+            {
+                print($"{kvp.Key}: {kvp.Value[0]}_{kvp.Value[1]}");
+            }
         }
     }
 
@@ -632,14 +652,14 @@ public class Server : NetworkBehaviour
             }
         }
     }
-    public void RemoveCardsFromCenter(SerializableList serializableList)
+    public void RemoveCardsFromCenter(SerializableCard serializableCard)
     {
-        List<int[]> cardsToRemove = serializableList.ToList();
-        foreach (int[] cardToBeRemoved in cardsToRemove)
+        var cardsToRemove = serializableCard.ToDictionary();
+        foreach (var key in cardsToRemove.Keys)
         {
-            centerCardsIDs.RemoveAll(card => card.SequenceEqual(cardToBeRemoved));
+            centerCardsDict.Remove(key);
         }
-        networkRelay.UpdateCenterCardIDListClientRPC(new SerializableList(centerCardsIDs));
+        networkRelay.UpdateCenterCardIDListClientRPC(new SerializableCard(centerCardsDict));
     }
 
     public void PrintMessage(string message)
@@ -683,34 +703,40 @@ public class Server : NetworkBehaviour
         }
     }
 
-    public void GetMove(int[] selectedHandCard, SerializableList serializableList, int playerNumber, int sumValue)
+    public void GetMove(string selectedHandCardUniqueID, SerializableCard serializableCard, int playerNumber, int sumValue)
     {
-        Debug.LogWarning("GetMove called with selectedHandCard: " + selectedHandCard[0] + "_" + selectedHandCard[1]);
+        // selectedHandCardUniqueID is the uniqueID of the played card
+        Debug.LogWarning("GetMove called with selectedHandCardUniqueID: " + selectedHandCardUniqueID);
+
+        // Get the cardID for rules
+        int[] selectedHandCard = allCardLookup[selectedHandCardUniqueID];
+        Debug.LogWarning("Selected hand card: " + selectedHandCard[0] + "_" + selectedHandCard[1]);
+        Debug.LogWarning("Sum value: " + sumValue);
 
         if (selectedHandCard[1] == sumValue || (selectedHandCard[1] == 11 && sumValue != 0))
         {
-            RemoveCardsFromCenter(serializableList);
-            serializableList.Add(selectedHandCard);
-            AddDiscardedCardsToPlayerPool(serializableList, playerNumber);
-            serializableList.Pop();
-            networkRelay.SendMoveToClientRPC(selectedHandCard, serializableList, playerNumber);
+            RemoveCardsFromCenter(serializableCard);
+            // Add the played card to the serializableCard for pool addition
+            var updatedDict = serializableCard.ToDictionary();
+            updatedDict[selectedHandCardUniqueID] = selectedHandCard;
+            AddDiscardedCardsToPlayerPool(new SerializableCard(updatedDict), playerNumber);
+            updatedDict.Remove(selectedHandCardUniqueID); // Remove again if needed
+            networkRelay.SendMoveToClientRPC(selectedHandCardUniqueID, new SerializableCard(updatedDict), playerNumber);
             lastPlayerToCapture = playerNumber;
-
-            //EndTurn();
         }
         else
         {
-            AddCardIDToCenter(selectedHandCard);
+            AddCardIDToCenter(selectedHandCardUniqueID, selectedHandCard);
         }
         //if(singleDebuggingMode)EndTurn();
     }
 
-    public void AddCardIDToCenter(int[] cardID)
+    public void AddCardIDToCenter(string uniqueID, int[] cardID)
     {
         Debug.LogWarning("AddCardIDToCenter called with cardID: " + cardID[0] + "_" + cardID[1]);
-        centerCardsIDs.Add(cardID);
-        networkRelay.UpdateCenterCardIDListClientRPC(new SerializableList(centerCardsIDs));
-        networkRelay.SendCardAddedToCenterClientRPC(cardID);
+        centerCardsDict[uniqueID] = cardID;
+        networkRelay.UpdateCenterCardIDListClientRPC(new SerializableCard(centerCardsDict));
+        networkRelay.SendCardAddedToCenterClientRPC(uniqueID, cardID);
         //EndTurn();
     }
 
@@ -783,7 +809,7 @@ public class Server : NetworkBehaviour
         if (handA.Count <= cardAIndex || handB.Count <= cardBIndex) return;
 
         // Swap the cards in the server's hand data
-        int[] temp = handA[cardAIndex];
+        string temp = handA[cardAIndex];
         handA[cardAIndex] = handB[cardBIndex];
         handB[cardBIndex] = temp;
 

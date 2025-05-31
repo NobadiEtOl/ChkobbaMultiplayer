@@ -6,52 +6,41 @@ using System;
 [Serializable]
 public struct SerializableDictionary : INetworkSerializable
 {
-    private List<int> keys;              // List to store dictionary keys
-    private List<List<int[]>> values;    // List to store dictionary values (nested lists)
+    private List<int> keys;              // List to store player numbers
+    private List<List<string>> values;   // List to store uniqueIDs
 
     // Constructor to initialize from a regular dictionary
-    public SerializableDictionary(Dictionary<int, List<int[]>> dictionary)
+    public SerializableDictionary(Dictionary<int, List<string>> dictionary)
     {
         keys = new List<int>();
-        values = new List<List<int[]>>();
+        values = new List<List<string>>();
 
         foreach (var kvp in dictionary)
         {
             keys.Add(kvp.Key);
 
-            // Deep copy of the nested list
-            List<int[]> deepCopiedList = new List<int[]>();
-            foreach (var array in kvp.Value)
-            {
-                deepCopiedList.Add((int[])array.Clone());
-            }
+            // Deep copy of the list
+            List<string> deepCopiedList = new List<string>(kvp.Value);
             values.Add(deepCopiedList);
         }
     }
 
     // Convert back to a regular dictionary
-    public Dictionary<int, List<int[]>> ToDictionary()
+    public Dictionary<int, List<string>> ToDictionary()
     {
-        Dictionary<int, List<int[]>> dictionary = new Dictionary<int, List<int[]>>();
+        Dictionary<int, List<string>> dictionary = new Dictionary<int, List<string>>();
         for (int i = 0; i < keys.Count; i++)
         {
-            dictionary[keys[i]] = values[i];
+            dictionary[keys[i]] = new List<string>(values[i]);
         }
         return dictionary;
     }
 
     // Add key-value pair
-    public void Add(int key, List<int[]> value)
+    public void Add(int key, List<string> value)
     {
         keys.Add(key);
-
-        // Deep copy of the nested list
-        List<int[]> deepCopiedList = new List<int[]>();
-        foreach (var array in value)
-        {
-            deepCopiedList.Add((int[])array.Clone());
-        }
-        values.Add(deepCopiedList);
+        values.Add(new List<string>(value));
     }
 
     // Clear the dictionary
@@ -70,7 +59,7 @@ public struct SerializableDictionary : INetworkSerializable
         if (serializer.IsReader)
         {
             keys = new List<int>(keyCount);
-            values = new List<List<int[]>>(keyCount);
+            values = new List<List<string>>(keyCount);
         }
 
         for (int i = 0; i < keyCount; i++)
@@ -88,28 +77,17 @@ public struct SerializableDictionary : INetworkSerializable
 
             if (serializer.IsReader)
             {
-                values.Add(new List<int[]>());
+                values.Add(new List<string>());
             }
 
             for (int j = 0; j < valueCount; j++)
             {
-                int arrayLength = i < values.Count && j < values[i]?.Count ? values[i][j]?.Length ?? 0 : 0;
-                serializer.SerializeValue(ref arrayLength);
+                string element = i < values.Count && j < values[i]?.Count ? values[i][j] : string.Empty;
+                serializer.SerializeValue(ref element);
 
                 if (serializer.IsReader)
                 {
-                    values[i].Add(new int[arrayLength]);
-                }
-
-                for (int k = 0; k < arrayLength; k++)
-                {
-                    int element = j < values[i].Count && k < values[i][j]?.Length ? values[i][j][k] : 0;
-                    serializer.SerializeValue(ref element);
-
-                    if (serializer.IsReader)
-                    {
-                        values[i][j][k] = element;
-                    }
+                    values[i].Add(element);
                 }
             }
         }
@@ -126,11 +104,11 @@ public struct SerializableDictionary : INetworkSerializable
 
         for (int i = 0; i < keys.Count; i++)
         {
-            Debug.Log($"Key: {keys[i]}");
-            Debug.Log("Values:");
-            foreach (var array in values[i])
+            Debug.Log($"Key (Player Number): {keys[i]}");
+            Debug.Log("UniqueIDs:");
+            foreach (var uniqueID in values[i])
             {
-                Debug.Log($"  [{string.Join(", ", array)}]");
+                Debug.Log($"  {uniqueID}");
             }
         }
     }

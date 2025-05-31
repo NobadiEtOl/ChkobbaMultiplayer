@@ -30,11 +30,11 @@ public class NetworkRelay : NetworkBehaviour
         }
     }
     [ClientRpc(RequireOwnership = false)]
-    public void UpdateCenterCardIDListClientRPC(SerializableList serializableList)
+    public void UpdateCenterCardIDListClientRPC(SerializableCard serializableCard)
     {
         if (GameManager.LocalInstance != null)
         {
-            GameManager.LocalInstance.UpdateCenterCardIDList(serializableList);
+            GameManager.LocalInstance.UpdateCenterCardIDList(serializableCard);
         }
         else
         {
@@ -54,21 +54,21 @@ public class NetworkRelay : NetworkBehaviour
     }
 
     [ClientRpc(RequireOwnership = false)]
-    public void DealCardPrefabsToCenterClientRPC(SerializableList serializableList)
+    public void DealCardPrefabsToCenterClientRPC(SerializableCard serializableCard)
     {
-        GameManager.LocalInstance.CardPrefabsToCenter(serializableList);
+        GameManager.LocalInstance.CardPrefabsToCenter(serializableCard);
     }
 
     [ClientRpc(RequireOwnership = false)]
-    public void SendMoveToClientRPC(int[] selectedHandCard, SerializableList selectedCenterCards, int playerNumber)
+    public void SendMoveToClientRPC(string selectedHandCard, SerializableCard selectedCenterCards, int playerNumber)
     {
         GameManager.LocalInstance.GetCardThatCaptured(selectedHandCard, selectedCenterCards, playerNumber);
     }
 
     [ClientRpc(RequireOwnership = false)]
-    public void SendCardAddedToCenterClientRPC(int[] cardID)
+    public void SendCardAddedToCenterClientRPC(string uniqueID, int[] cardID)
     {
-        GameManager.LocalInstance.GetCardAddedToCenter(cardID);
+        GameManager.LocalInstance.GetCardAddedToCenter(uniqueID,cardID);
     }
 
     [ClientRpc(RequireOwnership = false)]
@@ -146,10 +146,10 @@ public class NetworkRelay : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void RemoveCenterCardsServerRPC(SerializableList serializableList)
+    public void RemoveCenterCardsServerRPC(SerializableCard serializableCard)
     {
 
-        server.RemoveCardsFromCenter(serializableList);
+        server.RemoveCardsFromCenter(serializableCard);
 
     }
     [ServerRpc(RequireOwnership = false)]
@@ -160,15 +160,15 @@ public class NetworkRelay : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void SendMoveToServerRPC(int[] selectedHandCard, SerializableList serializableList, int playerNumber, int sumValue)
+    public void SendMoveToServerRPC(string selectedHandCard, SerializableCard serializableCard, int playerNumber, int sumValue)
     {
-        server.GetMove(selectedHandCard, serializableList, playerNumber, sumValue);
+        server.GetMove(selectedHandCard, serializableCard, playerNumber, sumValue);
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void AddCenterCardServerRPC(int[] cardID)
+    public void AddCenterCardServerRPC(string uniqueCardID ,int[] cardID)
     {
-        server.AddCardIDToCenter(cardID);
+        server.AddCardIDToCenter(uniqueCardID, cardID);
     }
 
     [ServerRpc(RequireOwnership = false)]

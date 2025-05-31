@@ -80,6 +80,7 @@ public class DeckController : MonoBehaviour
 
     //Initialize and instantiate all the card objects that can be used
     private List<GameObject> cardObjectList = new List<GameObject>();
+    private int uniqueCardCounter = 0;
     private IEnumerator InitializeCardPool()
     {
         yield return new WaitForSeconds(0);
@@ -91,6 +92,7 @@ public class DeckController : MonoBehaviour
             int counter = 0;
             foreach (var cardPrefabEntry in cardPrefabs)
             {
+                int[] cardID = new int[] { (counter / 13) + 1, (counter % 13) + 1 };
                 var cardIDString = cardPrefabEntry.Key;
                 var cardPrefab = cardPrefabEntry.Value;
 
@@ -104,7 +106,9 @@ public class DeckController : MonoBehaviour
                 CardInteraction cardInteraction = card.GetComponent<CardInteraction>();
                 if (cardInteraction != null)
                 {
-                    cardInteractionList.Add(cardInteraction); // Store the reference in the list
+                    string uniqueID = "card_" + uniqueCardCounter++;
+                    cardInteraction.SetUniqueID(uniqueID, cardID);
+                    cardInteractionList.Add(cardInteraction);
                 }
 
                 card.transform.position = new Vector3(deckTransform.transform.position.x, deckTransform.transform.position.y + (counter * 2), deckTransform.transform.position.z);
@@ -200,7 +204,7 @@ public class DeckController : MonoBehaviour
     }
 
     //Deals to players according to the playerCount
-    public void DealPlayers(int playerCount, Dictionary<int, List<int[]>> playerHands)
+    public void DealPlayers(int playerCount, Dictionary<int, List<string>> playerHands)
     {
         this.playerCount = playerCount;
 
@@ -220,7 +224,7 @@ public class DeckController : MonoBehaviour
         }
     }
 
-    private void DealTwoPlayers(Dictionary<int, List<int[]>> playerHands)
+    private void DealTwoPlayers(Dictionary<int, List<string>> playerHands)
     {
         var cardObjects = new List<GameObject>();
         var positions = new List<Vector3>();
@@ -233,15 +237,15 @@ public class DeckController : MonoBehaviour
             relativeIndex = (i - thisPlayerNumber + playerCount) % playerCount;
             Debug.LogWarning("relativeIndex: " + relativeIndex);
 
-            if (relativeIndex == 0) gameManager.myCards = new List<int[]>();
+            if (relativeIndex == 0) gameManager.myCards = new List<string>();
 
             for (int j = 0; j < 4; j++)
             {
-                var cardID = playerHands[i][j];
-                if (relativeIndex == 0) gameManager.myCards.Add(cardID);
+                string uniqueCardID = playerHands[i][j];
+                if (relativeIndex == 0) gameManager.myCards.Add(uniqueCardID);
                 //if (relativeIndex == 1) relativeIndex=2;
 
-                GameObject tempCardObject = GetCardFromPool(cardID);
+                GameObject tempCardObject = CardInteraction.cardLookup[uniqueCardID].gameObject;
                 if (tempCardObject == null) continue;
 
                 cardObjects.Add(tempCardObject);
@@ -280,7 +284,7 @@ public class DeckController : MonoBehaviour
         StartCoroutine(ChainMoveCards(positions, cardObjects, 10, rotations, scales));
     }
 
-    private void DealFourPlayers(Dictionary<int, List<int[]>> playerHands)
+    private void DealFourPlayers(Dictionary<int, List<string>> playerHands)
     {
         var cardObjects = new List<GameObject>();
         var positions = new List<Vector3>();
@@ -291,14 +295,14 @@ public class DeckController : MonoBehaviour
         {
             int i = (startingPlayerNoCounter + n) % 4;
             relativeIndex = (i - thisPlayerNumber + playerCount) % playerCount;
-            if (relativeIndex == 0) gameManager.myCards = new List<int[]>();
+            if (relativeIndex == 0) gameManager.myCards = new List<string>();
 
             for (int j = 0; j < 4; j++)
             {
-                var cardID = playerHands[i][j];
-                if (relativeIndex == 0) gameManager.myCards.Add(cardID);
+                string uniqueCardID = playerHands[i][j];
+                if (relativeIndex == 0) gameManager.myCards.Add(uniqueCardID);
 
-                GameObject tempCardObject = GetCardFromPool(cardID);
+                GameObject tempCardObject = CardInteraction.cardLookup[uniqueCardID].gameObject;
                 if (tempCardObject == null) continue;
 
                 cardObjects.Add(tempCardObject);
@@ -349,7 +353,7 @@ public class DeckController : MonoBehaviour
 
     private int startingPlayerNoCounter = -1;
     //Deals to center according to the playerCount
-    public void DealCenter(List<int[]> centerCardIDs)
+    public void DealCenter(List<string> centerCardIDs)
     {
         startingPlayerNoCounter++;
         SendCardInteractionsToGameManager();
@@ -360,8 +364,8 @@ public class DeckController : MonoBehaviour
 
         for (int i = 0; i < 4; i++)
         {
-            var cardID = centerCardIDs[i];
-            GameObject tempCenterCard = GetCardFromPool(cardID);
+            string uniqueCardID = centerCardIDs[i];
+            GameObject tempCenterCard = CardInteraction.cardLookup[uniqueCardID].gameObject;
             cardObjects.Add(tempCenterCard);
             if (tempCenterCard != null)
             {
@@ -375,7 +379,7 @@ public class DeckController : MonoBehaviour
 
 
                 gameManager.centerCardsObjects.Add(tempCenterCard);
-                gameManager.centerCards.Add(cardID);
+                gameManager.centerCards.Add(uniqueCardID, CardInteraction.cardLookup[uniqueCardID].GetCardID());
 
                 if (i == 3)
                 {
@@ -399,28 +403,9 @@ public class DeckController : MonoBehaviour
         gameManager.GetCardInteractionScripts(cardInteractionList);
     }
 
-    //Allow to get card object with the cardID
-    private GameObject GetCardFromPool(int[] cardID)
+    public void DiscardHandCardToCenter(string uniqueCardID, int[] cardID)
     {
-        string cardIDString = GameManager.TurnCardIdToString(cardID);
-        //print("cardIDString: " + cardIDString);
-
-        if (deckPool.ContainsKey(cardIDString) && deckPool[cardIDString] != null)
-        {
-            var card = deckPool[cardIDString];
-            //deckPool[cardIDString] = null;
-            card.SetActive(true);
-            activeCards.Add(card);
-            return card;
-        }
-
-        //Debug.LogError($"No cards available in the pool for ID: {cardIDString}");
-        return null;
-    }
-
-    public void DiscardHandCardToCenter(int[] cardID)
-    {
-        GameObject placedCard = GameObject.FindGameObjectWithTag(GameManager.TurnCardIdToString(cardID));
+        GameObject placedCard = CardInteraction.cardLookup[uniqueCardID].gameObject;
         List<Vector3> positions = new List<Vector3>();
         List<GameObject> cardObjects = new List<GameObject>();
         List<Quaternion> rotations = new List<Quaternion>();
@@ -438,7 +423,7 @@ public class DeckController : MonoBehaviour
             positions.Add(new Vector3(centerPosition.x, centerPosition.y + 10 * GameManager.LocalInstance.centerCardsObjects.Count, centerPosition.z));
             scales.Add(new Vector3(1200, 1200, 1200));
 
-            gameManager.centerCards.Add(cardID);
+            gameManager.centerCards.Add(uniqueCardID,cardID);
             gameManager.centerCardsObjects.Add(placedCard);
             cardObjects.Add(placedCard);
         }
