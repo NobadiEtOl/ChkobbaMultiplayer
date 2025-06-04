@@ -68,7 +68,7 @@ public class NetworkRelay : NetworkBehaviour
     [ClientRpc(RequireOwnership = false)]
     public void SendCardAddedToCenterClientRPC(string uniqueID, int[] cardID)
     {
-        GameManager.LocalInstance.GetCardAddedToCenter(uniqueID,cardID);
+        GameManager.LocalInstance.GetCardAddedToCenter(uniqueID, cardID);
     }
 
     [ClientRpc(RequireOwnership = false)]
@@ -129,8 +129,34 @@ public class NetworkRelay : NetworkBehaviour
     {
         GameManager.LocalInstance.OnSwapCardWithOpponentSynced(myPlayerNo, myCardIndex, opponentPlayerNo, oppCardIndex);
     }
+    
+    [ClientRpc]
+    public void UseBayaBayaBakClientRPC(int opponentPlayerNo)
+    {
+        GameManager.LocalInstance.OnBayaBayaBakSynced(opponentPlayerNo);
+    }
+
+    [ClientRpc]
+    public void BombaClientRPC()
+    {
+        GameManager.LocalInstance.OnBombaCenter();
+    }
+
 
     //ServerRPC
+    [ServerRpc(RequireOwnership = false)]
+    public void BombaServerRPC()
+    {
+        server.BombaCenter();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void UseBayaBayaBakServerRPC(int opponentPlayerNo)
+    {
+        // Get the hand from the server
+        UseBayaBayaBakClientRPC(opponentPlayerNo);
+    }
+
     [ServerRpc(RequireOwnership = false)]
     public void UseSwapCardWithOpponentPowerServerRPC(int myPlayerNo, int myCardIndex, int opponentPlayerNo, int oppCardIndex)
     {
@@ -166,7 +192,7 @@ public class NetworkRelay : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void AddCenterCardServerRPC(string uniqueCardID ,int[] cardID)
+    public void AddCenterCardServerRPC(string uniqueCardID, int[] cardID)
     {
         server.AddCardIDToCenter(uniqueCardID, cardID);
     }
@@ -188,11 +214,17 @@ public class NetworkRelay : NetworkBehaviour
     {
         server.EndTurnCheck();
     }
-    
+
     [ServerRpc(RequireOwnership = false)]
     public void DeckReadyServerRPC()
     {
         server.InitialDealCoroutineCheck();
+    }
+    
+    [ServerRpc(RequireOwnership = false)]
+    public void RegisterCardCopyServerRPC(string targetUniqueID, string sourceUniqueID)
+    {
+        server.RegisterCopiedCard(targetUniqueID, sourceUniqueID);
     }
 
 }

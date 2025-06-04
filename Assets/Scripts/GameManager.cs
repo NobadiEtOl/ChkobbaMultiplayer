@@ -19,7 +19,7 @@ public class GameManager : NetworkBehaviour
     private string currentSelectedHandCard;//Represents the card current player chose to play with.
     public Dictionary<string, int[]> centerCards = new Dictionary<string, int[]>();//List of cards in the center
     public List<GameObject> centerCardsObjects = new List<GameObject>();//List of the card objects in the center
-    private List<CardInteraction> cardInteractionsScripts;//Reference to the scripts of every card.
+    private List<CardInteraction> cardInteractionsScripts = new List<CardInteraction>();//Reference to the scripts of every card.
     private List<GameObject> cardObjectsToBeDiscarted = new List<GameObject>();
     public static int currentPlayerNo = 0;
     private List<string> centerCardIDList;
@@ -41,6 +41,8 @@ public class GameManager : NetworkBehaviour
 
     public void ResetForNewRound()
     {
+        foreach (var cardScript in cardInteractionsScripts)
+            cardScript.ResetToOriginalCard();
         currentSelectedHandCard = null;
         centerCards.Clear();
         centerCardsObjects.Clear();
@@ -93,6 +95,12 @@ public class GameManager : NetworkBehaviour
     private CardInteraction tempCard;
     void Update()
     {
+        if (Input.GetKeyDown(KeyCode.W)) PlayAutomatically(3);
+        if (Input.GetKeyDown(KeyCode.A)) PlayAutomatically(4);
+        if (Input.GetKeyDown(KeyCode.S)) PlayAutomatically(1);
+        if (Input.GetKeyDown(KeyCode.D)) PlayAutomatically(2);
+
+        // ...existing code...
         // Handle touch input (mobile)
         /*if (Input.touchCount > 0)
         {
@@ -308,7 +316,7 @@ public class GameManager : NetworkBehaviour
             myCards.Remove(currentSelectedHandCard);
             return;
         }
-    
+
         if (blockedPlayerNo == playerNumber && blockCount > 0)
         {
             Debug.LogWarning($"Player {playerNumber}'s move is blocked by Oynayamazsın!");
@@ -397,13 +405,9 @@ public class GameManager : NetworkBehaviour
 
             if (selectedCards.Count == 2)
             {
-                if (selectedCards[selectedCards.Count - 1][1] != 11)
+                if (CardInteraction.cardLookup[selectedCards[selectedCards.Count - 1]].GetCardID()[1] == CardInteraction.cardLookup[selectedCards[selectedCards.Count - 2]].GetCardID()[1])
                 {
-                    piştiHappened = true;
-                }
-
-                else if (selectedCards[selectedCards.Count - 1][1] != 11 && selectedCards[selectedCards.Count - 2][1] != 11)
-                {
+                    Debug.LogError("Pişti happened!");
                     piştiHappened = true;
                 }
             }
@@ -429,7 +433,7 @@ public class GameManager : NetworkBehaviour
         }
     }
 
-    public void GetCardAddedToCenter(string uniqueCardID,int[] cardID)
+    public void GetCardAddedToCenter(string uniqueCardID, int[] cardID)
     {
         Debug.Log("Discarding hand cards: " + movePlayedLocally);
         if (!movePlayedLocally)
@@ -670,9 +674,6 @@ public class GameManager : NetworkBehaviour
         int opponentPlayerNo = GetRandomOpponentPlayerNo();
         int cardIndex = deckController.GetRandomHandCardIndex(opponentPlayerNo);
 
-        // Locally show the effect
-        deckController.PeekOpponentCard(opponentPlayerNo, cardIndex);
-
         // Send to server for sync
         networkRelay.UsePeekOpponentCardPowerServerRPC(opponentPlayerNo, cardIndex);
     }
@@ -683,6 +684,18 @@ public class GameManager : NetworkBehaviour
     public void OnPeekOpponentCardSynced(int opponentPlayerNo, int cardIndex)
     {
         deckController.PeekOpponentCard(opponentPlayerNo, cardIndex);
+    }
+
+    public void UseBayaBayaBakPower()
+    {
+        Debug.Log("Using BayaBayaBak Power");
+        int opponentPlayerNo = GetRandomOpponentPlayerNo(); // You can reuse your existing logic
+        networkRelay.UseBayaBayaBakServerRPC(opponentPlayerNo);
+    }
+
+    public void OnBayaBayaBakSynced(int opponentPlayerNo)
+    {
+        deckController.PeekOpponentCardAll(opponentPlayerNo);
     }
 
     /// <summary>
@@ -822,6 +835,9 @@ public class GameManager : NetworkBehaviour
         // Copy suit, value, and sprite
         targetCard.SetCardIDAndSprite(kopyalaSourceCard.GetCardID(), kopyalaSourceCard.GetComponent<SpriteRenderer>().sprite);
 
+        // After copying visuals and cardID
+        networkRelay.RegisterCardCopyServerRPC(targetCard.uniqueCardInstanceID, kopyalaSourceCard.uniqueCardInstanceID);
+
         Debug.Log($"KopyalaYapıstır: {kopyalaSourceCard.gameObject.name} copied to {targetCard.gameObject.name}");
 
         // Reset state
@@ -834,6 +850,76 @@ public class GameManager : NetworkBehaviour
     {
         foreach (var cardScript in cardInteractionsScripts)
             cardScript.ResetToOriginalCard();
+    }
+
+    public void PlayAutomatically(int playerIndex)
+    {
+        // Defensive: Check if playerHandTransforms is valid and has children
+        if (playerHandTransforms == null || playerHandTransforms.Count <= playerIndex - 1)
+        {
+            Debug.LogError($"PlayAutomatically: playerHandTransforms missing for player {playerIndex}");
+            return;
+        }
+
+        var handTransform = playerHandTransforms[playerIndex - 1];
+        if (handTransform.childCount == 0)
+        {
+            Debug.LogWarning($"PlayAutomatically: No cards left in hand for player {playerIndex}");
+            return;
+        }
+
+        // Get the first card in the hand (change index if you want a different card)
+        var cardObj = handTransform.GetChild(2).gameObject;
+        var cardScript = cardObj.GetComponent<CardInteraction>();
+        if (cardScript == null)
+        {
+            Debug.LogError("PlayAutomatically: CardInteraction not found on hand card.");
+            return;
+        }
+
+        // Set as if this card was selected
+        currentSelectedHandCard = cardScript.uniqueCardInstanceID;
+        CardInteraction.currentlySelectedCard = cardScript;
+
+        // Optionally, invoke selection event if you want to mimic UI
+        cardScript.TriggerOnCardSelected();
+
+        // Play the card as if the player played it
+        CheckIfLegal(playerIndex - 1);
+    }
+
+    public void ActivateBombaPower()
+    {
+        // Tell the server to bomb the center
+        networkRelay.BombaServerRPC();
+    }
+
+    public void OnBombaCenter()
+    {
+        // Find the BombedStack GameObject
+        GameObject bombedStack = GameObject.Find("BombedStack");
+        if (bombedStack == null)
+        {
+            Debug.LogError("BombedStack GameObject not found in scene!");
+            return;
+        }
+
+        // Move all center cards to BombedStack
+        foreach (var cardObj in centerCardsObjects)
+        {
+            if (cardObj != null)
+            {
+                cardObj.transform.SetParent(bombedStack.transform, true);
+                cardObj.transform.localPosition = Vector3.zero; // Reset position if needed
+            }
+        }
+
+        // Clear all center-related lists/dictionaries
+        centerCards.Clear();
+        centerCardsObjects.Clear();
+        if (centerCardIDList != null) centerCardIDList.Clear();
+
+        Debug.Log("Bomba: Center cleared and cards moved to BombedStack.");
     }
 
 }

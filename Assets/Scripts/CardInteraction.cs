@@ -286,4 +286,9 @@ public class CardInteraction : MonoBehaviour
         GetComponent<SpriteRenderer>().sprite = newSprite;
     }
 
+    public void TriggerOnCardSelected()
+    {
+        OnCardSelected?.Invoke(uniqueCardInstanceID);
+    }
+
 }

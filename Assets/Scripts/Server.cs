@@ -19,7 +19,7 @@ public class Server : NetworkBehaviour
     private Dictionary<string, int[]> allCardLookup = new Dictionary<string, int[]>();
     private int playerCount; // Number of players in the game for the game mode
     private int connectedPlayerCount = 0;
-    [SerializeField] private int seed = 0;//Seed for the deck suffle
+    [SerializeField] private int seed;//Seed for the deck suffle
     private int turnCounter = 0;
     public int currentPlayer;//The player that is currently playing
     int[] points;// To store points for each player
@@ -32,6 +32,8 @@ public class Server : NetworkBehaviour
     private int readyToEndTurnCounter = 0; //Counter to make sure every connected player is ready to end the turn
     private bool singleDebuggingMode;
     public bool winnerPrintFlag = false;
+    // Server.cs
+    private Dictionary<string, string> copiedCardMap = new Dictionary<string, string>();
 
     public void ResetAllServerVariables()
     {
@@ -39,7 +41,7 @@ public class Server : NetworkBehaviour
         centerCardsDict = null;
         playersHandCardsIDs = null;
         playersPooledCardsIDs = null;
-        seed = 0;
+        //seed = 0;
         turnCounter = 0;
         currentPlayer = 0;
         points = new int[2];
@@ -55,6 +57,7 @@ public class Server : NetworkBehaviour
         readyToEndTurnCounter = 0;
         singleDebuggingMode = false;
         winnerPrintFlag = false;
+        copiedCardMap.Clear();
     }
 
     public void ResetForNewRound()
@@ -63,7 +66,7 @@ public class Server : NetworkBehaviour
         centerCardsDict = null;
         playersHandCardsIDs = null;
         playersPooledCardsIDs = null;
-        seed = 0; // Optionally keep or randomize for each round
+        //seed = 0; // Optionally keep or randomize for each round
         turnCounter = 0;
         currentPlayer = 0;
         lastPlayerToCapture = -1;
@@ -73,6 +76,7 @@ public class Server : NetworkBehaviour
         readyToEndTurnCounter = 0;
         singleDebuggingMode = false;
         winnerPrintFlag = false;
+        copiedCardMap.Clear();
         // DO NOT reset: points, piştiCounts, roundCount, startingPlayerNo
     }
 
@@ -103,7 +107,7 @@ public class Server : NetworkBehaviour
     public void StartGame(int tempPlayerCount)
     {
         timer = 0;
-        if (roundCount > 1) ResetForNewRound();
+        if (roundCount > 0) ResetForNewRound();
 
         turnCounter = 0;
         playerCount = tempPlayerCount;
@@ -185,7 +189,7 @@ public class Server : NetworkBehaviour
         else
         {
             System.Random random = new System.Random(DateTime.Now.Millisecond);
-            seed = random.Next();
+            if (seed == 0) seed = random.Next();
 
             Debug.Log("NetworkManager State: " + NetworkManager.Singleton.NetworkConfig.NetworkTransport);
             //Invoke("StartGame",0f);
@@ -223,19 +227,19 @@ public class Server : NetworkBehaviour
         for (int value = 1; value <= 13; value++)
         {
             string uniqueID = "card_" + cardIndex++;
-            deckCardsDict.Add(uniqueID, new int[] { 1, value });
+            deckCardsDict.Add(uniqueID, new int[] { 2, value });
         }
         // Heart cards (kind=3, value=1 to 13)
         for (int value = 1; value <= 13; value++)
         {
             string uniqueID = "card_" + cardIndex++;
-            deckCardsDict.Add(uniqueID, new int[] { 1, value });
+            deckCardsDict.Add(uniqueID, new int[] { 3, value });
         }
         // Spade cards (kind=4, value=1 to 13)
         for (int value = 1; value <= 13; value++)
         {
             string uniqueID = "card_" + cardIndex++;
-            deckCardsDict.Add(uniqueID, new int[] { 1, value });
+            deckCardsDict.Add(uniqueID, new int[] { 4, value });
         }
 
         allCardLookup = new Dictionary<string, int[]>(deckCardsDict);
@@ -453,6 +457,19 @@ public class Server : NetworkBehaviour
             pooledCards = playersPooledCardsIDs;
         }
 
+        foreach (var kvp in pooledCards)
+        {
+            int playerID = kvp.Key;
+            List<string> cardList = kvp.Value;
+            Debug.Log($"Player {playerID} pooled cards: {string.Join(", ", cardList)}");
+            foreach (var card in cardList)
+            {
+                int[] cardID = allCardLookup[card];
+                Debug.Log($"Player {playerID} card: {card} ({cardID[0]}, {cardID[1]})");
+            }
+        }
+
+
 
         // Iterate through each player's or team's pooled cards
         foreach (var kvp in pooledCards)
@@ -476,27 +493,46 @@ public class Server : NetworkBehaviour
                 }
             }
 
+            List<string> controlCardList = new List<string>();
             // Calculate points based on card values
             foreach (var card in cardList)
             {
-                int[] cardID = allCardLookup[card]; // card is uniqueID
+                if (controlCardList.Contains(card))
+                {
+                    Debug.LogError("Duplicate card found in player's pool: " + card);
+                    continue; // Skip duplicate cards
+                }
+                else
+                {
+                    controlCardList.Add(card);
+                }
+
+                int[] cardID;
+                if (copiedCardMap.ContainsKey(card))
+                    cardID = allCardLookup[copiedCardMap[card]];
+                else
+                    cardID = allCardLookup[card];
                 int kind = cardID[0];
                 int value = cardID[1];
 
                 if (value == 1) // Ace
                 {
+                    Debug.LogWarning("Player " + playerID + " has an Ace");
                     points[playerID]++;
                 }
                 else if (value == 11) // Jack
                 {
+                    Debug.LogWarning("Player " + playerID + " has a Jack");
                     points[playerID]++;
                 }
                 else if (kind == 1 && value == 2) // 2 of Clubs
                 {
+                    Debug.LogWarning("Player " + playerID + " has a 2 of Clubs");
                     points[playerID] += 2;
                 }
                 else if (kind == 2 && value == 10) // 10 of Diamonds
                 {
+                    Debug.LogWarning("Player " + playerID + " has a 10 of Diamonds");
                     points[playerID] += 3;
                 }
             }
@@ -505,8 +541,15 @@ public class Server : NetworkBehaviour
         // Add 3-point bonus for most cards
         if (playerWithMostCards.Count == 1)
         {
+            Debug.LogWarning("Player with most cards: " + playerWithMostCards[0]);
             points[playerWithMostCards[0]] += 3;
         }
+
+        // Collect all pooled cards across all players
+        var allPooledCards = pooledCards.SelectMany(kvp => kvp.Value).ToList();
+        var duplicateCards = allPooledCards.GroupBy(x => x).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
+        if (duplicateCards.Count > 0)
+            Debug.LogError("DUPLICATE CARDS ACROSS POOLS: " + string.Join(", ", duplicateCards));
 
         // Determine the winner (max points)
         int maxPoints = -1;
@@ -609,7 +652,9 @@ public class Server : NetworkBehaviour
         if (centerCardsDict == null) return;
         foreach (var kvp in centerCardsDict)
         {
-            Debug.LogWarning("Adding remaining card to player pool: " + kvp.Value[0] + "_" + kvp.Value[1]);
+            Debug.LogWarning("Adding remaining card to player pool: " + kvp.Key);
+            if (playersPooledCardsIDs[lastPlayerToCapture].Contains(kvp.Key))
+                Debug.LogError("DUPLICATE ADD TO POOL: " + kvp.Key);
             playersPooledCardsIDs[lastPlayerToCapture].Add(kvp.Key);
         }
     }
@@ -794,7 +839,7 @@ public class Server : NetworkBehaviour
     {
         networkRelay.PrintPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs), 5);
     }
-    
+
     /// <summary>
     /// Swaps cards between two players in the server's hand data.
     /// </summary>
@@ -815,4 +860,27 @@ public class Server : NetworkBehaviour
 
         Debug.LogWarning($"Server swapped card {cardAIndex} of player {playerANo} with card {cardBIndex} of player {playerBNo}");
     }
+
+    public void RegisterCopiedCard(string targetUniqueID, string sourceUniqueID)
+    {
+        copiedCardMap[targetUniqueID] = sourceUniqueID;
+    }
+
+    public List<string> GetPlayerHand(int playerNo)
+    {
+        if (playersHandCardsIDs != null && playersHandCardsIDs.ContainsKey(playerNo))
+            return new List<string>(playersHandCardsIDs[playerNo]);
+        return new List<string>();
+    }
+
+    public void BombaCenter()
+    {
+        // Remove all cards from the center (do NOT add to any player's pool)
+        if (centerCardsDict != null)
+            centerCardsDict.Clear();
+
+        // Notify all clients to update their view
+        networkRelay.BombaClientRPC();
+    }
+
 }   

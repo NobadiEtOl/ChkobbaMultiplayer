@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: New Kopyala Yapistir
   m_EditorClassIdentifier: Assembly-CSharp::KopyalaYapistir
   name: "KopyalaYap\u0131\u015Ft\u0131r"
-  description: "Se\xE7ilen kart\u0131 di\u011Fer es\xE7ilen karta de\u011Fi\u015Ftirir"
-  rarityMultiplier: 1
+  description: "Bir kart\u0131 kopyalad\u0131ktan sonra di\u011Fer karta yap\u0131\u015Ft\u0131r"
+  rarityMultiplier: 0

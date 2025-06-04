@@ -71,6 +71,26 @@ public class KopyalaYapistir : SuperPower
     }
 }
 
+[CreateAssetMenu(menuName = "SuperPower/BayaBayaBak")]
+public class BayaBayaBak : SuperPower
+{
+    public override void ActivatePower()
+    {
+        Debug.Log("BayaBayaBak activated!");
+        GameManager.LocalInstance.UseBayaBayaBakPower();
+    }
+}
+
+[CreateAssetMenu(menuName = "SuperPower/Bomba")]
+public class Bomba : SuperPower
+{
+    public override void ActivatePower()
+    {
+        Debug.Log("Bomba activated!");
+        GameManager.LocalInstance.ActivateBombaPower();
+    }
+}
+
 public class SuperPowerController : MonoBehaviour
 {
     // Start is called before the first frame update

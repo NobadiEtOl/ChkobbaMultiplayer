@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: "New Kapka\xE7"
   m_EditorClassIdentifier: "Assembly-CSharp::Kapka\xE7"
   name: "Kapka\xE7"
-  description: "Bir sonraki oynanan kart Vale say\u0131l\u0131r"
+  description: "Herhangi bir kart ile ortay\u0131 al"
   rarityMultiplier: 1

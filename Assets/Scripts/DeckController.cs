@@ -1296,6 +1296,32 @@ public class DeckController : MonoBehaviour
         }
     }
 
+    public void PeekOpponentCardAll(int opponentPlayerNo)
+    {
+        int myNo = thisPlayerNumber;
+        int playerCount = this.playerCount;
+        int relativeIndex = (opponentPlayerNo - myNo + playerCount) % playerCount;
+
+        // Get the hand transform for the opponent in my perspective
+        Transform handTransform = playerHandTransforms[GetPoolIndex(relativeIndex)];
+
+
+        // Skip pool/extra children if needed
+        int actualIndex = 0;
+        List<GameObject> cardsToPeek = new List<GameObject>();
+        foreach (Transform child in handTransform)
+        {
+            if (actualIndex > 1) // skip pool/extra
+            {
+                cardsToPeek.Add(child.gameObject);
+            }
+            actualIndex++;
+        }
+
+        StartCoroutine(PeekCardAllAnimation(cardsToPeek));
+    }
+
+
     /// <summary>
     /// Coroutine to animate the peek effect on a card.
     /// </summary>
@@ -1335,6 +1361,65 @@ public class DeckController : MonoBehaviour
         card.transform.rotation = originalRot;
         card.transform.position = originalPos;
     }
+    
+    private IEnumerator PeekCardAllAnimation(List<GameObject> cards)
+    {
+        // Store original rotations and positions
+        List<Quaternion> originalRots = new List<Quaternion>();
+        List<Vector3> originalPoss = new List<Vector3>();
+        List<Quaternion> peekRots = new List<Quaternion>();
+        List<Vector3> peekPoss = new List<Vector3>();
+
+        foreach (var card in cards)
+        {
+            var origRot = card.transform.rotation;
+            var origPos = card.transform.position;
+            originalRots.Add(origRot);
+            originalPoss.Add(origPos);
+            peekRots.Add(Quaternion.Euler(90, origRot.eulerAngles.y, origRot.eulerAngles.z));
+            peekPoss.Add(new Vector3(origPos.x, 2000, origPos.z));
+        }
+
+        float duration = 0.5f;
+        float t = 0f;
+        // Animate all to peek
+        while (t < duration)
+        {
+            for (int i = 0; i < cards.Count; i++)
+            {
+                cards[i].transform.rotation = Quaternion.Lerp(originalRots[i], peekRots[i], t / duration);
+                cards[i].transform.position = Vector3.Lerp(originalPoss[i], peekPoss[i], t / duration);
+            }
+            t += Time.deltaTime;
+            yield return null;
+        }
+        for (int i = 0; i < cards.Count; i++)
+        {
+            cards[i].transform.rotation = peekRots[i];
+            cards[i].transform.position = peekPoss[i];
+        }
+
+        // Hold for a moment
+        yield return new WaitForSeconds(1.0f);
+
+        // Animate all back
+        t = 0f;
+        while (t < duration)
+        {
+            for (int i = 0; i < cards.Count; i++)
+            {
+                cards[i].transform.rotation = Quaternion.Lerp(peekRots[i], originalRots[i], t / duration);
+                cards[i].transform.position = Vector3.Lerp(peekPoss[i], originalPoss[i], t / duration);
+            }
+            t += Time.deltaTime;
+            yield return null;
+        }
+        for (int i = 0; i < cards.Count; i++)
+        {
+            cards[i].transform.rotation = originalRots[i];
+            cards[i].transform.position = originalPoss[i];
+        }
+    }
 
     public int GetRandomHandCardIndex(int absolutePlayerNo)
     {
@@ -1351,7 +1436,7 @@ public class DeckController : MonoBehaviour
         foreach (Transform child in handTransform)
         {
             // You may want to filter out non-hand cards here if needed
-            if(!child.gameObject.name.Contains("Player"))handCards.Add(child);
+            if (!child.gameObject.name.Contains("Player")) handCards.Add(child);
         }
 
         if (handCards.Count == 0)
