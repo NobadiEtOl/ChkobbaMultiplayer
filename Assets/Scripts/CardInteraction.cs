@@ -115,7 +115,7 @@ public class CardInteraction : MonoBehaviour
 
     public void OnCardTouched(Vector3 touchPosition)
     {
-        Debug.Log("OnCardTouched called for card: " + gameObject.name);
+        //Debug.Log("OnCardTouched called for card: " + gameObject.name);
         // Ensure only one card is selected at a time
         if (currentlySelectedCard == this)
             return;

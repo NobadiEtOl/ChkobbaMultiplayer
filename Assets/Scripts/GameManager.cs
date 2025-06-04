@@ -13,7 +13,7 @@ public class GameManager : NetworkBehaviour
     //Scripts
     public static GameManager LocalInstance { get; private set; }
     [SerializeField] private DeckController deckController;
-    private NetworkRelay networkRelay;
+    public NetworkRelay networkRelay;
     //Card Variables
     [SerializeField] public GameObject cardBack;
     private string currentSelectedHandCard;//Represents the card current player chose to play with.
@@ -139,12 +139,10 @@ public class GameManager : NetworkBehaviour
         // Handle mouse input (editor/desktop)
         if (Input.GetMouseButtonDown(0) || Input.GetMouseButton(0))
         {
-            Debug.LogWarning("OnClicked");
             Vector3 mousePosition = Input.mousePosition;
             Ray ray = Camera.main.ScreenPointToRay(mousePosition);
             if (Physics.Raycast(ray, out RaycastHit hit))
             {
-                Debug.LogWarning("OnCardTouchedIN");
                 CardInteraction card = hit.collider.GetComponent<CardInteraction>();
                 if (Input.GetMouseButtonDown(0) && card != null)
                 {
@@ -158,10 +156,8 @@ public class GameManager : NetworkBehaviour
                 }
                 else if (Input.GetMouseButton(0) && tempCard != null)
                 {
-                    Debug.LogWarning("OnTouchDrag");
                     if (CardInteraction.currentlySelectedCard == tempCard)
                     {
-                        Debug.LogWarning("OnTouchDragIN");
                         tempCard.OnTouchDrag(mousePosition); // If you have this method/event
                     }
                 }
@@ -170,10 +166,8 @@ public class GameManager : NetworkBehaviour
 
         else if (Input.GetMouseButtonUp(0))
         {
-            Debug.LogWarning("OnTouchUp");
             if (CardInteraction.currentlySelectedCard != null)
             {
-                Debug.LogWarning("OnTouchUpIN");
                 CardInteraction.currentlySelectedCard.OnTouchUp();
                 //CardInteraction.currentlySelectedCard = null;
                 tempCard = null; // Reset the stored card
@@ -902,6 +896,62 @@ public class GameManager : NetworkBehaviour
     public void ActivateBlockNextPlayerPower()
     {
         networkRelay.ActivateOynayamazsinServerRPC();
+    }
+
+    private bool verZehriActive = false;
+    private bool kutsalDesteActive = false;
+
+    public void SetVerZehriActive(bool isActive)
+    {
+        verZehriActive = isActive;
+        if (isActive)
+            StartVerZehriEffect();
+        else
+            StopVerZehriEffect();
+    }
+
+    public void SetKutsalDesteActive(bool isActive)
+    {
+        kutsalDesteActive = isActive;
+        if (isActive)
+            StartKutsalDesteEffect();
+        else
+            StopKutsalDesteEffect();
+    }
+
+    private void StartVerZehriEffect()
+    {
+        // Show UI/animation for VerZehri active
+        Debug.Log("VerZehri effect started!");
+        // TODO: Add your visual effect here
+    }
+
+    private void StopVerZehriEffect()
+    {
+        // Hide UI/animation for VerZehri
+        Debug.Log("VerZehri effect stopped!");
+        // TODO: Remove your visual effect here
+    }
+
+    private void StartKutsalDesteEffect()
+    {
+        Debug.Log("KutsalDeste effect started!");
+        // TODO: Add your visual effect here
+    }
+
+    private void StopKutsalDesteEffect()
+    {
+        Debug.Log("KutsalDeste effect stopped!");
+        // TODO: Remove your visual effect here
+    }
+
+    public void ShowVerZehriEffect(int playerNumber, int points)
+    {
+        // Show effect/animation/notification for VerZehri
+    }
+    public void ShowKutsalDesteEffect(int playerNumber, int points)
+    {
+        // Show effect/animation/notification for KutsalDeste
     }
 
 }

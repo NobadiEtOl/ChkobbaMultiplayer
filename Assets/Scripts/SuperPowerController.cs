@@ -101,6 +101,26 @@ public class Yapamazsın : SuperPower
     }
 }
 
+[CreateAssetMenu(menuName = "SuperPower/VerZehri")]
+public class VerZehri : SuperPower
+{
+    public override void ActivatePower()
+    {
+        Debug.Log("VerZehri activated!");
+        GameManager.LocalInstance.networkRelay.ActivateVerZehriServerRPC();
+    }
+}
+
+[CreateAssetMenu(menuName = "SuperPower/KutsalDeste")]
+public class KutsalDeste : SuperPower
+{
+    public override void ActivatePower()
+    {
+        Debug.Log("KutsalDeste activated!");
+        GameManager.LocalInstance.networkRelay.ActivateKutsalDesteServerRPC();
+    }
+}
+
 public class SuperPowerController : MonoBehaviour
 {
     // Start is called before the first frame update

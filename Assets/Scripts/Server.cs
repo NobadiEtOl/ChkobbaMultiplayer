@@ -409,6 +409,19 @@ public class Server : NetworkBehaviour
             Invoke("DealCardsToPlayerHands", 1f);
         }
         NextTurn();
+
+        if (verZehriPending)
+        {
+            verZehriActive = true;
+            verZehriPending = false;
+            networkRelay.SetVerZehriActiveClientRPC(true); // Notify clients to start effect
+        }
+        if (kutsalDestePending)
+        {
+            kutsalDesteActive = true;
+            kutsalDestePending = false;
+            networkRelay.SetKutsalDesteActiveClientRPC(true); // Notify clients to start effect
+        }
     }
 
     private void NextTurn()
@@ -752,7 +765,7 @@ public class Server : NetworkBehaviour
     {
         // selectedHandCardUniqueID is the uniqueID of the played card
         Debug.LogWarning("GetMove called with selectedHandCardUniqueID: " + selectedHandCardUniqueID);
-        
+
         int[] selectedHandCard = allCardLookup[selectedHandCardUniqueID];
         // Kapkaç: force this card to capture (as if it was a Jack)
         if (kapkacCount > 0)
@@ -785,6 +798,23 @@ public class Server : NetworkBehaviour
             updatedDict.Remove(selectedHandCardUniqueID); // Remove again if needed
             networkRelay.SendMoveToClientRPC(selectedHandCardUniqueID, new SerializableCard(updatedDict), playerNumber);
             lastPlayerToCapture = playerNumber;
+
+            if (verZehriActive)
+            {
+                int team = (playerNumber % 2);
+                points[team] -= 5;
+                networkRelay.ShowVerZehriEffectClientRPC(playerNumber, -5);
+                verZehriActive = false;
+                networkRelay.SetVerZehriActiveClientRPC(false); // Notify clients to stop effect
+            }
+            if (kutsalDesteActive)
+            {
+                int team = (playerNumber % 2);
+                points[team] += 5;
+                networkRelay.ShowKutsalDesteEffectClientRPC(playerNumber, 5);
+                kutsalDesteActive = false;
+                networkRelay.SetKutsalDesteActiveClientRPC(false); // Notify clients to stop effect
+            }
         }
         else
         {
@@ -932,4 +962,18 @@ public class Server : NetworkBehaviour
         networkRelay.SetOynayamazsinActiveClientRPC(true);
     }
 
+    private bool verZehriActive = false;
+    private bool kutsalDesteActive = false;
+    private bool verZehriPending = false;
+    private bool kutsalDestePending = false;
+
+    public void ActivateVerZehri()
+    {
+        verZehriPending = true;
+    }
+
+    public void ActivateKutsalDeste()
+    {
+        kutsalDestePending = true;
+    }
 }   

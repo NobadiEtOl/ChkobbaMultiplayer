@@ -160,7 +160,43 @@ public class NetworkRelay : NetworkBehaviour
         GameManager.LocalInstance.SetOynayamazsinActive(isActive);
     }
 
+    [ClientRpc]
+    public void SetVerZehriActiveClientRPC(bool isActive)
+    {
+        GameManager.LocalInstance.SetVerZehriActive(isActive);
+    }
+
+    [ClientRpc]
+    public void SetKutsalDesteActiveClientRPC(bool isActive)
+    {
+        GameManager.LocalInstance.SetKutsalDesteActive(isActive);
+    }
+
+    [ClientRpc]
+    public void ShowVerZehriEffectClientRPC(int playerNumber, int points)
+    {
+        GameManager.LocalInstance.ShowVerZehriEffect(playerNumber, points);
+    }
+
+    [ClientRpc]
+    public void ShowKutsalDesteEffectClientRPC(int playerNumber, int points)
+    {
+        GameManager.LocalInstance.ShowKutsalDesteEffect(playerNumber, points);
+    }
+
     //ServerRPC
+    [ServerRpc(RequireOwnership = false)]
+    public void ActivateVerZehriServerRPC()
+    {
+        server.ActivateVerZehri();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void ActivateKutsalDesteServerRPC()
+    {
+        server.ActivateKutsalDeste();
+    }
+
     [ServerRpc(RequireOwnership = false)]
     public void ActivateKapkacServerRPC()
     {
