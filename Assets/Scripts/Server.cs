@@ -752,9 +752,26 @@ public class Server : NetworkBehaviour
     {
         // selectedHandCardUniqueID is the uniqueID of the played card
         Debug.LogWarning("GetMove called with selectedHandCardUniqueID: " + selectedHandCardUniqueID);
+        
+        int[] selectedHandCard = allCardLookup[selectedHandCardUniqueID];
+        // Kapkaç: force this card to capture (as if it was a Jack)
+        if (kapkacCount > 0)
+        {
+            Debug.LogWarning("Kapkac active, forcing capture with Jack");
+            sumValue = selectedHandCard[1]; // Jack value
+            kapkacCount = 0;
+            networkRelay.SetKapkacActiveClientRPC(false);
+        }
+        // Oynayamazsın: force this card to be blocked (add to center, no capture)
+        else if (blockCount > 0)
+        {
+            Debug.LogWarning("Oynayamazsın active, blocking card");
+            sumValue = 0;
+            blockCount = 0;
+            networkRelay.SetOynayamazsinActiveClientRPC(false);
+        }
 
         // Get the cardID for rules
-        int[] selectedHandCard = allCardLookup[selectedHandCardUniqueID];
         Debug.LogWarning("Selected hand card: " + selectedHandCard[0] + "_" + selectedHandCard[1]);
         Debug.LogWarning("Sum value: " + sumValue);
 
@@ -881,6 +898,38 @@ public class Server : NetworkBehaviour
 
         // Notify all clients to update their view
         networkRelay.BombaClientRPC();
+    }
+
+    private bool isYapamazsınActive = false;
+    public void ActivateYapamazsın()
+    {
+        isYapamazsınActive = true;
+        networkRelay.SetYapamazsınActiveClientRPC(true);
+    }
+    public bool TryBlockPower()
+    {
+        if (isYapamazsınActive)
+        {
+            isYapamazsınActive = false;
+            networkRelay.SetYapamazsınActiveClientRPC(false);
+            return true; // Blocked
+        }
+        return false; // Not blocked
+    }
+
+    private int kapkacCount = 0;
+    private int blockCount = 0;
+
+    public void ActivateKapkac()
+    {
+        kapkacCount = 1;
+        networkRelay.SetKapkacActiveClientRPC(true);
+    }
+
+    public void ActivateOynayamazsin()
+    {
+        blockCount = 1;
+        networkRelay.SetOynayamazsinActiveClientRPC(true);
     }
 
 }   

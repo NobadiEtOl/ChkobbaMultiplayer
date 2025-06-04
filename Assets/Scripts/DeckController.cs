@@ -510,7 +510,7 @@ public class DeckController : MonoBehaviour
                     break;
                 case 2: // Top (Player 2)
                     offset = new Vector3(spacing * 3f * (i - offsetMult), 1000 + (i * 10), 0);
-                    rotation = Quaternion.Euler(centerRotation.x, centerRotation.y, centerRotation.z);
+                    rotation = Quaternion.Euler(-centerRotation.x, centerRotation.y, centerRotation.z);
                     break;
             }
 

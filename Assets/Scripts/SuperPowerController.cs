@@ -91,6 +91,16 @@ public class Bomba : SuperPower
     }
 }
 
+[CreateAssetMenu(menuName = "SuperPower/Yapamazsın")]
+public class Yapamazsın : SuperPower
+{
+    public override void ActivatePower()
+    {
+        Debug.Log("Yapamazsın activated!");
+        GameManager.LocalInstance.ActivateYapamazsınPower();
+    }
+}
+
 public class SuperPowerController : MonoBehaviour
 {
     // Start is called before the first frame update

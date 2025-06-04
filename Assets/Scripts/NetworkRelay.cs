@@ -142,33 +142,77 @@ public class NetworkRelay : NetworkBehaviour
         GameManager.LocalInstance.OnBombaCenter();
     }
 
+    [ClientRpc]
+    public void SetYapamazsınActiveClientRPC(bool isActive)
+    {
+        GameManager.LocalInstance.SetYapamazsınActive(isActive);
+    }
+
+    [ClientRpc]
+    public void SetKapkacActiveClientRPC(bool isActive)
+    {
+        GameManager.LocalInstance.SetKapkacActive(isActive);
+    }
+
+    [ClientRpc]
+    public void SetOynayamazsinActiveClientRPC(bool isActive)
+    {
+        GameManager.LocalInstance.SetOynayamazsinActive(isActive);
+    }
 
     //ServerRPC
     [ServerRpc(RequireOwnership = false)]
+    public void ActivateKapkacServerRPC()
+    {
+        server.ActivateKapkac();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void ActivateOynayamazsinServerRPC()
+    {
+        server.ActivateOynayamazsin();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void ActivateYapamazsınServerRPC()
+    {
+        if (!server.TryBlockPower())server.ActivateYapamazsın();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
     public void BombaServerRPC()
     {
-        server.BombaCenter();
+        if (!server.TryBlockPower())server.BombaCenter();
     }
 
     [ServerRpc(RequireOwnership = false)]
     public void UseBayaBayaBakServerRPC(int opponentPlayerNo)
     {
         // Get the hand from the server
-        UseBayaBayaBakClientRPC(opponentPlayerNo);
+        if (!server.TryBlockPower())UseBayaBayaBakClientRPC(opponentPlayerNo);
     }
 
     [ServerRpc(RequireOwnership = false)]
     public void UseSwapCardWithOpponentPowerServerRPC(int myPlayerNo, int myCardIndex, int opponentPlayerNo, int oppCardIndex)
     {
-        server.SwapCardsBetweenPlayersOnServer(myPlayerNo, myCardIndex, opponentPlayerNo, oppCardIndex);
+        if (!server.TryBlockPower())
+        {
+            server.SwapCardsBetweenPlayersOnServer(myPlayerNo, myCardIndex, opponentPlayerNo, oppCardIndex);
 
-        UseSwapCardWithOpponentPowerClientRPC(myPlayerNo, myCardIndex, opponentPlayerNo, oppCardIndex);
+            UseSwapCardWithOpponentPowerClientRPC(myPlayerNo, myCardIndex, opponentPlayerNo, oppCardIndex);
+        }
     }
 
     [ServerRpc(RequireOwnership = false)]
     public void UsePeekOpponentCardPowerServerRPC(int opponentPlayerNo, int cardIndex)
     {
-        UsePeekOpponentCardPowerClientRPC(opponentPlayerNo, cardIndex);
+        if (!server.TryBlockPower())UsePeekOpponentCardPowerClientRPC(opponentPlayerNo, cardIndex);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void RegisterCardCopyServerRPC(string targetUniqueID, string sourceUniqueID)
+    {
+        if (!server.TryBlockPower())server.RegisterCopiedCard(targetUniqueID, sourceUniqueID);
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -219,12 +263,6 @@ public class NetworkRelay : NetworkBehaviour
     public void DeckReadyServerRPC()
     {
         server.InitialDealCoroutineCheck();
-    }
-    
-    [ServerRpc(RequireOwnership = false)]
-    public void RegisterCardCopyServerRPC(string targetUniqueID, string sourceUniqueID)
-    {
-        server.RegisterCopiedCard(targetUniqueID, sourceUniqueID);
     }
 
 }

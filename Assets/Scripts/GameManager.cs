@@ -297,36 +297,15 @@ public class GameManager : NetworkBehaviour
         int sumValue = centerCards.Count > 0 ? centerCards.Last().Value[1] : 0;
         int cardValue = CardInteraction.cardLookup[currentSelectedHandCard].GetCardID()[1];
 
-        // Kapkaç logic: If this player has Kapkaç, force their card to act as value 11 and capture
-        if (kapkacPlayerNo == playerNumber && kapkacCount > 0)
+        if (kapkacActive)
         {
-            Debug.LogWarning($"Player {playerNumber}'s move is affected by Kapkaç!");
-            // Force the played card to act as value 11 (Jack)
-            string kapkacCard = (string)currentSelectedHandCard.Clone();
-            //var kapkacCard = CardInteraction.cardLookup[kapkacCardID].GetCardID();
-            // kapkacCard[1] = 11;
-
-            SerializableCard tempSerializableList = new SerializableCard(centerCards);
-
-            DiscardPlayedCards(kapkacCard, tempSerializableList, playerNumber, currentSelectedHandCard[1]); // Use the original value for Kapkaç
+            DiscardPlayedCards(currentSelectedHandCard, serializableCard, playerNumber);
             movePlayedLocally = true;
-            kapkacCount--;
-            if (kapkacCount == 0) kapkacPlayerNo = -1;
-            networkRelay.SendMoveToServerRPC(kapkacCard, serializableCard, playerNumber, 11); // Use 11 to indicate Jack
-            myCards.Remove(currentSelectedHandCard);
-            return;
         }
-
-        if (blockedPlayerNo == playerNumber && blockCount > 0)
+        else if (oynayamazsinActive)
         {
-            Debug.LogWarning($"Player {playerNumber}'s move is blocked by Oynayamazsın!");
-            DiscardHandCards(currentSelectedHandCard, CardInteraction.cardLookup[currentSelectedHandCard].GetCardID()); // Always add to center
+            DiscardHandCards(currentSelectedHandCard, CardInteraction.cardLookup[currentSelectedHandCard].GetCardID());
             movePlayedLocally = true;
-            blockCount--;
-            if (blockCount == 0) blockedPlayerNo = -1;
-            networkRelay.SendMoveToServerRPC(currentSelectedHandCard, new SerializableCard(centerCards), playerNumber, -999); // Use -999 or another value to indicate block
-            myCards.Remove(currentSelectedHandCard);
-            return;
         }
         else if (cardValue == sumValue || (cardValue == 11 && sumValue != 0))
         {
@@ -733,11 +712,8 @@ public class GameManager : NetworkBehaviour
         int myCardIndex = deckController.GetRandomHandCardIndex(myPlayerNo);
         int oppCardIndex = deckController.GetRandomHandCardIndex(opponentPlayerNo);
 
-        // Locally show the effect and swap
-        StartCoroutine(deckController.SwapCardsBetweenPlayers(myPlayerNo, myCardIndex, opponentPlayerNo, oppCardIndex));
-
         // Send to server for sync
-        //snetworkRelay.UseSwapCardWithOpponentPowerServerRPC(myPlayerNo, myCardIndex, opponentPlayerNo, oppCardIndex);
+        networkRelay.UseSwapCardWithOpponentPowerServerRPC(myPlayerNo, myCardIndex, opponentPlayerNo, oppCardIndex);
     }
 
     /// <summary>
@@ -745,29 +721,7 @@ public class GameManager : NetworkBehaviour
     /// </summary>
     public void OnSwapCardWithOpponentSynced(int myPlayerNo, int myCardIndex, int opponentPlayerNo, int oppCardIndex)
     {
-        deckController.SwapCardsBetweenPlayers(myPlayerNo, myCardIndex, opponentPlayerNo, oppCardIndex);
-    }
-
-    private int blockedPlayerNo = -1;
-    private int blockCount = 0;
-
-    public void ActivateBlockNextPlayerPower()
-    {
-        // Block the next player for one turn
-        blockedPlayerNo = (deckController.thisPlayerNumber + 1) % deckController.playerCount;
-        blockCount = 1;
-        Debug.LogWarning($"Player {blockedPlayerNo} will be blocked on their next move!");
-        // Optionally, sync this state to the server/other clients if needed
-    }
-
-    private int kapkacPlayerNo = -1;
-    private int kapkacCount = 0;
-    public void ActivateKapkacPower()
-    {
-        kapkacPlayerNo = deckController.thisPlayerNumber;
-        kapkacCount = 1;
-        Debug.LogWarning($"Player {kapkacPlayerNo} will have Kapkaç effect on their next move!");
-        // Optionally, sync this state to the server/other clients if needed
+        StartCoroutine(deckController.SwapCardsBetweenPlayers(myPlayerNo, myCardIndex, opponentPlayerNo, oppCardIndex));
     }
 
     public void ActivateValeArarPower()
@@ -920,6 +874,34 @@ public class GameManager : NetworkBehaviour
         if (centerCardIDList != null) centerCardIDList.Clear();
 
         Debug.Log("Bomba: Center cleared and cards moved to BombedStack.");
+    }
+
+    private bool isYapamazsınActive = false;
+
+    public void ActivateYapamazsınPower()
+    {
+        networkRelay.ActivateYapamazsınServerRPC();
+    }
+
+    public void SetYapamazsınActive(bool isActive)
+    {
+        isYapamazsınActive = isActive;
+        // Optionally update UI here
+    }
+
+    private bool kapkacActive = false;
+    private bool oynayamazsinActive = false;
+
+    public void SetKapkacActive(bool isActive) => kapkacActive = isActive;
+    public void SetOynayamazsinActive(bool isActive) => oynayamazsinActive = isActive;
+    public void ActivateKapkacPower()
+    {
+        networkRelay.ActivateKapkacServerRPC();
+    }
+
+    public void ActivateBlockNextPlayerPower()
+    {
+        networkRelay.ActivateOynayamazsinServerRPC();
     }
 
 }
