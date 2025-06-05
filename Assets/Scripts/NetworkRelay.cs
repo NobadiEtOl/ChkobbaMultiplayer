@@ -123,12 +123,6 @@ public class NetworkRelay : NetworkBehaviour
     {
         GameManager.LocalInstance.OnPeekOpponentCardSynced(opponentPlayerNo, cardIndex);
     }
-
-    [ClientRpc]
-    public void UseSwapCardWithOpponentPowerClientRPC(int myPlayerNo, int myCardIndex, int opponentPlayerNo, int oppCardIndex)
-    {
-        GameManager.LocalInstance.OnSwapCardWithOpponentSynced(myPlayerNo, myCardIndex, opponentPlayerNo, oppCardIndex);
-    }
     
     [ClientRpc]
     public void UseBayaBayaBakClientRPC(int opponentPlayerNo)
@@ -190,8 +184,26 @@ public class NetworkRelay : NetworkBehaviour
         GameManager.LocalInstance.OnBuDahaIyiSynced(playerNo, handCardID, centerCardID);
     }
 
+    [ClientRpc]
+    public void UseSunuDegisTokusClientRPC(int myPlayerNo, int otherPlayerNo, string myHandCardID, string otherHandCardID)
+    {
+        GameManager.LocalInstance.OnSunuDegisTokusSynced(myPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID);
+    }
+
+
 
     //ServerRPC
+    [ServerRpc(RequireOwnership = false)]
+    public void UseSunuDegisTokusServerRPC(int myPlayerNo, string myHandCardID, string otherHandCardID)
+    {
+        // Find the owner of the otherHandCardID
+        int otherPlayerNo = server.FindOwnerOfCard(otherHandCardID);
+        if (otherPlayerNo == -1 || otherPlayerNo == myPlayerNo) return;
+
+        server.SunuDegisTokusSwap(myPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID);
+        UseSunuDegisTokusClientRPC(myPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID);
+    }
+
     [ServerRpc(RequireOwnership = false)]
     public void UseBuDahaIyiServerRPC(int playerNo, string handCardID, string centerCardID)
     {
@@ -243,17 +255,6 @@ public class NetworkRelay : NetworkBehaviour
     {
         // Get the hand from the server
         if (!server.TryBlockPower())UseBayaBayaBakClientRPC(opponentPlayerNo);
-    }
-
-    [ServerRpc(RequireOwnership = false)]
-    public void UseSwapCardWithOpponentPowerServerRPC(int myPlayerNo, int myCardIndex, int opponentPlayerNo, int oppCardIndex)
-    {
-        if (!server.TryBlockPower())
-        {
-            server.SwapCardsBetweenPlayersOnServer(myPlayerNo, myCardIndex, opponentPlayerNo, oppCardIndex);
-
-            UseSwapCardWithOpponentPowerClientRPC(myPlayerNo, myCardIndex, opponentPlayerNo, oppCardIndex);
-        }
     }
 
     [ServerRpc(RequireOwnership = false)]

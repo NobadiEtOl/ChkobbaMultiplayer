@@ -1446,73 +1446,6 @@ public class DeckController : MonoBehaviour
         return UnityEngine.Random.Range(0, handCards.Count);
     }
 
-    /// <summary>
-    /// Swaps cards between two players at the given indices, animating the swap for both players' perspectives.
-    /// </summary>
-    public IEnumerator SwapCardsBetweenPlayers(int playerANo, int cardAIndex, int playerBNo, int cardBIndex)
-    {
-        Debug.LogWarning($"SwapCardsBetweenPlayers called: Player {playerANo} card {cardAIndex} <-> Player {playerBNo} card {cardBIndex}");
-        int myNo = thisPlayerNumber;
-        int playerCount = this.playerCount;
-
-        // Get relative indices for both players from my perspective
-        int relA = (playerANo - myNo + playerCount) % playerCount;
-        int relB = (playerBNo - myNo + playerCount) % playerCount;
-
-        Transform handA = playerHandTransforms[GetPoolIndex(relA)];
-        Transform handB = playerHandTransforms[GetPoolIndex(relB)];
-
-        GameObject cardA = GetHandCardByIndex(handA, cardAIndex);
-        GameObject cardB = GetHandCardByIndex(handB, cardBIndex);
-
-        cardA.GetComponent<CardInteraction>().autoRotateFlag = false;
-
-        if (cardA == null || cardB == null)
-        {
-            Debug.LogWarning($"SwapCardsBetweenPlayers: One or both cards not found. Player {playerANo} card {cardAIndex} or Player {playerBNo} card {cardBIndex}.");
-            yield return null;
-        }
-
-        // Store target positions and rotations
-        Vector3 posA = cardA.transform.position;
-        Vector3 posB = cardB.transform.position;
-        Quaternion rotA = cardA.transform.rotation;
-        Quaternion rotB = cardB.transform.rotation;
-        Vector3 scaleA = cardA.transform.localScale;
-        Vector3 scaleB = cardB.transform.localScale;
-
-        // Animate the swap
-        List<Vector3> positions = new List<Vector3> { posB, posA };
-        List<GameObject> cards = new List<GameObject> { cardA, cardB };
-        List<Quaternion> rotations = new List<Quaternion> { rotB, rotA };
-        List<Vector3> scales = new List<Vector3> { scaleB, scaleA };
-        Vector3 centerA = centerTransform.position; //+ new Vector3(1000, 0, 0);
-        Vector3 centerB = centerTransform.position;//+ new Vector3(-1000, 0, 0);
-
-        float speed = 1f; // Adjust speed as needed
-
-        MoveCard(centerB, cardB, speed, rotA, scaleB);
-        MoveCard(centerA, cardA, speed, rotA, scaleB);
-
-
-
-        yield return new WaitForSeconds(0.8f); // Small delay to ensure both cards are ready for the next move
-
-        speed = 5f;
-
-        StartCoroutine(MoveCardCoroutine(posB, cardA, speed, rotB, scaleB));
-        yield return StartCoroutine(MoveCardCoroutine(posA, cardB, speed, rotA, scaleA));
-
-        cardB.GetComponent<CardInteraction>().autoRotateFlag = true;
-
-        // Swap parents
-        cardA.transform.SetParent(handB, true);
-        cardB.transform.SetParent(handA, true);
-
-        // Optionally, update layout after animation if needed
-        // StartCoroutine(DelayedLayoutUpdate());
-    }
-
     IEnumerator WaitForBoth(IEnumerator a, IEnumerator b)
     {
         bool aDone = false, bDone = false;
@@ -1608,6 +1541,87 @@ public class DeckController : MonoBehaviour
         UpdateCurrentPlayerHandLayout();
     }
 
+    public void SwapCardsBetweenPlayersByID(int playerANo, string cardAID, int playerBNo, string cardBID)
+    {
+        int relA = (playerANo - thisPlayerNumber + playerCount) % playerCount;
+        int relB = (playerBNo - thisPlayerNumber + playerCount) % playerCount;
+
+        Transform handA = playerHandTransforms[GetPoolIndex(relA)];
+        Transform handB = playerHandTransforms[GetPoolIndex(relB)];
+
+        GameObject cardAObj = CardInteraction.cardLookup[cardAID].gameObject;
+        GameObject cardBObj = CardInteraction.cardLookup[cardBID].gameObject;
+        cardAObj.transform.localScale = new Vector3(1000, 1000, 1000);
+
+        // Store world positions before changing parents
+        Vector3 cardAOldPos = cardAObj.transform.position;
+        Vector3 cardBOldPos = cardBObj.transform.position;
+
+        // Find indexes
+        int idxA = -1, idxB = -1, i = 0;
+        foreach (Transform child in handA)
+        {
+            if (child.gameObject == cardAObj) { idxA = i; break; }
+            i++;
+        }
+        i = 0;
+        foreach (Transform child in handB)
+        {
+            if (child.gameObject == cardBObj) { idxB = i; break; }
+            i++;
+        }
+
+        // Swap parents
+        cardAObj.transform.SetParent(handB, true);
+        cardBObj.transform.SetParent(handA, true);
+
+        // --- Set positions to old world positions so animation is visible ---
+        cardAObj.transform.position = cardAOldPos;
+        cardBObj.transform.position = cardBOldPos;
+
+        // Set autoRotateFlag and call OnCardTouched for the new card in my hand
+        if (thisPlayerNumber == playerANo)
+        {
+            cardBObj.GetComponent<CardInteraction>().autoRotateFlag = true;
+            cardBObj.GetComponent<CardInteraction>().OnCardTouched(Input.mousePosition);
+            cardAObj.GetComponent<CardInteraction>().autoRotateFlag = false;
+        }
+        else if (thisPlayerNumber == playerBNo)
+        {
+            cardAObj.GetComponent<CardInteraction>().autoRotateFlag = true;
+            cardAObj.GetComponent<CardInteraction>().OnCardTouched(Input.mousePosition);
+            cardBObj.GetComponent<CardInteraction>().autoRotateFlag = false;
+        }
+
+        // Swap sibling indexes to preserve hand order
+        if (idxA != -1) cardBObj.transform.SetSiblingIndex(idxA);
+        if (idxB != -1) cardAObj.transform.SetSiblingIndex(idxB);
+
+        // Now, when UpdateCurrentPlayerHandLayout is called, the cards will animate from their old positions
+        UpdateCurrentPlayerHandLayout();
+    }
+
+
+    //DeğişTokuş
+    public List<string> GetOpponentHandCardIDs(int absolutePlayerNo)
+    {
+        int myNo = thisPlayerNumber;
+        int playerCount = this.playerCount;
+        int relativeIndex = (absolutePlayerNo - myNo + playerCount) % playerCount;
+        Transform handTransform = playerHandTransforms[GetPoolIndex(relativeIndex)];
+        List<string> handCardIDs = new List<string>();
+        int actualIndex = 0;
+        foreach (Transform child in handTransform)
+        {
+            if (actualIndex > 1) // skip pool/extra
+            {
+                CardInteraction ci = child.GetComponent<CardInteraction>();
+                if (ci != null) handCardIDs.Add(ci.uniqueCardInstanceID);
+            }
+            actualIndex++;
+        }
+        return handCardIDs;
+    }
 
 }
 

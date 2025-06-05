@@ -258,6 +258,21 @@ public class GameManager : NetworkBehaviour
     //Called when a card is selected in the player's hand
     private void CardSelected(string cardID)
     {
+        if (isSunuDegisTokusActive)
+        {
+            // Only allow selecting a card outside your own hand for the second selection
+            if (myCards.Contains(cardID))
+            {
+                Debug.LogWarning("You must select a card from another player's hand for ŞunuDeğişTokuş.");
+                return;
+            }
+            // Send swap request to server
+            networkRelay.UseSunuDegisTokusServerRPC(deckController.thisPlayerNumber, sunuDegisTokusFirstCard, cardID);
+            isSunuDegisTokusActive = false;
+            sunuDegisTokusFirstCard = null;
+            return;
+        }
+
         currentSelectedHandCard = cardID;
     }
 
@@ -700,22 +715,33 @@ public class GameManager : NetworkBehaviour
     /// </summary>
     public void UseSwapCardWithOpponentPower()
     {
-        Debug.Log("Using Swap Card With Opponent Power");
+        Debug.Log("Using Swap Card With Opponent Power (randomized, new logic)");
         int myPlayerNo = deckController.thisPlayerNumber;
         int opponentPlayerNo = GetRandomOpponentPlayerNo();
-        int myCardIndex = deckController.GetRandomHandCardIndex(myPlayerNo);
-        int oppCardIndex = deckController.GetRandomHandCardIndex(opponentPlayerNo);
 
-        // Send to server for sync
-        networkRelay.UseSwapCardWithOpponentPowerServerRPC(myPlayerNo, myCardIndex, opponentPlayerNo, oppCardIndex);
+        if (myCards == null || myCards.Count == 0)
+        {
+            Debug.LogWarning("No cards in hand for DeğişTokuş!");
+            return;
+        }
+        string myHandCardID = myCards[UnityEngine.Random.Range(0, myCards.Count)];
+
+        List<string> oppHand = deckController.GetOpponentHandCardIDs(opponentPlayerNo);
+        if (oppHand == null || oppHand.Count == 0)
+        {
+            Debug.LogWarning("No cards in opponent's hand for DeğişTokuş!");
+            return;
+        }
+        string oppHandCardID = oppHand[UnityEngine.Random.Range(0, oppHand.Count)];
+
+        // Add a short delay before swapping
+        StartCoroutine(DelayedSwap(myPlayerNo, myHandCardID, opponentPlayerNo, oppHandCardID));
     }
 
-    /// <summary>
-    /// Called by the server to sync the swap effect to all clients.
-    /// </summary>
-    public void OnSwapCardWithOpponentSynced(int myPlayerNo, int myCardIndex, int opponentPlayerNo, int oppCardIndex)
+    private IEnumerator DelayedSwap(int myPlayerNo, string myHandCardID, int opponentPlayerNo, string oppHandCardID)
     {
-        StartCoroutine(deckController.SwapCardsBetweenPlayers(myPlayerNo, myCardIndex, opponentPlayerNo, oppCardIndex));
+        yield return new WaitForSeconds(0.5f); // Adjust as needed
+        networkRelay.UseSunuDegisTokusServerRPC(myPlayerNo, myHandCardID, oppHandCardID);
     }
 
     public void ActivateValeArarPower()
@@ -965,7 +991,7 @@ public class GameManager : NetworkBehaviour
         string topCenterCardID = centerCards.Keys.Last();
         networkRelay.UseBuDahaIyiServerRPC(deckController.thisPlayerNumber, currentSelectedHandCard, topCenterCardID);
     }
-        
+
     public void OnBuDahaIyiSynced(int playerNo, string handCardID, string centerCardID)
     {
         // Swap in myCards
@@ -998,6 +1024,47 @@ public class GameManager : NetworkBehaviour
 
         // Swap card objects visually
         deckController.SwapHandCardWithCenterCard(handCardID, centerCardID, playerNo);
+    }
+    
+    // Add at the top of GameManager.cs
+    private bool isSunuDegisTokusActive = false;
+    private string sunuDegisTokusFirstCard = null;
+
+    // Call this to activate the power
+    public void ActivateSunuDegisTokusPower()
+    {
+        if (currentSelectedHandCard == null)
+        {
+            Debug.LogWarning("No card selected in your hand for ŞunuDeğişTokuş!");
+            return;
+        }
+        isSunuDegisTokusActive = true;
+        sunuDegisTokusFirstCard = currentSelectedHandCard;
+        Debug.Log("ŞunuDeğişTokuş: Select a card from another player's hand to swap with.");
+    }
+
+    public void OnSunuDegisTokusSynced(int myPlayerNo, int otherPlayerNo, string myHandCardID, string otherHandCardID)
+    {
+        // Swap in myCards if relevant
+        if (deckController.thisPlayerNumber == myPlayerNo)
+        {
+            int idx = myCards.IndexOf(myHandCardID);
+            if (idx != -1)
+            {
+                myCards[idx] = otherHandCardID;
+            }
+        }
+        else if (deckController.thisPlayerNumber == otherPlayerNo)
+        {
+            int idx = myCards.IndexOf(otherHandCardID);
+            if (idx != -1)
+            {
+                myCards[idx] = myHandCardID;
+            }
+        }
+
+        // Visual swap
+        deckController.SwapCardsBetweenPlayersByID(myPlayerNo, myHandCardID, otherPlayerNo, otherHandCardID);
     }
 
 }

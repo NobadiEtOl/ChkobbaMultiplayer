@@ -131,6 +131,16 @@ public class BuDahaİyi : SuperPower
     }
 }
 
+[CreateAssetMenu(menuName = "SuperPower/SunuDegisTokus")]
+public class SunuDegisTokus : SuperPower
+{
+    public override void ActivatePower()
+    {
+        Debug.Log("ŞunuDeğişTokuş activated!");
+        GameManager.LocalInstance.ActivateSunuDegisTokusPower();
+    }
+}
+
 public class SuperPowerController : MonoBehaviour
 {
     // Start is called before the first frame update

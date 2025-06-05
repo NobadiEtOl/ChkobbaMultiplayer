@@ -1008,4 +1008,26 @@ public class Server : NetworkBehaviour
         }
     }
 
+    public int FindOwnerOfCard(string cardID)
+    {
+        foreach (var kvp in playersHandCardsIDs)
+        {
+            if (kvp.Value.Contains(cardID))
+                return kvp.Key;
+        }
+        return -1;
+    }
+
+    public void SunuDegisTokusSwap(int playerANo, int playerBNo, string cardAID, string cardBID)
+    {
+        // Swap in player hands
+        var handA = playersHandCardsIDs[playerANo];
+        var handB = playersHandCardsIDs[playerBNo];
+        int idxA = handA.IndexOf(cardAID);
+        int idxB = handB.IndexOf(cardBID);
+        if (idxA == -1 || idxB == -1) return;
+
+        handA[idxA] = cardBID;
+        handB[idxB] = cardAID;
+    }
 }   
