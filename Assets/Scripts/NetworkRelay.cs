@@ -41,7 +41,7 @@ public class NetworkRelay : NetworkBehaviour
             Debug.LogError("GameManagers list is null or empty!");
         }
     }
-    [ClientRpc(RequireOwnership = true)]
+    [ClientRpc(RequireOwnership = false)]
     public void InitializeCardPrefabsClientRPC()
     {
         StartCoroutine(GameManager.LocalInstance.InitializeCardPrefabs());
@@ -190,6 +190,12 @@ public class NetworkRelay : NetworkBehaviour
         GameManager.LocalInstance.OnSunuDegisTokusSynced(myPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID);
     }
 
+    [ClientRpc]
+    public void UseSunuDegisBunuTokusClientRPC(int myPlayerNo, int otherPlayerNo, string myHandCardID, string otherHandCardID, int myHandIndex)
+    {
+        GameManager.LocalInstance.OnSunuDegisBunuTokusSynced(myPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID, myHandIndex);
+    }
+
 
 
     //ServerRPC
@@ -317,6 +323,17 @@ public class NetworkRelay : NetworkBehaviour
     public void DeckReadyServerRPC()
     {
         server.InitialDealCoroutineCheck();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void UseSunuDegisBunuTokusServerRPC(int myPlayerNo, string myHandCardID, string otherHandCardID, int myHandIndex)
+    {
+        // Find the owner of the otherHandCardID
+        int otherPlayerNo = server.FindOwnerOfCard(otherHandCardID);
+        if (otherPlayerNo == -1 || otherPlayerNo == myPlayerNo) return;
+
+        server.SunuDegisBunuTokusSwap(myPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID, myHandIndex);
+        UseSunuDegisBunuTokusClientRPC(myPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID, myHandIndex);
     }
 
 }

@@ -113,12 +113,18 @@ public class CardInteraction : MonoBehaviour
         }
     }
 
+    private bool stopPower = false;
     public void OnCardTouched(Vector3 touchPosition)
     {
+        // Suppress input if flagged (e.g., after swap)
+        if (suppressInputThisFrame)
+            return;
+
+        stopPower = AreSwapPowersActive();
         //Debug.Log("OnCardTouched called for card: " + gameObject.name);
         // Ensure only one card is selected at a time
         //if (currentlySelectedCard == this)
-            //return;
+        //return;
 
         if (gameObject.transform.parent.name == "PlayerPool1" || gameObject.transform.parent.name == "PlayerPiştiPool1")
         {
@@ -154,6 +160,11 @@ public class CardInteraction : MonoBehaviour
 
     public void OnTouchDrag(Vector3 touchPosition)
     {
+        if (suppressInputThisFrame)
+            return;
+        // Prevent drag while swap powers are active
+        if (stopPower)
+            return;
         Debug.Log("OnTouchDrag called for card: " + gameObject.name);
         if (isDragging)
         {
@@ -165,6 +176,13 @@ public class CardInteraction : MonoBehaviour
 
     public void OnTouchUp()
     {
+
+        if (suppressInputThisFrame)
+            return;
+        // Prevent touch up while swap powers are active
+        if (stopPower)
+            return;
+
         Debug.Log("OnTouchUp called for card: " + gameObject.name);
         if (!isDragging) return;
 
@@ -289,6 +307,17 @@ public class CardInteraction : MonoBehaviour
     public void TriggerOnCardSelected()
     {
         OnCardSelected?.Invoke(uniqueCardInstanceID);
+    }
+
+    // Add this static flag
+    public static bool suppressInputThisFrame = false;
+
+    // Helper to check if swap powers are active
+    private bool AreSwapPowersActive()
+    {
+        if (GameManager.LocalInstance == null)
+            return false;
+        return GameManager.LocalInstance.IsAnySwapPowerActive();
     }
 
 }

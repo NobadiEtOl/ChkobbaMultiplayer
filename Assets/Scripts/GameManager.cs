@@ -273,6 +273,40 @@ public class GameManager : NetworkBehaviour
             return;
         }
 
+        // ŞunuDeğişBunuTokuş logic
+        if (isSunuDegisBunuTokusActive)
+        {
+            // Only allow selecting a card from another player's hand
+            if (myCards.Contains(cardID))
+            {
+                Debug.LogWarning("You must select a card from another player's hand for ŞunuDeğişBunuTokuş.");
+                return;
+            }
+            // Get my hand snapshot and current swap index
+            if (sunuDegisBunuTokusMyHandSnapshot == null || sunuDegisBunuTokusSwapIndex >= sunuDegisBunuTokusMyHandSnapshot.Count)
+            {
+                Debug.LogWarning("No more cards to swap for ŞunuDeğişBunuTokuş.");
+                isSunuDegisBunuTokusActive = false;
+                return;
+            }
+            string myHandCardID = sunuDegisBunuTokusMyHandSnapshot[sunuDegisBunuTokusSwapIndex];
+            // Send swap request to server
+            networkRelay.UseSunuDegisBunuTokusServerRPC(deckController.thisPlayerNumber, myHandCardID, cardID, sunuDegisBunuTokusSwapIndex);
+            sunuDegisBunuTokusSwapIndex++;
+            if (sunuDegisBunuTokusSwapIndex >= sunuDegisBunuTokusMyHandSnapshot.Count)
+            {
+                isSunuDegisBunuTokusActive = false;
+                sunuDegisBunuTokusMyHandSnapshot = null;
+                sunuDegisBunuTokusSwapIndex = 0;
+                Debug.Log("ŞunuDeğişBunuTokuş: All swaps done.");
+            }
+            else
+            {
+                Debug.Log($"ŞunuDeğişBunuTokuş: Select card {sunuDegisBunuTokusSwapIndex + 1} to swap.");
+            }
+            return;
+        }
+
         currentSelectedHandCard = cardID;
     }
 
@@ -1027,8 +1061,8 @@ public class GameManager : NetworkBehaviour
     }
     
     // Add at the top of GameManager.cs
-    private bool isSunuDegisTokusActive = false;
-    private string sunuDegisTokusFirstCard = null;
+    public bool isSunuDegisTokusActive = false;
+    public string sunuDegisTokusFirstCard = null;
 
     // Call this to activate the power
     public void ActivateSunuDegisTokusPower()
@@ -1065,6 +1099,55 @@ public class GameManager : NetworkBehaviour
 
         // Visual swap
         deckController.SwapCardsBetweenPlayersByID(myPlayerNo, myHandCardID, otherPlayerNo, otherHandCardID);
+    }
+
+    // Add at the top of GameManager.cs
+    private bool isSunuDegisBunuTokusActive = false;
+    private int sunuDegisBunuTokusSwapIndex = 0;
+    private List<string> sunuDegisBunuTokusMyHandSnapshot = null;
+
+    // Call this to activate the power
+    public void ActivateSunuDegisBunuTokusPower()
+    {
+        if (myCards == null || myCards.Count == 0)
+        {
+            Debug.LogWarning("No cards in hand for ŞunuDeğişBunuTokuş!");
+            return;
+        }
+        isSunuDegisBunuTokusActive = true;
+        sunuDegisBunuTokusSwapIndex = 0;
+        sunuDegisBunuTokusMyHandSnapshot = new List<string>(myCards);
+        Debug.Log("ŞunuDeğişBunuTokuş: Select a card from another player's hand to swap with your first card.");
+    }
+
+    // Add this method to handle the synced swap
+    public void OnSunuDegisBunuTokusSynced(int myPlayerNo, int otherPlayerNo, string myHandCardID, string otherHandCardID, int myHandIndex)
+    {
+        // Update myCards if relevant
+        if (deckController.thisPlayerNumber == myPlayerNo)
+        {
+            int idx = myCards.IndexOf(myHandCardID);
+            if (idx != -1)
+            {
+                myCards[idx] = otherHandCardID;
+            }
+        }
+        else if (deckController.thisPlayerNumber == otherPlayerNo)
+        {
+            int idx = myCards.IndexOf(otherHandCardID);
+            if (idx != -1)
+            {
+                myCards[idx] = myHandCardID;
+            }
+        }
+        // Visual swap at the correct index
+        deckController.SwapCardsBetweenPlayersByIDAtIndex(myPlayerNo, myHandCardID, otherPlayerNo, otherHandCardID, myHandIndex);
+    }
+
+    // Add this public method to allow CardInteraction to check swap power activeness
+    public bool IsAnySwapPowerActive()
+    {
+        return isSunuDegisTokusActive || isSunuDegisBunuTokusActive;
     }
 
 }

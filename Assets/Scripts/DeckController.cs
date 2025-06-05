@@ -510,7 +510,7 @@ public class DeckController : MonoBehaviour
                     break;
                 case 2: // Top (Player 2)
                     offset = new Vector3(spacing * 3f * (i - offsetMult), 1000 + (i * 10), 0);
-                    rotation = Quaternion.Euler(-centerRotation.x, centerRotation.y, centerRotation.z);
+                    rotation = Quaternion.Euler(centerRotation.x, centerRotation.y, centerRotation.z);
                     break;
             }
 
@@ -1553,6 +1553,9 @@ public class DeckController : MonoBehaviour
         GameObject cardBObj = CardInteraction.cardLookup[cardBID].gameObject;
         cardAObj.transform.localScale = new Vector3(1000, 1000, 1000);
 
+        Vector3 cardARotation = cardAObj.transform.rotation.eulerAngles;
+        cardBObj.transform.rotation = Quaternion.Euler(cardARotation.x, cardARotation.y, cardARotation.z);
+
         // Store world positions before changing parents
         Vector3 cardAOldPos = cardAObj.transform.position;
         Vector3 cardBOldPos = cardBObj.transform.position;
@@ -1623,5 +1626,128 @@ public class DeckController : MonoBehaviour
         return handCardIDs;
     }
 
+    /// <summary>
+    /// Swaps a specific card in player A's hand (by index) with a specific card in player B's hand (by unique ID), preserving the index in A's hand.
+    /// </summary>
+    public void SwapCardsBetweenPlayersByIDAtIndex(int playerANo, string cardAID, int playerBNo, string cardBID, int handIndexA)
+    {
+        int relA = (playerANo - thisPlayerNumber + playerCount) % playerCount;
+        int relB = (playerBNo - thisPlayerNumber + playerCount) % playerCount;
+
+        Transform handA = playerHandTransforms[GetPoolIndex(relA)];
+        Transform handB = playerHandTransforms[GetPoolIndex(relB)];
+
+        GameObject cardAObj = CardInteraction.cardLookup[cardAID].gameObject;
+        GameObject cardBObj = CardInteraction.cardLookup[cardBID].gameObject;
+        cardAObj.transform.localScale = new Vector3(1000, 1000, 1000);
+
+        Vector3 cardARotation = cardAObj.transform.rotation.eulerAngles;
+        cardBObj.transform.rotation = Quaternion.Euler(cardARotation.x, cardARotation.y, cardARotation.z);
+
+        // Store world positions before changing parents
+        Vector3 cardAOldPos = cardAObj.transform.position;
+        Vector3 cardBOldPos = cardBObj.transform.position;
+
+        // Find index of cardB in handB (skipping first 2 children)
+        int idxB = -1, i = 0, actualIdxB = 0;
+        foreach (Transform child in handB)
+        {
+            if (i > 1) // skip first 2
+            {
+                if (child.gameObject == cardBObj) { idxB = actualIdxB; break; }
+                actualIdxB++;
+            }
+            i++;
+        }
+
+        // Set parents
+        cardAObj.transform.SetParent(handB, true);
+        cardBObj.transform.SetParent(handA, true);
+
+        // Set positions to old world positions so animation is visible
+        cardAObj.transform.position = cardAOldPos;
+        cardBObj.transform.position = cardBOldPos;
+
+        // Set autoRotateFlag and call OnCardTouched for the new card in my hand
+        if (thisPlayerNumber == playerANo)
+        {
+            cardBObj.GetComponent<CardInteraction>().autoRotateFlag = true;
+            // Suppress input for this frame to prevent accidental play
+            CardInteraction.suppressInputThisFrame = true;
+            cardBObj.GetComponent<CardInteraction>().OnCardTouched(Input.mousePosition);
+            StartCoroutine(ResetSuppressInputFlagNextFrame());
+            cardAObj.GetComponent<CardInteraction>().autoRotateFlag = false;
+        }
+        else if (thisPlayerNumber == playerBNo)
+        {
+            cardAObj.GetComponent<CardInteraction>().autoRotateFlag = true;
+            CardInteraction.suppressInputThisFrame = true;
+            cardAObj.GetComponent<CardInteraction>().OnCardTouched(Input.mousePosition);
+            StartCoroutine(ResetSuppressInputFlagNextFrame());
+            cardBObj.GetComponent<CardInteraction>().autoRotateFlag = false;
+        }
+
+        // --- Insert cardBObj at the correct index in handA (skipping first 2 children) ---
+        List<Transform> handAChildren = new List<Transform>();
+        int idx = 0;
+        foreach (Transform child in handA)
+        {
+            if (idx > 1) handAChildren.Add(child);
+            idx++;
+        }
+        handAChildren.Remove(cardBObj.transform);
+        if (handIndexA >= 0 && handIndexA <= handAChildren.Count)
+            handAChildren.Insert(handIndexA, cardBObj.transform);
+        else
+            handAChildren.Add(cardBObj.transform);
+
+        // Reorder only the card objects (after the first 2 children)
+        idx = 0;
+        foreach (Transform child in handA)
+        {
+            if (idx > 1)
+            {
+                handAChildren[idx - 2].SetSiblingIndex(idx);
+            }
+            idx++;
+        }
+
+        // --- Insert cardAObj at the correct index in handB (skipping first 2 children) ---
+        if (idxB != -1)
+        {
+            List<Transform> handBChildren = new List<Transform>();
+            int idx2 = 0;
+            foreach (Transform child in handB)
+            {
+                if (idx2 > 1) handBChildren.Add(child);
+                idx2++;
+            }
+            handBChildren.Remove(cardAObj.transform);
+            if (idxB >= 0 && idxB <= handBChildren.Count)
+                handBChildren.Insert(idxB, cardAObj.transform);
+            else
+                handBChildren.Add(cardAObj.transform);
+
+            // Reorder only the card objects (after the first 2 children)
+            idx2 = 0;
+            foreach (Transform child in handB)
+            {
+                if (idx2 > 1)
+                {
+                    handBChildren[idx2 - 2].SetSiblingIndex(idx2);
+                }
+                idx2++;
+            }
+        }
+
+        // Optionally, update layout
+        UpdateCurrentPlayerHandLayout();
+    }
+
+    private IEnumerator ResetSuppressInputFlagNextFrame()
+    {
+        yield return new WaitForSeconds(0.5f); // Wait one frame
+        CardInteraction.suppressInputThisFrame = false;
+    }
 }
 

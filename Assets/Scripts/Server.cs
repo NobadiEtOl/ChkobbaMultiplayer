@@ -1030,4 +1030,63 @@ public class Server : NetworkBehaviour
         handA[idxA] = cardBID;
         handB[idxB] = cardAID;
     }
-}   
+
+    /// <summary>
+    /// Swaps a specific card in player A's hand (by index) with a specific card in player B's hand (by unique ID).
+    /// </summary>
+    public void SunuDegisBunuTokusSwap(int playerANo, int playerBNo, string cardAID, string cardBID, int handIndexA)
+    {
+        if (playersHandCardsIDs == null) return;
+        if (!playersHandCardsIDs.ContainsKey(playerANo) || !playersHandCardsIDs.ContainsKey(playerBNo)) return;
+
+        var handA = playersHandCardsIDs[playerANo];
+        var handB = playersHandCardsIDs[playerBNo];
+
+        int idxA = handA.IndexOf(cardAID);
+        int idxB = handB.IndexOf(cardBID);
+
+        // For safety, use the provided index for handA
+        if (handIndexA >= 0 && handIndexA < handA.Count && idxB != -1)
+        {
+            // Remove cardA from handA at handIndexA
+            handA.RemoveAt(handIndexA);
+            // Insert cardB into handA at handIndexA
+            handA.Insert(handIndexA, cardBID);
+
+            // Remove cardB from handB at idxB
+            handB.RemoveAt(idxB);
+            // Insert cardA into handB at the same index (idxB)
+            handB.Insert(idxB, cardAID);
+
+            Debug.LogWarning($"Server ŞunuDeğişBunuTokuş swapped card at index {handIndexA} of player {playerANo} with card {idxB} of player {playerBNo}");
+        }
+    }
+
+    [ContextMenu("NamedPlayerHands")]
+    public void NamedPlayerHands()
+    {
+        if (playersHandCardsIDs == null || allCardLookup == null)
+        {
+            Debug.LogWarning("playersHandCardsIDs or allCardLookup is null.");
+            return;
+        }
+
+        foreach (var kvp in playersHandCardsIDs)
+        {
+            int playerNo = kvp.Key;
+            List<string> hand = kvp.Value;
+            Debug.Log($"Player {playerNo} hand:");
+            foreach (var cardID in hand)
+            {
+                if (allCardLookup.TryGetValue(cardID, out int[] cardArr))
+                {
+                    Debug.Log($"  {cardID}: {cardArr[0]}_{cardArr[1]}");
+                }
+                else
+                {
+                    Debug.LogWarning($"  {cardID}: not found in allCardLookup");
+                }
+            }
+        }
+    }
+}
