@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 0}
   m_Name: New Bomba
   m_EditorClassIdentifier: Assembly-CSharp::Bomba
-  name: Bomba
-  description: Discard all the center pile
-  rarityMultiplier: 1
+  name: 
+  description: 
+  rarityMultiplier: 0

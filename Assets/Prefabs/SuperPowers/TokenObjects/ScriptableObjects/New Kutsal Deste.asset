@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 0}
   m_Name: New Kutsal Deste
   m_EditorClassIdentifier: Assembly-CSharp::KutsalDeste
-  name: KutsalDeste
-  description: Desteyi kutsa
-  rarityMultiplier: 1
+  name: 
+  description: 
+  rarityMultiplier: 0

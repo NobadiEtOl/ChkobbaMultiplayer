@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 0}
   m_Name: New Ver Zehri
   m_EditorClassIdentifier: Assembly-CSharp::VerZehri
-  name: VerZehri
-  description: Desteyi zehirle
-  rarityMultiplier: 1
+  name: 
+  description: 
+  rarityMultiplier: 0

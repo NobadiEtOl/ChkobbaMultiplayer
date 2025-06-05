@@ -12,7 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 0}
   m_Name: "New Oynayamazs\u0131n"
   m_EditorClassIdentifier: "Assembly-CSharp::Oynayamazs\u0131n"
-  name: "Oynayamazs\u0131n"
-  description: "D\xFC\u015Fman\u0131n bir sonraki oynanan kart\u0131n\u0131 bo\u015F
-    karta d\xF6n\xFC\u015Ft\xFCr\xFCr"
-  rarityMultiplier: 1
+  name: 
+  description: 
+  rarityMultiplier: 0

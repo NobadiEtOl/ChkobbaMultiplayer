@@ -10,8 +10,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 0}
-  m_Name: "New Yapamazs\u0131n"
-  m_EditorClassIdentifier: "Assembly-CSharp::Yapamazs\u0131n"
+  m_Name: New Elimi Degistir
+  m_EditorClassIdentifier: Assembly-CSharp::ElimiDegistir
   name: 
   description: 
   rarityMultiplier: 0

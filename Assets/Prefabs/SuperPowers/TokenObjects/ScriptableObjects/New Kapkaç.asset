@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 0}
   m_Name: "New Kapka\xE7"
   m_EditorClassIdentifier: "Assembly-CSharp::Kapka\xE7"
-  name: "Kapka\xE7"
-  description: "Herhangi bir kart ile ortay\u0131 al"
-  rarityMultiplier: 1
+  name: 
+  description: 
+  rarityMultiplier: 0

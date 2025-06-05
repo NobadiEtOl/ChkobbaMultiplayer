@@ -1059,7 +1059,7 @@ public class GameManager : NetworkBehaviour
         // Swap card objects visually
         deckController.SwapHandCardWithCenterCard(handCardID, centerCardID, playerNo);
     }
-    
+
     // Add at the top of GameManager.cs
     public bool isSunuDegisTokusActive = false;
     public string sunuDegisTokusFirstCard = null;
@@ -1148,6 +1148,33 @@ public class GameManager : NetworkBehaviour
     public bool IsAnySwapPowerActive()
     {
         return isSunuDegisTokusActive || isSunuDegisBunuTokusActive;
+    }
+
+    public void ActivateElimiDegistirPower()
+    {
+        if (myCards == null || myCards.Count == 0)
+        {
+            Debug.LogWarning("No cards in hand for ElimiDeğiştir!");
+            return;
+        }
+        // Convert myCards to a dictionary for SerializableCard
+        var handDict = new Dictionary<string, int[]>();
+        foreach (var cardID in myCards)
+            handDict[cardID] = CardInteraction.cardLookup[cardID].GetCardID();
+        SerializableCard serializableHand = new SerializableCard(handDict);
+        networkRelay.ElimiDegistirServerRPC(deckController.thisPlayerNumber, serializableHand);
+    }
+
+    // Called by the server to sync the new hand after swap
+    public void OnElimiDegistirSynced(int playerNo, SerializableCard newHandSerializable)
+    {
+        if (deckController.thisPlayerNumber == playerNo)
+        {
+            var newHand = newHandSerializable.ToDictionary().Keys.ToList();
+            myCards = new List<string>(newHand);
+            deckController.SetPlayerHandByIDs(playerNo, newHand);
+            deckController.UpdateCurrentPlayerHandLayout();
+        }
     }
 
 }

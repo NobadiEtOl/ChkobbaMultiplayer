@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 0}
   m_Name: New Sunu Degis Tokus
   m_EditorClassIdentifier: Assembly-CSharp::SunuDegisTokus
-  name: "\u015EunuDe\u011Fi\u015FToku\u015F"
-  description: "Se\xE7ilen kart\u0131 ba\u015Fka se\xE7ilen bir kart ile de\u011Fi\u015Ftirir"
-  rarityMultiplier: 1
+  name: 
+  description: 
+  rarityMultiplier: 0

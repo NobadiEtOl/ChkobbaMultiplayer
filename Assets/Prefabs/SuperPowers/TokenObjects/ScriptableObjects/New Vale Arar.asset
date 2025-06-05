@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 0}
   m_Name: New Vale Arar
   m_EditorClassIdentifier: Assembly-CSharp::ValeArar
-  name: ValeArar
-  description: "Oyundaki her Valenin yerini g\xF6ster"
-  rarityMultiplier: 1
+  name: 
+  description: 
+  rarityMultiplier: 0

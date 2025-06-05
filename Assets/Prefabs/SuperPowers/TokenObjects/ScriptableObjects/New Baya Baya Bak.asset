@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 0}
   m_Name: New Baya Baya Bak
   m_EditorClassIdentifier: Assembly-CSharp::BayaBayaBak
-  name: BayaBayaBak
-  description: Peek at all of the opponents cards
-  rarityMultiplier: 1
+  name: 
+  description: 
+  rarityMultiplier: 0

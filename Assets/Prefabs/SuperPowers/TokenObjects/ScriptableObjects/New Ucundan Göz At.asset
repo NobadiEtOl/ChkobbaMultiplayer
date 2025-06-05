@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 0}
   m_Name: "New Ucundan G\xF6z At"
   m_EditorClassIdentifier: "Assembly-CSharp::UcundanG\xF6zAt"
-  name: "Ucundan G\xF6z At"
-  description: "D\xFC\u015Fman\u0131n rastgele bir kart\u0131n\u0131 herkese g\xF6sterir"
-  rarityMultiplier: 1
+  name: 
+  description: 
+  rarityMultiplier: 0

@@ -12,7 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 0}
   m_Name: "New De\u011Fi\u015FToku\u015F"
   m_EditorClassIdentifier: "Assembly-CSharp::De\u011Fi\u015FToku\u015F"
-  name: "De\u011Fi\u015F Toku\u015F"
-  description: "Se\xE7ilen kart\u0131 d\xFC\u015Fman\u0131n ratgele bir kart\u0131yla
-    de\u011Fi\u015Ftirir"
-  rarityMultiplier: 1
+  name: 
+  description: 
+  rarityMultiplier: 0

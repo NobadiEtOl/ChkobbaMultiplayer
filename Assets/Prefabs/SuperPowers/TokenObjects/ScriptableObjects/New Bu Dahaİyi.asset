@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 0}
   m_Name: "New Bu Daha\u0130yi"
   m_EditorClassIdentifier: "Assembly-CSharp::BuDaha\u0130yi"
-  name: "BuDaha\u0130yi"
-  description: "Se\xE7ili kart ile ortadaki kart\u0131 de\u011Fi\u015Ftir"
-  rarityMultiplier: 1
+  name: 
+  description: 
+  rarityMultiplier: 0

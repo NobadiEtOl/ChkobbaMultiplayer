@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 0}
   m_Name: New Kopyala Yapistir
   m_EditorClassIdentifier: Assembly-CSharp::KopyalaYapistir
-  name: "KopyalaYap\u0131\u015Ft\u0131r"
-  description: "Bir kart\u0131 kopyalad\u0131ktan sonra di\u011Fer karta yap\u0131\u015Ft\u0131r"
+  name: 
+  description: 
   rarityMultiplier: 0
