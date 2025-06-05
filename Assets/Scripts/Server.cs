@@ -976,4 +976,36 @@ public class Server : NetworkBehaviour
     {
         kutsalDestePending = true;
     }
+
+    public void BuDahaIyiSwap(int playerNo, string handCardID, string centerCardID)
+    {
+        // Swap in player's hand
+        if (playersHandCardsIDs[playerNo].Contains(handCardID))
+        {
+            playersHandCardsIDs[playerNo].Remove(handCardID);
+            playersHandCardsIDs[playerNo].Add(centerCardID);
+        }
+        // Swap in center
+        if (centerCardsDict.ContainsKey(centerCardID))
+        {
+            int[] temp = centerCardsDict[centerCardID];
+            centerCardsDict.Remove(centerCardID);
+            centerCardsDict[handCardID] = allCardLookup[handCardID];
+        }
+        else if (centerCardsDict.ContainsKey(handCardID))
+        {
+            int[] temp = centerCardsDict[handCardID];
+            centerCardsDict.Remove(handCardID);
+            centerCardsDict[centerCardID] = allCardLookup[centerCardID];
+        }
+        else
+        {
+            // Fallback: just swap the last card
+            var lastKey = centerCardsDict.Keys.Last();
+            int[] temp = centerCardsDict[lastKey];
+            centerCardsDict.Remove(lastKey);
+            centerCardsDict[handCardID] = allCardLookup[handCardID];
+        }
+    }
+
 }   

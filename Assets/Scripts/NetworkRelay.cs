@@ -184,7 +184,24 @@ public class NetworkRelay : NetworkBehaviour
         GameManager.LocalInstance.ShowKutsalDesteEffect(playerNumber, points);
     }
 
+    [ClientRpc]
+    public void UseBuDahaIyiClientRPC(int playerNo, string handCardID, string centerCardID)
+    {
+        GameManager.LocalInstance.OnBuDahaIyiSynced(playerNo, handCardID, centerCardID);
+    }
+
+
     //ServerRPC
+    [ServerRpc(RequireOwnership = false)]
+    public void UseBuDahaIyiServerRPC(int playerNo, string handCardID, string centerCardID)
+    {
+        if (!server.TryBlockPower())
+        {
+            server.BuDahaIyiSwap(playerNo, handCardID, centerCardID);
+            UseBuDahaIyiClientRPC(playerNo, handCardID, centerCardID);
+        }
+    }
+
     [ServerRpc(RequireOwnership = false)]
     public void ActivateVerZehriServerRPC()
     {

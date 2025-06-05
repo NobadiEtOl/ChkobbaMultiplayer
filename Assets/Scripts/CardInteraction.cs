@@ -117,8 +117,8 @@ public class CardInteraction : MonoBehaviour
     {
         //Debug.Log("OnCardTouched called for card: " + gameObject.name);
         // Ensure only one card is selected at a time
-        if (currentlySelectedCard == this)
-            return;
+        //if (currentlySelectedCard == this)
+            //return;
 
         if (gameObject.transform.parent.name == "PlayerPool1" || gameObject.transform.parent.name == "PlayerPiştiPool1")
         {

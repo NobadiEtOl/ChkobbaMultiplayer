@@ -954,4 +954,50 @@ public class GameManager : NetworkBehaviour
         // Show effect/animation/notification for KutsalDeste
     }
 
+    public void UseBuDahaIyiPower()
+    {
+        if (currentSelectedHandCard == null || centerCards.Count == 0)
+        {
+            Debug.LogWarning("No card selected or center is empty!");
+            return;
+        }
+        // Get the top card of the center pile (last added)
+        string topCenterCardID = centerCards.Keys.Last();
+        networkRelay.UseBuDahaIyiServerRPC(deckController.thisPlayerNumber, currentSelectedHandCard, topCenterCardID);
+    }
+        
+    public void OnBuDahaIyiSynced(int playerNo, string handCardID, string centerCardID)
+    {
+        // Swap in myCards
+        if (myCards.Contains(handCardID))
+        {
+            myCards.Remove(handCardID);
+            myCards.Add(centerCardID);
+        }
+        // Swap in centerCards
+        if (centerCards.ContainsKey(centerCardID))
+        {
+            int[] temp = centerCards[centerCardID];
+            centerCards.Remove(centerCardID);
+            centerCards[handCardID] = CardInteraction.cardLookup[handCardID].GetCardID();
+        }
+        else if (centerCards.ContainsKey(handCardID))
+        {
+            int[] temp = centerCards[handCardID];
+            centerCards.Remove(handCardID);
+            centerCards[centerCardID] = CardInteraction.cardLookup[centerCardID].GetCardID();
+        }
+        else
+        {
+            // Fallback: just swap the last card
+            var lastKey = centerCards.Keys.Last();
+            int[] temp = centerCards[lastKey];
+            centerCards.Remove(lastKey);
+            centerCards[handCardID] = CardInteraction.cardLookup[handCardID].GetCardID();
+        }
+
+        // Swap card objects visually
+        deckController.SwapHandCardWithCenterCard(handCardID, centerCardID, playerNo);
+    }
+
 }

@@ -423,7 +423,7 @@ public class DeckController : MonoBehaviour
             positions.Add(new Vector3(centerPosition.x, centerPosition.y + 10 * GameManager.LocalInstance.centerCardsObjects.Count, centerPosition.z));
             scales.Add(new Vector3(1200, 1200, 1200));
 
-            gameManager.centerCards.Add(uniqueCardID,cardID);
+            gameManager.centerCards.Add(uniqueCardID, cardID);
             gameManager.centerCardsObjects.Add(placedCard);
             cardObjects.Add(placedCard);
         }
@@ -1361,7 +1361,7 @@ public class DeckController : MonoBehaviour
         card.transform.rotation = originalRot;
         card.transform.position = originalPos;
     }
-    
+
     private IEnumerator PeekCardAllAnimation(List<GameObject> cards)
     {
         // Store original rotations and positions
@@ -1493,8 +1493,8 @@ public class DeckController : MonoBehaviour
 
         MoveCard(centerB, cardB, speed, rotA, scaleB);
         MoveCard(centerA, cardA, speed, rotA, scaleB);
-        
-        
+
+
 
         yield return new WaitForSeconds(0.8f); // Small delay to ensure both cards are ready for the next move
 
@@ -1504,7 +1504,7 @@ public class DeckController : MonoBehaviour
         yield return StartCoroutine(MoveCardCoroutine(posA, cardB, speed, rotA, scaleA));
 
         cardB.GetComponent<CardInteraction>().autoRotateFlag = true;
-        
+
         // Swap parents
         cardA.transform.SetParent(handB, true);
         cardB.transform.SetParent(handA, true);
@@ -1550,5 +1550,64 @@ public class DeckController : MonoBehaviour
         }
         return null;
     }
+
+    public void SwapHandCardWithCenterCard(string handCardID, string centerCardID, int playerNo)
+    {
+        // Find hand card object and center card object
+        GameObject handCardObj = CardInteraction.cardLookup[handCardID].gameObject;
+        GameObject centerCardObj = CardInteraction.cardLookup[centerCardID].gameObject;
+
+        // Find the player's hand transform and the index of the hand card
+        int relativeIndex = (playerNo - thisPlayerNumber + playerCount) % playerCount;
+        Transform handTransform = playerHandTransforms[GetPoolIndex(relativeIndex)];
+        int handCardIndex = -1;
+        int idx = 0;
+        foreach (Transform child in handTransform)
+        {
+            if (child.gameObject == handCardObj)
+            {
+                handCardIndex = idx;
+                break;
+            }
+            idx++;
+
+        }
+
+        // Store center card's position and rotation
+        Vector3 centerPos = centerCardObj.transform.position;
+        Quaternion centerRot = centerCardObj.transform.rotation;
+        Vector3 handCardPos = handCardObj.transform.position;
+
+        // Hand card goes to center: set position/rotation to center card's
+        handCardObj.transform.SetParent(centerTransform, true);
+        handCardObj.transform.position = centerPos;
+        handCardObj.transform.rotation = centerRot;
+        handCardObj.GetComponent<CardInteraction>().autoRotateFlag = false;
+
+        // Center card goes to player's hand at the same index
+        centerCardObj.transform.SetParent(handTransform, true);
+        centerCardObj.GetComponent<CardInteraction>().autoRotateFlag = true;
+        centerCardObj.GetComponent<CardInteraction>().OnCardTouched(Input.mousePosition);
+
+        // Insert at the same index in the hand
+        // Remove and re-insert at the correct position
+        List<Transform> handChildren = new List<Transform>();
+        foreach (Transform child in handTransform) handChildren.Add(child);
+
+        handChildren.Remove(centerCardObj.transform);
+        if (handCardIndex >= 0 && handCardIndex <= handChildren.Count)
+            handChildren.Insert(handCardIndex, centerCardObj.transform);
+        else
+            handChildren.Add(centerCardObj.transform);
+
+        // Reorder children
+        for (int i = 0; i < handChildren.Count; i++)
+            handChildren[i].SetSiblingIndex(i);
+
+        // Optionally, update layout
+        UpdateCurrentPlayerHandLayout();
+    }
+
+
 }
 

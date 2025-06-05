@@ -121,6 +121,16 @@ public class KutsalDeste : SuperPower
     }
 }
 
+[CreateAssetMenu(menuName = "SuperPower/BuDahaİyi")]
+public class BuDahaİyi : SuperPower
+{
+    public override void ActivatePower()
+    {
+        Debug.Log("BuDahaİyi activated!");
+        GameManager.LocalInstance.UseBuDahaIyiPower();
+    }
+}
+
 public class SuperPowerController : MonoBehaviour
 {
     // Start is called before the first frame update
