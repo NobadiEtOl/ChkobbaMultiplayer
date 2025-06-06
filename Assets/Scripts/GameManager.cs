@@ -90,6 +90,8 @@ public class GameManager : NetworkBehaviour
         InitialGameManagerSetUp();//Identifies and assigns necessary variables and calls other functions
 
         networkRelay.NotifyCientConnectedServerRPC(NetworkManager.Singleton.LocalClientId);// Tells the server that a client is started
+
+        SuperPowerSpawner.LocalInstance.InitializeSuperPowers(); // Initialize super powers
     }
 
     private CardInteraction tempCard;
@@ -1148,33 +1150,6 @@ public class GameManager : NetworkBehaviour
     public bool IsAnySwapPowerActive()
     {
         return isSunuDegisTokusActive || isSunuDegisBunuTokusActive;
-    }
-
-    public void ActivateElimiDegistirPower()
-    {
-        if (myCards == null || myCards.Count == 0)
-        {
-            Debug.LogWarning("No cards in hand for ElimiDeğiştir!");
-            return;
-        }
-        // Convert myCards to a dictionary for SerializableCard
-        var handDict = new Dictionary<string, int[]>();
-        foreach (var cardID in myCards)
-            handDict[cardID] = CardInteraction.cardLookup[cardID].GetCardID();
-        SerializableCard serializableHand = new SerializableCard(handDict);
-        networkRelay.ElimiDegistirServerRPC(deckController.thisPlayerNumber, serializableHand);
-    }
-
-    // Called by the server to sync the new hand after swap
-    public void OnElimiDegistirSynced(int playerNo, SerializableCard newHandSerializable)
-    {
-        if (deckController.thisPlayerNumber == playerNo)
-        {
-            var newHand = newHandSerializable.ToDictionary().Keys.ToList();
-            myCards = new List<string>(newHand);
-            deckController.SetPlayerHandByIDs(playerNo, newHand);
-            deckController.UpdateCurrentPlayerHandLayout();
-        }
     }
 
 }

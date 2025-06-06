@@ -14,4 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::KopyalaYapistir
   name: 
   description: 
-  rarityMultiplier: 0
+  rarityMultiplier: 1

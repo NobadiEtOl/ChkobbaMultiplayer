@@ -14,4 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: "Assembly-CSharp::De\u011Fi\u015FToku\u015F"
   name: 
   description: 
-  rarityMultiplier: 0
+  rarityMultiplier: 1
