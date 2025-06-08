@@ -504,9 +504,9 @@ public class DeckController : MonoBehaviour
             switch (playerNumber)
             {
                 case 0: // Bottom (Player 0)
-                    offset = new Vector3(spacing * 15f * (i - offsetMult), 1000, 100);
+                    offset = new Vector3(spacing * 15f * (i - offsetMult), 1000, 0);
                     rotation = Quaternion.Euler(-centerRotation.x, centerRotation.y, centerRotation.z);
-                    currentScale = new Vector3(1250, 1250, 1250);
+                    currentScale = new Vector3(1200, 1200, 1200);
                     break;
                 case 2: // Top (Player 2)
                     offset = new Vector3(spacing * 3f * (i - offsetMult), 1000 + (i * 10), 0);
@@ -573,7 +573,7 @@ public class DeckController : MonoBehaviour
                 case 0: // Bottom (Player 0)
                     offset = new Vector3(spacing * 15f * (i - offsetMult), 1000, 0);
                     rotation = Quaternion.Euler(-centerRotation.x, centerRotation.y, centerRotation.z);
-                    currentScale = new Vector3(1250, 1250, 1250);
+                    currentScale = new Vector3(1200, 1200, 1200);
                     break;
                 case 1: // Right (Player 1)
                     offset = new Vector3(0, i * 10, spacing * 3f * (i - offsetMult));

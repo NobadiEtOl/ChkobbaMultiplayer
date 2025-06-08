@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 0}
   m_Name: New Bomba
   m_EditorClassIdentifier: Assembly-CSharp::Bomba
-  name: 
+  name: Bomba
   description: 
   rarityMultiplier: 1

@@ -69,6 +69,8 @@ TagManager:
   - 4_11
   - 4_12
   - 4_13
+  - Token
+  - Button
   layers:
   - Default
   - TransparentFX

@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 0}
   m_Name: New Baya Baya Bak
   m_EditorClassIdentifier: Assembly-CSharp::BayaBayaBak
-  name: 
+  name: Baya Baya Bak
   description: 
   rarityMultiplier: 1

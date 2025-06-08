@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 0}
   m_Name: New Vale Arar
   m_EditorClassIdentifier: Assembly-CSharp::ValeArar
-  name: 
+  name: Vale Arar
   description: 
   rarityMultiplier: 1

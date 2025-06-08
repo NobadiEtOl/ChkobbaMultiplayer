@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 0}
   m_Name: "New Bu Daha\u0130yi"
   m_EditorClassIdentifier: "Assembly-CSharp::BuDaha\u0130yi"
-  name: 
+  name: "Bu Daha \u0130yi"
   description: 
   rarityMultiplier: 1

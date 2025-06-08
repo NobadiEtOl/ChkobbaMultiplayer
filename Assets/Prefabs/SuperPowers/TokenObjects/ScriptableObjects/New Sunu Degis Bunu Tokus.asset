@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 0}
   m_Name: New Sunu Degis Bunu Tokus
   m_EditorClassIdentifier: Assembly-CSharp::SunuDegisBunuTokus
-  name: 
+  name: "\u015Eunu De\u011Fi\u015F Bunu Toku\u015F"
   description: 
   rarityMultiplier: 1

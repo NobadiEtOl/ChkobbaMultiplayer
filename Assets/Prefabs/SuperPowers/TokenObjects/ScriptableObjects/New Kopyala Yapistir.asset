@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 0}
   m_Name: New Kopyala Yapistir
   m_EditorClassIdentifier: Assembly-CSharp::KopyalaYapistir
-  name: 
+  name: "Kopyala Yap\u0131\u015Ft\u0131r"
   description: 
   rarityMultiplier: 1

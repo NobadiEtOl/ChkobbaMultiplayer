@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 0}
   m_Name: "New Yapamazs\u0131n"
   m_EditorClassIdentifier: "Assembly-CSharp::Yapamazs\u0131n"
-  name: 
+  name: "Yapamazs\u0131n"
   description: 
   rarityMultiplier: 1

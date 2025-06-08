@@ -145,6 +145,20 @@ public class GameManager : NetworkBehaviour
             Ray ray = Camera.main.ScreenPointToRay(mousePosition);
             if (Physics.Raycast(ray, out RaycastHit hit))
             {
+                if (hit.collider.gameObject.tag == "Token")
+                {
+                    SuperPowerToken superPowerToken = hit.collider.GetComponent<SuperPowerToken>();
+                    if (superPowerToken != null)
+                    {
+                        SuperPowerSpawner.LocalInstance.OpenInfoBox(superPowerToken);
+                        return; // Exit early if a token was clicked
+                    }
+                }
+                if (hit.collider.gameObject.tag == "Button")
+                {
+                    Debug.Log("Clicked on: " + hit.collider.gameObject.name);
+                    return; // Exit early if a button
+                }
                 CardInteraction card = hit.collider.GetComponent<CardInteraction>();
                 if (Input.GetMouseButtonDown(0) && card != null)
                 {
@@ -155,6 +169,7 @@ public class GameManager : NetworkBehaviour
                 {
                     Debug.LogError("CardInteraction is null, trying to stop showcase player pool cards");
                     deckController.TryStopShowcasePlayerPoolCards();
+                    if(SuperPowerToken.ActiveInstance != null && hit.collider.gameObject.tag != "Button")SuperPowerSpawner.LocalInstance.CloseInfoBox();
                 }
                 else if (Input.GetMouseButton(0) && tempCard != null)
                 {
