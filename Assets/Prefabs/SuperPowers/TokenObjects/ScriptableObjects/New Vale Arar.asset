@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: New Vale Arar
   m_EditorClassIdentifier: Assembly-CSharp::ValeArar
   name: Vale Arar
-  description: 
-  rarityMultiplier: 1
+  description: "Oyundaki Valeleri nerde oldu\u011Funu g\xF6rmeni sa\u011Flar"
+  rarityMultiplier: 5

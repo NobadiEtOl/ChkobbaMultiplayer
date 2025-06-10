@@ -12,7 +12,7 @@ public class CardInteraction : MonoBehaviour
     private Vector3 originalScreenPosition; // Original position in screen space
     private Vector3 offset; // Offset between touch position and card position in screen space
     private bool isDragging = false;
-    private float snapBackThreshold = 250f;
+    private float snapBackThreshold = 175f;
     private GameObject selectedCardIndicator;
     public event Action<string> OnCardSelected;
     public event Action<string, GameObject, int> OnCardsPlayed;
@@ -116,10 +116,6 @@ public class CardInteraction : MonoBehaviour
     private bool stopPower = false;
     public void OnCardTouched(Vector3 touchPosition)
     {
-        // Suppress input if flagged (e.g., after swap)
-        if (suppressInputThisFrame)
-            return;
-
         stopPower = AreSwapPowersActive();
         //Debug.Log("OnCardTouched called for card: " + gameObject.name);
         // Ensure only one card is selected at a time
@@ -160,8 +156,6 @@ public class CardInteraction : MonoBehaviour
 
     public void OnTouchDrag(Vector3 touchPosition)
     {
-        if (suppressInputThisFrame)
-            return;
         // Prevent drag while swap powers are active
         if (stopPower)
             return;
@@ -176,9 +170,6 @@ public class CardInteraction : MonoBehaviour
 
     public void OnTouchUp()
     {
-
-        if (suppressInputThisFrame)
-            return;
         // Prevent touch up while swap powers are active
         if (stopPower)
             return;
@@ -308,9 +299,6 @@ public class CardInteraction : MonoBehaviour
     {
         OnCardSelected?.Invoke(uniqueCardInstanceID);
     }
-
-    // Add this static flag
-    public static bool suppressInputThisFrame = false;
 
     // Helper to check if swap powers are active
     private bool AreSwapPowersActive()

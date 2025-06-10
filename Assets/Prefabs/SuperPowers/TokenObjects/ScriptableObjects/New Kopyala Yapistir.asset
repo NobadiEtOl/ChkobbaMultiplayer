@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: New Kopyala Yapistir
   m_EditorClassIdentifier: Assembly-CSharp::KopyalaYapistir
   name: "Kopyala Yap\u0131\u015Ft\u0131r"
-  description: 
-  rarityMultiplier: 1
+  description: "Bir kart\u0131 kopyala, ba\u015Fka bir karta yap\u0131\u015Ft\u0131r"
+  rarityMultiplier: 5

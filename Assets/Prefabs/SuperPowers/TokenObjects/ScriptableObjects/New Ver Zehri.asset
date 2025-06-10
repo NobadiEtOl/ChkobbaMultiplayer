@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 0}
   m_Name: New Ver Zehri
   m_EditorClassIdentifier: Assembly-CSharp::VerZehri
-  name: Ver Zehri
-  description: 
-  rarityMultiplier: 1
+  name: Ver zehri
+  description: "Bir sonraki kapat\u0131\u015F, kapatan tarafa puan kaybettirir"
+  rarityMultiplier: 10

@@ -145,20 +145,6 @@ public class GameManager : NetworkBehaviour
             Ray ray = Camera.main.ScreenPointToRay(mousePosition);
             if (Physics.Raycast(ray, out RaycastHit hit))
             {
-                if (hit.collider.gameObject.tag == "Token")
-                {
-                    SuperPowerToken superPowerToken = hit.collider.GetComponent<SuperPowerToken>();
-                    if (superPowerToken != null)
-                    {
-                        SuperPowerSpawner.LocalInstance.OpenInfoBox(superPowerToken);
-                        return; // Exit early if a token was clicked
-                    }
-                }
-                if (hit.collider.gameObject.tag == "Button")
-                {
-                    Debug.Log("Clicked on: " + hit.collider.gameObject.name);
-                    return; // Exit early if a button
-                }
                 CardInteraction card = hit.collider.GetComponent<CardInteraction>();
                 if (Input.GetMouseButtonDown(0) && card != null)
                 {
@@ -169,7 +155,6 @@ public class GameManager : NetworkBehaviour
                 {
                     Debug.LogError("CardInteraction is null, trying to stop showcase player pool cards");
                     deckController.TryStopShowcasePlayerPoolCards();
-                    if(SuperPowerToken.ActiveInstance != null && hit.collider.gameObject.tag != "Button")SuperPowerSpawner.LocalInstance.CloseInfoBox();
                 }
                 else if (Input.GetMouseButton(0) && tempCard != null)
                 {
@@ -259,6 +244,10 @@ public class GameManager : NetworkBehaviour
         yield return new WaitForSeconds(1.5f);
 
         if (deckController) deckController.DealPlayers(playerCount, playerHands);
+
+        yield return new WaitForSeconds(0f);
+
+        SuperPowerSpawner.LocalInstance.ReadyToSpawnSuperPowers();
     }
 
     //Gets message from the server to start dealing cards to center
@@ -287,6 +276,7 @@ public class GameManager : NetworkBehaviour
             networkRelay.UseSunuDegisTokusServerRPC(deckController.thisPlayerNumber, sunuDegisTokusFirstCard, cardID);
             isSunuDegisTokusActive = false;
             sunuDegisTokusFirstCard = null;
+            DeckController.LocalInstance.ExitShowcaseAllOtherHands();
             return;
         }
 
@@ -1092,6 +1082,7 @@ public class GameManager : NetworkBehaviour
         isSunuDegisTokusActive = true;
         sunuDegisTokusFirstCard = currentSelectedHandCard;
         Debug.Log("ŞunuDeğişTokuş: Select a card from another player's hand to swap with.");
+        DeckController.LocalInstance.ShowcaseAllOtherHands();
     }
 
     public void OnSunuDegisTokusSynced(int myPlayerNo, int otherPlayerNo, string myHandCardID, string otherHandCardID)
@@ -1119,7 +1110,7 @@ public class GameManager : NetworkBehaviour
     }
 
     // Add at the top of GameManager.cs
-    private bool isSunuDegisBunuTokusActive = false;
+    public bool isSunuDegisBunuTokusActive = false;
     private int sunuDegisBunuTokusSwapIndex = 0;
     private List<string> sunuDegisBunuTokusMyHandSnapshot = null;
 
@@ -1135,6 +1126,7 @@ public class GameManager : NetworkBehaviour
         sunuDegisBunuTokusSwapIndex = 0;
         sunuDegisBunuTokusMyHandSnapshot = new List<string>(myCards);
         Debug.Log("ŞunuDeğişBunuTokuş: Select a card from another player's hand to swap with your first card.");
+        DeckController.LocalInstance.ShowcaseAllOtherHands();
     }
 
     // Add this method to handle the synced swap

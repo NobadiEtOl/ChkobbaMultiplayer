@@ -14,7 +14,9 @@ public class SuperPowerToken : MonoBehaviour
     {
         Debug.Log("SuperPowerToken clicked: " + power.name);
         power.ActivatePower();
+        SuperPowerSpawner.LocalInstance.CloseInfoBox();
         SuperPowerSpawner.LocalInstance.RemoveSpawnedSuperPower(gameObject);
+        SuperPowerSpawner.LocalInstance.UpdateTokenPositions();
         StartCoroutine(FadeOutSprite()); // Destroy the token after activation
     }
 

@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: New Sunu Degis Bunu Tokus
   m_EditorClassIdentifier: Assembly-CSharp::SunuDegisBunuTokus
   name: "\u015Eunu De\u011Fi\u015F Bunu Toku\u015F"
-  description: 
-  rarityMultiplier: 1
+  description: "Elindeki t\xFCm kartlar\u0131 tek tek istedi\u011Fin kartlarla de\u011Fi\u015Ftirebilirsin"
+  rarityMultiplier: 5

@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: New Bomba
   m_EditorClassIdentifier: Assembly-CSharp::Bomba
   name: Bomba
-  description: 
-  rarityMultiplier: 1
+  description: "Ortadaki t\xFCm kartlar\u0131 yok et"
+  rarityMultiplier: 4

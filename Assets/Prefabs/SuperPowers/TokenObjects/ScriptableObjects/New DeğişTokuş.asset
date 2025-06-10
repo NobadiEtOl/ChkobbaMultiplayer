@@ -13,5 +13,6 @@ MonoBehaviour:
   m_Name: "New De\u011Fi\u015FToku\u015F"
   m_EditorClassIdentifier: "Assembly-CSharp::De\u011Fi\u015FToku\u015F"
   name: "De\u011Fi\u015F Toku\u015F"
-  description: 
-  rarityMultiplier: 1
+  description: "Elindeki rastgele bir kart\u0131 rastgele ba\u015Fka bir kart ile
+    de\u011F\u015Ftir"
+  rarityMultiplier: 20

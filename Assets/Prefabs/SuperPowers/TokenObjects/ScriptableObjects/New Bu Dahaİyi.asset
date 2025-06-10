@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: "New Bu Daha\u0130yi"
   m_EditorClassIdentifier: "Assembly-CSharp::BuDaha\u0130yi"
   name: "Bu Daha \u0130yi"
-  description: 
-  rarityMultiplier: 1
+  description: "Se\xE7ilen bir kart\u0131 ortadaki kart ile de\u011Fi\u015Ftir"
+  rarityMultiplier: 10
