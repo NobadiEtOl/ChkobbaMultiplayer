@@ -1,0 +1,813 @@
+fileFormatVersion: 2
+guid: e618357a2344f6340bc8cfe8b00d7002
+TextureImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 12
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 0
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 3
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: WebGL
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: iPhone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 1023.2
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 7b842f120bf211b46893dece466c339e
+      internalID: -1840727807
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_1
+      rect:
+        serializedVersion: 2
+        x: 256
+        y: 1023.2
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: c0fc6f9bdd40f114dbe53301c88cc014
+      internalID: 165709884
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_2
+      rect:
+        serializedVersion: 2
+        x: 512
+        y: 1023.2
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 2a38b4927caae654a91da05e59745509
+      internalID: 925408498
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_3
+      rect:
+        serializedVersion: 2
+        x: 768
+        y: 1023.2
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 73f078269746d11468429cc7bb907a3b
+      internalID: 1665311271
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_4
+      rect:
+        serializedVersion: 2
+        x: 1024
+        y: 1023.2
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 4153d43bbb2c9754da70c5c33711a23f
+      internalID: 1862211445
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_5
+      rect:
+        serializedVersion: 2
+        x: 1280
+        y: 1023.2
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 839bb608f67aaf640a8831917a253b47
+      internalID: 1407269448
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_6
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 768.2
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 550359bb9ac284a489ef50990999be6d
+      internalID: -425950192
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_7
+      rect:
+        serializedVersion: 2
+        x: 256
+        y: 768.2
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 020ff97c3fc904c4a80239ca70706d08
+      internalID: -517700450
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_8
+      rect:
+        serializedVersion: 2
+        x: 512
+        y: 768.2
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 551edf221564cae4d8ea9b475e754d2d
+      internalID: 1132487116
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_9
+      rect:
+        serializedVersion: 2
+        x: 768
+        y: 768.2
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 96006b586585826429a40047ac0c2ab9
+      internalID: -667769989
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_10
+      rect:
+        serializedVersion: 2
+        x: 1024
+        y: 768.2
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 71e78ccc4364fbd4bb21cd0dcede03db
+      internalID: -465485596
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_11
+      rect:
+        serializedVersion: 2
+        x: 1280
+        y: 768.2
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: d8c8dc9fe199a97498f3ac49857bdc7d
+      internalID: -261536766
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_12
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 513.2
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 92306ec8716f35842a4be1ded7020af0
+      internalID: 1658732453
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_13
+      rect:
+        serializedVersion: 2
+        x: 256
+        y: 513.2
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 6357d7674840bd74b884cc84d94256d0
+      internalID: -1918075848
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_14
+      rect:
+        serializedVersion: 2
+        x: 512
+        y: 513.2
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: f90d2cb31bbd7fc4499a72c90bb244f9
+      internalID: -431681306
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_15
+      rect:
+        serializedVersion: 2
+        x: 768
+        y: 513.2
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: eb25e96a30412d647a16d5597dbc58ed
+      internalID: -1468621479
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_16
+      rect:
+        serializedVersion: 2
+        x: 1024
+        y: 513.2
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: e83b8b774f01a824a83adee5fd6e67f9
+      internalID: 1861659343
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_17
+      rect:
+        serializedVersion: 2
+        x: 1280
+        y: 513.2
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: c8857a5305f664a4181aeedca89ae71c
+      internalID: -832558157
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_18
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 258.2
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: e192c3858e07c6c4c885736838c16d71
+      internalID: 574812625
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_19
+      rect:
+        serializedVersion: 2
+        x: 256
+        y: 258.2
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 346d20137c866d54792cdb3e5ec652cc
+      internalID: -853917266
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_20
+      rect:
+        serializedVersion: 2
+        x: 512
+        y: 258.2
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: e43495bbaa3ba0b4696ded78c7070638
+      internalID: -923110002
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_21
+      rect:
+        serializedVersion: 2
+        x: 768
+        y: 258.2
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: d69e0a4d93bc17e46adfc7225c295218
+      internalID: -615871717
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_22
+      rect:
+        serializedVersion: 2
+        x: 1024
+        y: 258.2
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 7584fec2015efc24ea9f21bfb94c1c29
+      internalID: 16706886
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_23
+      rect:
+        serializedVersion: 2
+        x: 1280
+        y: 258.2
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 0e27574708e1c014e9bb92c89d1cd033
+      internalID: 95958847
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_24
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 3.199997
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 7f4ea03113912854587f1fb682e83f0f
+      internalID: -1255114077
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_25
+      rect:
+        serializedVersion: 2
+        x: 256
+        y: 3.199997
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 49bae83cee888344fabf74f3ec68eae8
+      internalID: -1564562905
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_26
+      rect:
+        serializedVersion: 2
+        x: 512
+        y: 3.199997
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 8611cdc63f8cdd74faf4c846066b4027
+      internalID: 915831408
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_27
+      rect:
+        serializedVersion: 2
+        x: 768
+        y: 3.199997
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 0b0fd9d63ca786642980eb3861d4b26c
+      internalID: 54218327
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_28
+      rect:
+        serializedVersion: 2
+        x: 1024
+        y: 3.199997
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: f2c730a63a46a014f878e2f83ca39c96
+      internalID: 1109295040
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: pngkey.com-smoke-png-41262_29
+      rect:
+        serializedVersion: 2
+        x: 1280
+        y: 3.199997
+        width: 256
+        height: 255.8
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 3090e99ed0d05ab46921a65223bfe7d5
+      internalID: -1383330154
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    physicsShape: []
+    bones: []
+    spriteID: 5e97eb03825dee720800000000000000
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    nameFileIdTable:
+      pngkey.com-smoke-png-41262_0: -1840727807
+      pngkey.com-smoke-png-41262_1: 165709884
+      pngkey.com-smoke-png-41262_10: -465485596
+      pngkey.com-smoke-png-41262_11: -261536766
+      pngkey.com-smoke-png-41262_12: 1658732453
+      pngkey.com-smoke-png-41262_13: -1918075848
+      pngkey.com-smoke-png-41262_14: -431681306
+      pngkey.com-smoke-png-41262_15: -1468621479
+      pngkey.com-smoke-png-41262_16: 1861659343
+      pngkey.com-smoke-png-41262_17: -832558157
+      pngkey.com-smoke-png-41262_18: 574812625
+      pngkey.com-smoke-png-41262_19: -853917266
+      pngkey.com-smoke-png-41262_2: 925408498
+      pngkey.com-smoke-png-41262_20: -923110002
+      pngkey.com-smoke-png-41262_21: -615871717
+      pngkey.com-smoke-png-41262_22: 16706886
+      pngkey.com-smoke-png-41262_23: 95958847
+      pngkey.com-smoke-png-41262_24: -1255114077
+      pngkey.com-smoke-png-41262_25: -1564562905
+      pngkey.com-smoke-png-41262_26: 915831408
+      pngkey.com-smoke-png-41262_27: 54218327
+      pngkey.com-smoke-png-41262_28: 1109295040
+      pngkey.com-smoke-png-41262_29: -1383330154
+      pngkey.com-smoke-png-41262_3: 1665311271
+      pngkey.com-smoke-png-41262_4: 1862211445
+      pngkey.com-smoke-png-41262_5: 1407269448
+      pngkey.com-smoke-png-41262_6: -425950192
+      pngkey.com-smoke-png-41262_7: -517700450
+      pngkey.com-smoke-png-41262_8: 1132487116
+      pngkey.com-smoke-png-41262_9: -667769989
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

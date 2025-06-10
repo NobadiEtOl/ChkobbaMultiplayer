@@ -692,6 +692,9 @@ public class GameManager : NetworkBehaviour
         playerPiştiPoolTransforms.Add(GameObject.Find("PlayerPiştiPool2").GetComponent<Transform>());
         playerPiştiPoolTransforms.Add(GameObject.Find("PlayerPiştiPool3").GetComponent<Transform>());
         playerPiştiPoolTransforms.Add(GameObject.Find("PlayerPiştiPool4").GetComponent<Transform>());
+
+        verZehriObject = GameObject.Find("VerZehriFog");
+        kutsalDesteObject = GameObject.Find("KutsalDesteFog");
     }
 
     /// <summary>
@@ -972,9 +975,15 @@ public class GameManager : NetworkBehaviour
     {
         verZehriActive = isActive;
         if (isActive)
+        {
             StartVerZehriEffect();
+        }
+
         else
+        {
             StopVerZehriEffect();
+        }
+            
     }
 
     public void SetKutsalDesteActive(bool isActive)
@@ -986,11 +995,17 @@ public class GameManager : NetworkBehaviour
             StopKutsalDesteEffect();
     }
 
+    [SerializeField]private GameObject verZehriObject;
     private void StartVerZehriEffect()
     {
         // Show UI/animation for VerZehri active
         Debug.Log("VerZehri effect started!");
         // TODO: Add your visual effect here
+        foreach (Transform child in verZehriObject.transform)
+        {
+            child.GetComponent<FogController>().StartFog();
+        }
+
     }
 
     private void StopVerZehriEffect()
@@ -998,18 +1013,31 @@ public class GameManager : NetworkBehaviour
         // Hide UI/animation for VerZehri
         Debug.Log("VerZehri effect stopped!");
         // TODO: Remove your visual effect here
+        foreach (Transform child in verZehriObject.transform)
+        {
+            child.GetComponent<FogController>().StopFog();
+        }
     }
-
+    
+    [SerializeField] private GameObject kutsalDesteObject;
     private void StartKutsalDesteEffect()
     {
         Debug.Log("KutsalDeste effect started!");
         // TODO: Add your visual effect here
+        foreach (Transform child in kutsalDesteObject.transform)
+        {
+            child.GetComponent<FogController>().StartFog();
+        }
     }
 
     private void StopKutsalDesteEffect()
     {
         Debug.Log("KutsalDeste effect stopped!");
         // TODO: Remove your visual effect here
+        foreach (Transform child in kutsalDesteObject.transform)
+        {
+            child.GetComponent<FogController>().StopFog();
+        }
     }
 
     public void ShowVerZehriEffect(int playerNumber, int points)
@@ -1158,5 +1186,5 @@ public class GameManager : NetworkBehaviour
     {
         return isSunuDegisTokusActive || isSunuDegisBunuTokusActive;
     }
-
+    
 }
