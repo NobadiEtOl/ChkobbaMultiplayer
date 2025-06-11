@@ -1384,6 +1384,7 @@ public class DeckController : MonoBehaviour
         int myNo = thisPlayerNumber;
         int playerCount = this.playerCount;
         int relativeIndex = (opponentPlayerNo - myNo + playerCount) % playerCount;
+        bool isMine = thisPlayerNumber == opponentPlayerNo;
 
         // Get the hand transform for the opponent in my perspective
         Transform handTransform = playerHandTransforms[GetPoolIndex(relativeIndex)];
@@ -1402,7 +1403,7 @@ public class DeckController : MonoBehaviour
                 if (found == cardIndex)
                 {
                     GameObject card = child.gameObject;
-                    StartCoroutine(PeekCardAnimation(card));
+                    StartCoroutine(PeekCardAnimation(card,isMine));
                     break;
                 }
                 found++;
@@ -1416,6 +1417,7 @@ public class DeckController : MonoBehaviour
         int myNo = thisPlayerNumber;
         int playerCount = this.playerCount;
         int relativeIndex = (opponentPlayerNo - myNo + playerCount) % playerCount;
+        bool isMine = thisPlayerNumber == opponentPlayerNo;
 
         // Get the hand transform for the opponent in my perspective
         Transform handTransform = playerHandTransforms[GetPoolIndex(relativeIndex)];
@@ -1433,108 +1435,175 @@ public class DeckController : MonoBehaviour
             actualIndex++;
         }
 
-        StartCoroutine(PeekCardAllAnimation(cardsToPeek));
+        StartCoroutine(PeekCardAllAnimation(cardsToPeek, isMine));
     }
 
 
     /// <summary>
     /// Coroutine to animate the peek effect on a card.
     /// </summary>
-    private IEnumerator PeekCardAnimation(GameObject card)
+    private IEnumerator PeekCardAnimation(GameObject card, bool isMine)
     {
-        Quaternion originalRot = card.transform.rotation;
+        // Store original transform
         Vector3 originalPos = card.transform.position;
+        Quaternion originalRot = card.transform.rotation;
+        Vector3 originalScale = card.transform.localScale;
 
-        // Animate: rotate X to 90, move Y to 2000
-        Quaternion peekRot = Quaternion.Euler(90, originalRot.eulerAngles.y, originalRot.eulerAngles.z);
-        Vector3 peekPos = new Vector3(originalPos.x, 2000, originalPos.z);
+        // Calculate target position (midpoint between card and center, lifted above table)
+        Vector3 centerPos = centerTransform.position;
+        Vector3 peekPos; // 1000 units above table, adjust as needed
 
-        float duration = 0.5f;
-        float t = 0f;
-        while (t < duration)
+        // Target rotation: face up (show card front)
+        Quaternion peekRot;
+
+        // Target scale: bigger
+        Vector3 peekScale;
+        if (!isMine)
         {
-            card.transform.rotation = Quaternion.Lerp(originalRot, peekRot, t / duration);
-            card.transform.position = Vector3.Lerp(originalPos, peekPos, t / duration);
+            peekPos = ((playerCount == 2 ? new Vector3(0, 0, 0) : originalPos) + centerPos) / 2f + new Vector3(0, 1000, 0);
+            peekScale = originalScale * 2.0f; // 2x bigger, adjust as needed
+            peekRot = Quaternion.Euler(90, 0, 0); // Adjust as needed for your card orientation
+        }
+        else
+        {
+            peekPos = originalPos + new Vector3(0, 1000, 0);
+            card.GetComponent<CardInteraction>().autoRotateFlag = false;
+            peekScale = originalScale;
+            peekRot = Quaternion.Euler(-90, 0, 0);
+        }
+
+        float moveDuration = 0.4f;
+        float pauseDuration = 1.2f;
+        float t = 0f;
+
+        // Move, scale, and rotate to peek position
+        while (t < moveDuration)
+        {
+            float lerp = t / moveDuration;
+            card.transform.position = Vector3.Lerp(originalPos, peekPos, lerp);
+            card.transform.rotation = Quaternion.Lerp(originalRot, peekRot, lerp);
+            card.transform.localScale = Vector3.Lerp(originalScale, peekScale, lerp);
             t += Time.deltaTime;
             yield return null;
         }
-        card.transform.rotation = peekRot;
         card.transform.position = peekPos;
+        card.transform.rotation = peekRot;
+        card.transform.localScale = peekScale;
 
-        // Hold for a moment
-        yield return new WaitForSeconds(1.0f);
+        // Pause so player can see
+        yield return new WaitForSeconds(pauseDuration);
 
-        // Animate back
+        // Move, scale, and rotate back to original
         t = 0f;
-        while (t < duration)
+        while (t < moveDuration)
         {
-            card.transform.rotation = Quaternion.Lerp(peekRot, originalRot, t / duration);
-            card.transform.position = Vector3.Lerp(peekPos, originalPos, t / duration);
+            float lerp = t / moveDuration;
+            card.transform.position = Vector3.Lerp(peekPos, originalPos, lerp);
+            card.transform.rotation = Quaternion.Lerp(peekRot, originalRot, lerp);
+            card.transform.localScale = Vector3.Lerp(peekScale, originalScale, lerp);
             t += Time.deltaTime;
             yield return null;
         }
-        card.transform.rotation = originalRot;
         card.transform.position = originalPos;
+        card.transform.rotation = originalRot;
+        card.transform.localScale = originalScale;
+        if (isMine) card.GetComponent<CardInteraction>().autoRotateFlag = true;
     }
 
-    private IEnumerator PeekCardAllAnimation(List<GameObject> cards)
-    {
-        // Store original rotations and positions
-        List<Quaternion> originalRots = new List<Quaternion>();
-        List<Vector3> originalPoss = new List<Vector3>();
-        List<Quaternion> peekRots = new List<Quaternion>();
-        List<Vector3> peekPoss = new List<Vector3>();
 
-        foreach (var card in cards)
+    private IEnumerator PeekCardAllAnimation(List<GameObject> cards, bool isMine)
+    {
+        // Store original transforms
+        List<Vector3> originalPoss = new List<Vector3>();
+        List<Quaternion> originalRots = new List<Quaternion>();
+        List<Vector3> originalScales = new List<Vector3>();
+
+        for (int i = 0; i < cards.Count; i++)
         {
-            var origRot = card.transform.rotation;
-            var origPos = card.transform.position;
-            originalRots.Add(origRot);
-            originalPoss.Add(origPos);
-            peekRots.Add(Quaternion.Euler(90, origRot.eulerAngles.y, origRot.eulerAngles.z));
-            peekPoss.Add(new Vector3(origPos.x, 2000, origPos.z));
+            originalPoss.Add(cards[i].transform.position);
+            originalRots.Add(cards[i].transform.rotation);
+            originalScales.Add(cards[i].transform.localScale);
         }
 
-        float duration = 0.5f;
+        // Calculate new positions for spread-out effect
+        float spread = 1000f; // Adjust for desired spacing
+        float yOffset = 1200f; // How much to bring cards forward (higher Y)
+        Vector3 center = Vector3.zero;
+        foreach (var pos in originalPoss) center += pos;
+        center /= cards.Count;
+
+        List<Vector3> peekPoss = new List<Vector3>();
+        List<Quaternion> peekRots = new List<Quaternion>();
+        List<Vector3> peekScales = new List<Vector3>();
+
+        for (int i = 0; i < cards.Count; i++)
+        {
+            cards[i].GetComponent<CardInteraction>().autoRotateFlag = false;
+            // Spread cards along X axis, centered
+            float offset = (i - (cards.Count - 1) / 2f) * spread;
+            Vector3 peekPos;
+            if (!isMine) peekPos = originalPoss[i] + new Vector3(offset, yOffset, playerCount == 2 ? -500 : 0);
+            else peekPos = originalPoss[i] + new Vector3(offset, yOffset, playerCount == 2 ? -500 : 0);
+            peekPoss.Add(peekPos);
+
+            // Face up
+            if (!isMine) peekRots.Add(Quaternion.Euler(90, 0, 0));
+            else peekRots.Add(Quaternion.Euler(-90, 0, 0));
+            // Scale up
+            if (!isMine) peekScales.Add(originalScales[i] * 2.0f);
+            else peekScales.Add(originalScales[i]);
+        }
+
+        float duration = 0.4f;
+        float pause = 3;
         float t = 0f;
-        // Animate all to peek
+
+        // Animate to peek positions
         while (t < duration)
         {
+            float lerp = t / duration;
             for (int i = 0; i < cards.Count; i++)
             {
-                cards[i].transform.rotation = Quaternion.Lerp(originalRots[i], peekRots[i], t / duration);
-                cards[i].transform.position = Vector3.Lerp(originalPoss[i], peekPoss[i], t / duration);
+                cards[i].transform.position = Vector3.Lerp(originalPoss[i], peekPoss[i], lerp);
+                cards[i].transform.rotation = Quaternion.Lerp(originalRots[i], peekRots[i], lerp);
+                cards[i].transform.localScale = Vector3.Lerp(originalScales[i], peekScales[i], lerp);
             }
             t += Time.deltaTime;
             yield return null;
         }
         for (int i = 0; i < cards.Count; i++)
         {
-            cards[i].transform.rotation = peekRots[i];
             cards[i].transform.position = peekPoss[i];
+            cards[i].transform.rotation = peekRots[i];
+            cards[i].transform.localScale = peekScales[i];
         }
 
-        // Hold for a moment
-        yield return new WaitForSeconds(1.0f);
+        // Pause for viewing
+        yield return new WaitForSeconds(pause);
 
-        // Animate all back
+        // Animate back to original
         t = 0f;
         while (t < duration)
         {
+            float lerp = t / duration;
             for (int i = 0; i < cards.Count; i++)
             {
-                cards[i].transform.rotation = Quaternion.Lerp(peekRots[i], originalRots[i], t / duration);
-                cards[i].transform.position = Vector3.Lerp(peekPoss[i], originalPoss[i], t / duration);
+                cards[i].transform.position = Vector3.Lerp(peekPoss[i], originalPoss[i], lerp);
+                cards[i].transform.rotation = Quaternion.Lerp(peekRots[i], originalRots[i], lerp);
+                cards[i].transform.localScale = Vector3.Lerp(peekScales[i], originalScales[i], lerp);
             }
             t += Time.deltaTime;
             yield return null;
         }
         for (int i = 0; i < cards.Count; i++)
         {
-            cards[i].transform.rotation = originalRots[i];
             cards[i].transform.position = originalPoss[i];
+            cards[i].transform.rotation = originalRots[i];
+            cards[i].transform.localScale = originalScales[i];
+            cards[i].GetComponent<CardInteraction>().autoRotateFlag = true;
         }
     }
+
 
     public int GetRandomHandCardIndex(int absolutePlayerNo)
     {

@@ -716,6 +716,7 @@ public class GameManager : NetworkBehaviour
     public void OnPeekOpponentCardSynced(int opponentPlayerNo, int cardIndex)
     {
         deckController.PeekOpponentCard(opponentPlayerNo, cardIndex);
+        
     }
 
     public void UseBayaBayaBakPower()

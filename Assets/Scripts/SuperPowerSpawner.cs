@@ -33,10 +33,8 @@ public class SuperPowerSpawner : MonoBehaviour
         LocalInstance = this;
         DontDestroyOnLoad(this.gameObject); // Optional, if you want it to persist
 
-        GetUIElements();
-
-        //centerGameObject = GameObject.Find("Center");
         centerPosition = centerGameObject.transform.position;
+        GetUIElements();
 
     }
 
@@ -58,15 +56,15 @@ public class SuperPowerSpawner : MonoBehaviour
                     SuperPowerToken superPowerToken = hit.collider.GetComponent<SuperPowerToken>();
                     if (superPowerToken != null)
                     {
-                        OpenInfoBox(superPowerToken);
                         centerGameObject.transform.position = new Vector3(centerPosition.x + 2500, centerPosition.y, centerPosition.z);
+                        OpenInfoBox(superPowerToken);
                         return; // Exit early if a token was clicked
                     }
                 }
                 if (SuperPowerToken.ActiveInstance != null && hit.collider.gameObject.tag == "Respawn")
                 {
-                    CloseInfoBox();
                     centerGameObject.transform.position = centerPosition;
+                    CloseInfoBox();
                 }
             }
         }
