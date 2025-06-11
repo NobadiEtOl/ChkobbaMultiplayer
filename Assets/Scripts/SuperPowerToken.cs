@@ -7,7 +7,12 @@ public class SuperPowerToken : MonoBehaviour
 {
     public static SuperPowerToken ActiveInstance { get; set; }
     public SuperPower power; // Assign this in the Inspector
+    public string superPowerClassName;
 
+    void Awake()
+    {
+
+    }
 
     [ContextMenu("Activate Power")]
     public void OnTokenClicked()

@@ -14,6 +14,12 @@ public abstract class SuperPower : ScriptableObject
 [CreateAssetMenu(menuName = "SuperPower/UcundanGözAt")]
 public class UcundanGözAt : SuperPower
 {
+    private void OnEnable()
+    {
+        name = "Ucundan Göz At";
+        description = "Peek at an opponent's card.";
+        rarityMultiplier = 1;
+    }
     public override void ActivatePower()
     {
         Debug.Log("Ucundan Göz At activated!");
@@ -24,6 +30,12 @@ public class UcundanGözAt : SuperPower
 [CreateAssetMenu(menuName = "SuperPower/Oynayamazsın")]
 public class Oynayamazsın : SuperPower
 {
+    private void OnEnable()
+    {
+        name = "Oynayamazsın";
+        description = "Peek at an opponent's card.";
+        rarityMultiplier = 1;
+    }
     public override void ActivatePower()
     {
         Debug.Log("Oynayamazsın activated!");
@@ -34,6 +46,12 @@ public class Oynayamazsın : SuperPower
 [CreateAssetMenu(menuName = "SuperPower/DeğişTokuş")]
 public class DeğişTokuş : SuperPower
 {
+    private void OnEnable()
+    {
+        name = "Değiş Tokuş";
+        description = "Peek at an opponent's card.";
+        rarityMultiplier = 1;
+    }
     public override void ActivatePower()
     {
         Debug.Log("Değiş Tokuş activated!");
@@ -44,6 +62,12 @@ public class DeğişTokuş : SuperPower
 [CreateAssetMenu(menuName = "SuperPower/Kapkaç")]
 public class Kapkaç : SuperPower
 {
+    private void OnEnable()
+    {
+        name = "Kapkaç";
+        description = "Peek at an opponent's card.";
+        rarityMultiplier = 1;
+    }
     public override void ActivatePower()
     {
         Debug.Log("Kapkaç activated!");
@@ -54,16 +78,30 @@ public class Kapkaç : SuperPower
 [CreateAssetMenu(menuName = "SuperPower/ValeArar")]
 public class ValeArar : SuperPower
 {
+    private void OnEnable()
+    {
+        name = "Vale Arar";
+        description = "Peek at an opponent's card.";
+        rarityMultiplier = 1;
+    }
     public override void ActivatePower()
     {
         Debug.Log("ValeArar activated!");
         GameManager.LocalInstance.ActivateValeArarPower();
     }
+
+
 }
 
 [CreateAssetMenu(menuName = "SuperPower/KopyalaYapistir")]
 public class KopyalaYapistir : SuperPower
 {
+    private void OnEnable()
+    {
+        name = "Kopyala Yapıştır";
+        description = "Peek at an opponent's card.";
+        rarityMultiplier = 1;
+    }
     public override void ActivatePower()
     {
         Debug.Log("KopyalaYapıstır activated!");
@@ -74,6 +112,12 @@ public class KopyalaYapistir : SuperPower
 [CreateAssetMenu(menuName = "SuperPower/BayaBayaBak")]
 public class BayaBayaBak : SuperPower
 {
+    private void OnEnable()
+    {
+        name = "Baya Baya Bak";
+        description = "Peek at an opponent's card.";
+        rarityMultiplier = 1;
+    }
     public override void ActivatePower()
     {
         Debug.Log("BayaBayaBak activated!");
@@ -84,6 +128,12 @@ public class BayaBayaBak : SuperPower
 [CreateAssetMenu(menuName = "SuperPower/Bomba")]
 public class Bomba : SuperPower
 {
+    private void OnEnable()
+    {
+        name = "Bomba";
+        description = "Peek at an opponent's card.";
+        rarityMultiplier = 1;
+    }
     public override void ActivatePower()
     {
         Debug.Log("Bomba activated!");
@@ -94,6 +144,12 @@ public class Bomba : SuperPower
 [CreateAssetMenu(menuName = "SuperPower/Yapamazsın")]
 public class Yapamazsın : SuperPower
 {
+    private void OnEnable()
+    {
+        name = "Yapamazsın";
+        description = "Peek at an opponent's card.";
+        rarityMultiplier = 1;
+    }
     public override void ActivatePower()
     {
         Debug.Log("Yapamazsın activated!");
@@ -104,6 +160,12 @@ public class Yapamazsın : SuperPower
 [CreateAssetMenu(menuName = "SuperPower/VerZehri")]
 public class VerZehri : SuperPower
 {
+    private void OnEnable()
+    {
+        name = "Ver Zehri";
+        description = "Peek at an opponent's card.";
+        rarityMultiplier = 1;
+    }
     public override void ActivatePower()
     {
         Debug.Log("VerZehri activated!");
@@ -114,6 +176,12 @@ public class VerZehri : SuperPower
 [CreateAssetMenu(menuName = "SuperPower/KutsalDeste")]
 public class KutsalDeste : SuperPower
 {
+    private void OnEnable()
+    {
+        name = "Kutsal Deste";
+        description = "Peek at an opponent's card.";
+        rarityMultiplier = 1;
+    }
     public override void ActivatePower()
     {
         Debug.Log("KutsalDeste activated!");
@@ -124,6 +192,12 @@ public class KutsalDeste : SuperPower
 [CreateAssetMenu(menuName = "SuperPower/BuDahaİyi")]
 public class BuDahaİyi : SuperPower
 {
+    private void OnEnable()
+    {
+        name = "Bu Daha İyi";
+        description = "Peek at an opponent's card.";
+        rarityMultiplier = 1;
+    }
     public override void ActivatePower()
     {
         Debug.Log("BuDahaİyi activated!");
@@ -134,6 +208,12 @@ public class BuDahaİyi : SuperPower
 [CreateAssetMenu(menuName = "SuperPower/SunuDegisTokus")]
 public class SunuDegisTokus : SuperPower
 {
+    private void OnEnable()
+    {
+        name = "Şunu Değiş Tokuş";
+        description = "Peek at an opponent's card.";
+        rarityMultiplier = 1;
+    }
     public override void ActivatePower()
     {
         Debug.Log("ŞunuDeğişTokuş activated!");
@@ -144,6 +224,12 @@ public class SunuDegisTokus : SuperPower
 [CreateAssetMenu(menuName = "SuperPower/SunuDegisBunuTokus")]
 public class SunuDegisBunuTokus : SuperPower
 {
+    private void OnEnable()
+    {
+        name = "Şunu Değiş Bunu Tokuş";
+        description = "Peek at an opponent's card.";
+        rarityMultiplier = 1;
+    }
     public override void ActivatePower()
     {
         Debug.Log("ŞunuDeğişBunuTokuş activated!");

@@ -8,7 +8,7 @@ public class SuperPowerSpawner : MonoBehaviour
 {
     public static SuperPowerSpawner LocalInstance { get; private set; }
     [SerializeField] private List<GameObject> superPowerTokens = new List<GameObject>();
-    private Dictionary<SuperPower, GameObject> superPowers = new Dictionary<SuperPower, GameObject>();
+    private Dictionary<SuperPower, GameObject> superPowerPrefabs = new Dictionary<SuperPower, GameObject>();
     private List<SuperPower> superPowerList = new List<SuperPower>();
     [SerializeField] private int maxSuperPowers = 5;
     private int numberOfSuperPowersToSpawn = 3;
@@ -17,11 +17,11 @@ public class SuperPowerSpawner : MonoBehaviour
     [SerializeField] private List<Transform> spawnPositions = new List<Transform>();
     [SerializeField] private GameObject centerGameObject;
     private Vector3 centerPosition;
-    public GameObject backgroundPanel;
-    public Text nameText;
-    public Text descriptionText;
-    public Button activateButton;
-    public Button closeButton;
+    private GameObject backgroundPanel;
+    private Text nameText;
+    private Text descriptionText;
+    private Button activateButton;
+    private Button closeButton;
     // Start is called before the first frame update
     void Start()
     {
@@ -98,7 +98,8 @@ public class SuperPowerSpawner : MonoBehaviour
         {
             RemoveSpawnedSuperPower(SuperPowerToken.ActiveInstance.gameObject); // Remove this token from the spawner
             UpdateTokenPositions();
-            Destroy(gameObject);
+            StartCoroutine(SuperPowerToken.ActiveInstance.FadeOutSprite());
+            CloseInfoBox();
         });
 
         CloseInfoBox(); // Ensure the info box is closed initially
@@ -138,29 +139,58 @@ public class SuperPowerSpawner : MonoBehaviour
     public void InitializeSuperPowers()
     {
         DictionaryCreation();
-        foreach (var superPower in superPowers)
-        {
-            int rarity = superPower.Key.rarityMultiplier;
-            for (int i = 0; i < rarity; i++)
-            {
-                superPowerList.Add(superPower.Key);
-            }
-        }
-        playerPowerPoolTransform = GameObject.Find("PlayerPowerPool").transform;
+        playerPowerPoolTransform = GameObject.Find("PlayerPowerPool")?.transform;
+        if (playerPowerPoolTransform == null)
+            Debug.LogWarning("PlayerPowerPool transform not found!");
     }
+
+
 
     private void DictionaryCreation()
     {
+        superPowerPrefabs.Clear();
+        superPowerList.Clear();
+
         foreach (var token in superPowerTokens)
         {
-            SuperPower superPower = token.GetComponent<SuperPowerToken>().power;
-            if (superPower != null && !superPowers.ContainsKey(superPower))
+            var tokenScript = token.GetComponent<SuperPowerToken>();
+            if (tokenScript == null)
             {
-                superPowers.Add(superPower, token);
+                Debug.LogWarning($"Token prefab {token.name} does not have a SuperPowerToken component.");
+                continue;
+            }
+
+            string className = tokenScript.superPowerClassName;
+            if (string.IsNullOrEmpty(className))
+            {
+                Debug.LogWarning($"Token prefab {token.name} does not have a valid superPowerClassName.");
+                continue;
+            }
+
+            var type = System.Type.GetType(className);
+            if (type == null || !typeof(SuperPower).IsAssignableFrom(type))
+            {
+                Debug.LogWarning($"Could not find SuperPower type for {className}");
+                continue;
+            }
+
+            SuperPower powerInstance = ScriptableObject.CreateInstance(type) as SuperPower;
+            if (powerInstance == null)
+            {
+                Debug.LogWarning($"Failed to create SuperPower instance for {className}");
+                continue;
+            }
+
+            if (!superPowerPrefabs.ContainsKey(powerInstance))
+            {
+                superPowerPrefabs.Add(powerInstance, token);
+                // Add to list for rarity
+                for (int i = 0; i < powerInstance.rarityMultiplier; i++)
+                    superPowerList.Add(powerInstance);
             }
             else
             {
-                Debug.LogWarning($"Super power {superPower?.name} already exists or is null.");
+                Debug.LogWarning($"Super power {className} already exists in the dictionary.");
             }
         }
     }
@@ -182,28 +212,36 @@ public class SuperPowerSpawner : MonoBehaviour
 
     private IEnumerator SpawnSuperPower(SuperPower superPower)
     {
+        if (superPower == null)
+        {
+            Debug.LogError("SpawnSuperPower called with null SuperPower!");
+            yield break;
+        }
+
         if (spawnedSuperPowers.Count >= maxSuperPowers)
         {
             Debug.LogWarning("Max super powers reached, cannot spawn more.");
-            yield return null;
+            yield break;
         }
 
-        // 1. Add a placeholder (empty GameObject)
         GameObject placeholder = new GameObject("TokenPlaceholder");
         spawnedSuperPowers.Add(placeholder);
-
-        // 2. Update positions so existing tokens move as if the new token is present
         UpdateTokenPositions();
 
         yield return new WaitForSeconds(1.5f);
 
-        // 3. Instantiate the real token at the placeholder's position
-        if (superPowers.TryGetValue(superPower, out GameObject prefab))
+        if (superPowerPrefabs.TryGetValue(superPower, out GameObject prefab))
         {
             Vector3 spawnPos = placeholder.transform.position;
             GameObject instance = Instantiate(prefab, spawnPos, transform.rotation);
 
-            // 4. Replace the placeholder with the real token
+            // Assign the SuperPower instance to the token
+            var tokenScript = instance.GetComponent<SuperPowerToken>();
+            if (tokenScript != null)
+            {
+                tokenScript.power = superPower;
+            }
+
             int placeholderIndex = spawnedSuperPowers.IndexOf(placeholder);
             if (placeholderIndex != -1)
             {
@@ -212,18 +250,15 @@ public class SuperPowerSpawner : MonoBehaviour
             Destroy(placeholder);
 
             Debug.Log($"{superPower.name} spawned.");
-            // 5. Optionally update positions again to animate the real token (if needed)
             UpdateTokenPositions();
         }
         else
         {
-            Debug.LogError($"Super power {superPower.name} not found in the dictionary.");
+            Debug.LogError($"Super power {superPower?.name} not found in the dictionary.");
             spawnedSuperPowers.Remove(placeholder);
             Destroy(placeholder);
         }
     }
-
-
 
 
     private SuperPower GetRandomSuperPower()
@@ -233,10 +268,11 @@ public class SuperPowerSpawner : MonoBehaviour
             Debug.LogWarning("No super powers available to spawn.");
             return null;
         }
-
         int randomIndex = Random.Range(0, superPowerList.Count);
         return superPowerList[randomIndex];
     }
+
+
 
     public void UpdateTokenPositions(float moveDuration = 0.25f)
     {

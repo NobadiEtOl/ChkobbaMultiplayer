@@ -293,7 +293,7 @@ RectTransform:
   m_Father: {fileID: 124277165}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0.5, y: 1}
+  m_AnchorMax: {x: 0, y: 0}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 10, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -938,7 +938,6 @@ MonoBehaviour:
   - {fileID: 4598371265184639164, guid: 8a4c2ccde36ff6e4ca52c9c38731e354, type: 3}
   - {fileID: 4598371265184639164, guid: eee17caf17a7450419947c59fdc576ff, type: 3}
   - {fileID: 4598371265184639164, guid: 6d99f634d6c226b4886f496017c02d00, type: 3}
-  - {fileID: 4598371265184639164, guid: c53bed0217918554d8080b2e66585387, type: 3}
   - {fileID: 4598371265184639164, guid: 461b8aa80fb31724288e92805b13a556, type: 3}
   - {fileID: 4598371265184639164, guid: 4e25fbd0db21e07419a766a3a2a9a4bb, type: 3}
   - {fileID: 4598371265184639164, guid: 07758e35b8ddad14f84cd8c9b43482e7, type: 3}
@@ -959,11 +958,6 @@ MonoBehaviour:
   - {fileID: 1331638882}
   - {fileID: 1610205051}
   centerGameObject: {fileID: 1261711844}
-  backgroundPanel: {fileID: 0}
-  nameText: {fileID: 0}
-  descriptionText: {fileID: 0}
-  activateButton: {fileID: 0}
-  closeButton: {fileID: 0}
 --- !u!1 &403717977 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 3933157743994487865, guid: dab5da10fe7642c49904dc160f745cb6, type: 3}
@@ -1285,71 +1279,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!1001 &665399388
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: 3782511676057307462, guid: d09d5b71f5ec4d640b48e784c72f27a8, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: -6021
-      objectReference: {fileID: 0}
-    - target: {fileID: 3782511676057307462, guid: d09d5b71f5ec4d640b48e784c72f27a8, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 1006
-      objectReference: {fileID: 0}
-    - target: {fileID: 3782511676057307462, guid: d09d5b71f5ec4d640b48e784c72f27a8, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: -4301
-      objectReference: {fileID: 0}
-    - target: {fileID: 3782511676057307462, guid: d09d5b71f5ec4d640b48e784c72f27a8, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 0.7071068
-      objectReference: {fileID: 0}
-    - target: {fileID: 3782511676057307462, guid: d09d5b71f5ec4d640b48e784c72f27a8, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0.7071068
-      objectReference: {fileID: 0}
-    - target: {fileID: 3782511676057307462, guid: d09d5b71f5ec4d640b48e784c72f27a8, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3782511676057307462, guid: d09d5b71f5ec4d640b48e784c72f27a8, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3782511676057307462, guid: d09d5b71f5ec4d640b48e784c72f27a8, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 90
-      objectReference: {fileID: 0}
-    - target: {fileID: 3782511676057307462, guid: d09d5b71f5ec4d640b48e784c72f27a8, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3782511676057307462, guid: d09d5b71f5ec4d640b48e784c72f27a8, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4598371265184639164, guid: d09d5b71f5ec4d640b48e784c72f27a8, type: 3}
-      propertyPath: m_Name
-      value: "\u015EunuDe\u011Fi\u015FToku\u015F_Token"
-      objectReference: {fileID: 0}
-    - target: {fileID: 7667949175906956723, guid: d09d5b71f5ec4d640b48e784c72f27a8, type: 3}
-      propertyPath: m_Size.x
-      value: 5.12
-      objectReference: {fileID: 0}
-    - target: {fileID: 7667949175906956723, guid: d09d5b71f5ec4d640b48e784c72f27a8, type: 3}
-      propertyPath: m_Size.y
-      value: 5.12
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: d09d5b71f5ec4d640b48e784c72f27a8, type: 3}
 --- !u!1 &682084426
 GameObject:
   m_ObjectHideFlags: 0
@@ -1651,6 +1580,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   animationClip: New Animation
+  fadeDuration: 1
+  fogRenderer: {fileID: 0}
 --- !u!95 &823299614
 Animator:
   serializedVersion: 5
@@ -3236,7 +3167,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &1386298420
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3780,8 +3711,8 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 2123185553}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0}
-  m_AnchorMax: {x: 0.5, y: 1}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 20, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -4040,6 +3971,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   animationClip: New Animation
+  fadeDuration: 1
+  fogRenderer: {fileID: 0}
 --- !u!1 &1672637671
 GameObject:
   m_ObjectHideFlags: 0
@@ -4166,6 +4099,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   animationClip: KutsalDesteFog_AnimationClip
+  fadeDuration: 1
+  fogRenderer: {fileID: 0}
 --- !u!95 &1675861886
 Animator:
   serializedVersion: 5
@@ -4402,63 +4337,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1783563072}
   m_CullTransparentMesh: 1
---- !u!1001 &1796497123
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: 3782511676057307462, guid: 14057099a9d11204db933f1e2e4f27c9, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: -4683
-      objectReference: {fileID: 0}
-    - target: {fileID: 3782511676057307462, guid: 14057099a9d11204db933f1e2e4f27c9, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 1006
-      objectReference: {fileID: 0}
-    - target: {fileID: 3782511676057307462, guid: 14057099a9d11204db933f1e2e4f27c9, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: -4205
-      objectReference: {fileID: 0}
-    - target: {fileID: 3782511676057307462, guid: 14057099a9d11204db933f1e2e4f27c9, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 0.7071068
-      objectReference: {fileID: 0}
-    - target: {fileID: 3782511676057307462, guid: 14057099a9d11204db933f1e2e4f27c9, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0.7071068
-      objectReference: {fileID: 0}
-    - target: {fileID: 3782511676057307462, guid: 14057099a9d11204db933f1e2e4f27c9, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3782511676057307462, guid: 14057099a9d11204db933f1e2e4f27c9, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3782511676057307462, guid: 14057099a9d11204db933f1e2e4f27c9, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 90
-      objectReference: {fileID: 0}
-    - target: {fileID: 3782511676057307462, guid: 14057099a9d11204db933f1e2e4f27c9, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3782511676057307462, guid: 14057099a9d11204db933f1e2e4f27c9, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4598371265184639164, guid: 14057099a9d11204db933f1e2e4f27c9, type: 3}
-      propertyPath: m_Name
-      value: "\u015EunuDe\u011Fi\u015FBunuToku\u015F_Token"
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 14057099a9d11204db933f1e2e4f27c9, type: 3}
 --- !u!1 &1801400087
 GameObject:
   m_ObjectHideFlags: 0
@@ -5248,6 +5126,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   animationClip: KutsalDesteFog_AnimationClip
+  fadeDuration: 1
+  fogRenderer: {fileID: 0}
 --- !u!1 &2067031635 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 7892905855436415934, guid: dab5da10fe7642c49904dc160f745cb6, type: 3}
@@ -6172,5 +6052,3 @@ SceneRoots:
   - {fileID: 112376593}
   - {fileID: 1386298423}
   - {fileID: 92865349}
-  - {fileID: 665399388}
-  - {fileID: 1796497123}

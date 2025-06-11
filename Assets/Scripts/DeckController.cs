@@ -622,6 +622,7 @@ public class DeckController : MonoBehaviour
                 case 2: // Top (Player 2)
                     offset = new Vector3(spacing * 3f * (i - offsetMult), 1000 + (i * 10), 0);
                     rotation = Quaternion.Euler(centerRotation.x, centerRotation.y, centerRotation.z);
+                    currentScale = new Vector3 (normalScale,normalScale,normalScale);
                     break;
             }
 
@@ -689,14 +690,17 @@ public class DeckController : MonoBehaviour
                 case 1: // Right (Player 1)
                     offset = new Vector3(0, i * 10, spacing * 3f * (i - offsetMult));
                     rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + 90, centerRotation.z);
+                    currentScale = new Vector3 (normalScale,normalScale,normalScale);
                     break;
                 case 2: // Top (Player 2)
                     offset = new Vector3(spacing * 3f * (i - offsetMult), i * 10, 0);
                     rotation = Quaternion.Euler(centerRotation.x, centerRotation.y, centerRotation.z);
+                    currentScale = new Vector3 (normalScale,normalScale,normalScale);
                     break;
                 case 3: // Left (Player 3)
                     offset = new Vector3(0, i * 10, spacing * 3f * (i - offsetMult));
                     rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + 90, centerRotation.z);
+                    currentScale = new Vector3 (normalScale,normalScale,normalScale);
                     break;
             }
 

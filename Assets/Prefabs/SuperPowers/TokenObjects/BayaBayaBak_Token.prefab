@@ -11,9 +11,9 @@ GameObject:
   - component: {fileID: 3782511676057307462}
   - component: {fileID: 1211842771313687162}
   - component: {fileID: 3931491671187450550}
-  - component: {fileID: 1105751592382907958}
+  - component: {fileID: -6948236213368455051}
   m_Layer: 0
-  m_Name: Bomba_Token
+  m_Name: BayaBayaBak_Token
   m_TagString: Token
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -32,7 +32,7 @@ Transform:
   m_LocalScale: {x: 1000, y: 1000, z: 1000}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 5892738820238365057}
+  - {fileID: 1763795108917710847}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 90, y: 0, z: 0}
 --- !u!114 &1211842771313687162
@@ -47,7 +47,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 890940bbc59c3f649b9e0d4f17919f87, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  power: {fileID: 11400000, guid: b2710be074a0e11418d72d1185d5963c, type: 2}
+  power: {fileID: 0}
+  superPowerClassName: BayaBayaBak
 --- !u!212 &3931491671187450550
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -88,8 +89,8 @@ SpriteRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_Sprite: {fileID: 21300000, guid: d5d5ecbca9397ed468497925b04a3c2a, type: 3}
+  m_SortingOrder: 1
+  m_Sprite: {fileID: 21300000, guid: 8d2332e4341488c42af3b315f3f625d5, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -100,7 +101,7 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
---- !u!65 &1105751592382907958
+--- !u!65 &-6948236213368455051
 BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -121,7 +122,7 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 0.20000005}
   m_Center: {x: 0, y: 0, z: 0}
---- !u!1001 &4592105057902130411
+--- !u!1001 &8504796976891374229
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -182,8 +183,8 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 2e93de75ccda983438a73c2d99de5014, type: 3}
---- !u!4 &5892738820238365057 stripped
+--- !u!4 &1763795108917710847 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 7961618140770706794, guid: 2e93de75ccda983438a73c2d99de5014, type: 3}
-  m_PrefabInstance: {fileID: 4592105057902130411}
+  m_PrefabInstance: {fileID: 8504796976891374229}
   m_PrefabAsset: {fileID: 0}
