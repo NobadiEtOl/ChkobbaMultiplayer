@@ -21,6 +21,7 @@ public class SuperPowerSpawner : MonoBehaviour
     private Text nameText;
     private Text descriptionText;
     private Button activateButton;
+    private Button falseActivateButton;
     private Button closeButton;
     // Start is called before the first frame update
     void Start()
@@ -79,6 +80,7 @@ public class SuperPowerSpawner : MonoBehaviour
         nameText = backgroundPanel.transform.Find("NamePanel/NameText")?.GetComponent<Text>();
         descriptionText = backgroundPanel.transform.Find("DescriptionPanel/DescriptionText")?.GetComponent<Text>();
         activateButton = GameObject.Find("ActivateButton")?.GetComponent<Button>();
+        falseActivateButton = GameObject.Find("FalseActivateButton")?.GetComponent<Button>();
         closeButton = GameObject.Find("CloseButton")?.GetComponent<Button>();
 
         if (nameText == null || descriptionText == null || activateButton == null || closeButton == null)
@@ -92,6 +94,7 @@ public class SuperPowerSpawner : MonoBehaviour
         }
 
         activateButton.onClick.AddListener(OnTokenClicked);
+        falseActivateButton.onClick.AddListener(GetActiveButtonErrorMessage);
         closeButton.onClick.AddListener(() =>
         {
             RemoveSpawnedSuperPower(SuperPowerToken.ActiveInstance.gameObject); // Remove this token from the spawner
@@ -128,10 +131,50 @@ public class SuperPowerSpawner : MonoBehaviour
         }
         SuperPowerToken.ActiveInstance = superPowerToken; // Set the active instance
         backgroundPanel.SetActive(true);
-        activateButton.gameObject.SetActive(true);
+
+        bool canActivate = CheckIfCardShouldBeSelected(superPowerToken.power.name);
+        activateButton.gameObject.SetActive(canActivate);
+        falseActivateButton.gameObject.SetActive(!canActivate);
         closeButton.gameObject.SetActive(true);
-        nameText.text = SuperPowerToken.ActiveInstance.power.name;
-        descriptionText.text = SuperPowerToken.ActiveInstance.power.description;
+
+        // Always update the current info
+        currentNameText = superPowerToken.power.name;
+        currentDescriptionText = superPowerToken.power.description;
+        nameText.text = currentNameText;
+        descriptionText.text = currentDescriptionText;
+
+        // If an error message is showing, stop it and show the correct info
+        if (errorMessageCoroutine != null)
+        {
+            StopCoroutine(errorMessageCoroutine);
+            errorMessageCoroutine = null;
+        }
+    }
+
+
+
+    private List<string> restirictedPowersName = new List<string> { "Bu Daha İyi", "Şunu Değiş Tokuş", "Kopyala Yapıştır"};
+    private bool CheckIfCardShouldBeSelected(string superPowerTokenName)
+    {
+        if (restirictedPowersName.Contains(superPowerTokenName))
+        {
+            if (CardInteraction.currentlySelectedCard != null && GameManager.LocalInstance.GetCurrentSelectedHandCard() != null)
+                return true;
+            else
+                return false;
+
+        }
+        return true;
+    }
+
+    public void SetActiveActivateButtonTrue()
+    {
+        if (activateButton.gameObject.activeSelf) return;
+        else
+        {
+            activateButton.gameObject.SetActive(true);
+            ResetInfoBoxText();
+        }
     }
 
     public void InitializeSuperPowers()
@@ -338,5 +381,66 @@ public class SuperPowerSpawner : MonoBehaviour
         return indices;
     }
 
+    private Coroutine errorMessageCoroutine;
+    private string currentNameText = "";
+    private string currentDescriptionText = "";
+    public void GetActiveButtonErrorMessage()
+    {
+        // If already showing error, reset timer
+        if (errorMessageCoroutine != null)
+        {
+            StopCoroutine(errorMessageCoroutine);
+        }
+        errorMessageCoroutine = StartCoroutine(ShowErrorMessageCoroutine());
+    }
 
+    private IEnumerator ShowErrorMessageCoroutine()
+    {
+        nameText.text = "Hatan var";
+        descriptionText.text = "Bu gücü kullanabilmek için önce bir kart seçmelisin";
+        activateButton.gameObject.SetActive(false);
+        falseActivateButton.gameObject.SetActive(true);
+
+        float timer = 0f;
+        while (timer < 4f)
+        {
+            // If info box is updated (e.g. new power selected), break early
+            if (nameText.text != "Hatan var" || descriptionText.text != "Bu gücü kullanabilmek için önce bir kart seçmelisin")
+                yield break;
+            timer += Time.deltaTime;
+            yield return null;
+        }
+        ResetInfoBoxText();
+    }
+
+
+
+    private void ResetInfoBoxText()
+    {
+        nameText.text = currentNameText;
+        descriptionText.text = currentDescriptionText;
+
+        // Update buttons based on current info
+        bool canActivate = false;
+        if (SuperPowerToken.ActiveInstance != null && SuperPowerToken.ActiveInstance.power != null)
+            canActivate = CheckIfCardShouldBeSelected(SuperPowerToken.ActiveInstance.power.name);
+
+        activateButton.gameObject.SetActive(canActivate);
+        falseActivateButton.gameObject.SetActive(!canActivate);
+
+        if (errorMessageCoroutine != null)
+        {
+            StopCoroutine(errorMessageCoroutine);
+            errorMessageCoroutine = null;
+        }
+    }
+
+    public void CheckIfBackgroundPanelOpen()
+    {
+        if (!backgroundPanel.activeSelf) return;
+        else
+        {
+            OpenInfoBox(SuperPowerToken.ActiveInstance);
+        }
+    }
 }

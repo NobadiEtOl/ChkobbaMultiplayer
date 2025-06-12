@@ -1699,6 +1699,7 @@ public class DeckController : MonoBehaviour
         handCardObj.transform.SetParent(centerTransform, true);
         handCardObj.transform.position = centerPos;
         handCardObj.transform.rotation = centerRot;
+        handCardObj.transform.localScale = new Vector3(centerScale, centerScale, centerScale);
         handCardObj.GetComponent<CardInteraction>().autoRotateFlag = false;
 
         // Center card goes to player's hand at the same index
@@ -1724,6 +1725,7 @@ public class DeckController : MonoBehaviour
         // Optionally, update layout
         UpdateCurrentPlayerHandLayout();
         CardInteraction.currentlySelectedCard = null;
+        GameManager.LocalInstance.SetCurrentSelectedHandCardNull();
     }
 
     public void SwapCardsBetweenPlayersByID(int playerANo, string cardAID, int playerBNo, string cardBID)
@@ -1788,6 +1790,7 @@ public class DeckController : MonoBehaviour
         // Now, when UpdateCurrentPlayerHandLayout is called, the cards will animate from their old positions
         UpdateCurrentPlayerHandLayout();
         CardInteraction.currentlySelectedCard = null;
+        GameManager.LocalInstance.SetCurrentSelectedHandCardNull();
     }
 
 
@@ -1945,6 +1948,8 @@ public class DeckController : MonoBehaviour
         if (!GameManager.LocalInstance.isSunuDegisBunuTokusActive) ExitShowcaseAllOtherHands();
 
         CardInteraction.currentlySelectedCard = null;
+        GameManager.LocalInstance.SetCurrentSelectedHandCardNull();
+        //asflalkf
     }
 
 

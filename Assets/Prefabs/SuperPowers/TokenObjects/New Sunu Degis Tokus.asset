@@ -10,8 +10,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 0}
-  m_Name: "New Ucundan G\xF6z At"
-  m_EditorClassIdentifier: "Assembly-CSharp::UcundanG\xF6zAt"
-  name: "Ucundan G\xF6z At"
+  m_Name: New Sunu Degis Tokus
+  m_EditorClassIdentifier: Assembly-CSharp::SunuDegisTokus
+  name: "\u015Eunu De\u011Fi\u015F Toku\u015F"
   description: Peek at an opponent's card.
   rarityMultiplier: 1

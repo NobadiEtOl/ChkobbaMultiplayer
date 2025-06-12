@@ -315,6 +315,7 @@ public class GameManager : NetworkBehaviour
         }
 
         currentSelectedHandCard = cardID;
+        SuperPowerSpawner.LocalInstance.SetActiveActivateButtonTrue();
     }
 
     public void UpdateCurrentPlayerHandLayoutCall()
@@ -371,6 +372,9 @@ public class GameManager : NetworkBehaviour
         networkRelay.SendMoveToServerRPC(currentSelectedHandCard, serializableCard, playerNumber, sumValue);
         myCards.Remove(currentSelectedHandCard);
 
+        CardInteraction.currentlySelectedCard = null;
+        SetCurrentSelectedHandCardNull();
+        SuperPowerSpawner.LocalInstance.CheckIfBackgroundPanelOpen();
 
     }
 
@@ -716,7 +720,7 @@ public class GameManager : NetworkBehaviour
     public void OnPeekOpponentCardSynced(int opponentPlayerNo, int cardIndex)
     {
         deckController.PeekOpponentCard(opponentPlayerNo, cardIndex);
-        
+
     }
 
     public void UseBayaBayaBakPower()
@@ -862,6 +866,8 @@ public class GameManager : NetworkBehaviour
         // Reset state
         isKopyalaActive = false;
         kopyalaSourceCard = null;
+        CardInteraction.currentlySelectedCard = null;
+        GameManager.LocalInstance.SetCurrentSelectedHandCardNull();
     }
 
     // Call this at the end of the round to reset all cards
@@ -984,7 +990,7 @@ public class GameManager : NetworkBehaviour
         {
             StopVerZehriEffect();
         }
-            
+
     }
 
     public void SetKutsalDesteActive(bool isActive)
@@ -996,7 +1002,7 @@ public class GameManager : NetworkBehaviour
             StopKutsalDesteEffect();
     }
 
-    [SerializeField]private GameObject verZehriObject;
+    [SerializeField] private GameObject verZehriObject;
     private void StartVerZehriEffect()
     {
         // Show UI/animation for VerZehri active
@@ -1019,7 +1025,7 @@ public class GameManager : NetworkBehaviour
             child.GetComponent<FogController>().StopFog();
         }
     }
-    
+
     [SerializeField] private GameObject kutsalDesteObject;
     private void StartKutsalDesteEffect()
     {
@@ -1187,5 +1193,14 @@ public class GameManager : NetworkBehaviour
     {
         return isSunuDegisTokusActive || isSunuDegisBunuTokusActive;
     }
-    
+
+    public void SetCurrentSelectedHandCardNull()
+    {
+        currentSelectedHandCard = null;
+    }
+
+    public string GetCurrentSelectedHandCard()
+    {
+        return currentSelectedHandCard;
+    }
 }
