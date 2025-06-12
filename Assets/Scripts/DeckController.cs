@@ -1460,7 +1460,7 @@ public class DeckController : MonoBehaviour
         Vector3 peekScale;
         if (!isMine)
         {
-            peekPos = ((playerCount == 2 ? new Vector3(0, 0, 0) : originalPos) + centerPos) / 2f + new Vector3(0, 1000, 0);
+            peekPos = originalPos + new Vector3(0, 1000, 0);
             peekScale = originalScale * 2.0f; // 2x bigger, adjust as needed
             peekRot = Quaternion.Euler(90, 0, 0); // Adjust as needed for your card orientation
         }
@@ -1538,12 +1538,12 @@ public class DeckController : MonoBehaviour
 
         for (int i = 0; i < cards.Count; i++)
         {
-            cards[i].GetComponent<CardInteraction>().autoRotateFlag = false;
+            if(isMine)cards[i].GetComponent<CardInteraction>().autoRotateFlag = false;
             // Spread cards along X axis, centered
             float offset = (i - (cards.Count - 1) / 2f) * spread;
             Vector3 peekPos;
             if (!isMine) peekPos = originalPoss[i] + new Vector3(offset, yOffset, playerCount == 2 ? -500 : 0);
-            else peekPos = originalPoss[i] + new Vector3(offset, yOffset, playerCount == 2 ? -500 : 0);
+            else peekPos = originalPoss[i] + new Vector3(offset, yOffset, 0);
             peekPoss.Add(peekPos);
 
             // Face up
@@ -1600,7 +1600,7 @@ public class DeckController : MonoBehaviour
             cards[i].transform.position = originalPoss[i];
             cards[i].transform.rotation = originalRots[i];
             cards[i].transform.localScale = originalScales[i];
-            cards[i].GetComponent<CardInteraction>().autoRotateFlag = true;
+            if(isMine)cards[i].GetComponent<CardInteraction>().autoRotateFlag = true;
         }
     }
 
@@ -1723,6 +1723,7 @@ public class DeckController : MonoBehaviour
 
         // Optionally, update layout
         UpdateCurrentPlayerHandLayout();
+        CardInteraction.currentlySelectedCard = null;
     }
 
     public void SwapCardsBetweenPlayersByID(int playerANo, string cardAID, int playerBNo, string cardBID)
@@ -1786,6 +1787,7 @@ public class DeckController : MonoBehaviour
 
         // Now, when UpdateCurrentPlayerHandLayout is called, the cards will animate from their old positions
         UpdateCurrentPlayerHandLayout();
+        CardInteraction.currentlySelectedCard = null;
     }
 
 
@@ -1941,6 +1943,8 @@ public class DeckController : MonoBehaviour
         UpdateShowcaseOriginalsAfterSwap(cardBObj);
 
         if (!GameManager.LocalInstance.isSunuDegisBunuTokusActive) ExitShowcaseAllOtherHands();
+
+        CardInteraction.currentlySelectedCard = null;
     }
 
 
