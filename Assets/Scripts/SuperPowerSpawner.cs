@@ -153,16 +153,36 @@ public class SuperPowerSpawner : MonoBehaviour
 
 
 
-    private List<string> restirictedPowersName = new List<string> { "Bu Daha İyi", "Şunu Değiş Tokuş", "Kopyala Yapıştır"};
+    private List<string> restirictedPowersName_CardNeedToBeSelected = new List<string> { "Bu Daha İyi", "Şunu Değiş Tokuş", "Kopyala Yapıştır" };
+    private List<string> restirictedPowersName_CenterNotEmpty = new List<string> { "Bomba" };
     private bool CheckIfCardShouldBeSelected(string superPowerTokenName)
     {
-        if (restirictedPowersName.Contains(superPowerTokenName))
+        bool flag = CardNeedToBeSelected(superPowerTokenName);
+        flag = flag && CenterNotEmpty(superPowerTokenName);
+
+        return flag;
+    }
+
+    private bool CardNeedToBeSelected(string superPowerTokenName)
+    {
+        if (restirictedPowersName_CardNeedToBeSelected.Contains(superPowerTokenName))
         {
             if (CardInteraction.currentlySelectedCard != null && GameManager.LocalInstance.GetCurrentSelectedHandCard() != null)
                 return true;
             else
                 return false;
+        }
+        return true;
+    }
 
+    private bool CenterNotEmpty(string superPowerTokenName)
+    {
+        if (restirictedPowersName_CardNeedToBeSelected.Contains(superPowerTokenName))
+        {
+            if (GameManager.LocalInstance.centerCards.Count != 0)
+                return true;
+            else
+                return false;
         }
         return true;
     }
@@ -443,4 +463,23 @@ public class SuperPowerSpawner : MonoBehaviour
             OpenInfoBox(SuperPowerToken.ActiveInstance);
         }
     }
+
+    public void ReportZaferPuaniToServer()
+    {
+        int playerNo = DeckController.LocalInstance.thisPlayerNumber;
+        int totalPoints = 0;
+        foreach (var tokenObj in spawnedSuperPowers)
+        {
+            if (tokenObj == null) continue;
+            var token = tokenObj.GetComponent<SuperPowerToken>();
+            if (token != null && token.power is ZaferPuani zaferPower)
+            {
+                totalPoints += zaferPower.points;
+            }
+        }
+        // Always report, even if totalPoints is 0
+        NetworkRelay.Instance.ReportZaferPuaniServerRPC(playerNo, totalPoints);
+    }
+
+
 }

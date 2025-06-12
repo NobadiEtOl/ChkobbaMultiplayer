@@ -132,7 +132,7 @@ public class Bomba : SuperPower
     {
         name = "Bomba";
         description = "Peek at an opponent's card.";
-        rarityMultiplier = 1;
+        rarityMultiplier = 100;
     }
     public override void ActivatePower()
     {
@@ -234,6 +234,25 @@ public class SunuDegisBunuTokus : SuperPower
     {
         Debug.Log("ŞunuDeğişBunuTokuş activated!");
         GameManager.LocalInstance.ActivateSunuDegisBunuTokusPower();
+    }
+}
+
+[CreateAssetMenu(menuName = "SuperPower/ZaferPuani")]
+public class ZaferPuani : SuperPower
+{
+    [SerializeField] public int points = 5; // Adjustable in Inspector
+
+    private void OnEnable()
+    {
+        name = "Zafer Puanı";
+        description = $"Round bonus: If you hold this at the end of the round, your team gets {points} points!";
+        rarityMultiplier = 1;
+    }
+
+    public override void ActivatePower()
+    {
+        // No active effect
+        Debug.Log("Zafer Puanı has no active effect.");
     }
 }
 

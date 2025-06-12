@@ -18,11 +18,11 @@ public class NetworkRelay : NetworkBehaviour
 
     //ClientRpc
     [ClientRpc(RequireOwnership = false)]
-    public void UpdateCurrentPlayerClientRPC(int currentPlayer)
+    public void UpdateCurrentPlayerClientRPC(int currentPlayer, int turnCounter)
     {
         if (GameManager.LocalInstance != null)
         {
-            GameManager.LocalInstance.UpdateCurrentPlayer(currentPlayer);
+            GameManager.LocalInstance.UpdateCurrentPlayer(currentPlayer, turnCounter);
         }
         else
         {
@@ -199,6 +199,12 @@ public class NetworkRelay : NetworkBehaviour
 
 
     //ServerRPC
+    [ServerRpc(RequireOwnership = false)]
+    public void ReportZaferPuaniServerRPC(int playerNo, int points)
+    {
+        server.AddZaferPuaniPoints(playerNo, points);
+    }
+
     [ServerRpc(RequireOwnership = false)]
     public void UseSunuDegisTokusServerRPC(int myPlayerNo, string myHandCardID, string otherHandCardID)
     {

@@ -58,6 +58,7 @@ public class Server : NetworkBehaviour
         singleDebuggingMode = false;
         winnerPrintFlag = false;
         copiedCardMap.Clear();
+        zaferPuaniPoints.Clear();
     }
 
     public void ResetForNewRound()
@@ -77,6 +78,7 @@ public class Server : NetworkBehaviour
         singleDebuggingMode = false;
         winnerPrintFlag = false;
         copiedCardMap.Clear();
+        zaferPuaniPoints.Clear();
         // DO NOT reset: points, piştiCounts, roundCount, startingPlayerNo
     }
 
@@ -153,7 +155,7 @@ public class Server : NetworkBehaviour
 
     public void CallUpdateCurrentPlayer()
     {
-        networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer);
+        networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer,turnCounter);
     }
 
     private int initialDealCoroutineCheckCounter = 0;
@@ -401,7 +403,7 @@ public class Server : NetworkBehaviour
         if (turnCounter == 47)
         {
             //Round ends and a winner is decided after each card is played
-            DecideWinner();
+            //DecideWinner();
         }
         else if (turnCounter % (playerCount * 4) == (playerCount * 4) - 1)
         {
@@ -430,7 +432,7 @@ public class Server : NetworkBehaviour
 
         currentPlayer = (currentPlayer + 1) % playerCount;
 
-        networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer);
+        networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer,turnCounter);
     }
 
     private void GivePlayerCount()
@@ -1089,4 +1091,34 @@ public class Server : NetworkBehaviour
             }
         }
     }
+
+    private Dictionary<int, int> zaferPuaniPoints = new Dictionary<int, int>();
+    private int zaferPuaniReportsReceived = 0;
+    public void AddZaferPuaniPoints(int playerNo, int points)
+    {
+        if (!zaferPuaniPoints.ContainsKey(playerNo))
+            zaferPuaniPoints[playerNo] = 0;
+        zaferPuaniPoints[playerNo] += points;
+        zaferPuaniReportsReceived++;
+
+        if (zaferPuaniReportsReceived >= playerCount)
+        {
+            ApplyZaferPuaniPoints();
+            DecideWinner();
+        }
+    }
+
+    private void ApplyZaferPuaniPoints()
+    {
+        foreach (var kvp in zaferPuaniPoints)
+        {
+            int playerNo = kvp.Key;
+            int points = kvp.Value;
+            this.points[playerNo] += points; // 'this.points' is your main points array
+            Debug.LogWarning($"Applied {points} Zafer Puanı to player/team {playerNo}");
+        }
+        zaferPuaniPoints.Clear();
+        zaferPuaniReportsReceived = 0;
+    }
+
 }

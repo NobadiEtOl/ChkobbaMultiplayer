@@ -38,6 +38,12 @@ public class GameManager : NetworkBehaviour
     private bool movePlayedLocally = false;
     private GameObject waitingScreen;
     private GameObject mainScreen;
+    private GameObject explosionObject;
+    private Animator explosionAnimator;
+    private GameObject bombObject;
+    private Animator bombAnimator;
+
+
 
     public void ResetForNewRound()
     {
@@ -486,9 +492,11 @@ public class GameManager : NetworkBehaviour
         deckController.DiscardHandCardToCenter(uniqueCardID, cardID);
     }
 
-    public void UpdateCurrentPlayer(int playerNumber)
+    private int turnCounter;
+    public void UpdateCurrentPlayer(int playerNumber, int turnC)
     {
         currentPlayerNo = playerNumber;
+        turnCounter = turnC;
     }
 
     public void UpdateCenterCardIDList(SerializableCard serializableCard)
@@ -665,6 +673,29 @@ public class GameManager : NetworkBehaviour
 
         centerTransform = GameObject.Find("Center").GetComponent<Transform>();
         deckController.GetPlayerHandTransforms(playerHandTransforms, playerPoolTransforms, centerTransform, playerPiştiPoolTransforms);
+
+        var centerObj = GameObject.Find("Center");
+        if (centerObj != null)
+        {
+            bombObject = centerObj.transform.Find("Bomb")?.gameObject;
+            if (bombObject != null)
+            {
+                bombAnimator = bombObject.GetComponent<Animator>();
+                bombObject.SetActive(false);
+            }
+
+            explosionObject = centerObj.transform.Find("Explosion")?.gameObject;
+            if (explosionObject != null)
+            {
+                explosionAnimator = explosionObject.GetComponent<Animator>();
+                explosionObject.SetActive(false);
+
+                // Find Bomb child and its animator
+
+            }
+        }
+
+
     }
 
     public void SkipTurn()
@@ -674,6 +705,7 @@ public class GameManager : NetworkBehaviour
 
     public void TellServerTurnEnded()
     {
+        if (turnCounter == 47) NotifyZaferPuaniAtRoundEnd();
         networkRelay.NotifyTurnIsReadyToEndServerRPC();
         //Debug.LogError("Turn ended");
     }
@@ -921,31 +953,111 @@ public class GameManager : NetworkBehaviour
 
     public void OnBombaCenter()
     {
-        // Find the BombedStack GameObject
+        StartCoroutine(BombThenExplosionSequence());
+    }
+
+    private IEnumerator BombThenExplosionSequence()
+    {
+        // 1. Ensure both are inactive at the start
+        if (bombObject != null) bombObject.SetActive(false);
+        if (explosionObject != null) explosionObject.SetActive(false);
+
+        // 2. Activate and play Bomb animation
+        if (bombObject != null && bombAnimator != null)
+        {
+            bombObject.SetActive(true);
+            bombAnimator.Play("BombAnimationClip", 0, 0f);
+
+            // Wait for bomb animation to finish
+            float bombAnimLength = 1.0f;
+            AnimatorStateInfo bombStateInfo = bombAnimator.GetCurrentAnimatorStateInfo(0);
+            if (bombStateInfo.length > 0)
+                bombAnimLength = bombStateInfo.length;
+            else if (bombAnimator.runtimeAnimatorController != null && bombAnimator.runtimeAnimatorController.animationClips.Length > 0)
+                bombAnimLength = bombAnimator.runtimeAnimatorController.animationClips[0].length;
+
+            yield return new WaitForSeconds(bombAnimLength);
+
+            // Optionally, hide the bomb sprite after animation
+            var bombSpriteRenderer = bombObject.GetComponent<SpriteRenderer>();
+            if (bombSpriteRenderer != null)
+                bombSpriteRenderer.sprite = null;
+
+            bombObject.SetActive(false);
+        }
+        else
+        {
+            Debug.LogWarning("Bomb object or animator not found!");
+        }
+
+        // 3. Activate and play Explosion animation
+        if (explosionObject != null && explosionAnimator != null)
+        {
+            explosionObject.SetActive(true);
+            explosionAnimator.Play("ExplosionAnimationClip", 0, 0f);
+
+            // Wait for explosion animation to finish
+            float explosionAnimLength = 1.0f;
+            AnimatorStateInfo explosionStateInfo = explosionAnimator.GetCurrentAnimatorStateInfo(0);
+            if (explosionStateInfo.length > 0)
+                explosionAnimLength = explosionStateInfo.length;
+            else if (explosionAnimator.runtimeAnimatorController != null && explosionAnimator.runtimeAnimatorController.animationClips.Length > 0)
+                explosionAnimLength = explosionAnimator.runtimeAnimatorController.animationClips[0].length;
+
+            yield return new WaitForSeconds(explosionAnimLength);
+
+            explosionObject.SetActive(false);
+        }
+        else
+        {
+            Debug.LogWarning("Explosion object or animator not found!");
+        }
+
+        // 4. Move all center cards to BombedStack (as before)
         GameObject bombedStack = GameObject.Find("BombedStack");
         if (bombedStack == null)
         {
             Debug.LogError("BombedStack GameObject not found in scene!");
-            return;
+            yield break;
         }
 
-        // Move all center cards to BombedStack
         foreach (var cardObj in centerCardsObjects)
         {
             if (cardObj != null)
             {
                 cardObj.transform.SetParent(bombedStack.transform, true);
-                cardObj.transform.localPosition = Vector3.zero; // Reset position if needed
+                cardObj.transform.localPosition = Vector3.zero;
             }
         }
 
-        // Clear all center-related lists/dictionaries
+        // 5. Clear all center-related lists/dictionaries (as before)
         centerCards.Clear();
         centerCardsObjects.Clear();
         if (centerCardIDList != null) centerCardIDList.Clear();
 
         Debug.Log("Bomba: Center cleared and cards moved to BombedStack.");
     }
+
+
+
+
+
+    private IEnumerator DisableExplosionAfterAnimation()
+    {
+        // Wait for the animation to finish
+        float animLength = 1.0f;
+        if (explosionAnimator != null)
+        {
+            AnimatorStateInfo stateInfo = explosionAnimator.GetCurrentAnimatorStateInfo(0);
+            animLength = stateInfo.length;
+        }
+        yield return new WaitForSeconds(animLength);
+
+        if (explosionObject != null)
+            explosionObject.SetActive(false);
+    }
+
+
 
     private bool isYapamazsınActive = false;
 
@@ -1203,4 +1315,10 @@ public class GameManager : NetworkBehaviour
     {
         return currentSelectedHandCard;
     }
+
+    public void NotifyZaferPuaniAtRoundEnd()
+    {
+        SuperPowerSpawner.LocalInstance.ReportZaferPuaniToServer();
+    }
+
 }
