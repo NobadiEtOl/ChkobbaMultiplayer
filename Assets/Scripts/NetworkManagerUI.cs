@@ -105,11 +105,13 @@ public class NetworkManagerUI : MonoBehaviour
             IsPrivate = privateFlag, // <--- This makes the lobby joinable only by code
             Data = new Dictionary<string, DataObject>
             {
-                { "JoinCode", new DataObject(DataObject.VisibilityOptions.Public, joinCodeVar) }
+                { "JoinCode", new DataObject(DataObject.VisibilityOptions.Public, joinCodeVar) },
+                { "HostPlayerId", new DataObject(DataObject.VisibilityOptions.Public, AuthenticationService.Instance.PlayerId) }
             }
         };
 
         currentLobby = await Lobbies.Instance.CreateLobbyAsync("MyLobby", playerCount, options);
+        LobbyHostMitigator.Instance.Initialize(currentLobby);
         Debug.Log($"Host started with join code: {joinCodeVar}");
         Server.Singleton.SetPlayerCount(playerCount);
         return NetworkManager.Singleton.StartHost() ? joinCodeVar : null;
@@ -160,6 +162,7 @@ public class NetworkManagerUI : MonoBehaviour
         if (foundLobby != null)
         {
             currentLobby = await Lobbies.Instance.JoinLobbyByIdAsync(foundLobby.Id);
+            LobbyHostMitigator.Instance.Initialize(currentLobby);
         }
         else
         {
@@ -235,6 +238,18 @@ public class NetworkManagerUI : MonoBehaviour
         {
             var lobby = await Lobbies.Instance.JoinLobbyByIdAsync(lobbyId);
             currentLobby = lobby; // Store the current lobby
+            if (lobby == null)
+            {
+                Debug.LogError("Lobby is null!");
+                return;
+            }
+            if (lobby.Data == null || !lobby.Data.ContainsKey("HostPlayerId"))
+            {
+                Debug.LogError("Lobby data or HostPlayerId is missing!");
+                return;
+            }
+
+            LobbyHostMitigator.Instance.Initialize(currentLobby);
 
             if (lobby != null)
             {
