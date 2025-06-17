@@ -24,7 +24,7 @@ public class SuperPowerSpawner : MonoBehaviour
     private Button falseActivateButton;
     private Button closeButton;
     // Start is called before the first frame update
-    void Start()
+    void Awake()
     {
         if (LocalInstance != null && LocalInstance != this)
         {

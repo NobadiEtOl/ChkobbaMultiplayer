@@ -161,6 +161,7 @@ public class Server : NetworkBehaviour
     private int initialDealCoroutineCheckCounter = 0;
     public void InitialDealCoroutineCheck()
     {
+        Debug.LogWarning("InitialDealCoroutineCheck called, connectedPlayerCount: " + connectedPlayerCount);
         initialDealCoroutineCheckCounter++;
         if (initialDealCoroutineCheckCounter == connectedPlayerCount)
         {

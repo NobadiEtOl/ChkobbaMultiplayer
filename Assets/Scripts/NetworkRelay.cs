@@ -44,6 +44,7 @@ public class NetworkRelay : NetworkBehaviour
     [ClientRpc(RequireOwnership = false)]
     public void InitializeCardPrefabsClientRPC()
     {
+        Debug.Log("InitializeCardPrefabsClientRPC called");
         StartCoroutine(GameManager.LocalInstance.InitializeCardPrefabs());
     }
 

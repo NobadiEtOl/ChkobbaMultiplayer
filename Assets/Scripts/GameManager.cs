@@ -8,7 +8,7 @@ using Unity.Netcode;
 using UnityEngine.UI;
 using UnityEngine.UIElements;
 
-public class GameManager : NetworkBehaviour
+public class GameManager : MonoBehaviour
 {
     //Scripts
     public static GameManager LocalInstance { get; private set; }
@@ -81,13 +81,16 @@ public class GameManager : NetworkBehaviour
 
     void Awake()
     {
+        Debug.Log($"GameManager Awake called on {gameObject.GetInstanceID()}");
         if (LocalInstance != null && LocalInstance != this)
         {
+            Debug.LogWarning($"Destroying duplicate GameManager {gameObject.GetInstanceID()}");
             Destroy(this.gameObject);
             return;
         }
         LocalInstance = this;
-        DontDestroyOnLoad(this.gameObject); // Optional, if you want it to persist
+        DontDestroyOnLoad(this.gameObject);
+        Debug.Log($"GameManager LocalInstance set to {gameObject.GetInstanceID()}");
     }
 
     void Start()
@@ -95,10 +98,23 @@ public class GameManager : NetworkBehaviour
         Debug.Log("GameManager started");
         InitialGameManagerSetUp();//Identifies and assigns necessary variables and calls other functions
 
-        networkRelay.NotifyCientConnectedServerRPC(NetworkManager.Singleton.LocalClientId);// Tells the server that a client is started
-
         SuperPowerSpawner.LocalInstance.InitializeSuperPowers(); // Initialize super powers
     }
+
+    public void NotifyConnection()
+    {
+        networkRelay.NotifyCientConnectedServerRPC(NetworkManager.Singleton.LocalClientId);// Tells the server that a client is started
+    }
+
+    void OnDestroy()
+    {
+        if (LocalInstance == this)
+        {
+            Debug.LogWarning($"GameManager {gameObject.GetInstanceID()} destroyed, clearing LocalInstance");
+            LocalInstance = null;
+        }
+    }
+
 
     private CardInteraction tempCard;
     void Update()
@@ -159,7 +175,7 @@ public class GameManager : NetworkBehaviour
                 }
                 else if (card == null && Input.GetMouseButtonDown(0))
                 {
-                    Debug.LogError("CardInteraction is null, trying to stop showcase player pool cards");
+                    //Debug.LogError("CardInteraction is null, trying to stop showcase player pool cards");
                     deckController.TryStopShowcasePlayerPoolCards();
                 }
                 else if (Input.GetMouseButton(0) && tempCard != null)
@@ -201,16 +217,22 @@ public class GameManager : NetworkBehaviour
     [ContextMenu("Initialize Card Prefabs")]
     public IEnumerator InitializeCardPrefabs()
     {
+        Debug.Log("InitializeCardPrefabs called. deckController: " + (deckController != null));
         ResetForNewRound();
+        Debug.Log("InitializeCardPrefabs called. deckController: " + (deckController != null));
         roundCount++;
         if (waitingScreen.activeSelf) waitingScreen.SetActive(false);
+        Debug.Log("InitializeCardPrefabs called. deckController: " + (deckController != null));
         if (mainScreen.activeSelf) mainScreen.SetActive(false);
+        Debug.Log("InitializeCardPrefabs called. deckController: " + (deckController != null));
         yield return StartCoroutine(deckController.DeckStart());
         if (winScreen.activeSelf) winScreen.SetActive(false);
+        Debug.Log("InitializeCardPrefabs called. deckController: " + (deckController != null));
     }
 
     public void DeckReady()
     {
+        Debug.Log("Deck is ready, notifying server.");
         networkRelay.DeckReadyServerRPC();
     }
 
@@ -663,6 +685,7 @@ public class GameManager : NetworkBehaviour
         GameObject.Find("PlayerPointText2").GetComponent<Text>().text = "0 ";
 
         waitingScreen = GameObject.Find("WaitingScreen");
+        waitingScreen.SetActive(false);
         mainScreen = GameObject.Find("MainScreen");
 
         winScreen = GameObject.Find("WinScreen");
