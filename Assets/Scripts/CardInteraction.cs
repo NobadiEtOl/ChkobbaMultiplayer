@@ -25,6 +25,8 @@ public class CardInteraction : MonoBehaviour
     // In CardInteraction.cs
     public string uniqueCardInstanceID; // e.g., a GUID
 
+    private static Color baseCardIndicatorColor;
+
     public int[] GetCardID()
     {
         // Return a copy of the cardID to prevent external modification
@@ -223,6 +225,7 @@ public class CardInteraction : MonoBehaviour
 
         // Activate this card's indicator
         selectedCardIndicator.SetActive(true);
+        selectedCardIndicator.GetComponent<SpriteRenderer>().color = baseCardIndicatorColor; // Bring the card to the front
         activeCardIndicator = selectedCardIndicator;
 
         // Mark this card as selected
@@ -247,7 +250,8 @@ public class CardInteraction : MonoBehaviour
         Transform cardIndTransform = cardInd.transform;
         cardIndTransform.localPosition = new Vector3(0, 0, 0.04f);
         cardIndTransform.localRotation = cardInd.transform.rotation;
-        cardIndTransform.localScale = new Vector3(1.7f, 2.3f, 1);
+        cardIndTransform.localScale = new Vector3(1f, 1f, 1);
+        baseCardIndicatorColor = cardInd.GetComponent<SpriteRenderer>().color;
         cardInd.SetActive(false);
         selectedCardIndicator = cardInd;
     }

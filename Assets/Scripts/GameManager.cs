@@ -861,7 +861,10 @@ public class GameManager : MonoBehaviour
                     // Activate the indicator for this card
                     var indicator = cardScript.transform.Find("SelectedCardIndicator(Clone)");
                     if (indicator != null)
+                    {
                         indicator.gameObject.SetActive(true);
+                        indicator.GetComponent<SpriteRenderer>().color = Color.red; // Set the sprite to card back
+                    }
                 }
             }
         }

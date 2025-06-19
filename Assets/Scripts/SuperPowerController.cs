@@ -82,8 +82,9 @@ public class ValeArar : SuperPower
     {
         name = "Vale Arar";
         description = "Peek at an opponent's card.";
-        rarityMultiplier = 1;
+        rarityMultiplier = 100;
     }
+    [ContextMenu("Vale Arar")]
     public override void ActivatePower()
     {
         Debug.Log("ValeArar activated!");
