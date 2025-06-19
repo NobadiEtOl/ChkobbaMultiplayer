@@ -82,7 +82,7 @@ public class ValeArar : SuperPower
     {
         name = "Vale Arar";
         description = "Peek at an opponent's card.";
-        rarityMultiplier = 100;
+        rarityMultiplier = 1;
     }
     [ContextMenu("Vale Arar")]
     public override void ActivatePower()
@@ -133,12 +133,13 @@ public class Bomba : SuperPower
     {
         name = "Bomba";
         description = "Peek at an opponent's card.";
-        rarityMultiplier = 1;
+        rarityMultiplier = 100;
     }
     public override void ActivatePower()
     {
         Debug.Log("Bomba activated!");
-        GameManager.LocalInstance.ActivateBombaPower();
+        if (GameManager.LocalInstance.centerCards.Count != 0) GameManager.LocalInstance.ActivateBombaPower();
+        else SuperPowerSpawner.LocalInstance.CloseInfoBox();
     }
 }
 

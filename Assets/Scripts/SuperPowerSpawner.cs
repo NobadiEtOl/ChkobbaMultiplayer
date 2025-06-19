@@ -177,7 +177,7 @@ public class SuperPowerSpawner : MonoBehaviour
 
     private bool CenterNotEmpty(string superPowerTokenName)
     {
-        if (restirictedPowersName_CardNeedToBeSelected.Contains(superPowerTokenName))
+        if (restirictedPowersName_CenterNotEmpty.Contains(superPowerTokenName))
         {
             if (GameManager.LocalInstance.centerCards.Count != 0)
                 return true;

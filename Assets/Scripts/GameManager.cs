@@ -983,6 +983,7 @@ public class GameManager : MonoBehaviour
 
     private IEnumerator BombThenExplosionSequence()
     {
+        centerCards.Clear();
         // 1. Ensure both are inactive at the start
         if (bombObject != null) bombObject.SetActive(false);
         if (explosionObject != null) explosionObject.SetActive(false);
@@ -1055,7 +1056,6 @@ public class GameManager : MonoBehaviour
         }
 
         // 5. Clear all center-related lists/dictionaries (as before)
-        centerCards.Clear();
         centerCardsObjects.Clear();
         if (centerCardIDList != null) centerCardIDList.Clear();
 
