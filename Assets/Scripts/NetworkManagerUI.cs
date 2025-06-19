@@ -111,7 +111,6 @@ public class NetworkManagerUI : MonoBehaviour
         };
 
         currentLobby = await Lobbies.Instance.CreateLobbyAsync("MyLobby", playerCount, options);
-        LobbyHostMitigator.Instance.Initialize(currentLobby);
         Debug.Log($"Host started with join code: {joinCodeVar}");
         Server.Singleton.SetPlayerCount(playerCount);
         return NetworkManager.Singleton.StartHost() ? joinCodeVar : null;
@@ -162,7 +161,6 @@ public class NetworkManagerUI : MonoBehaviour
         if (foundLobby != null)
         {
             currentLobby = await Lobbies.Instance.JoinLobbyByIdAsync(foundLobby.Id);
-            LobbyHostMitigator.Instance.Initialize(currentLobby);
         }
         else
         {
@@ -248,8 +246,6 @@ public class NetworkManagerUI : MonoBehaviour
                 Debug.LogError("Lobby data or HostPlayerId is missing!");
                 return;
             }
-
-            LobbyHostMitigator.Instance.Initialize(currentLobby);
 
             if (lobby != null)
             {

@@ -155,7 +155,7 @@ public class Server : NetworkBehaviour
 
     public void CallUpdateCurrentPlayer()
     {
-        networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer,turnCounter);
+        networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer, turnCounter);
     }
 
     private int initialDealCoroutineCheckCounter = 0;
@@ -433,7 +433,7 @@ public class Server : NetworkBehaviour
 
         currentPlayer = (currentPlayer + 1) % playerCount;
 
-        networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer,turnCounter);
+        networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer, turnCounter);
     }
 
     private void GivePlayerCount()
@@ -446,6 +446,7 @@ public class Server : NetworkBehaviour
         networkRelay.SkipTurnClientRPC();
     }
 
+    [ContextMenu("DecideWinner")]
     private void DecideWinner()
     {
         AddRemainingCardsToPlayerPool();
@@ -643,7 +644,7 @@ public class Server : NetworkBehaviour
 
         if (winnerSide == -1)
         {
-            Invoke("StartGameAutomatic", 10f);
+            //Invoke("StartGameAutomatic", 10f);
         }
     }
 
@@ -665,6 +666,7 @@ public class Server : NetworkBehaviour
     //Add remaining cards in the center to the pool of the player who last captured a card.
     public void AddRemainingCardsToPlayerPool()
     {
+        if(endTestFlag)return;
         if (centerCardsDict == null) return;
         foreach (var kvp in centerCardsDict)
         {
@@ -1102,7 +1104,7 @@ public class Server : NetworkBehaviour
         zaferPuaniPoints[playerNo] += points;
         zaferPuaniReportsReceived++;
 
-        if (zaferPuaniReportsReceived >= playerCount)
+        if (zaferPuaniReportsReceived >= connectedPlayerCount)
         {
             ApplyZaferPuaniPoints();
             DecideWinner();
@@ -1121,5 +1123,46 @@ public class Server : NetworkBehaviour
         zaferPuaniPoints.Clear();
         zaferPuaniReportsReceived = 0;
     }
+
+
+    bool endTestFlag=false;
+    [ContextMenu("RandomlyDistributeCardsAndDecideWinner")]
+    public void RandomlyDistributeCardsAndDecideWinner()
+    {
+        endTestFlag = true;
+        // Ensure player pools are initialized
+        playersPooledCardsIDs = new Dictionary<int, List<string>>();
+        for (int i = 0; i < playerCount; i++)
+            playersPooledCardsIDs[i] = new List<string>();
+
+        // Get all card IDs
+        List<string> allCardIDs = new List<string>(allCardLookup.Keys);
+
+        // Shuffle the cards
+        System.Random rng = new System.Random();
+        int n = allCardIDs.Count;
+        while (n > 1)
+        {
+            n--;
+            int k = rng.Next(n + 1);
+            string value = allCardIDs[k];
+            allCardIDs[k] = allCardIDs[n];
+            allCardIDs[n] = value;
+        }
+
+        // Distribute cards to player pools
+        for (int i = 0; i < allCardIDs.Count; i++)
+        {
+            int playerIndex = i % playerCount;
+            playersPooledCardsIDs[playerIndex].Add(allCardIDs[i]);
+        }
+
+        Debug.Log("Randomly distributed all cards to player pools. Calling DecideWinner...");
+        // Example: Assign pools for showcase
+        
+        networkRelay.AssignCardsToPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs));
+        DecideWinner();
+    }
+
 
 }

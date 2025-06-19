@@ -118,6 +118,12 @@ public class NetworkRelay : NetworkBehaviour
             GameManager.LocalInstance.GetPlayerNumber(playerNumber);
         }
     }
+    [ClientRpc(RequireOwnership = false)]
+    public void AssignCardsToPlayerPoolsClientRPC(SerializableDictionary serializableDictionary)
+    {
+        DeckController.LocalInstance.AssignCardsToPlayerPools(serializableDictionary);
+    }
+    
 
     [ClientRpc]
     public void UsePeekOpponentCardPowerClientRPC(int opponentPlayerNo, int cardIndex)

@@ -900,15 +900,15 @@ public class DeckController : MonoBehaviour
 
     private void ShowcasePiştisAndPoints1v1()
     {
-        int cardsPerRow = 7;
-        float cardSpacing = 420f;
+        int cardsPerRow = 4;
+        float cardSpacing = 500f;
         float rowSpacing = 1250f;
         float cardScale = myCardsScale;
         float piştiGap = 1.5f * rowSpacing;
 
         // Get screen positions for left (my side) and right (opponent)
-        Vector3 leftScreen = new Vector3(Screen.width * 0.25f, Screen.height * 0.75f, 3000f);
-        Vector3 rightScreen = new Vector3(Screen.width * 0.75f, Screen.height * 0.75f, 3000f);
+        Vector3 leftScreen = new Vector3(Screen.width * 0.2f, Screen.height * 0.6f, 3000f);
+        Vector3 rightScreen = new Vector3(Screen.width * 0.8f, Screen.height * 0.6f, 3000f);
 
         Vector3 leftWorld = Camera.main.ScreenToWorldPoint(leftScreen);
         Vector3 rightWorld = Camera.main.ScreenToWorldPoint(rightScreen);
@@ -988,15 +988,15 @@ public class DeckController : MonoBehaviour
 
     private void ShowcasePiştisAndPoints2v2()
     {
-        int cardsPerRow = 7;
-        float cardSpacing = 420f;
+        int cardsPerRow = 5;
+        float cardSpacing = 500f;
         float rowSpacing = 1250f;
         float cardScale = myCardsScale;
         float piştiGap = 1.5f * rowSpacing;
 
         // Get screen positions for left (my team) and right (opponent team)
-        Vector3 leftScreen = new Vector3(Screen.width * 0.25f, Screen.height * 0.75f, 3000f);
-        Vector3 rightScreen = new Vector3(Screen.width * 0.75f, Screen.height * 0.75f, 3000f);
+        Vector3 leftScreen = new Vector3(Screen.width * 0.2f, Screen.height * 0.6f, 3000f);
+        Vector3 rightScreen = new Vector3(Screen.width * 0.8f, Screen.height * 0.6f, 3000f);
 
         Vector3 leftWorld = Camera.main.ScreenToWorldPoint(leftScreen);
         Vector3 rightWorld = Camera.main.ScreenToWorldPoint(rightScreen);
@@ -1986,6 +1986,74 @@ public class DeckController : MonoBehaviour
             var ci = card.GetComponent<CardInteraction>();
             bool autoRotate = ci != null ? ci.autoRotateFlag : false;
             showcaseOriginalTransforms[card] = (card.transform.position, card.transform.rotation, card.transform.localScale, autoRotate);
+        }
+    }
+
+    /// <summary>
+    /// Assigns card GameObjects to player pools based on a dictionary of playerNo -> List of card IDs.
+    /// </summary>
+    public void AssignCardsToPlayerPools(SerializableDictionary playersPooledCardsIDsSerialized)
+    {
+        Dictionary<int, List<string>> playersPooledCardsIDs = playersPooledCardsIDsSerialized.ToDictionary();
+        if (playerPoolTransforms == null || playerPoolTransforms.Count == 0)
+        {
+            Debug.LogError("playerPoolTransforms not set!");
+            return;
+        }
+
+        foreach (var kvp in playersPooledCardsIDs)
+        {
+            int playerNo = kvp.Key;
+            List<string> cardIDs = kvp.Value;
+
+            // Get the correct pool transform for this player
+            int poolIndex = GetPoolIndex(playerNo); // Use your existing logic for 2v2/1v1
+            Transform poolTransform = playerPoolTransforms[poolIndex];
+
+            foreach (string cardID in cardIDs)
+            {
+                if (CardInteraction.cardLookup.TryGetValue(cardID, out var cardInteraction))
+                {
+                    GameObject cardObj = cardInteraction.gameObject;
+                    cardObj.transform.SetParent(poolTransform, false);
+                    // Optionally, reset position/rotation/scale here if needed
+                }
+                else
+                {
+                    Debug.LogWarning($"CardInteraction.cardLookup does not contain cardID: {cardID}");
+                }
+            }
+        }
+    }
+
+    public void AssignCardsToPlayerHands(Dictionary<int, List<string>> playersHandCardsIDs)
+    {
+        if (playerHandTransforms == null || playerHandTransforms.Count == 0)
+        {
+            Debug.LogError("playerHandTransforms not set!");
+            return;
+        }
+
+        foreach (var kvp in playersHandCardsIDs)
+        {
+            int playerNo = kvp.Key;
+            List<string> cardIDs = kvp.Value;
+
+            int handIndex = GetPoolIndex(playerNo); // Use your existing logic
+            Transform handTransform = playerHandTransforms[handIndex];
+
+            foreach (string cardID in cardIDs)
+            {
+                if (CardInteraction.cardLookup.TryGetValue(cardID, out var cardInteraction))
+                {
+                    GameObject cardObj = cardInteraction.gameObject;
+                    cardObj.transform.SetParent(handTransform, false);
+                }
+                else
+                {
+                    Debug.LogWarning($"CardInteraction.cardLookup does not contain cardID: {cardID}");
+                }
+            }
         }
     }
 

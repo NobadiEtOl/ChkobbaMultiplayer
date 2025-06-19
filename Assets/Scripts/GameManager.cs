@@ -217,17 +217,12 @@ public class GameManager : MonoBehaviour
     [ContextMenu("Initialize Card Prefabs")]
     public IEnumerator InitializeCardPrefabs()
     {
-        Debug.Log("InitializeCardPrefabs called. deckController: " + (deckController != null));
         ResetForNewRound();
-        Debug.Log("InitializeCardPrefabs called. deckController: " + (deckController != null));
         roundCount++;
         if (waitingScreen.activeSelf) waitingScreen.SetActive(false);
-        Debug.Log("InitializeCardPrefabs called. deckController: " + (deckController != null));
-        if (mainScreen.activeSelf) mainScreen.SetActive(false);
-        Debug.Log("InitializeCardPrefabs called. deckController: " + (deckController != null));
         yield return StartCoroutine(deckController.DeckStart());
         if (winScreen.activeSelf) winScreen.SetActive(false);
-        Debug.Log("InitializeCardPrefabs called. deckController: " + (deckController != null));
+        if (mainScreen.activeSelf) mainScreen.SetActive(false);
     }
 
     public void DeckReady()
@@ -564,10 +559,10 @@ public class GameManager : MonoBehaviour
 
         //turnTimerText.text = "";
 
-        UpdatePointText(point0, point1);
-
         winScreen.SetActive(true);
         roundOverText.text = message;
+
+        UpdatePointText(point0, point1);
 
         if (winnerSide != -1)
         {
@@ -597,12 +592,16 @@ public class GameManager : MonoBehaviour
         {
             pointTexts[0].text = point0.ToString();
             pointTexts[1].text = point1.ToString();
+            GameObject.Find("TallyContainer").GetComponent<TallyMarkDisplay>().UpdateTallyDisplay(point0);
+            GameObject.Find("TallyContainer1").GetComponent<TallyMarkDisplay>().UpdateTallyDisplay(point1);
         }
 
         else if (deckController.thisPlayerNumber == 1 || deckController.thisPlayerNumber == 3)
         {
             pointTexts[1].text = point0.ToString();
             pointTexts[0].text = point1.ToString();
+            GameObject.Find("TallyContainer").GetComponent<TallyMarkDisplay>().UpdateTallyDisplay(point1);
+            GameObject.Find("TallyContainer1").GetComponent<TallyMarkDisplay>().UpdateTallyDisplay(point0);
         }
     }
 
@@ -1013,6 +1012,22 @@ public class GameManager : MonoBehaviour
             Debug.LogWarning("Bomb object or animator not found!");
         }
 
+        GameObject bombedStack = GameObject.Find("BombedStack");
+        if (bombedStack == null)
+        {
+            Debug.LogError("BombedStack GameObject not found in scene!");
+            yield break;
+        }
+
+        foreach (var cardObj in centerCardsObjects)
+        {
+            if (cardObj != null)
+            {
+                cardObj.transform.SetParent(bombedStack.transform, true);
+                cardObj.transform.localPosition = Vector3.zero;
+            }
+        }
+
         // 3. Activate and play Explosion animation
         if (explosionObject != null && explosionAnimator != null)
         {
@@ -1034,23 +1049,6 @@ public class GameManager : MonoBehaviour
         else
         {
             Debug.LogWarning("Explosion object or animator not found!");
-        }
-
-        // 4. Move all center cards to BombedStack (as before)
-        GameObject bombedStack = GameObject.Find("BombedStack");
-        if (bombedStack == null)
-        {
-            Debug.LogError("BombedStack GameObject not found in scene!");
-            yield break;
-        }
-
-        foreach (var cardObj in centerCardsObjects)
-        {
-            if (cardObj != null)
-            {
-                cardObj.transform.SetParent(bombedStack.transform, true);
-                cardObj.transform.localPosition = Vector3.zero;
-            }
         }
 
         // 5. Clear all center-related lists/dictionaries (as before)
