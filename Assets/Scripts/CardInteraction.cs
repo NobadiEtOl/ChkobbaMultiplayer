@@ -47,6 +47,12 @@ public class CardInteraction : MonoBehaviour
         gameObject.tag = cardID[0] + "_" + cardID[1];
     }
 
+    public void SetCardValue(int value)
+    {
+        cardID[1] = value;
+        gameObject.tag = cardID[0] + "_" + cardID[1];
+    }
+
     void Start()
     {
         //InitializeCard();
@@ -298,6 +304,7 @@ public class CardInteraction : MonoBehaviour
         gameObject.tag = cardID[0] + "_" + cardID[1];
         GetComponent<SpriteRenderer>().sprite = newSprite;
     }
+
 
     public void TriggerOnCardSelected()
     {

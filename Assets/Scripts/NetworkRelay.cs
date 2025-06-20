@@ -149,11 +149,11 @@ public class NetworkRelay : NetworkBehaviour
         GameManager.LocalInstance.SetYapamazsınActive(isActive);
     }
 
-    [ClientRpc]
+    /*[ClientRpc]
     public void SetKapkacActiveClientRPC(bool isActive)
     {
         GameManager.LocalInstance.SetKapkacActive(isActive);
-    }
+    }*/
 
     [ClientRpc]
     public void SetOynayamazsinActiveClientRPC(bool isActive)
@@ -202,10 +202,53 @@ public class NetworkRelay : NetworkBehaviour
     {
         GameManager.LocalInstance.OnSunuDegisBunuTokusSynced(myPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID, myHandIndex);
     }
+    [ClientRpc(RequireOwnership = false)]
+    public void KapkacCardChangedClientRPC(string cardUniqueID)
+    {
+        GameManager.LocalInstance.OnKapkacCardChanged(cardUniqueID);
+    }
+    [ClientRpc(RequireOwnership = false)]
+    public void KopyalaYapistirClientRPC(string targetUniqueID, string sourceUniqueID)
+    {
+        GameManager.LocalInstance.OnKopyalaYapistir(targetUniqueID, sourceUniqueID);
+    }
+
 
 
 
     //ServerRPC
+    [ServerRpc(RequireOwnership = false)]
+    public void KopyalaYapistirServerRPC(string targetUniqueID, string sourceUniqueID)
+    {
+        // Update the server's authoritative card data
+        if (Server.Singleton != null && Server.Singleton.allCardLookup.ContainsKey(sourceUniqueID) && Server.Singleton.allCardLookup.ContainsKey(targetUniqueID))
+        {
+            var sourceID = Server.Singleton.allCardLookup[sourceUniqueID];
+            Server.Singleton.allCardLookup[targetUniqueID][0] = sourceID[0]; // kind
+            Server.Singleton.allCardLookup[targetUniqueID][1] = sourceID[1]; // value
+        }
+        // Notify all clients to update visuals and local cardID
+        KopyalaYapistirClientRPC(targetUniqueID, sourceUniqueID);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void ActivateKapkacOnCardServerRPC(string cardUniqueID)
+    {
+        // Update the server's authoritative card data
+        if (Server.Singleton != null && Server.Singleton.allCardLookup.ContainsKey(cardUniqueID))
+        {
+            Server.Singleton.allCardLookup[cardUniqueID][1] = 11; // Set value to 11 (Jack)
+        }
+
+        // Optionally, also update CardInteraction on the server (for host visuals)
+        if (CardInteraction.cardLookup.ContainsKey(cardUniqueID))
+        {
+            CardInteraction.cardLookup[cardUniqueID].SetCardValue(11);
+        }
+
+        KapkacCardChangedClientRPC(cardUniqueID);
+    }
+
     [ServerRpc(RequireOwnership = false)]
     public void ReportZaferPuaniServerRPC(int playerNo, int points)
     {
@@ -245,11 +288,11 @@ public class NetworkRelay : NetworkBehaviour
         server.ActivateKutsalDeste();
     }
 
-    [ServerRpc(RequireOwnership = false)]
+    /*[ServerRpc(RequireOwnership = false)]
     public void ActivateKapkacServerRPC()
     {
         server.ActivateKapkac();
-    }
+    }*/
 
     [ServerRpc(RequireOwnership = false)]
     public void ActivateOynayamazsinServerRPC()

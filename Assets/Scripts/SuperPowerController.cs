@@ -101,7 +101,7 @@ public class KopyalaYapistir : SuperPower
     {
         name = "Kopyala Yapıştır";
         description = "Peek at an opponent's card.";
-        rarityMultiplier = 1;
+        rarityMultiplier = 100;
     }
     public override void ActivatePower()
     {
@@ -133,7 +133,7 @@ public class Bomba : SuperPower
     {
         name = "Bomba";
         description = "Peek at an opponent's card.";
-        rarityMultiplier = 100;
+        rarityMultiplier =1;
     }
     public override void ActivatePower()
     {
@@ -248,7 +248,7 @@ public class ZaferPuani : SuperPower
     {
         name = "Zafer Puanı";
         description = $"Round bonus: If you hold this at the end of the round, your team gets {points} points!";
-        rarityMultiplier = 100;
+        rarityMultiplier = 1;
     }
 
     public override void ActivatePower()

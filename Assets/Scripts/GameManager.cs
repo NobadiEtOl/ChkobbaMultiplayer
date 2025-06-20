@@ -43,6 +43,10 @@ public class GameManager : MonoBehaviour
     private GameObject bombObject;
     private Animator bombAnimator;
 
+    public List<GameObject> kapkacCardsToBeReset = new List<GameObject>();
+    [SerializeField] private GameObject kapkacEffectPrefab; // Prefab with your PNG as a SpriteRenderers
+    [SerializeField] private GameObject oynayamazsinBlockPrefab;
+    private GameObject oynayamazsinBlockInstance;
 
 
     public void ResetForNewRound()
@@ -371,12 +375,7 @@ public class GameManager : MonoBehaviour
         int sumValue = centerCards.Count > 0 ? centerCards.Last().Value[1] : 0;
         int cardValue = CardInteraction.cardLookup[currentSelectedHandCard].GetCardID()[1];
 
-        if (kapkacActive)
-        {
-            DiscardPlayedCards(currentSelectedHandCard, serializableCard, playerNumber);
-            movePlayedLocally = true;
-        }
-        else if (oynayamazsinActive)
+        if (oynayamazsinActive)
         {
             DiscardHandCards(currentSelectedHandCard, CardInteraction.cardLookup[currentSelectedHandCard].GetCardID());
             movePlayedLocally = true;
@@ -401,6 +400,54 @@ public class GameManager : MonoBehaviour
 
     }
 
+    private IEnumerator KapkacCourotine(string playedCard)
+    {
+        // --- Kapkaç animation addition START ---
+        GameObject cardObj = CardInteraction.cardLookup[playedCard].gameObject;
+        if (kapkacEffectPrefab != null)
+        {
+            Debug.LogWarning("Instantiating Kapkaç effect for card: " + currentSelectedHandCard);
+            GameObject effect = Instantiate(kapkacEffectPrefab, cardObj.transform);
+            effect.transform.localPosition = new Vector3(0, 0, -0.01f); // Slightly above the card face
+            kapkacCardsToBeReset.Add(cardObj);
+
+            // Start fade-in
+            SpriteRenderer sr = effect.GetComponent<SpriteRenderer>();
+            if (sr != null)
+            {
+                Color c = sr.color;
+                c.a = 0f;
+                sr.color = c;
+                yield return StartCoroutine(FadeInSprite(effect, 0.5f)); // 0.5 seconds fade-in
+            }
+        }
+        // --- Kapkaç animation addition END ---
+    }
+
+
+    private IEnumerator FadeInSprite(GameObject effectObj, float duration = 0.5f)
+    {
+        var sr = effectObj.GetComponent<SpriteRenderer>();
+        if (sr == null)
+            yield break;
+
+        Color color = sr.color;
+        color.a = 0f;
+        sr.color = color;
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            color.a = Mathf.Clamp01(elapsed / duration);
+            sr.color = color;
+            yield return null;
+        }
+        color.a = 1f;
+        sr.color = color;
+    }
+
+
     //Called when the player decides to put the selected hand card to the center
     private void CardAddedToCenter()
     {
@@ -422,12 +469,8 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    public void DiscardPlayedCards(string playedCard, SerializableCard serializedCard, int playerNumber, int KKvalue = 0)
+    public void DiscardPlayedCards(string playedCard, SerializableCard serializedCard, int playerNumber)
     {
-        if (KKvalue != 0)
-        {
-            CardInteraction.cardLookup[playedCard].GetCardID()[1] = KKvalue; // Set the value to 11 if Kapkaç is used
-        }
         Debug.Log("Discarding played cards: " + movePlayedLocally);
         if (!movePlayedLocally)
         {
@@ -909,29 +952,72 @@ public class GameManager : MonoBehaviour
             return;
 
         Debug.Log($"KopyalaYapıstır: {kopyalaSourceCard.gameObject.name} -> {targetCard.gameObject.name}");
-        // Store original data if not already stored
-        targetCard.StoreOriginalCardData();
 
-        // Copy suit, value, and sprite
-        targetCard.SetCardIDAndSprite(kopyalaSourceCard.GetCardID(), kopyalaSourceCard.GetComponent<SpriteRenderer>().sprite);
-
-        // After copying visuals and cardID
-        networkRelay.RegisterCardCopyServerRPC(targetCard.uniqueCardInstanceID, kopyalaSourceCard.uniqueCardInstanceID);
-
-        Debug.Log($"KopyalaYapıstır: {kopyalaSourceCard.gameObject.name} copied to {targetCard.gameObject.name}");
+        // Network the change to server and all clients
+        networkRelay.KopyalaYapistirServerRPC(targetCard.uniqueCardInstanceID, kopyalaSourceCard.uniqueCardInstanceID);
 
         // Reset state
         isKopyalaActive = false;
         kopyalaSourceCard = null;
         CardInteraction.currentlySelectedCard = null;
-        GameManager.LocalInstance.SetCurrentSelectedHandCardNull();
+        SetCurrentSelectedHandCardNull();
+    }
+
+    public void OnKopyalaYapistir(string targetUniqueID, string sourceUniqueID)
+    {
+        if (CardInteraction.cardLookup.TryGetValue(targetUniqueID, out var targetCard) &&
+            CardInteraction.cardLookup.TryGetValue(sourceUniqueID, out var sourceCard))
+        {
+            // Copy cardID and sprite
+            int[] newCardID = sourceCard.GetCardID();
+            Sprite newSprite = sourceCard.GetComponent<SpriteRenderer>().sprite;
+
+            // Set cardID and sprite with fade-in
+            StartCoroutine(SetCardIDAndSpriteWithFade(targetCard, newCardID, newSprite));
+        }
+    }
+
+    private IEnumerator SetCardIDAndSpriteWithFade(CardInteraction card, int[] newCardID, Sprite newSprite)
+    {
+        var sr = card.GetComponent<SpriteRenderer>();
+        if (sr == null)
+            yield break;
+
+        // Fade out
+        Color color = sr.color;
+        float duration = 0.3f;
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            color.a = Mathf.Clamp01(1f - (elapsed / duration));
+            sr.color = color;
+            yield return null;
+        }
+        color.a = 0f;
+        sr.color = color;
+
+        // Change cardID and sprite
+        card.SetCardIDAndSprite(newCardID, newSprite);
+
+        // Fade in
+        elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            color.a = Mathf.Clamp01(elapsed / duration);
+            sr.color = color;
+            yield return null;
+        }
+        color.a = 1f;
+        sr.color = color;
     }
 
     // Call this at the end of the round to reset all cards
     public void ResetAllKopyalaCards()
     {
-        foreach (var cardScript in cardInteractionsScripts)
-            cardScript.ResetToOriginalCard();
+        /*foreach (var cardScript in cardInteractionsScripts)
+            cardScript.ResetToOriginalCard();*/
     }
 
     public void PlayAutomatically(int playerIndex)
@@ -1096,14 +1182,44 @@ public class GameManager : MonoBehaviour
         // Optionally update UI here
     }
 
-    private bool kapkacActive = false;
     private bool oynayamazsinActive = false;
+    public void SetOynayamazsinActive(bool isActive)
+    {
+        oynayamazsinActive = isActive;
 
-    public void SetKapkacActive(bool isActive) => kapkacActive = isActive;
-    public void SetOynayamazsinActive(bool isActive) => oynayamazsinActive = isActive;
+        if (isActive)
+        {
+            Debug.LogWarning("Oynayamazsin power activated! Showing block prefab above center.");
+            // Show the block prefab above the center
+            if (oynayamazsinBlockInstance == null && oynayamazsinBlockPrefab != null)
+            {
+                oynayamazsinBlockInstance = Instantiate(oynayamazsinBlockPrefab, centerTransform.GetChild(centerTransform.childCount - 1));
+                oynayamazsinBlockInstance.transform.localPosition = new Vector3(0, 0, -0.05f); // Slightly above center
+
+                StartCoroutine(FadeInSprite(oynayamazsinBlockInstance, 0.5f));
+            }
+        }
+        else
+        {
+            // Hide and destroy the block prefab
+            if (oynayamazsinBlockInstance != null)
+            {
+                Destroy(oynayamazsinBlockInstance);
+                oynayamazsinBlockInstance = null;
+            }
+        }
+    }
+
     public void ActivateKapkacPower()
     {
-        networkRelay.ActivateKapkacServerRPC();
+        // Only allow if a card is selected
+        string selectedCardID = GetCurrentSelectedHandCard();
+        if (string.IsNullOrEmpty(selectedCardID))
+        {
+            Debug.LogWarning("No card selected for Kapkaç!");
+            return;
+        }
+        networkRelay.ActivateKapkacOnCardServerRPC(selectedCardID);
     }
 
     public void ActivateBlockNextPlayerPower()
@@ -1344,5 +1460,20 @@ public class GameManager : MonoBehaviour
     {
         SuperPowerSpawner.LocalInstance.ReportZaferPuaniToServer();
     }
+
+    public void OnKapkacCardChanged(string cardUniqueID)
+    {
+        // Set the card's value to 11 (Jack)
+        if (CardInteraction.cardLookup.TryGetValue(cardUniqueID, out var cardInteraction))
+        {
+            int[] cardID = cardInteraction.GetCardID();
+            cardID[1] = 11;
+            cardInteraction.SetCardID(cardID);
+
+            // Optionally, update the card's visual to indicate Kapkaç (e.g., highlight, effect)
+            StartCoroutine(KapkacCourotine(cardUniqueID));
+        }
+    }
+
 
 }

@@ -206,6 +206,14 @@ PrefabInstance:
       propertyPath: kutsalDesteObject
       value: 
       objectReference: {fileID: 1559792477}
+    - target: {fileID: 8858676597646837954, guid: 0547bdc6482fdb0479bfbf10d66e62ec, type: 3}
+      propertyPath: kapkacEffectPrefab
+      value: 
+      objectReference: {fileID: 3972489628764809046, guid: 3e65db69abed7f3418c4736c8ead7c63, type: 3}
+    - target: {fileID: 8858676597646837954, guid: 0547bdc6482fdb0479bfbf10d66e62ec, type: 3}
+      propertyPath: oynayamazsinBlockPrefab
+      value: 
+      objectReference: {fileID: 6993060252410929291, guid: 937de98c04436ab479081c43aa140278, type: 3}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

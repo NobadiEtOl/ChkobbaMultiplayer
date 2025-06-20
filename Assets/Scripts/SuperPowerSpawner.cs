@@ -153,7 +153,7 @@ public class SuperPowerSpawner : MonoBehaviour
 
 
 
-    private List<string> restirictedPowersName_CardNeedToBeSelected = new List<string> { "Bu Daha İyi", "Şunu Değiş Tokuş", "Kopyala Yapıştır" };
+    private List<string> restirictedPowersName_CardNeedToBeSelected = new List<string> { "Bu Daha İyi", "Şunu Değiş Tokuş", "Kopyala Yapıştır", "Kapkaç" };
     private List<string> restirictedPowersName_CenterNotEmpty = new List<string> { "Bomba" };
     private bool CheckIfCardShouldBeSelected(string superPowerTokenName)
     {

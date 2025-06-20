@@ -16,7 +16,7 @@ public class Server : NetworkBehaviour
     private Dictionary<int, List<string>> playersPooledCardsIDs;//Dictionary containing all the players' pools
     private Dictionary<string, int[]> deckCardsDict; // replaces deckCardsIDs
     public Dictionary<string, int[]> centerCardsDict; // replaces centerCardsIDs
-    private Dictionary<string, int[]> allCardLookup = new Dictionary<string, int[]>();
+    public Dictionary<string, int[]> allCardLookup = new Dictionary<string, int[]>();
     private int playerCount; // Number of players in the game for the game mode
     private int connectedPlayerCount = 0;
     [SerializeField] private int seed;//Seed for the deck suffle
@@ -34,6 +34,7 @@ public class Server : NetworkBehaviour
     public bool winnerPrintFlag = false;
     // Server.cs
     private Dictionary<string, string> copiedCardMap = new Dictionary<string, string>();
+    private bool oynayamazsinPending = false;
 
     public void ResetAllServerVariables()
     {
@@ -406,7 +407,13 @@ public class Server : NetworkBehaviour
             //Round ends and a winner is decided after each card is played
             //DecideWinner();
         }
-        else if (turnCounter % (playerCount * 4) == (playerCount * 4) - 1)
+        if (oynayamazsinPending)
+        {
+            blockCount = 1;
+            oynayamazsinPending = false;
+            networkRelay.SetOynayamazsinActiveClientRPC(true); // Show block on all clients
+        }
+        if (turnCounter % (playerCount * 4) == (playerCount * 4) - 1)
         {
             //If each player played their 4 cards new cards are dealt
             Invoke("DealCardsToPlayerHands", 1f);
@@ -772,16 +779,8 @@ public class Server : NetworkBehaviour
         Debug.LogWarning("GetMove called with selectedHandCardUniqueID: " + selectedHandCardUniqueID);
 
         int[] selectedHandCard = allCardLookup[selectedHandCardUniqueID];
-        // Kapkaç: force this card to capture (as if it was a Jack)
-        if (kapkacCount > 0)
-        {
-            Debug.LogWarning("Kapkac active, forcing capture with Jack");
-            sumValue = selectedHandCard[1]; // Jack value
-            kapkacCount = 0;
-            networkRelay.SetKapkacActiveClientRPC(false);
-        }
         // Oynayamazsın: force this card to be blocked (add to center, no capture)
-        else if (blockCount > 0)
+        if (blockCount > 0)
         {
             Debug.LogWarning("Oynayamazsın active, blocking card");
             sumValue = 0;
@@ -952,19 +951,11 @@ public class Server : NetworkBehaviour
         return false; // Not blocked
     }
 
-    private int kapkacCount = 0;
     private int blockCount = 0;
-
-    public void ActivateKapkac()
-    {
-        kapkacCount = 1;
-        networkRelay.SetKapkacActiveClientRPC(true);
-    }
 
     public void ActivateOynayamazsin()
     {
-        blockCount = 1;
-        networkRelay.SetOynayamazsinActiveClientRPC(true);
+        oynayamazsinPending = true;
     }
 
     private bool verZehriActive = false;

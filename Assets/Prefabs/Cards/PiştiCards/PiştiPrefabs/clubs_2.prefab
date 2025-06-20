@@ -101,6 +101,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   isPlayable: 1
+  autoRotateFlag: 0
+  uniqueCardInstanceID: 
 --- !u!114 &-8500986499759111946
 MonoBehaviour:
   m_ObjectHideFlags: 0
