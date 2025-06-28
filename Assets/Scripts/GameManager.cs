@@ -7,6 +7,7 @@ using UnityEngine;
 using Unity.Netcode;
 using UnityEngine.UI;
 using UnityEngine.UIElements;
+using TMPro;
 
 public class GameManager : MonoBehaviour
 {
@@ -28,6 +29,8 @@ public class GameManager : MonoBehaviour
     Text roundOverText;
     private float turnTimer = 0;
     private List<Text> pointTexts = new List<Text>();
+    [SerializeField] private CanvasGroup superPowerTextGroup;
+    private TextMeshProUGUI superPowerText;
     public Sprite cardBackSprite;
     [SerializeField] public GameObject cardIndicator;
     [SerializeField] private List<Transform> playerHandTransforms;
@@ -732,6 +735,10 @@ public class GameManager : MonoBehaviour
 
         winScreen = GameObject.Find("WinScreen");
         roundOverText = GameObject.Find("RoundOverText").GetComponent<Text>();
+        
+        superPowerTextGroup = GameObject.Find("SuperPowerTextContainer").GetComponent<CanvasGroup>();
+        superPowerText = GameObject.Find("SuperPowerText").GetComponent<TextMeshProUGUI>();
+        superPowerTextGroup.gameObject.SetActive(false);
 
         GetNecessaryTransforms();
 
@@ -1474,6 +1481,45 @@ public class GameManager : MonoBehaviour
             StartCoroutine(KapkacCourotine(cardUniqueID));
         }
     }
+
+    public void ShowcaseSuperPower(string powerName, float fadeDuration = 0.5f, float displayDuration = 2f)
+    {
+        StartCoroutine(ShowcaseSuperPowerCoroutine(powerName, fadeDuration, displayDuration));
+    }
+
+    private IEnumerator ShowcaseSuperPowerCoroutine(string powerName, float fadeDuration, float displayDuration)
+    {
+        if (superPowerText == null || superPowerTextGroup == null)
+            yield break;
+
+        superPowerText.text = powerName;
+        superPowerTextGroup.gameObject.SetActive(true);
+
+        // Fade in
+        float elapsed = 0f;
+        while (elapsed < fadeDuration)
+        {
+            elapsed += Time.deltaTime;
+            superPowerTextGroup.alpha = Mathf.Clamp01(elapsed / fadeDuration);
+            yield return null;
+        }
+        superPowerTextGroup.alpha = 1f;
+
+        // Wait
+        yield return new WaitForSeconds(displayDuration);
+
+        // Fade out
+        elapsed = 0f;
+        while (elapsed < fadeDuration)
+        {
+            elapsed += Time.deltaTime;
+            superPowerTextGroup.alpha = Mathf.Clamp01(1f - (elapsed / fadeDuration));
+            yield return null;
+        }
+        superPowerTextGroup.alpha = 0f;
+        superPowerTextGroup.gameObject.SetActive(false);
+    }
+
 
 
 }

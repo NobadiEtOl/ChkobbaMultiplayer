@@ -212,11 +212,23 @@ public class NetworkRelay : NetworkBehaviour
     {
         GameManager.LocalInstance.OnKopyalaYapistir(targetUniqueID, sourceUniqueID);
     }
+    [ClientRpc(RequireOwnership = false)]
+    public void ShowcaseSuperPowerClientRPC(string powerName, float fadeDuration = 0.5f, float displayDuration = 2f)
+    {
+        GameManager.LocalInstance.ShowcaseSuperPower(powerName, fadeDuration, displayDuration);
+    }
+
 
 
 
 
     //ServerRPC
+    [ServerRpc(RequireOwnership = false)]
+    public void ShowcaseSuperPowerServerRPC(string powerName, float fadeDuration = 0.5f, float displayDuration = 2f)
+    {
+        ShowcaseSuperPowerClientRPC(powerName, fadeDuration, displayDuration);
+    }
+
     [ServerRpc(RequireOwnership = false)]
     public void KopyalaYapistirServerRPC(string targetUniqueID, string sourceUniqueID)
     {

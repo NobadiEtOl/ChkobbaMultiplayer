@@ -9,6 +9,11 @@ public abstract class SuperPower : ScriptableObject
     public string description;
     public int rarityMultiplier;
     public abstract void ActivatePower();
+    public void PowerActivated()
+    {
+        GameManager.LocalInstance.networkRelay.ShowcaseSuperPowerServerRPC(name);
+    }
+
 }
 
 [CreateAssetMenu(menuName = "SuperPower/UcundanGözAt")]
@@ -23,6 +28,7 @@ public class UcundanGözAt : SuperPower
     public override void ActivatePower()
     {
         Debug.Log("Ucundan Göz At activated!");
+        PowerActivated();
         GameManager.LocalInstance.UsePeekOpponentCardPower();
     }
 }
@@ -39,6 +45,7 @@ public class Oynayamazsın : SuperPower
     public override void ActivatePower()
     {
         Debug.Log("Oynayamazsın activated!");
+        PowerActivated();
         GameManager.LocalInstance.ActivateBlockNextPlayerPower();
     }
 }
@@ -55,6 +62,7 @@ public class DeğişTokuş : SuperPower
     public override void ActivatePower()
     {
         Debug.Log("Değiş Tokuş activated!");
+        PowerActivated();
         GameManager.LocalInstance.UseSwapCardWithOpponentPower();
     }
 }
@@ -71,6 +79,7 @@ public class Kapkaç : SuperPower
     public override void ActivatePower()
     {
         Debug.Log("Kapkaç activated!");
+        PowerActivated();
         GameManager.LocalInstance.ActivateKapkacPower();
     }
 }
@@ -88,6 +97,7 @@ public class ValeArar : SuperPower
     public override void ActivatePower()
     {
         Debug.Log("ValeArar activated!");
+        PowerActivated();
         GameManager.LocalInstance.ActivateValeArarPower();
     }
 
@@ -101,11 +111,12 @@ public class KopyalaYapistir : SuperPower
     {
         name = "Kopyala Yapıştır";
         description = "Peek at an opponent's card.";
-        rarityMultiplier = 100;
+        rarityMultiplier = 1;
     }
     public override void ActivatePower()
     {
         Debug.Log("KopyalaYapıstır activated!");
+        PowerActivated();
         GameManager.LocalInstance.ActivateKopyalaYapistirPower();
     }
 }
@@ -122,6 +133,7 @@ public class BayaBayaBak : SuperPower
     public override void ActivatePower()
     {
         Debug.Log("BayaBayaBak activated!");
+        PowerActivated();
         GameManager.LocalInstance.UseBayaBayaBakPower();
     }
 }
@@ -138,6 +150,7 @@ public class Bomba : SuperPower
     public override void ActivatePower()
     {
         Debug.Log("Bomba activated!");
+        PowerActivated();
         if (GameManager.LocalInstance.centerCards.Count != 0) GameManager.LocalInstance.ActivateBombaPower();
         else SuperPowerSpawner.LocalInstance.CloseInfoBox();
     }
@@ -155,6 +168,7 @@ public class Yapamazsın : SuperPower
     public override void ActivatePower()
     {
         Debug.Log("Yapamazsın activated!");
+        PowerActivated();
         GameManager.LocalInstance.ActivateYapamazsınPower();
     }
 }
@@ -171,6 +185,7 @@ public class VerZehri : SuperPower
     public override void ActivatePower()
     {
         Debug.Log("VerZehri activated!");
+        PowerActivated();
         GameManager.LocalInstance.networkRelay.ActivateVerZehriServerRPC();
     }
 }
@@ -187,6 +202,7 @@ public class KutsalDeste : SuperPower
     public override void ActivatePower()
     {
         Debug.Log("KutsalDeste activated!");
+        PowerActivated();
         GameManager.LocalInstance.networkRelay.ActivateKutsalDesteServerRPC();
     }
 }
@@ -203,6 +219,7 @@ public class BuDahaİyi : SuperPower
     public override void ActivatePower()
     {
         Debug.Log("BuDahaİyi activated!");
+        PowerActivated();
         GameManager.LocalInstance.UseBuDahaIyiPower();
     }
 }
@@ -219,6 +236,7 @@ public class SunuDegisTokus : SuperPower
     public override void ActivatePower()
     {
         Debug.Log("ŞunuDeğişTokuş activated!");
+        PowerActivated();
         GameManager.LocalInstance.ActivateSunuDegisTokusPower();
     }
 }
@@ -235,6 +253,7 @@ public class SunuDegisBunuTokus : SuperPower
     public override void ActivatePower()
     {
         Debug.Log("ŞunuDeğişBunuTokuş activated!");
+        PowerActivated();
         GameManager.LocalInstance.ActivateSunuDegisBunuTokusPower();
     }
 }
@@ -255,6 +274,7 @@ public class ZaferPuani : SuperPower
     {
         // No active effect
         Debug.Log("Zafer Puanı has no active effect.");
+        PowerActivated();
     }
 }
 
