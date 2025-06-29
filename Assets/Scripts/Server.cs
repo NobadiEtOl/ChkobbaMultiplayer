@@ -721,7 +721,10 @@ public class Server : NetworkBehaviour
                 piştiCounts[1]++;
             }
         }
+        
+        networkRelay.ShowPistiTextClientRPC(playerID, jPiştiFlag);
     }
+    
     public void RemoveCardsFromCenter(SerializableCard serializableCard)
     {
         var cardsToRemove = serializableCard.ToDictionary();

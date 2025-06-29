@@ -217,6 +217,12 @@ public class NetworkRelay : NetworkBehaviour
     {
         GameManager.LocalInstance.ShowcaseSuperPower(powerName, fadeDuration, displayDuration);
     }
+    [ClientRpc(RequireOwnership = false)]
+    public void ShowPistiTextClientRPC(int playerNo, bool isJack)
+    {
+        string msg = isJack ? $"Player {playerNo + 1} made a Jack PISTI!" : $"Player {playerNo + 1} made a Pişti!";
+        GameManager.LocalInstance.ShowPistiText(msg);
+    }
 
 
 
