@@ -29,8 +29,10 @@ public class GameManager : MonoBehaviour
     Text roundOverText;
     private float turnTimer = 0;
     private List<Text> pointTexts = new List<Text>();
-    [SerializeField] private CanvasGroup superPowerTextGroup;
+    private CanvasGroup superPowerTextGroup;
     private TextMeshProUGUI superPowerText;
+    private CanvasGroup pistiTextGroup;
+    private TextMeshProUGUI pistiText;
     public Sprite cardBackSprite;
     [SerializeField] public GameObject cardIndicator;
     [SerializeField] private List<Transform> playerHandTransforms;
@@ -739,6 +741,9 @@ public class GameManager : MonoBehaviour
         superPowerTextGroup = GameObject.Find("SuperPowerTextContainer").GetComponent<CanvasGroup>();
         superPowerText = GameObject.Find("SuperPowerText").GetComponent<TextMeshProUGUI>();
         superPowerTextGroup.gameObject.SetActive(false);
+        pistiTextGroup = GameObject.Find("PiştiTextContainer").GetComponent<CanvasGroup>();
+        pistiText = GameObject.Find("PiştiText").GetComponent<TextMeshProUGUI>();
+        pistiTextGroup.gameObject.SetActive(false);
 
         GetNecessaryTransforms();
 
@@ -1520,6 +1525,43 @@ public class GameManager : MonoBehaviour
         superPowerTextGroup.gameObject.SetActive(false);
     }
 
+    public void ShowPistiText(string message, float fadeDuration = 0.5f, float displayDuration = 2f)
+    {
+        StartCoroutine(ShowPistiTextCoroutine(message, fadeDuration, displayDuration));
+    }
+
+    private IEnumerator ShowPistiTextCoroutine(string message, float fadeDuration, float displayDuration)
+    {
+        if (pistiText == null || pistiTextGroup == null)
+            yield break;
+
+        pistiText.text = message;
+        pistiTextGroup.gameObject.SetActive(true);
+
+        // Fade in
+        float elapsed = 0f;
+        while (elapsed < fadeDuration)
+        {
+            elapsed += Time.deltaTime;
+            pistiTextGroup.alpha = Mathf.Clamp01(elapsed / fadeDuration);
+            yield return null;
+        }
+        pistiTextGroup.alpha = 1f;
+
+        // Wait
+        yield return new WaitForSeconds(displayDuration);
+
+        // Fade out
+        elapsed = 0f;
+        while (elapsed < fadeDuration)
+        {
+            elapsed += Time.deltaTime;
+            pistiTextGroup.alpha = Mathf.Clamp01(1f - (elapsed / fadeDuration));
+            yield return null;
+        }
+        pistiTextGroup.alpha = 0f;
+        pistiTextGroup.gameObject.SetActive(false);
+    }
 
 
 }
