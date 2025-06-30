@@ -11,7 +11,7 @@
     ##Problems
         #Bu daha iyi kullandıktan sonra ele gelen kartın scale i doğru değil
         #Showcase açıkken bi anda rakibin tüm kartları face up oldu
-        #Kopyala yapıştır kartı koypalayıp yapıştırıyor ama üstündeki efektleri(kapkaç) etkilemiyor
+        (Done)#Kopyala yapıştır kartı koypalayıp yapıştırıyor ama üstündeki efektleri(kapkaç) etkilemiyor
     ##Audio
         #Sound Effects
             //Captures
@@ -211,3 +211,10 @@ other players (or center or deck) cards and powers (for example: şunu değiş t
 - No turn timers
 - The code for card movements are wonky and too nested, probably needs refactoring.
 - Constructing the local view for clients is based on relative indexes because it is simple but I dont know if there is any weak point in the code because of that.
+
+
+### Things to test
+
+-Check if kopyalayapıştır is working for different effects both for addition and reset. Values are set correctly,
+need to check if visuals are updated correctly.
+-Check if updatecurrentlayout is called after necessary powers (mainly swaps).

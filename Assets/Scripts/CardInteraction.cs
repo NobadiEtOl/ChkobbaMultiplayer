@@ -28,6 +28,7 @@ public class CardInteraction : MonoBehaviour
     private static bool allowOwnHand = true;
     private static int allowedSelections = 0; // 0 means no limit
     private static int currentSelections = 0;
+    public string activePowerEffect = "none";
 
 
     public int[] GetCardID()

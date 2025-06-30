@@ -991,9 +991,38 @@ public class GameManager : MonoBehaviour
             // Copy cardID and sprite
             int[] newCardID = sourceCard.GetCardID();
             Sprite newSprite = sourceCard.GetComponent<SpriteRenderer>().sprite;
+            targetCard.activePowerEffect = sourceCard.activePowerEffect; // Copy active power effect
 
             // Set cardID and sprite with fade-in
             StartCoroutine(SetCardIDAndSpriteWithFade(targetCard, newCardID, newSprite));
+
+            ResetVisuals(targetCard);
+            if (targetCard.activePowerEffect != "none")
+            {
+                CopyEffectVisuals(targetCard);
+            }
+        }
+    }
+
+    private void CopyEffectVisuals(CardInteraction targetCard)
+    {
+        string effectName = targetCard.activePowerEffect;
+        if (effectName == "Kapkaç")
+        {
+            StartCoroutine(KapkacCourotine(targetCard.uniqueCardInstanceID));
+        }
+    }
+
+    private void ResetVisuals(CardInteraction targetCard)
+    {
+        int counter = 0;
+        foreach (Transform child in targetCard.gameObject.transform)
+        {
+            if (counter > 1)
+            {
+                Destroy(child.gameObject);
+            }
+            counter++;
         }
     }
 
@@ -1489,6 +1518,7 @@ public class GameManager : MonoBehaviour
             int[] cardID = cardInteraction.GetCardID();
             cardID[1] = 11;
             cardInteraction.SetCardID(cardID);
+            cardInteraction.activePowerEffect = "Kapkaç";
 
             // Optionally, update the card's visual to indicate Kapkaç (e.g., highlight, effect)
             StartCoroutine(KapkacCourotine(cardUniqueID));
