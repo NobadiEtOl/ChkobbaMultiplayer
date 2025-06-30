@@ -550,7 +550,7 @@ public class DeckController : MonoBehaviour
                 Vector3 targetPosition = basePos + offset;
                 MoveCard(targetPosition, card, 10, rotation, scale, false);
 
-                ci.StopAutoRotate();
+                ci.StartAutoRotateFaceDown();
             }
         }
     }

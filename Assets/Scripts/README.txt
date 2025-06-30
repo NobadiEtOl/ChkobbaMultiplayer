@@ -8,6 +8,10 @@
     # You should make recommendations if you think there is a better approach according to README
 
 ###TO DO
+    ##Problems
+        #Bu daha iyi kullandıktan sonra ele gelen kartın scale i doğru değil
+        #Showcase açıkken bi anda rakibin tüm kartları face up oldu
+        #Kopyala yapıştır kartı koypalayıp yapıştırıyor ama üstündeki efektleri(kapkaç) etkilemiyor
     ##Audio
         #Sound Effects
             //Captures

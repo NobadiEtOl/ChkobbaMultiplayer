@@ -10,7 +10,6 @@ public class CardInteraction : MonoBehaviour
     public static bool isOneCardSelected = false;
     public static CardInteraction currentlySelectedCard = null; // Tracks the currently selected card
     public bool isPlayable = false;
-
     private Vector3 originalScreenPosition; // Original position in screen space
     private Vector3 offset; // Offset between touch position and card position in screen space
     private bool isDragging = false;
@@ -19,13 +18,17 @@ public class CardInteraction : MonoBehaviour
     public event Action<string> OnCardSelected;
     public event Action<string, GameObject, int> OnCardsPlayed;
     private static GameObject activeCardIndicator = null; // Tracks the currently active card indicator
-
     public static Dictionary<string, CardInteraction> cardLookup = new Dictionary<string, CardInteraction>();
-
     // In CardInteraction.cs
     public string uniqueCardInstanceID; // e.g., a GUID
-
     private static Color baseCardIndicatorColor;
+    // --- Card selection restriction system ---
+    private static bool restrictToOwnHand = true;
+    private static HashSet<string> allowedParentNames = new HashSet<string>();
+    private static bool allowOwnHand = true;
+    private static int allowedSelections = 0; // 0 means no limit
+    private static int currentSelections = 0;
+
 
     public int[] GetCardID()
     {
@@ -126,6 +129,31 @@ public class CardInteraction : MonoBehaviour
         // Ensure only one card is selected at a time
         //if (currentlySelectedCard == this)
         //return;
+        string parentName = gameObject.transform.parent != null ? gameObject.transform.parent.name : "";
+        bool isOwnHand = parentName.Contains("PlayerHand") && DeckController.LocalInstance != null &&
+                        DeckController.LocalInstance.thisPlayerNumber == GetHandIndexFromParentName(parentName);
+
+        if (restrictToOwnHand)
+        {
+            if (!isOwnHand)
+                return; // Only allow own hand cards
+        }
+        else
+        {
+            // If not allowed to select own hand, block
+            if (!allowOwnHand && isOwnHand)
+                return;
+            // If allowed parent names are set, only allow those
+            if (allowedParentNames.Count > 0 && !allowedParentNames.Contains(parentName))
+                return;
+            // If selection count is limited, block after limit
+            if (allowedSelections > 0 && currentSelections >= allowedSelections)
+                return;
+            currentSelections++;
+            // If we've reached the limit, restore default restriction
+            if (allowedSelections > 0 && currentSelections >= allowedSelections)
+                RestrictSelectionToOwnHand();
+        }
 
         if (gameObject.transform.parent.name == "PlayerPool1" || gameObject.transform.parent.name == "PlayerPiştiPool1")
         {
@@ -157,6 +185,19 @@ public class CardInteraction : MonoBehaviour
             return;
         }
 
+    }
+
+    // Add this helper in CardInteraction.cs
+    private int GetHandIndexFromParentName(string parentName)
+    {
+        // Assumes hand names like "PlayerHand1", "PlayerHand2", etc.
+        if (parentName.StartsWith("PlayerHand"))
+        {
+            string num = parentName.Substring("PlayerHand".Length);
+            if (int.TryParse(num, out int idx))
+                return idx - 1; // zero-based
+        }
+        return -1;
     }
 
     public void OnTouchDrag(Vector3 touchPosition)
@@ -358,6 +399,32 @@ public class CardInteraction : MonoBehaviour
             });
     }
 
+    public void StartAutoRotateFaceDown(float minAngle = 10f, float maxAngle = 20f, float duration = 2.5f)
+    {
+        autoRotateActive = true;
+        // Kill any previous sequence
+        if (autoRotateSequence != null && autoRotateSequence.IsActive()) autoRotateSequence.Kill();
+        transform.DOKill();
+
+        // Always start from face up
+        //transform.rotation = Quaternion.Euler(90, 0, 0);
+
+        // Pick a random angle for this cycle
+        float angle = UnityEngine.Random.Range(minAngle, maxAngle);
+
+        autoRotateSequence = DOTween.Sequence();
+        autoRotateSequence.Append(transform.DORotate(new Vector3(-90, 0, angle), duration).SetEase(Ease.OutSine));
+        autoRotateSequence.Append(transform.DORotate(new Vector3(-90, 0, -angle), duration * 2).SetEase(Ease.InOutSine));
+        autoRotateSequence.Append(transform.DORotate(new Vector3(-90, 0, 0), duration).SetEase(Ease.InSine));
+        autoRotateSequence.SetLoops(1)
+            .OnComplete(() =>
+            {
+                // If still active, start again with a new random angle
+                if (autoRotateActive)
+                    StartAutoRotate(minAngle, maxAngle, duration);
+            });
+    }
+
 
     public void StopAutoRotate()
     {
@@ -366,5 +433,32 @@ public class CardInteraction : MonoBehaviour
         transform.DOKill();
         //transform.localRotation = Quaternion.Euler(90, 0, 0); // Reset to face up
     }
+
+    /// <summary>
+    /// Restrict selection to only own hand cards (default).
+    /// </summary>
+    public static void RestrictSelectionToOwnHand()
+    {
+        restrictToOwnHand = true;
+        allowedParentNames.Clear();
+        allowOwnHand = true;
+        allowedSelections = 0;
+        currentSelections = 0;
+    }
+
+    /// <summary>
+    /// Allow selection of cards with specific parent names (e.g. other players' hands, center).
+    /// Set allowOwnHand to false to prevent selecting own hand cards.
+    /// Set maxSelections to limit how many times this is allowed (0 = unlimited).
+    /// </summary>
+    public static void AllowSelectionForParents(IEnumerable<string> parentNames, bool allowOwnHandCards = false, int maxSelections = 1)
+    {
+        restrictToOwnHand = false;
+        allowedParentNames = new HashSet<string>(parentNames);
+        allowOwnHand = allowOwnHandCards;
+        allowedSelections = maxSelections;
+        currentSelections = 0;
+    }
+
 
 }

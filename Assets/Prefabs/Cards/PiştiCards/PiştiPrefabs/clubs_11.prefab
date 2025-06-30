@@ -11,8 +11,6 @@ GameObject:
   - component: {fileID: 2789250156250338269}
   - component: {fileID: 8620561302226533347}
   - component: {fileID: 6739787456453256988}
-  - component: {fileID: 660615624265836524}
-  - component: {fileID: 8597566468217456954}
   - component: {fileID: 5749141418400362950}
   m_Layer: 0
   m_Name: clubs_11
@@ -101,47 +99,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   isPlayable: 1
-  autoRotateFlag: 0
   uniqueCardInstanceID: 
---- !u!114 &660615624265836524
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6932388081314755846}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 47d3848cbbe9b1047a3a1d2eaa27bd06, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!54 &8597566468217456954
-Rigidbody:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6932388081314755846}
-  serializedVersion: 4
-  m_Mass: 10
-  m_Drag: 0
-  m_AngularDrag: 1
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 0
-  m_IsKinematic: 0
-  m_Interpolate: 0
-  m_Constraints: 0
-  m_CollisionDetection: 0
 --- !u!65 &5749141418400362950
 BoxCollider:
   m_ObjectHideFlags: 0

@@ -11,8 +11,6 @@ GameObject:
   - component: {fileID: 5646856451413621644}
   - component: {fileID: 410029655531137434}
   - component: {fileID: 3958937201893032026}
-  - component: {fileID: 6877724231420060050}
-  - component: {fileID: 1686301799993613074}
   - component: {fileID: 7071670685987578635}
   m_Layer: 0
   m_Name: diamonds_12
@@ -101,45 +99,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   isPlayable: 1
---- !u!114 &6877724231420060050
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 862257833019384201}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 47d3848cbbe9b1047a3a1d2eaa27bd06, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!54 &1686301799993613074
-Rigidbody:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 862257833019384201}
-  serializedVersion: 4
-  m_Mass: 10
-  m_Drag: 0
-  m_AngularDrag: 1
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 0
-  m_IsKinematic: 0
-  m_Interpolate: 0
-  m_Constraints: 0
-  m_CollisionDetection: 0
+  uniqueCardInstanceID: 
 --- !u!65 &7071670685987578635
 BoxCollider:
   m_ObjectHideFlags: 0

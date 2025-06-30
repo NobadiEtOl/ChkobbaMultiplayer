@@ -954,7 +954,15 @@ public class GameManager : MonoBehaviour
         kopyalaSourceCard = CardInteraction.currentlySelectedCard;
         if (kopyalaSourceCard == null)
             Debug.LogWarning("KopyalaYapıstır: No source card selected when activating power!");
+
+        // Allow selection from all hands (including own), for just one card
+        CardInteraction.AllowSelectionForParents(
+            new[] { "PlayerHand1", "PlayerHand2", "PlayerHand3", "PlayerHand4" }, // Add/remove as needed for your player count
+            allowOwnHandCards: true,
+            maxSelections: 1
+        );
     }
+
 
     // Call this from CardInteraction when a card is clicked and isKopyalaActive is true
     public void TryKopyalaYapistir(CardInteraction targetCard)

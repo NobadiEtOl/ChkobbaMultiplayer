@@ -11,8 +11,6 @@ GameObject:
   - component: {fileID: 6879532165074022240}
   - component: {fileID: 7253544096061993342}
   - component: {fileID: -7225731741893667722}
-  - component: {fileID: -416656602294758863}
-  - component: {fileID: 4539082186406252467}
   - component: {fileID: -53435766326639917}
   m_Layer: 0
   m_Name: hearts_4
@@ -101,45 +99,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   isPlayable: 1
---- !u!114 &-416656602294758863
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4411887696026682212}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 47d3848cbbe9b1047a3a1d2eaa27bd06, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!54 &4539082186406252467
-Rigidbody:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4411887696026682212}
-  serializedVersion: 4
-  m_Mass: 10
-  m_Drag: 0
-  m_AngularDrag: 1
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 0
-  m_IsKinematic: 0
-  m_Interpolate: 0
-  m_Constraints: 0
-  m_CollisionDetection: 0
+  uniqueCardInstanceID: 
 --- !u!65 &-53435766326639917
 BoxCollider:
   m_ObjectHideFlags: 0
