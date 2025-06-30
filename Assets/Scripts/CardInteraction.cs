@@ -20,8 +20,6 @@ public class CardInteraction : MonoBehaviour
     public event Action<string, GameObject, int> OnCardsPlayed;
     private static GameObject activeCardIndicator = null; // Tracks the currently active card indicator
 
-    // New variable to control auto-rotation
-    public bool autoRotateFlag = false;
     public static Dictionary<string, CardInteraction> cardLookup = new Dictionary<string, CardInteraction>();
 
     // In CardInteraction.cs
@@ -58,24 +56,12 @@ public class CardInteraction : MonoBehaviour
     void Start()
     {
         //InitializeCard();
+        StopAutoRotate(); // Ensure auto-rotation is stopped at the start
     }
 
-    private bool lastAutoRotateFlag = false;
     void Update()
     {
-        // Only react if the flag changes
-        if (autoRotateFlag != lastAutoRotateFlag)
-        {
-            if (autoRotateFlag)
-            {
-                StartAutoRotate();
-            }
-            else
-            {
-                StopAutoRotate();
-            }
-            lastAutoRotateFlag = autoRotateFlag;
-        }
+
     }
 
     private bool isRotating = false; // Flag to control rotation
@@ -208,7 +194,7 @@ public class CardInteraction : MonoBehaviour
             {
                 // Invoke OnCardsPlayed
                 //Debug.Log("OnCardsPlayed invoked!");
-                autoRotateFlag = false; // Stop auto-rotation when the card is played
+                StopAutoRotate(); // Stop auto-rotation when the card is played
                 OnCardsPlayed?.Invoke(this.uniqueCardInstanceID, this.gameObject, GameManager.currentPlayerNo);
 
                 if (activeCardIndicator != null)
@@ -254,12 +240,12 @@ public class CardInteraction : MonoBehaviour
         popSequence.Append(transform.DOScale(transform.localScale * 1.1f, 0.1f).SetLoops(2, LoopType.Yoyo));
         // Or for a jiggle:
         Sequence jiggleSequence = DOTween.Sequence();
-        jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, 15), 0.1f).SetLoops(2, LoopType.Yoyo));
-        jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, -12), 0.1f).SetLoops(2, LoopType.Yoyo));
-        jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, 13), 0.1f).SetLoops(2, LoopType.Yoyo));
-        jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, -15), 0.1f).SetLoops(2, LoopType.Yoyo));
-        jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, 17), 0.1f).SetLoops(2, LoopType.Yoyo));
-        jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, -10), 0.1f).SetLoops(2, LoopType.Yoyo));
+        jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, 15), 0.025f).SetLoops(2, LoopType.Yoyo));
+        jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, -12), 0.025f).SetLoops(2, LoopType.Yoyo));
+        jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, 13), 0.025f).SetLoops(2, LoopType.Yoyo));
+        jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, -16), 0.025f).SetLoops(2, LoopType.Yoyo));
+        jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, 17), 0.025f).SetLoops(2, LoopType.Yoyo));
+        jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, -17), 0.025f).SetLoops(2, LoopType.Yoyo));
     }
 
     public void InitializeCard()
@@ -354,7 +340,7 @@ public class CardInteraction : MonoBehaviour
         transform.DOKill();
 
         // Always start from face up
-        transform.rotation = Quaternion.Euler(90, 0, 0);
+        //transform.rotation = Quaternion.Euler(90, 0, 0);
 
         // Pick a random angle for this cycle
         float angle = UnityEngine.Random.Range(minAngle, maxAngle);

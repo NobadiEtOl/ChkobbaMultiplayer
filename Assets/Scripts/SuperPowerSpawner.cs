@@ -51,7 +51,7 @@ public class SuperPowerSpawner : MonoBehaviour
             Ray ray = Camera.main.ScreenPointToRay(mousePosition);
             if (Physics.Raycast(ray, out RaycastHit hit))
             {
-                Debug.LogError("Object touched: " + hit.collider.gameObject.tag);
+                Debug.LogWarning("Object touched: " + hit.collider.gameObject.tag);
                 if (hit.collider.gameObject.tag == "Token")
                 {
                     SuperPowerToken superPowerToken = hit.collider.GetComponent<SuperPowerToken>();

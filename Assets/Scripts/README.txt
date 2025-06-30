@@ -149,6 +149,7 @@ other players (or center or deck) cards and powers (for example: şunu değiş t
 - UI screens and panels are found and managed by GameManager.
 - Super power activations are shown with fade-in/out text and optional animations.
 - Card and power animations are handled by DeckController and CardInteraction.
+- Only the cards in the player's own hands should autoRotate
 
 ---
 

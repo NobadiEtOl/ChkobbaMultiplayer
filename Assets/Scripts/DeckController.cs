@@ -475,7 +475,7 @@ public class DeckController : MonoBehaviour
                 }
                 else
                 {
-                    ci.autoRotateFlag = false;
+                    ci.StopAutoRotate();
                 }
             }
         }
@@ -494,7 +494,7 @@ public class DeckController : MonoBehaviour
             var ci = child.GetComponent<CardInteraction>();
             if (ci != null)
             {
-                ci.autoRotateFlag = true;
+                ci.StartAutoRotate();
             }
         }
 
@@ -524,7 +524,7 @@ public class DeckController : MonoBehaviour
 
                 // Store original transform and flags if not already stored
                 if (!showcaseOriginalTransforms.ContainsKey(card))
-                    showcaseOriginalTransforms[card] = (card.transform.position, card.transform.rotation, card.transform.localScale, ci.autoRotateFlag);
+                    showcaseOriginalTransforms[card] = (card.transform.position, card.transform.rotation, card.transform.localScale, false);
 
                 Vector3 offset = Vector3.zero;
                 Quaternion rotation = Quaternion.identity;
@@ -550,7 +550,7 @@ public class DeckController : MonoBehaviour
                 Vector3 targetPosition = basePos + offset;
                 MoveCard(targetPosition, card, 10, rotation, scale, false);
 
-                ci.autoRotateFlag = false;
+                ci.StopAutoRotate();
             }
         }
     }
@@ -598,6 +598,7 @@ public class DeckController : MonoBehaviour
         }
 
         int totalCards = playerCards.Count;
+        Debug.LogError("totalCards: " + totalCards);
         if (totalCards == 0) return;
 
         // Calculate the offset multiplier
@@ -667,6 +668,7 @@ public class DeckController : MonoBehaviour
         }
 
         int totalCards = playerCards.Count;
+        Debug.LogError("totalCards: " + totalCards);
         if (totalCards == 0) return;
 
         // Calculate the offset multiplier
@@ -722,7 +724,7 @@ public class DeckController : MonoBehaviour
             {
                 if (cardInteraction.gameObject == cardObject)
                 {
-                    cardInteraction.autoRotateFlag = true; // Return the matching CardInteraction
+                    cardInteraction.StartAutoRotate(); // Return the matching CardInteraction
                 }
             }
         }
@@ -737,7 +739,7 @@ public class DeckController : MonoBehaviour
         {
             if (cardInteraction.gameObject == cardObject)
             {
-                cardInteraction.autoRotateFlag = false; // Return the matching CardInteraction
+                cardInteraction.StopAutoRotate();// Return the matching CardInteraction
                 return;
             }
         }
@@ -1132,7 +1134,7 @@ public class DeckController : MonoBehaviour
 
         // Ensure the card reaches the exact end position, rotation, and scale
         cardObject.transform.position = endPos;
-        cardObject.transform.rotation = rotation;
+        //cardObject.transform.rotation = rotation;
         cardObject.transform.localScale = scale;
     }
 
@@ -1467,7 +1469,7 @@ public class DeckController : MonoBehaviour
         else
         {
             peekPos = originalPos + new Vector3(0, 1000, 0);
-            card.GetComponent<CardInteraction>().autoRotateFlag = false;
+            card.GetComponent<CardInteraction>().StopAutoRotate();
             peekScale = originalScale;
             peekRot = Quaternion.Euler(-90, 0, 0);
         }
@@ -1507,7 +1509,7 @@ public class DeckController : MonoBehaviour
         card.transform.position = originalPos;
         card.transform.rotation = originalRot;
         card.transform.localScale = originalScale;
-        if (isMine) card.GetComponent<CardInteraction>().autoRotateFlag = true;
+        if (isMine) card.GetComponent<CardInteraction>().StartAutoRotate();
     }
 
 
@@ -1538,7 +1540,7 @@ public class DeckController : MonoBehaviour
 
         for (int i = 0; i < cards.Count; i++)
         {
-            if(isMine)cards[i].GetComponent<CardInteraction>().autoRotateFlag = false;
+            if(isMine)cards[i].GetComponent<CardInteraction>().StopAutoRotate();
             // Spread cards along X axis, centered
             float offset = (i - (cards.Count - 1) / 2f) * spread;
             Vector3 peekPos;
@@ -1600,7 +1602,7 @@ public class DeckController : MonoBehaviour
             cards[i].transform.position = originalPoss[i];
             cards[i].transform.rotation = originalRots[i];
             cards[i].transform.localScale = originalScales[i];
-            if(isMine)cards[i].GetComponent<CardInteraction>().autoRotateFlag = true;
+            if(isMine)cards[i].GetComponent<CardInteraction>().StartAutoRotate();
         }
     }
 
@@ -1700,11 +1702,11 @@ public class DeckController : MonoBehaviour
         handCardObj.transform.position = centerPos;
         handCardObj.transform.rotation = centerRot;
         handCardObj.transform.localScale = new Vector3(centerScale, centerScale, centerScale);
-        handCardObj.GetComponent<CardInteraction>().autoRotateFlag = false;
+        handCardObj.GetComponent<CardInteraction>().StopAutoRotate();
 
         // Center card goes to player's hand at the same index
         centerCardObj.transform.SetParent(handTransform, true);
-        centerCardObj.GetComponent<CardInteraction>().autoRotateFlag = true;
+        centerCardObj.GetComponent<CardInteraction>().StartAutoRotate();
         centerCardObj.GetComponent<CardInteraction>().OnCardTouched(Input.mousePosition);
 
         // Insert at the same index in the hand
@@ -1772,15 +1774,15 @@ public class DeckController : MonoBehaviour
         // Set autoRotateFlag and call OnCardTouched for the new card in my hand
         if (thisPlayerNumber == playerANo)
         {
-            cardBObj.GetComponent<CardInteraction>().autoRotateFlag = true;
+            cardBObj.GetComponent<CardInteraction>().StartAutoRotate();
             cardBObj.GetComponent<CardInteraction>().OnCardTouched(Input.mousePosition);
-            cardAObj.GetComponent<CardInteraction>().autoRotateFlag = false;
+            cardAObj.GetComponent<CardInteraction>().StopAutoRotate();
         }
         else if (thisPlayerNumber == playerBNo)
         {
-            cardAObj.GetComponent<CardInteraction>().autoRotateFlag = true;
+            cardAObj.GetComponent<CardInteraction>().StartAutoRotate();
             cardAObj.GetComponent<CardInteraction>().OnCardTouched(Input.mousePosition);
-            cardBObj.GetComponent<CardInteraction>().autoRotateFlag = false;
+            cardBObj.GetComponent<CardInteraction>().StopAutoRotate();
         }
 
         // Swap sibling indexes to preserve hand order
@@ -1866,16 +1868,16 @@ public class DeckController : MonoBehaviour
         // Set autoRotateFlag and call OnCardTouched for the new card in my hand
         if (thisPlayerNumber == playerANo)
         {
-            cardBObj.GetComponent<CardInteraction>().autoRotateFlag = true;
+            cardBObj.GetComponent<CardInteraction>().StartAutoRotate();
             // Suppress input for this frame to prevent accidental play
             cardBObj.GetComponent<CardInteraction>().OnCardTouched(Input.mousePosition);
-            cardAObj.GetComponent<CardInteraction>().autoRotateFlag = false;
+            cardAObj.GetComponent<CardInteraction>().StopAutoRotate();
         }
         else if (thisPlayerNumber == playerBNo)
         {
-            cardAObj.GetComponent<CardInteraction>().autoRotateFlag = true;
+            cardAObj.GetComponent<CardInteraction>().StartAutoRotate();
             cardAObj.GetComponent<CardInteraction>().OnCardTouched(Input.mousePosition);
-            cardBObj.GetComponent<CardInteraction>().autoRotateFlag = false;
+            cardBObj.GetComponent<CardInteraction>().StopAutoRotate();
         }
 
         // --- Insert cardBObj at the correct index in handA (skipping first 2 children) ---
@@ -1970,7 +1972,7 @@ public class DeckController : MonoBehaviour
             var ci = card.GetComponent<CardInteraction>();
             if (ci != null)
             {
-                ci.autoRotateFlag = autoRotateFlag;
+                ci.StopAutoRotate();// = autoRotateFlag;
             }
         }
         showcaseOriginalTransforms.Clear();
@@ -1984,7 +1986,7 @@ public class DeckController : MonoBehaviour
         if (isShowcaseAllActive && showcaseOriginalTransforms.ContainsKey(card))
         {
             var ci = card.GetComponent<CardInteraction>();
-            bool autoRotate = ci != null ? ci.autoRotateFlag : false;
+            bool autoRotate = ci != null ? false : false;
             showcaseOriginalTransforms[card] = (card.transform.position, card.transform.rotation, card.transform.localScale, autoRotate);
         }
     }
