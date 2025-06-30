@@ -1,6 +1,8 @@
 using System;
 using UnityEngine;
 using System.Collections.Generic;
+using DG.Tweening;
+using System.Collections;
 
 public class CardInteraction : MonoBehaviour
 {
@@ -58,15 +60,24 @@ public class CardInteraction : MonoBehaviour
         //InitializeCard();
     }
 
+    private bool lastAutoRotateFlag = false;
     void Update()
     {
-        if (autoRotateFlag)
+        // Only react if the flag changes
+        if (autoRotateFlag != lastAutoRotateFlag)
         {
-            // Call the rotation function if the card is not already rotating
-            RotateCardWithLerp();
+            if (autoRotateFlag)
+            {
+                StartAutoRotate();
+            }
+            else
+            {
+                StopAutoRotate();
+            }
+            lastAutoRotateFlag = autoRotateFlag;
         }
-
     }
+
     private bool isRotating = false; // Flag to control rotation
     private float rotationProgress = 0f; // Tracks the progress of the rotation
     private Quaternion startRotation; // Starting rotation
@@ -236,6 +247,19 @@ public class CardInteraction : MonoBehaviour
 
         // Mark this card as selected
         isOneCardSelected = true;
+
+        //transform.DOKill(); // Stop any previous tweens
+        Sequence popSequence = DOTween.Sequence();
+        popSequence.Append(transform.DOScale(transform.localScale * 1.25f, 0.1f).SetLoops(2, LoopType.Yoyo));
+        popSequence.Append(transform.DOScale(transform.localScale * 1.1f, 0.1f).SetLoops(2, LoopType.Yoyo));
+        // Or for a jiggle:
+        Sequence jiggleSequence = DOTween.Sequence();
+        jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, 15), 0.1f).SetLoops(2, LoopType.Yoyo));
+        jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, -12), 0.1f).SetLoops(2, LoopType.Yoyo));
+        jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, 13), 0.1f).SetLoops(2, LoopType.Yoyo));
+        jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, -15), 0.1f).SetLoops(2, LoopType.Yoyo));
+        jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, 17), 0.1f).SetLoops(2, LoopType.Yoyo));
+        jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, -10), 0.1f).SetLoops(2, LoopType.Yoyo));
     }
 
     public void InitializeCard()
@@ -317,6 +341,44 @@ public class CardInteraction : MonoBehaviour
         if (GameManager.LocalInstance == null)
             return false;
         return GameManager.LocalInstance.IsAnySwapPowerActive();
+    }
+
+    private Sequence autoRotateSequence;
+    private bool autoRotateActive = false;
+
+    public void StartAutoRotate(float minAngle = 10f, float maxAngle = 20f, float duration = 2.5f)
+    {
+        autoRotateActive = true;
+        // Kill any previous sequence
+        if (autoRotateSequence != null && autoRotateSequence.IsActive()) autoRotateSequence.Kill();
+        transform.DOKill();
+
+        // Always start from face up
+        transform.rotation = Quaternion.Euler(90, 0, 0);
+
+        // Pick a random angle for this cycle
+        float angle = UnityEngine.Random.Range(minAngle, maxAngle);
+
+        autoRotateSequence = DOTween.Sequence();
+        autoRotateSequence.Append(transform.DORotate(new Vector3(90, 0, angle), duration).SetEase(Ease.OutSine));
+        autoRotateSequence.Append(transform.DORotate(new Vector3(90, 0, -angle), duration * 2).SetEase(Ease.InOutSine));
+        autoRotateSequence.Append(transform.DORotate(new Vector3(90, 0, 0), duration).SetEase(Ease.InSine));
+        autoRotateSequence.SetLoops(1)
+            .OnComplete(() =>
+            {
+                // If still active, start again with a new random angle
+                if (autoRotateActive)
+                    StartAutoRotate(minAngle, maxAngle, duration);
+            });
+    }
+
+
+    public void StopAutoRotate()
+    {
+        autoRotateActive = false;
+        if (autoRotateSequence != null && autoRotateSequence.IsActive()) autoRotateSequence.Kill();
+        transform.DOKill();
+        //transform.localRotation = Quaternion.Euler(90, 0, 0); // Reset to face up
     }
 
 }

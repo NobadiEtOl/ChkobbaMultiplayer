@@ -471,7 +471,7 @@ public class DeckController : MonoBehaviour
                 if (ci == null) continue;
                 if (handIdx == 0)
                 {
-                    ci.autoRotateFlag = true;
+                    //ci.autoRotateFlag = true;
                 }
                 else
                 {
