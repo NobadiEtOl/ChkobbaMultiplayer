@@ -218,3 +218,18 @@ other players (or center or deck) cards and powers (for example: şunu değiş t
 -Check if kopyalayapıştır is working for different effects both for addition and reset. Values are set correctly,
 need to check if visuals are updated correctly.
 -Check if updatecurrentlayout is called after necessary powers (mainly swaps).
+
+
+//Turun kimde olduğu UI
+//Ortaya gelen kartlar birbirine cliplenebiliyor, ortaya geldikten sonar rotasyon 0la
+//Sırtını bıçakla gücü
+//BattıBalıkYanGider sen rakibini oyna
+//Oyundan çıkıca geri girişinde bağlantı kopuk
+//CloseInfoBoxı invokedan çıkar
+//2 player logicleri 4 e geçir
+//Kartlar hareket ederken DOKill lazım. Bazı swaplarda kart animasyonunu bitirmemişse kötü oluyor
+//ŞunuDeğişBunuTokuşta swap sonrası rotasyonlar yanlış ayarlı
+//Çok hızlı oynarsan kartlar orijinal halleri ile ortaya geliyor
+
+/////DOtweenler kart ortaya konurken hala bitmemiş olursa kartın scalei farklı kalıyor.
+Bir şekilde bğtğn aktif tweenleri kart hareketi başlamadan bitirmeli ya da tweenler bitene kadar beklemeli.

@@ -8,6 +8,7 @@ using Unity.Netcode;
 using UnityEngine.UI;
 using UnityEngine.UIElements;
 using TMPro;
+using UnityEngine.EventSystems;
 
 public class GameManager : MonoBehaviour
 {
@@ -47,11 +48,16 @@ public class GameManager : MonoBehaviour
     private Animator explosionAnimator;
     private GameObject bombObject;
     private Animator bombAnimator;
-
+    [SerializeField] private GameObject yandimAnamEffectPrefab;
+    [SerializeField] private GameObject yandimAnamSpritePrefab;
     public List<GameObject> kapkacCardsToBeReset = new List<GameObject>();
     [SerializeField] private GameObject kapkacEffectPrefab; // Prefab with your PNG as a SpriteRenderers
+    [SerializeField] private GameObject kapkacAnimEffectPrefab; // The animation prefab for Kapkaç
     [SerializeField] private GameObject oynayamazsinBlockPrefab;
     private GameObject oynayamazsinBlockInstance;
+    public bool isKapkacPending = false;
+    public bool isYandimAnamPending = false;
+
 
 
     public void ResetForNewRound()
@@ -169,7 +175,49 @@ public class GameManager : MonoBehaviour
                 }
             }
         }*/
-        // Handle mouse input (editor/desktop)
+        
+
+        if (Input.touchCount > 0)
+        {
+            Touch touch = Input.GetTouch(0);
+            if (touch.phase == TouchPhase.Began)
+            {
+                if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject(touch.fingerId))
+                    return; // Don't raycast or close anything if over UI
+            }
+            Vector3 touchPosition = touch.position;
+            Ray ray = Camera.main.ScreenPointToRay(touchPosition);
+            if (Physics.Raycast(ray, out RaycastHit hit))
+            {
+                CardInteraction card = hit.collider.GetComponent<CardInteraction>();
+                if (touch.phase == TouchPhase.Began && card != null)
+                {
+                    card.OnCardTouched(touchPosition);
+                    tempCard = card; // Store the card for later use
+                }
+                else if (card == null && touch.phase == TouchPhase.Began)
+                {
+                    deckController.TryStopShowcasePlayerPoolCards();
+                }
+                else if (touch.phase == TouchPhase.Moved && tempCard != null)
+                {
+                    if (CardInteraction.currentlySelectedCard == tempCard)
+                    {
+                        tempCard.OnTouchDrag(touchPosition);
+                    }
+                }
+            }
+            // Handle touch up/cancel outside the raycast hit
+            if ((touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled) && tempCard != null)
+            {
+                if (CardInteraction.currentlySelectedCard == tempCard)
+                {
+                    tempCard.OnTouchUp();
+                }
+                tempCard = null;
+            }
+        }
+        
         if (Input.GetMouseButtonDown(0) || Input.GetMouseButton(0))
         {
             Vector3 mousePosition = Input.mousePosition;
@@ -407,13 +455,27 @@ public class GameManager : MonoBehaviour
 
     private IEnumerator KapkacCourotine(string playedCard)
     {
-        // --- Kapkaç animation addition START ---
         GameObject cardObj = CardInteraction.cardLookup[playedCard].gameObject;
+        var cardInteraction = CardInteraction.cardLookup[playedCard];
+
+        // --- Reset visuals before applying Kapkaç effect ---
+        ResetVisuals(cardInteraction);
+
+        // 1. Play animation on top of the card
+        GameObject anim = null;
+        if (kapkacAnimEffectPrefab != null)
+        {
+            anim = Instantiate(kapkacAnimEffectPrefab, cardObj.transform);
+            anim.transform.localPosition = new Vector3(0, 0, -0.02f); // Above the sprite
+            anim.SetActive(true);
+        }
+
+        // 3. Add the overlay sprite, fade in
+        GameObject effect = null;
         if (kapkacEffectPrefab != null)
         {
-            Debug.LogWarning("Instantiating Kapkaç effect for card: " + currentSelectedHandCard);
-            GameObject effect = Instantiate(kapkacEffectPrefab, cardObj.transform);
-            effect.transform.localPosition = new Vector3(0, 0, -0.01f); // Slightly above the card face
+            effect = Instantiate(kapkacEffectPrefab, cardObj.transform);
+            effect.transform.localPosition = new Vector3(0, 0, -0.03f); // Below the animation
             kapkacCardsToBeReset.Add(cardObj);
 
             // Start fade-in
@@ -423,12 +485,42 @@ public class GameManager : MonoBehaviour
                 Color c = sr.color;
                 c.a = 0f;
                 sr.color = c;
-                yield return StartCoroutine(FadeInSprite(effect, 0.5f)); // 0.5 seconds fade-in
+                float fadeDuration = 0.5f;
+                float elapsed = 0f;
+                while (elapsed < fadeDuration)
+                {
+                    elapsed += Time.deltaTime;
+                    c.a = Mathf.Clamp01(elapsed / fadeDuration);
+                    sr.color = c;
+                    yield return null;
+                }
+                c.a = 1f;
+                sr.color = c;
             }
         }
-        // --- Kapkaç animation addition END ---
-    }
 
+        // 2. Wait for animation to finish (if it's a ParticleSystem or Animator)
+        if (anim != null)
+        {
+            var ps = anim.GetComponent<ParticleSystem>();
+            if (ps != null)
+            {
+                yield return new WaitForSeconds(ps.main.duration);
+                Destroy(anim);
+            }
+            else
+            {
+                yield return new WaitForSeconds(1f); // fallback duration
+                Destroy(anim);
+            }
+        }
+
+        // 4. Change the value of the card to 11 (Jack)
+        cardInteraction.SetCardValue(11);
+
+        // 5. Update the activePowerEffect
+        cardInteraction.activePowerEffect = "Kapkaç";
+    }
 
     private IEnumerator FadeInSprite(GameObject effectObj, float duration = 0.5f)
     {
@@ -737,7 +829,7 @@ public class GameManager : MonoBehaviour
 
         winScreen = GameObject.Find("WinScreen");
         roundOverText = GameObject.Find("RoundOverText").GetComponent<Text>();
-        
+
         superPowerTextGroup = GameObject.Find("SuperPowerTextContainer").GetComponent<CanvasGroup>();
         superPowerText = GameObject.Find("SuperPowerText").GetComponent<TextMeshProUGUI>();
         superPowerTextGroup.gameObject.SetActive(false);
@@ -1011,6 +1103,11 @@ public class GameManager : MonoBehaviour
         {
             StartCoroutine(KapkacCourotine(targetCard.uniqueCardInstanceID));
         }
+        else if (effectName == "YandımAnam")
+        {
+            StartCoroutine(YandimAnamCoroutine(targetCard.uniqueCardInstanceID));
+        }
+    
     }
 
     private void ResetVisuals(CardInteraction targetCard)
@@ -1261,15 +1358,13 @@ public class GameManager : MonoBehaviour
 
     public void ActivateKapkacPower()
     {
-        // Only allow if a card is selected
-        string selectedCardID = GetCurrentSelectedHandCard();
-        if (string.IsNullOrEmpty(selectedCardID))
-        {
-            Debug.LogWarning("No card selected for Kapkaç!");
-            return;
-        }
-        networkRelay.ActivateKapkacOnCardServerRPC(selectedCardID);
+        isKapkacPending = true;
+        // Allow selection from all hands, only one card
+        CardInteraction.AllowSelectionForParents(
+            new[] { "PlayerHand1", "PlayerHand2", "PlayerHand3", "PlayerHand4" }, true, 1);
+        DeckController.LocalInstance.ShowcaseAllOtherHands();
     }
+
 
     public void ActivateBlockNextPlayerPower()
     {
@@ -1600,6 +1695,94 @@ public class GameManager : MonoBehaviour
         pistiTextGroup.alpha = 0f;
         pistiTextGroup.gameObject.SetActive(false);
     }
+
+    public void ActivateYandimAnamPower()
+    {
+        isYandimAnamPending = true;
+        CardInteraction.AllowSelectionForParents(
+            new[] { "PlayerHand1", "PlayerHand2", "PlayerHand3", "PlayerHand4" }, true, 1);
+        DeckController.LocalInstance.ShowcaseAllOtherHands();
+    }
+
+
+    public void OnYandimAnamCardChanged(string cardUniqueID)
+    {
+        if (CardInteraction.cardLookup.TryGetValue(cardUniqueID, out var cardInteraction))
+        {
+            StartCoroutine(YandimAnamCoroutine(cardUniqueID));
+        }
+    }
+
+    private IEnumerator YandimAnamCoroutine(string cardUniqueID)
+    {
+        GameObject cardObj = CardInteraction.cardLookup[cardUniqueID].gameObject;
+        var cardScript = CardInteraction.cardLookup[cardUniqueID];
+
+        // --- Reset visuals before applying Yandım Anam effect ---
+        ResetVisuals(cardScript);
+
+        // 1. Play animation on top of the card
+        GameObject anim = null;
+        if (yandimAnamEffectPrefab != null)
+        {
+            anim = Instantiate(yandimAnamEffectPrefab, cardObj.transform);
+            anim.transform.localPosition = new Vector3(0, 0, -0.02f); // Above the sprite
+            anim.SetActive(true);
+        }
+
+        // 2. Add the overlay sprite below the animation, fade in
+        GameObject effect = null;
+        if (yandimAnamSpritePrefab != null)
+        {
+            effect = Instantiate(yandimAnamSpritePrefab, cardObj.transform);
+            effect.transform.localPosition = new Vector3(0, 0, -0.03f); // Below the animation
+            SpriteRenderer sr = effect.GetComponent<SpriteRenderer>();
+            if (sr != null)
+            {
+                Color c = sr.color;
+                c.a = 0f;
+                sr.color = c;
+                float fadeDuration = 0.5f;
+                float elapsed = 0f;
+                while (elapsed < fadeDuration)
+                {
+                    elapsed += Time.deltaTime;
+                    c.a = Mathf.Clamp01(elapsed / fadeDuration);
+                    sr.color = c;
+                    yield return null;
+                }
+                c.a = 1f;
+                sr.color = c;
+            }
+        }
+
+        // 3. Change the value of the card to 0 (kind stays the same)
+        cardScript.SetCardValue(0);
+
+        // 4. Update the activePowerEffect
+        cardScript.activePowerEffect = "YandımAnam";
+
+        // 5. Store references for copying visuals
+        cardScript.yandimAnamEffectInstance = anim;
+        cardScript.yandimAnamSpriteInstance = effect;
+
+        // 6. Optionally, destroy the animation after it plays (if it's not looping)
+        if (anim != null)
+        {
+            var ps = anim.GetComponent<ParticleSystem>();
+            if (ps != null)
+            {
+                yield return new WaitForSeconds(ps.main.duration);
+                Destroy(anim);
+            }
+            else
+            {
+                yield return new WaitForSeconds(1f);
+                Destroy(anim);
+            }
+        }
+    }
+
 
 
 }

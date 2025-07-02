@@ -9,6 +9,7 @@ using Unity.Netcode;
 using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.UIElements;
+using DG.Tweening;
 
 public class DeckController : MonoBehaviour
 {
@@ -20,7 +21,7 @@ public class DeckController : MonoBehaviour
     private Dictionary<string, GameObject> deckPool;//A dictionary of card ID and a list of all the instantiated cards
     private List<GameObject> activeCards = new List<GameObject>();
     private List<CardInteraction> cardInteractionList; // List to store CardInteraction references
-    private List<Transform> playerHandTransforms = new List<Transform>();
+    public List<Transform> playerHandTransforms = new List<Transform>();
     private List<Transform> playerPoolTransforms = new List<Transform>();
     private Transform centerTransform;
     private List<Transform> playerPiştiPoolTransforms = new List<Transform>();
@@ -1091,10 +1092,12 @@ public class DeckController : MonoBehaviour
     {
         // Start the coroutine to move the card
         StartCoroutine(MoveCardCoroutine(endPos, cardObject, speed, rotation, scales, audioFlag));
+        //cardObject.GetComponent<CardInteraction>().KillAllTweens();
     }
 
     private IEnumerator MoveCardCoroutine(Vector3 endPos, GameObject cardObject, float speedMultiplier, Quaternion rotation, Vector3 scale, bool audioFlag = true)
     {
+        // Stop auto-rotation if any
         // Set the initial position, rotation, and scale of the card
         Vector3 startingPos = cardObject.transform.position;
         Quaternion startingRotation = cardObject.transform.rotation;
@@ -1136,6 +1139,7 @@ public class DeckController : MonoBehaviour
         cardObject.transform.position = endPos;
         //cardObject.transform.rotation = rotation;
         cardObject.transform.localScale = scale;
+        //cardObject.GetComponent<CardInteraction>().KillAllTweens();
     }
 
 
@@ -1172,6 +1176,8 @@ public class DeckController : MonoBehaviour
         // Ensure the card reaches the exact end rotation
         cardObject.transform.rotation = endRotation;
     }
+    
+
 
     public IEnumerator ChainMoveCards(List<Vector3> positions, List<GameObject> cardObject, float speed, List<Quaternion> rotations, List<Vector3> scales, bool endTurnFlag = false, bool lastMove = false, bool updateFlag = true)
     {

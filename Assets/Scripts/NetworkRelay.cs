@@ -223,12 +223,24 @@ public class NetworkRelay : NetworkBehaviour
         string msg = isJack ? $"Player {playerNo + 1} made a Jack PISTI!" : $"Player {playerNo + 1} made a Pişti!";
         GameManager.LocalInstance.ShowPistiText(msg);
     }
-
-
-
-
+    [ClientRpc(RequireOwnership = false)]
+    public void YandimAnamCardChangedClientRPC(string cardUniqueID)
+    {
+        GameManager.LocalInstance.OnYandimAnamCardChanged(cardUniqueID);
+    }
 
     //ServerRPC
+    [ServerRpc(RequireOwnership = false)]
+    public void ActivateYandimAnamOnCardServerRPC(string cardUniqueID)
+    {
+        // Update the server's authoritative card data
+        if (Server.Singleton != null && Server.Singleton.allCardLookup.ContainsKey(cardUniqueID))
+        {
+            Server.Singleton.allCardLookup[cardUniqueID][1] = 0; // Set value to 0
+        }
+        YandimAnamCardChangedClientRPC(cardUniqueID);
+    }
+
     [ServerRpc(RequireOwnership = false)]
     public void ShowcaseSuperPowerServerRPC(string powerName, float fadeDuration = 0.5f, float displayDuration = 2f)
     {

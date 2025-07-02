@@ -42,7 +42,7 @@ public class Server : NetworkBehaviour
         centerCardsDict = null;
         playersHandCardsIDs = null;
         playersPooledCardsIDs = null;
-        //seed = 0;
+        seed = 0;
         turnCounter = 0;
         currentPlayer = 0;
         points = new int[2];
@@ -68,7 +68,7 @@ public class Server : NetworkBehaviour
         centerCardsDict = null;
         playersHandCardsIDs = null;
         playersPooledCardsIDs = null;
-        //seed = 0; // Optionally keep or randomize for each round
+        seed = 0; // Optionally keep or randomize for each round
         turnCounter = 0;
         currentPlayer = 0;
         lastPlayerToCapture = -1;
@@ -651,7 +651,7 @@ public class Server : NetworkBehaviour
 
         if (winnerSide == -1)
         {
-            //Invoke("StartGameAutomatic", 10f);
+            Invoke("StartGameAutomatic", 10f);
         }
     }
 
@@ -724,7 +724,7 @@ public class Server : NetworkBehaviour
         
         networkRelay.ShowPistiTextClientRPC(playerID, jPiştiFlag);
     }
-    
+
     public void RemoveCardsFromCenter(SerializableCard serializableCard)
     {
         var cardsToRemove = serializableCard.ToDictionary();

@@ -73,6 +73,8 @@ public class CardInteraction : MonoBehaviour
     private Quaternion startRotation; // Starting rotation
     private Quaternion endRotation; // Target rotation
     private bool rotateDirection = true; // Tracks the direction of rotation (true = clockwise, false = counterclockwise)
+    public GameObject yandimAnamEffectInstance;
+    public GameObject yandimAnamSpriteInstance;
 
     private void RotateCardWithLerp()
     {
@@ -131,10 +133,10 @@ public class CardInteraction : MonoBehaviour
         //if (currentlySelectedCard == this)
         //return;
         string parentName = gameObject.transform.parent != null ? gameObject.transform.parent.name : "";
-        bool isOwnHand = parentName.Contains("PlayerHand") && DeckController.LocalInstance != null &&
-                        DeckController.LocalInstance.thisPlayerNumber == GetHandIndexFromParentName(parentName);
+        Transform localPlayerHand = GetLocalPlayerHandTransform();
+        bool isOwnHand = transform.parent == localPlayerHand;
 
-        if (restrictToOwnHand)
+        /*if (restrictToOwnHand)
         {
             if (!isOwnHand)
                 return; // Only allow own hand cards
@@ -154,7 +156,31 @@ public class CardInteraction : MonoBehaviour
             // If we've reached the limit, restore default restriction
             if (allowedSelections > 0 && currentSelections >= allowedSelections)
                 RestrictSelectionToOwnHand();
+        }*/
+
+        // Kapkaç and Yandım Anam pending checks
+        if (GameManager.LocalInstance != null)
+        {
+            // Kapkaç pending
+            if (GameManager.LocalInstance.isKapkacPending)
+            {
+                GameManager.LocalInstance.isKapkacPending = false;
+                CardInteraction.RestrictSelectionToOwnHand();
+                DeckController.LocalInstance.ExitShowcaseAllOtherHands();
+                GameManager.LocalInstance.networkRelay.ActivateKapkacOnCardServerRPC(this.uniqueCardInstanceID);
+                return;
+            }
+            // Yandım Anam pending
+            if (GameManager.LocalInstance.isYandimAnamPending)
+            {
+                GameManager.LocalInstance.isYandimAnamPending = false;
+                CardInteraction.RestrictSelectionToOwnHand();
+                DeckController.LocalInstance.ExitShowcaseAllOtherHands();
+                GameManager.LocalInstance.networkRelay.ActivateYandimAnamOnCardServerRPC(this.uniqueCardInstanceID);
+                return;
+            }
         }
+
 
         if (gameObject.transform.parent.name == "PlayerPool1" || gameObject.transform.parent.name == "PlayerPiştiPool1")
         {
@@ -187,6 +213,18 @@ public class CardInteraction : MonoBehaviour
         }
 
     }
+
+    private static Transform GetLocalPlayerHandTransform()
+    {
+        if (DeckController.LocalInstance == null) return null;
+        int myNo = DeckController.LocalInstance.thisPlayerNumber;
+        if (DeckController.LocalInstance.playerHandTransforms == null || DeckController.LocalInstance.playerHandTransforms.Count == 0)
+            return null;
+        // In your setup, playerHandTransforms[0] is always the local player's hand
+        return DeckController.LocalInstance.playerHandTransforms[myNo]; // Get the local player's hand transform
+    }
+
+
 
     // Add this helper in CardInteraction.cs
     private int GetHandIndexFromParentName(string parentName)
@@ -232,6 +270,7 @@ public class CardInteraction : MonoBehaviour
         // Try to add the card to the center if moved enough distance
         if (distanceMoved > snapBackThreshold)
         {
+
             if (transform.parent.name.Contains("PlayerHand") && isOneCardSelected)
             {
                 // Invoke OnCardsPlayed
@@ -260,6 +299,8 @@ public class CardInteraction : MonoBehaviour
         //selectedCardIndicator.SetActive(false);
     }
 
+    Sequence popSequence;
+    Sequence jiggleSequence;
     private void SelectCard()
     {
         if (activeCardIndicator != null)
@@ -277,11 +318,11 @@ public class CardInteraction : MonoBehaviour
         isOneCardSelected = true;
 
         //transform.DOKill(); // Stop any previous tweens
-        Sequence popSequence = DOTween.Sequence();
+        popSequence = DOTween.Sequence();
         popSequence.Append(transform.DOScale(transform.localScale * 1.25f, 0.1f).SetLoops(2, LoopType.Yoyo));
         popSequence.Append(transform.DOScale(transform.localScale * 1.1f, 0.1f).SetLoops(2, LoopType.Yoyo));
         // Or for a jiggle:
-        Sequence jiggleSequence = DOTween.Sequence();
+        jiggleSequence = DOTween.Sequence();
         jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, 15), 0.025f).SetLoops(2, LoopType.Yoyo));
         jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, -12), 0.025f).SetLoops(2, LoopType.Yoyo));
         jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, 13), 0.025f).SetLoops(2, LoopType.Yoyo));
@@ -289,6 +330,7 @@ public class CardInteraction : MonoBehaviour
         jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, 17), 0.025f).SetLoops(2, LoopType.Yoyo));
         jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, -17), 0.025f).SetLoops(2, LoopType.Yoyo));
     }
+
 
     public void InitializeCard()
     {
@@ -441,7 +483,7 @@ public class CardInteraction : MonoBehaviour
     public static void RestrictSelectionToOwnHand()
     {
         restrictToOwnHand = true;
-        allowedParentNames.Clear();
+        allowedParentNames = new HashSet<string> { "PlayerHand1", "PlayerHand2", "PlayerHand3", "PlayerHand4" };
         allowOwnHand = true;
         allowedSelections = 0;
         currentSelections = 0;
@@ -461,5 +503,23 @@ public class CardInteraction : MonoBehaviour
         currentSelections = 0;
     }
 
+    public void KillAllTweens()
+    {
+        List<Tween> tweens = DOTween.TweensByTarget(transform);
+        foreach (Tween tween in tweens)
+        {
+            if (tween.IsActive())
+            {
+                tween.Kill();
+            }
+        }
+    }
+
+    public IEnumerator WaitForAllTweens(Transform target)
+    {
+        // Wait until there are no active tweens on this transform
+        while (DOTween.IsTweening(target))
+            yield return null;
+    }
 
 }

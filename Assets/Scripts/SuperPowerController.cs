@@ -23,7 +23,7 @@ public class UcundanGözAt : SuperPower
     {
         name = "Ucundan Göz At";
         description = "Peek at an opponent's card.";
-        rarityMultiplier = 1;
+        rarityMultiplier = 10;
     }
     public override void ActivatePower()
     {
@@ -40,7 +40,7 @@ public class Oynayamazsın : SuperPower
     {
         name = "Oynayamazsın";
         description = "Peek at an opponent's card.";
-        rarityMultiplier = 1;
+        rarityMultiplier = 3;
     }
     public override void ActivatePower()
     {
@@ -57,7 +57,7 @@ public class DeğişTokuş : SuperPower
     {
         name = "Değiş Tokuş";
         description = "Peek at an opponent's card.";
-        rarityMultiplier = 1;
+        rarityMultiplier = 9;
     }
     public override void ActivatePower()
     {
@@ -74,7 +74,7 @@ public class Kapkaç : SuperPower
     {
         name = "Kapkaç";
         description = "Peek at an opponent's card.";
-        rarityMultiplier = 1;
+        rarityMultiplier = 5;
     }
     public override void ActivatePower()
     {
@@ -111,7 +111,7 @@ public class KopyalaYapistir : SuperPower
     {
         name = "Kopyala Yapıştır";
         description = "Peek at an opponent's card.";
-        rarityMultiplier = 1;
+        rarityMultiplier = 4;
     }
     public override void ActivatePower()
     {
@@ -128,7 +128,7 @@ public class BayaBayaBak : SuperPower
     {
         name = "Baya Baya Bak";
         description = "Peek at an opponent's card.";
-        rarityMultiplier = 1;
+        rarityMultiplier = 4;
     }
     public override void ActivatePower()
     {
@@ -145,7 +145,7 @@ public class Bomba : SuperPower
     {
         name = "Bomba";
         description = "Peek at an opponent's card.";
-        rarityMultiplier =1;
+        rarityMultiplier =3;
     }
     public override void ActivatePower()
     {
@@ -163,7 +163,7 @@ public class Yapamazsın : SuperPower
     {
         name = "Yapamazsın";
         description = "Peek at an opponent's card.";
-        rarityMultiplier = 1;
+        rarityMultiplier = 5;
     }
     public override void ActivatePower()
     {
@@ -180,7 +180,7 @@ public class VerZehri : SuperPower
     {
         name = "Ver Zehri";
         description = "Peek at an opponent's card.";
-        rarityMultiplier = 1;
+        rarityMultiplier = 5;
     }
     public override void ActivatePower()
     {
@@ -197,7 +197,7 @@ public class KutsalDeste : SuperPower
     {
         name = "Kutsal Deste";
         description = "Peek at an opponent's card.";
-        rarityMultiplier = 1;
+        rarityMultiplier = 5;
     }
     public override void ActivatePower()
     {
@@ -214,7 +214,7 @@ public class BuDahaİyi : SuperPower
     {
         name = "Bu Daha İyi";
         description = "Peek at an opponent's card.";
-        rarityMultiplier = 1;
+        rarityMultiplier = 5;
     }
     public override void ActivatePower()
     {
@@ -231,7 +231,7 @@ public class SunuDegisTokus : SuperPower
     {
         name = "Şunu Değiş Tokuş";
         description = "Peek at an opponent's card.";
-        rarityMultiplier = 1;
+        rarityMultiplier = 4;
     }
     public override void ActivatePower()
     {
@@ -248,7 +248,7 @@ public class SunuDegisBunuTokus : SuperPower
     {
         name = "Şunu Değiş Bunu Tokuş";
         description = "Peek at an opponent's card.";
-        rarityMultiplier = 1;
+        rarityMultiplier = 2;
     }
     public override void ActivatePower()
     {
@@ -267,7 +267,7 @@ public class ZaferPuani : SuperPower
     {
         name = "Zafer Puanı";
         description = $"Round bonus: If you hold this at the end of the round, your team gets {points} points!";
-        rarityMultiplier = 1;
+        rarityMultiplier = 3;
     }
 
     public override void ActivatePower()
@@ -275,6 +275,23 @@ public class ZaferPuani : SuperPower
         // No active effect
         Debug.Log("Zafer Puanı has no active effect.");
         PowerActivated();
+    }
+}
+
+[CreateAssetMenu(menuName = "SuperPower/YandımAnam")]
+public class YandımAnam : SuperPower
+{
+    private void OnEnable()
+    {
+        name = "Yandım Anam";
+        description = "Set a card's value to 0 and add a burning effect!";
+        rarityMultiplier = 5;
+    }
+    public override void ActivatePower()
+    {
+        Debug.Log("Yandım Anam activated!");
+        PowerActivated();
+        GameManager.LocalInstance.ActivateYandimAnamPower();
     }
 }
 

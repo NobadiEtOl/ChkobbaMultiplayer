@@ -43,33 +43,56 @@ public class SuperPowerSpawner : MonoBehaviour
     {
         if (Input.GetMouseButtonDown(0))
         {
-
             if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
-                return;//Return if pointer is on a UI object
+                return; // Return if pointer is on a UI object
 
             Vector3 mousePosition = Input.mousePosition;
             Ray ray = Camera.main.ScreenPointToRay(mousePosition);
             if (Physics.Raycast(ray, out RaycastHit hit))
             {
-                Debug.LogWarning("Object touched: " + hit.collider.gameObject.tag);
-                if (hit.collider.gameObject.tag == "Token")
+                HandleTokenRaycast(hit);
+            }
+        }
+        // Handle touch input
+        if (Input.touchCount > 0)
+        {
+            
+            Touch touch = Input.GetTouch(0);
+
+            if (touch.phase == TouchPhase.Ended)
+            {
+                if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject(touch.fingerId))
+                    return; // Return if pointer is on a UI object
+
+                Ray ray = Camera.main.ScreenPointToRay(touch.position);
+                if (Physics.Raycast(ray, out RaycastHit hit))
                 {
-                    SuperPowerToken superPowerToken = hit.collider.GetComponent<SuperPowerToken>();
-                    if (superPowerToken != null)
-                    {
-                        centerGameObject.transform.position = new Vector3(centerPosition.x + 2500, centerPosition.y, centerPosition.z);
-                        OpenInfoBox(superPowerToken);
-                        return; // Exit early if a token was clicked
-                    }
-                }
-                if (SuperPowerToken.ActiveInstance != null && hit.collider.gameObject.tag == "Respawn")
-                {
-                    centerGameObject.transform.position = centerPosition;
-                    CloseInfoBox();
+                    HandleTokenRaycast(hit);
                 }
             }
         }
     }
+
+    private void HandleTokenRaycast(RaycastHit hit)
+    {
+        Debug.LogWarning("Object touched: " + hit.collider.gameObject.tag);
+        if (hit.collider.gameObject.tag == "Token")
+        {
+            SuperPowerToken superPowerToken = hit.collider.GetComponent<SuperPowerToken>();
+            if (superPowerToken != null)
+            {
+                centerGameObject.transform.position = new Vector3(centerPosition.x + 2500, centerPosition.y, centerPosition.z);
+                OpenInfoBox(superPowerToken);
+                return; // Exit early if a token was clicked
+            }
+        }
+        if (SuperPowerToken.ActiveInstance != null && hit.collider.gameObject.tag == "Respawn")
+        {
+            centerGameObject.transform.position = centerPosition;
+            Invoke("CloseInfoBox", 0.1f); // Close the info box after a short delay
+        }
+    }
+
 
     private void GetUIElements()
     {
@@ -153,7 +176,7 @@ public class SuperPowerSpawner : MonoBehaviour
 
 
 
-    private List<string> restirictedPowersName_CardNeedToBeSelected = new List<string> { "Bu Daha İyi", "Şunu Değiş Tokuş", "Kopyala Yapıştır", "Kapkaç" };
+    private List<string> restirictedPowersName_CardNeedToBeSelected = new List<string> { "Bu Daha İyi", "Şunu Değiş Tokuş", "Kopyala Yapıştır"};
     private List<string> restirictedPowersName_CenterNotEmpty = new List<string> { "Bomba" };
     private bool CheckIfCardShouldBeSelected(string superPowerTokenName)
     {
