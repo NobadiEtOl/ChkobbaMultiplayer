@@ -301,7 +301,7 @@ public class CardInteraction : MonoBehaviour
 
     Sequence popSequence;
     Sequence jiggleSequence;
-    private void SelectCard()
+    public void SelectCard()
     {
         if (activeCardIndicator != null)
         {
@@ -350,7 +350,7 @@ public class CardInteraction : MonoBehaviour
         Transform cardIndTransform = cardInd.transform;
         cardIndTransform.localPosition = new Vector3(0, 0, 0.04f);
         cardIndTransform.localRotation = cardInd.transform.rotation;
-        cardIndTransform.localScale = new Vector3(1f, 1f, 1);
+        cardIndTransform.localScale = new Vector3(1.1f, 1.25f, 1);
         baseCardIndicatorColor = cardInd.GetComponent<SpriteRenderer>().color;
         cardInd.SetActive(false);
         selectedCardIndicator = cardInd;
@@ -428,11 +428,13 @@ public class CardInteraction : MonoBehaviour
 
         // Pick a random angle for this cycle
         float angle = UnityEngine.Random.Range(minAngle, maxAngle);
+        float transformX = 90;
+        float transformY = 0;
 
         autoRotateSequence = DOTween.Sequence();
-        autoRotateSequence.Append(transform.DORotate(new Vector3(90, 0, angle), duration).SetEase(Ease.OutSine));
-        autoRotateSequence.Append(transform.DORotate(new Vector3(90, 0, -angle), duration * 2).SetEase(Ease.InOutSine));
-        autoRotateSequence.Append(transform.DORotate(new Vector3(90, 0, 0), duration).SetEase(Ease.InSine));
+        autoRotateSequence.Append(transform.DORotate(new Vector3(transformX, transformY, angle), duration).SetEase(Ease.OutSine));
+        autoRotateSequence.Append(transform.DORotate(new Vector3(transformX, transformY, -angle), duration * 2).SetEase(Ease.InOutSine));
+        autoRotateSequence.Append(transform.DORotate(new Vector3(transformX, transformY, 0), duration).SetEase(Ease.InSine));
         autoRotateSequence.SetLoops(1)
             .OnComplete(() =>
             {
@@ -472,9 +474,8 @@ public class CardInteraction : MonoBehaviour
     public void StopAutoRotate()
     {
         autoRotateActive = false;
-        if (autoRotateSequence != null && autoRotateSequence.IsActive()) autoRotateSequence.Kill();
-        transform.DOKill();
-        //transform.localRotation = Quaternion.Euler(90, 0, 0); // Reset to face up
+        KillAllTweens();
+        WaitForAllTweens();
     }
 
     /// <summary>
@@ -505,15 +506,26 @@ public class CardInteraction : MonoBehaviour
 
     public void KillAllTweens()
     {
-        List<Tween> tweens = DOTween.TweensByTarget(transform);
-        foreach (Tween tween in tweens)
-        {
-            if (tween.IsActive())
-            {
-                tween.Kill();
-            }
-        }
+        // Kill DOTween tweens on this transform
+        DOTween.Kill(transform);
+        transform.DOKill();
+
+        // Kill pop/jiggle sequences if active
+        if (popSequence != null && popSequence.IsActive()) popSequence.Kill();
+        if (jiggleSequence != null && jiggleSequence.IsActive()) jiggleSequence.Kill();
+
+        // Kill auto-rotate sequence if active
+        if (autoRotateSequence != null && autoRotateSequence.IsActive()) autoRotateSequence.Kill();
     }
+
+    public IEnumerator WaitForAllTweens()
+    {
+        // Wait until there are no active tweens on this transform
+        while (DOTween.IsTweening(transform))
+            yield return null;
+    }
+
+
 
     public IEnumerator WaitForAllTweens(Transform target)
     {
@@ -521,5 +533,7 @@ public class CardInteraction : MonoBehaviour
         while (DOTween.IsTweening(target))
             yield return null;
     }
+
+
 
 }

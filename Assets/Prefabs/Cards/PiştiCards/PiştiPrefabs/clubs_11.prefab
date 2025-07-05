@@ -100,6 +100,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   isPlayable: 1
   uniqueCardInstanceID: 
+  activePowerEffect: none
+  yandimAnamEffectInstance: {fileID: 0}
+  yandimAnamSpriteInstance: {fileID: 0}
 --- !u!65 &5749141418400362950
 BoxCollider:
   m_ObjectHideFlags: 0

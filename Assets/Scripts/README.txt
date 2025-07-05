@@ -221,15 +221,15 @@ need to check if visuals are updated correctly.
 
 
 //Turun kimde olduğu UI
-//Ortaya gelen kartlar birbirine cliplenebiliyor, ortaya geldikten sonar rotasyon 0la
 //Sırtını bıçakla gücü
 //BattıBalıkYanGider sen rakibini oyna
 //Oyundan çıkıca geri girişinde bağlantı kopuk
-//CloseInfoBoxı invokedan çıkar
 //2 player logicleri 4 e geçir
-//Kartlar hareket ederken DOKill lazım. Bazı swaplarda kart animasyonunu bitirmemişse kötü oluyor
-//ŞunuDeğişBunuTokuşta swap sonrası rotasyonlar yanlış ayarlı
-//Çok hızlı oynarsan kartlar orijinal halleri ile ortaya geliyor
-
-/////DOtweenler kart ortaya konurken hala bitmemiş olursa kartın scalei farklı kalıyor.
-Bir şekilde bğtğn aktif tweenleri kart hareketi başlamadan bitirmeli ya da tweenler bitene kadar beklemeli.
+//Playerlar kendi turlerinde sadece kendi kartlarını oynayabilmeli
+//Test et//Zehirli ve kutsal desteyi ortadaki kart sayısı kadar puanlıyıcak şekilde yap.(centercardcount+1(since the played card is not added to the center but added to the pool))
+//Zafer Puanını eldeki zafer puanına göre daha çok puan vericek şekilde yapabiliriz.
+//Silah gücü ekle. Silah roundu otomatik olarak bitirir. Puan cezası
+//Suffle Cards gücü. eli karıştırır
+//ŞunuDeğişTokuş ve ŞunuDeğişBunuTokuşa yeniden bak. ŞDT da değiştirilen kartın doğru yere gitmeme sorunu var.(updateLayout olunca yerine oturuyor ama)
+ŞDBTda da her verilen kart face up oluyor ama sonra düzeliyor.
+//Belki de oyuncu unitye oyun ararken değl oyuna girince sign in yapabilir

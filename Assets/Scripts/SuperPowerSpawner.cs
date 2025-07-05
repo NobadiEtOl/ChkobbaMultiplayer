@@ -81,15 +81,13 @@ public class SuperPowerSpawner : MonoBehaviour
             SuperPowerToken superPowerToken = hit.collider.GetComponent<SuperPowerToken>();
             if (superPowerToken != null)
             {
-                centerGameObject.transform.position = new Vector3(centerPosition.x + 2500, centerPosition.y, centerPosition.z);
                 OpenInfoBox(superPowerToken);
                 return; // Exit early if a token was clicked
             }
         }
         if (SuperPowerToken.ActiveInstance != null && hit.collider.gameObject.tag == "Respawn")
         {
-            centerGameObject.transform.position = centerPosition;
-            Invoke("CloseInfoBox", 0.1f); // Close the info box after a short delay
+            CloseInfoBox(); // Close the info box after a short delay
         }
     }
 
@@ -131,9 +129,9 @@ public class SuperPowerSpawner : MonoBehaviour
 
     private void OnTokenClicked()
     {
+        centerGameObject.transform.position = centerPosition;
         Debug.Log("Activate button clicked for " + SuperPowerToken.ActiveInstance?.power.name);
         SuperPowerToken.ActiveInstance.OnTokenClicked();
-        centerGameObject.transform.position = centerPosition;
     }
 
     public void CloseInfoBox()
@@ -143,10 +141,12 @@ public class SuperPowerSpawner : MonoBehaviour
         activateButton.gameObject.SetActive(false);
         closeButton.gameObject.SetActive(false);
         SuperPowerToken.ActiveInstance = null; // Clear the active instance
+        centerGameObject.transform.position = centerPosition;
     }
 
     public void OpenInfoBox(SuperPowerToken superPowerToken)
     {
+        centerGameObject.transform.position = new Vector3(centerPosition.x + 2500, centerPosition.y, centerPosition.z);
         Debug.Log("Opening InfoBox for " + superPowerToken.power.name);
         if (SuperPowerToken.ActiveInstance != null && SuperPowerToken.ActiveInstance != this)
         {
@@ -177,7 +177,7 @@ public class SuperPowerSpawner : MonoBehaviour
 
 
     private List<string> restirictedPowersName_CardNeedToBeSelected = new List<string> { "Bu Daha İyi", "Şunu Değiş Tokuş", "Kopyala Yapıştır"};
-    private List<string> restirictedPowersName_CenterNotEmpty = new List<string> { "Bomba" };
+    private List<string> restirictedPowersName_CenterNotEmpty = new List<string> { "Bu Daha İyi", "Bomba" };
     private bool CheckIfCardShouldBeSelected(string superPowerTokenName)
     {
         bool flag = CardNeedToBeSelected(superPowerTokenName);

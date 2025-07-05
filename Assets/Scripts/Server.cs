@@ -797,6 +797,7 @@ public class Server : NetworkBehaviour
 
         if (selectedHandCard[1] == sumValue || (selectedHandCard[1] == 11 && sumValue != 0))
         {
+            int centerCardCount = centerCardsDict.Count + 1;
             RemoveCardsFromCenter(serializableCard);
             // Add the played card to the serializableCard for pool addition
             var updatedDict = serializableCard.ToDictionary();
@@ -809,7 +810,8 @@ public class Server : NetworkBehaviour
             if (verZehriActive)
             {
                 int team = (playerNumber % 2);
-                points[team] -= 5;
+                points[team] -= centerCardCount;
+                Debug.LogWarning("Ver Zehri active, removing points"+ centerCardCount +"from team " + team);
                 networkRelay.ShowVerZehriEffectClientRPC(playerNumber, -5);
                 verZehriActive = false;
                 networkRelay.SetVerZehriActiveClientRPC(false); // Notify clients to stop effect
@@ -817,7 +819,8 @@ public class Server : NetworkBehaviour
             if (kutsalDesteActive)
             {
                 int team = (playerNumber % 2);
-                points[team] += 5;
+                points[team] += centerCardCount;
+                Debug.LogWarning("KutsalDeste active, removing points"+ centerCardCount +"from team " + team);
                 networkRelay.ShowKutsalDesteEffectClientRPC(playerNumber, 5);
                 kutsalDesteActive = false;
                 networkRelay.SetKutsalDesteActiveClientRPC(false); // Notify clients to stop effect

@@ -18,11 +18,11 @@ public class GameManager : MonoBehaviour
     public NetworkRelay networkRelay;
     //Card Variables
     [SerializeField] public GameObject cardBack;
-    private string currentSelectedHandCard;//Represents the card current player chose to play with.
+    public string currentSelectedHandCard;//Represents the card current player chose to play with.
     public Dictionary<string, int[]> centerCards = new Dictionary<string, int[]>();//List of cards in the center
     public List<GameObject> centerCardsObjects = new List<GameObject>();//List of the card objects in the center
     private List<CardInteraction> cardInteractionsScripts = new List<CardInteraction>();//Reference to the scripts of every card.
-    private List<GameObject> cardObjectsToBeDiscarted = new List<GameObject>();
+    public List<GameObject> cardObjectsToBeDiscarted = new List<GameObject>();
     public static int currentPlayerNo = 0;
     private List<string> centerCardIDList;
     public List<string> myCards;
@@ -41,7 +41,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private List<Transform> playerPiştiPoolTransforms;
     [SerializeField] private Transform centerTransform;
     bool alreadySubbed = false;
-    private bool movePlayedLocally = false;
+    public bool movePlayedLocally = false;
     private GameObject waitingScreen;
     private GameObject mainScreen;
     private GameObject explosionObject;
@@ -353,10 +353,10 @@ public class GameManager : MonoBehaviour
                 return;
             }
             // Send swap request to server
+            DeckController.LocalInstance.ExitShowcaseAllOtherHands();
             networkRelay.UseSunuDegisTokusServerRPC(deckController.thisPlayerNumber, sunuDegisTokusFirstCard, cardID);
             isSunuDegisTokusActive = false;
             sunuDegisTokusFirstCard = null;
-            DeckController.LocalInstance.ExitShowcaseAllOtherHands();
             return;
         }
 
@@ -398,12 +398,6 @@ public class GameManager : MonoBehaviour
         SuperPowerSpawner.LocalInstance.SetActiveActivateButtonTrue();
     }
 
-    public void UpdateCurrentPlayerHandLayoutCall()
-    {
-        //UI
-        deckController.UpdateCurrentPlayerHandLayout();
-    }
-
     //Called when the player tries to play the selected card with one or two center cards
     private void CardsPlayed(string cardID, GameObject cardObject, int playerNumber)
     {
@@ -430,17 +424,17 @@ public class GameManager : MonoBehaviour
 
         if (oynayamazsinActive)
         {
-            DiscardHandCards(currentSelectedHandCard, CardInteraction.cardLookup[currentSelectedHandCard].GetCardID());
+            PlayCardToCenter(currentSelectedHandCard, CardInteraction.cardLookup[currentSelectedHandCard].GetCardID());
             movePlayedLocally = true;
         }
         else if (cardValue == sumValue || (cardValue == 11 && sumValue != 0))
         {
-            DiscardPlayedCards(currentSelectedHandCard, serializableCard, playerNumber);
+            DiscardCapturedCards(currentSelectedHandCard, serializableCard, playerNumber);
             movePlayedLocally = true;
         }
         else
         {
-            DiscardHandCards(currentSelectedHandCard, CardInteraction.cardLookup[currentSelectedHandCard].GetCardID());
+            PlayCardToCenter(currentSelectedHandCard, CardInteraction.cardLookup[currentSelectedHandCard].GetCardID());
             movePlayedLocally = true;
         }
 
@@ -558,7 +552,7 @@ public class GameManager : MonoBehaviour
         Debug.Log("Discarding hand cards: " + movePlayedLocally);
         if (!movePlayedLocally)
         {
-            DiscardPlayedCards(playedCard, serializedCard, playerNumber);
+            DiscardCapturedCards(playedCard, serializedCard, playerNumber);
         }
         else
         {
@@ -566,67 +560,9 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    public void DiscardPlayedCards(string playedCard, SerializableCard serializedCard, int playerNumber)
+    public void DiscardCapturedCards(string playedCard, SerializableCard serializedCard, int playerNumber)
     {
-        Debug.Log("Discarding played cards: " + movePlayedLocally);
-        if (!movePlayedLocally)
-        {
-            List<string> selectedCenterCards = serializedCard.ToDictionary().Keys.ToList();
-            List<string> selectedCards = new List<string>(selectedCenterCards);
-            selectedCards.Add(playedCard);
-            cardObjectsToBeDiscarted.Clear();
-
-            foreach (string cardID in selectedCards)
-            {
-                GameObject tempCardObject = CardInteraction.cardLookup[cardID].gameObject;
-                tempCardObject.transform.parent = null;
-
-                if (cardID == playedCard)
-                {
-                    tempCardObject.transform.rotation = Quaternion.Euler(90, 0, 0);
-                    tempCardObject.transform.position = (centerTransform.position + tempCardObject.transform.position) / 2;
-                }
-
-                if (tempCardObject != null)
-                {
-                    cardObjectsToBeDiscarted.Add(tempCardObject);
-                }
-                else
-                {
-                    Debug.LogWarning("No card found with the tag: " + cardID[0] + "_" + cardID[1]);
-                }
-            }
-
-            bool piştiHappened = false;
-
-            if (selectedCards.Count == 2)
-            {
-                if (CardInteraction.cardLookup[selectedCards[selectedCards.Count - 1]].GetCardID()[1] == CardInteraction.cardLookup[selectedCards[selectedCards.Count - 2]].GetCardID()[1])
-                {
-                    Debug.LogError("Pişti happened!");
-                    piştiHappened = true;
-                }
-            }
-
-            deckController.MoveCardsToPlayerPool(cardObjectsToBeDiscarted, playerNumber, piştiHappened);
-
-            foreach (string uniqueCardId in selectedCenterCards)
-            {
-                var selectedCardId = CardInteraction.cardLookup[uniqueCardId].GetCardID();
-                centerCards = centerCards
-                    .Where(card => !(card.Value[0] == selectedCardId[0] && card.Value[1] == selectedCardId[1]))
-                    .ToDictionary(card => card.Key, card => card.Value);
-            }
-
-            PrintCenterCards();
-        }
-        else
-        {
-            movePlayedLocally = false;
-            CardInteraction.isOneCardSelected = false;
-            currentSelectedHandCard = null;
-            centerCards.Clear();
-        }
+        StartCoroutine(deckController.DiscardCapturedCards(playedCard, serializedCard, playerNumber));
     }
 
     public void GetCardAddedToCenter(string uniqueCardID, int[] cardID)
@@ -634,7 +570,7 @@ public class GameManager : MonoBehaviour
         Debug.Log("Discarding hand cards: " + movePlayedLocally);
         if (!movePlayedLocally)
         {
-            DiscardHandCards(uniqueCardID, cardID);
+            PlayCardToCenter(uniqueCardID, cardID);
         }
         else
         {
@@ -643,10 +579,9 @@ public class GameManager : MonoBehaviour
     }
 
     //To remove the played card from the hand when it played to the center
-    public void DiscardHandCards(string uniqueCardID, int[] cardID)
+    public void PlayCardToCenter(string uniqueCardID, int[] cardID)
     {
-        //UI
-        deckController.DiscardHandCardToCenter(uniqueCardID, cardID);
+        StartCoroutine(deckController.PlayHandCardToCenter(uniqueCardID, cardID));
     }
 
     private int turnCounter;
