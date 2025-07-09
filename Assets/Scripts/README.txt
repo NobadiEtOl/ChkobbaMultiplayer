@@ -230,3 +230,4 @@ need to check if visuals are updated correctly.
 //Silah gücü ekle. Silah roundu otomatik olarak bitirir. Puan cezası
 //Suffle Cards gücü. eli karıştırır
 //Belki de oyuncu unitye oyun ararken değl oyuna girince sign in yapabilir
+//Card Indicatoru bi önceki indicator nerde kaldıysa ordan başlat
