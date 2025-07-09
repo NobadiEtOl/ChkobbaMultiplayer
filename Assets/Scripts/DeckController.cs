@@ -560,16 +560,6 @@ public class DeckController : MonoBehaviour
         int handCount = playerHandTransforms.Count;
         int startIdx = 1; // Skip playerHandTransforms[0] (your hand)
 
-        // Layout for your hand (player 0) - normal layout, autoRotateFlag = true
-        foreach (Transform child in playerHandTransforms[0])
-        {
-            var ci = child.GetComponent<CardInteraction>();
-            if (ci != null)
-            {
-                ci.StartAutoRotate();
-            }
-        }
-
         // Layout for other hands (showcase)
         for (int handIdx = startIdx; handIdx < handCount; handIdx++)
         {
@@ -599,7 +589,7 @@ public class DeckController : MonoBehaviour
                     showcaseOriginalTransforms[card] = (card.transform.position, card.transform.rotation, card.transform.localScale, false);
 
                 Vector3 offset = Vector3.zero;
-                Quaternion rotation = Quaternion.identity;
+                Quaternion rotation = card.transform.rotation;
                 Vector3 scale = new Vector3(centerScale, centerScale, centerScale);
 
                 switch (handIdx)
@@ -1164,9 +1154,7 @@ public class DeckController : MonoBehaviour
     public void MoveCard(Vector3 endPos, GameObject cardObject, float speed, Quaternion rotation, Vector3 scales)
     {
         // Start the coroutine to move the card
-        Debug.LogError("Moving card to position: " + endPos + " with speed: " + speed);
         StartCoroutine(MoveCardCoroutine(endPos, cardObject, speed, rotation, scales));
-        Debug.LogError("Card moved to position: " + endPos + " with speed: " + speed);
         //cardObject.GetComponent<CardInteraction>().KillAllTweens();
     }
 
@@ -1711,7 +1699,7 @@ public class DeckController : MonoBehaviour
 
 
 
-    public void SwapCardsBetweenPlayersByID(int playerANo, string cardAID, int playerBNo, string cardBID)
+    public IEnumerator SwapCardsBetweenPlayersByID(int playerANo, string cardAID, int playerBNo, string cardBID, bool sunuFlag = false)
     {
         int relA = (playerANo - thisPlayerNumber + playerCount) % playerCount;
         int relB = (playerBNo - thisPlayerNumber + playerCount) % playerCount;
@@ -1746,11 +1734,16 @@ public class DeckController : MonoBehaviour
         Vector3 cardBOldScale = cardBObj.transform.localScale;
 
         // Animate cards to each other's old positions
-        MoveCard(cardBOldPos, cardAObj, 1, cardBOldRot, new Vector3(normalScale, normalScale, normalScale));
-        MoveCard(cardAOldPos, cardBObj, 1, cardAOldRot, new Vector3(myCardsScale, myCardsScale, myCardsScale));
+        StartCoroutine(MoveCardCoroutine(cardBOldPos, cardAObj, 1, cardBOldRot, cardBOldScale));
+        yield return StartCoroutine(MoveCardCoroutine(cardAOldPos, cardBObj, 1, cardAOldRot, new Vector3(myCardsScale, myCardsScale, myCardsScale)));
+
+        if (sunuFlag)
+        {
+            showcaseOriginalTransforms.Remove(cardBObj);
+        }
 
         // Swap parents but keep world positions for animation
-        cardAObj.transform.SetParent(handB, true);
+            cardAObj.transform.SetParent(handB, true);
         cardBObj.transform.SetParent(handA, true);
 
         // --- Insert at correct indexes ---
@@ -1793,6 +1786,7 @@ public class DeckController : MonoBehaviour
         //UpdateCurrentPlayerHandLayout();
         CardInteraction.currentlySelectedCard = null;
         GameManager.LocalInstance.SetCurrentSelectedHandCardNull();
+        //yield return new WaitForSeconds(0.5f);
     }
 
 
@@ -1827,7 +1821,7 @@ public class DeckController : MonoBehaviour
         StartCoroutine(SwapCardsAndUpdateLayoutCoroutine(playerANo, cardAID, playerBNo, cardBID, handIndexA));
     }
 
-    public IEnumerator SwapCardsAndUpdateLayoutCoroutine(int playerANo, string cardAID, int playerBNo, string cardBID, int handIndexA)
+    public IEnumerator SwapCardsAndUpdateLayoutCoroutine(int playerANo, string cardAID, int playerBNo, string cardBID, int handIndexA, bool sunuFlag = false)
     {
         int relA = (playerANo - thisPlayerNumber + playerCount) % playerCount;
         int relB = (playerBNo - thisPlayerNumber + playerCount) % playerCount;
@@ -1869,6 +1863,10 @@ public class DeckController : MonoBehaviour
         var moveA = MoveCardCoroutine(cardBOldPos, cardAObj, 1, cardBOldRot, new Vector3(normalScale, normalScale, normalScale));
         var moveB = MoveCardCoroutine(cardAOldPos, cardBObj, 1, cardAOldRot, new Vector3(myCardsScale, myCardsScale, myCardsScale));
         yield return StartCoroutine(WaitForBoth(moveA, moveB));
+        if (sunuFlag)
+        {
+            showcaseOriginalTransforms.Remove(cardBObj);
+        }
 
         // --- Insert cardBObj at the correct index in handA ---
         List<Transform> handAChildren = new List<Transform>();
@@ -1911,7 +1909,7 @@ public class DeckController : MonoBehaviour
         UpdateShowcaseOriginalsAfterSwap(cardAObj);
         UpdateShowcaseOriginalsAfterSwap(cardBObj);
 
-        if (!GameManager.LocalInstance.isSunuDegisBunuTokusActive) ExitShowcaseAllOtherHands();
+        //if (!GameManager.LocalInstance.isSunuDegisBunuTokusActive) ExitShowcaseAllOtherHands();
 
         CardInteraction.currentlySelectedCard = null;
         GameManager.LocalInstance.SetCurrentSelectedHandCardNull();
@@ -1919,7 +1917,7 @@ public class DeckController : MonoBehaviour
 
 
     private bool isShowcaseAllActive = false;
-    private Dictionary<GameObject, (Vector3 pos, Quaternion rot, Vector3 scale, bool autoRotateFlag)> showcaseOriginalTransforms = new Dictionary<GameObject, (Vector3, Quaternion, Vector3, bool)>();
+    public Dictionary<GameObject, (Vector3 pos, Quaternion rot, Vector3 scale, bool autoRotateFlag)> showcaseOriginalTransforms = new Dictionary<GameObject, (Vector3, Quaternion, Vector3, bool)>();
 
     [ContextMenu("ExitShowcaseAllOtherHands")]
     public void ExitShowcaseAllOtherHands()
@@ -1941,7 +1939,7 @@ public class DeckController : MonoBehaviour
         showcaseOriginalTransforms.Clear();
 
         // After restoring, update layout to ensure flags are correct for your hand
-        //UpdateCurrentPlayerHandLayout();
+        UpdateCurrentPlayerHandLayout();
     }
 
     public void UpdateShowcaseOriginalsAfterSwap(GameObject card)

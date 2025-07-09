@@ -466,7 +466,7 @@ public class CardInteraction : MonoBehaviour
             {
                 // If still active, start again with a new random angle
                 if (autoRotateActive)
-                    StartAutoRotate(minAngle, maxAngle, duration);
+                    StartAutoRotateFaceDown(minAngle, maxAngle, duration);
             });
     }
 

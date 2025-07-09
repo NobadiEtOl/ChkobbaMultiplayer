@@ -227,9 +227,6 @@ need to check if visuals are updated correctly.
 //2 player logicleri 4 e geçir
 //Playerlar kendi turlerinde sadece kendi kartlarını oynayabilmeli
 //Test et//Zehirli ve kutsal desteyi ortadaki kart sayısı kadar puanlıyıcak şekilde yap.(centercardcount+1(since the played card is not added to the center but added to the pool))
-//Zafer Puanını eldeki zafer puanına göre daha çok puan vericek şekilde yapabiliriz.
 //Silah gücü ekle. Silah roundu otomatik olarak bitirir. Puan cezası
 //Suffle Cards gücü. eli karıştırır
-//ŞunuDeğişTokuş ve ŞunuDeğişBunuTokuşa yeniden bak. ŞDT da değiştirilen kartın doğru yere gitmeme sorunu var.(updateLayout olunca yerine oturuyor ama)
-ŞDBTda da her verilen kart face up oluyor ama sonra düzeliyor.
 //Belki de oyuncu unitye oyun ararken değl oyuna girince sign in yapabilir

@@ -10,9 +10,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 0}
-  m_Name: New Sunu Degis Tokus
-  m_EditorClassIdentifier: Assembly-CSharp::SunuDegisTokus
-  name: "\u015Eunu De\u011Fi\u015F Toku\u015F"
-  description: "\xC7oktan se\xE7ilmi\u015F kart\u0131nla rakibin istedi\u011Fin kart\u0131n\u0131
-    de\u011Fi\u015F toku\u015F"
-  rarityMultiplier: 4
+  m_Name: New Sunu Degis Bunu Tokus 1
+  m_EditorClassIdentifier: Assembly-CSharp::SunuDegisBunuTokus
+  name: "\u015Eunu De\u011Fi\u015F Bunu Toku\u015F"
+  description: "T\xFCm karlar\u0131n\u0131 s\u0131rayla de\u011Fi\u015F toku\u015F"
+  rarityMultiplier: 2

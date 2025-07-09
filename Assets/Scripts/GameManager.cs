@@ -353,7 +353,6 @@ public class GameManager : MonoBehaviour
                 return;
             }
             // Send swap request to server
-            DeckController.LocalInstance.ExitShowcaseAllOtherHands();
             networkRelay.UseSunuDegisTokusServerRPC(deckController.thisPlayerNumber, sunuDegisTokusFirstCard, cardID);
             isSunuDegisTokusActive = false;
             sunuDegisTokusFirstCard = null;
@@ -378,7 +377,12 @@ public class GameManager : MonoBehaviour
             }
             string myHandCardID = sunuDegisBunuTokusMyHandSnapshot[sunuDegisBunuTokusSwapIndex];
             // Send swap request to server
-            networkRelay.UseSunuDegisBunuTokusServerRPC(deckController.thisPlayerNumber, myHandCardID, cardID, sunuDegisBunuTokusSwapIndex);
+            bool flag = false;
+            if (sunuDegisBunuTokusSwapIndex >= sunuDegisBunuTokusMyHandSnapshot.Count -1)
+            {
+                flag = true;
+            }
+            networkRelay.UseSunuDegisBunuTokusServerRPC(deckController.thisPlayerNumber, myHandCardID, cardID, sunuDegisBunuTokusSwapIndex,flag);
             sunuDegisBunuTokusSwapIndex++;
             if (sunuDegisBunuTokusSwapIndex >= sunuDegisBunuTokusMyHandSnapshot.Count)
             {
@@ -1451,7 +1455,7 @@ public class GameManager : MonoBehaviour
         DeckController.LocalInstance.ShowcaseAllOtherHands();
     }
 
-    public void OnSunuDegisTokusSynced(int myPlayerNo, int otherPlayerNo, string myHandCardID, string otherHandCardID)
+    public IEnumerator OnSunuDegisTokusSynced(int myPlayerNo, int otherPlayerNo, string myHandCardID, string otherHandCardID)
     {
         // Swap in myCards if relevant
         if (deckController.thisPlayerNumber == myPlayerNo)
@@ -1472,7 +1476,8 @@ public class GameManager : MonoBehaviour
         }
 
         // Visual swap
-        deckController.SwapCardsBetweenPlayersByID(myPlayerNo, myHandCardID, otherPlayerNo, otherHandCardID);
+        yield return StartCoroutine(deckController.SwapCardsBetweenPlayersByID(myPlayerNo, myHandCardID, otherPlayerNo, otherHandCardID, true));
+        DeckController.LocalInstance.ExitShowcaseAllOtherHands();
     }
 
     // Add at the top of GameManager.cs
@@ -1496,7 +1501,7 @@ public class GameManager : MonoBehaviour
     }
 
     // Add this method to handle the synced swap
-    public void OnSunuDegisBunuTokusSynced(int myPlayerNo, int otherPlayerNo, string myHandCardID, string otherHandCardID, int myHandIndex)
+    public IEnumerator OnSunuDegisBunuTokusSynced(int myPlayerNo, int otherPlayerNo, string myHandCardID, string otherHandCardID, int myHandIndex, bool readyToExit = false)
     {
         // Update myCards if relevant
         if (deckController.thisPlayerNumber == myPlayerNo)
@@ -1516,7 +1521,8 @@ public class GameManager : MonoBehaviour
             }
         }
         // Visual swap at the correct index
-        deckController.SwapCardsBetweenPlayersByIDAtIndex(myPlayerNo, myHandCardID, otherPlayerNo, otherHandCardID, myHandIndex);
+        yield return StartCoroutine(deckController.SwapCardsBetweenPlayersByID(myPlayerNo, myHandCardID, otherPlayerNo, otherHandCardID, true));
+        if(readyToExit) deckController.ExitShowcaseAllOtherHands();
     }
 
     // Add this public method to allow CardInteraction to check swap power activeness
@@ -1670,7 +1676,7 @@ public class GameManager : MonoBehaviour
         if (yandimAnamSpritePrefab != null)
         {
             effect = Instantiate(yandimAnamSpritePrefab, cardObj.transform);
-            effect.transform.localPosition = new Vector3(0, 0, -0.03f); // Below the animation
+            effect.transform.localPosition = new Vector3(0, 0, -0.002f); // Below the animation
             SpriteRenderer sr = effect.GetComponent<SpriteRenderer>();
             if (sr != null)
             {
