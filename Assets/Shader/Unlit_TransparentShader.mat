@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: MasaShader_Material
-  m_Shader: {fileID: 4800000, guid: c85474ede28a00a468c84fa2edd3cd63, type: 3}
+  m_Name: Unlit_TransparentShader
+  m_Shader: {fileID: 4800000, guid: 2aa237e19f8cfba499103ba00e8c49b0, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -16,20 +16,18 @@ Material:
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
-  m_CustomRenderQueue: 1000
+  m_CustomRenderQueue: -1
   stringTagMap: {}
   disabledShaderPasses: []
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
-    m_TexEnvs: []
+    m_TexEnvs:
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
-    m_Floats:
-    - _LineScale: 5
-    - _NoiseStrength: 7.5
-    - _ScaleX: 10
-    - _ScaleY: 5
-    - _Speed: 0.25
-    m_Colors:
-    - _MainColor: {r: 0.121568635, g: 0, b: 0.09411766, a: 1}
+    m_Floats: []
+    m_Colors: []
   m_BuildTextureStacks: []

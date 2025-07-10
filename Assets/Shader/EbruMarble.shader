@@ -1,4 +1,4 @@
-Shader "Custom/EbruMarble_TwoColorBands"
+Shader "Custom/EbruMarble_TwoColorBands_Velvet"
 {
     Properties
     {
@@ -11,8 +11,18 @@ Shader "Custom/EbruMarble_TwoColorBands"
         _BandWidth ("Band Width", Float) = 0.18
         _Zoom ("Zoom", Float) = 0.6
         _Rotation ("Rotation (Degrees)", Range(0,360)) = 0
-        _ColorMode ("Color Mode (0=DarkGreenBlack, 1=BrownBlack, 2=WhiteBlack)", Range(0,2)) = 0
+        _ColorMode ("Color Mode (0=DarkGreenBlack, 1=BrownBlack, 2=WhiteBlack, 3=Custom)", Range(0,3)) = 0
         _BlackBandRatio ("Black Band Ratio (0-1)", Range(0.05,0.5)) = 0.2
+
+        // Velvet controls
+        _VelvetColor ("Velvet Color", Color) = (1,0.9,0.8,1)
+        _VelvetIntensity ("Velvet Intensity", Range(0,1)) = 0.25
+        _VelvetSoftness ("Velvet Softness", Range(0.5,8)) = 2.5
+        _VelvetDirection ("Velvet Light Direction", Vector) = (0,1,0,0)
+
+        // Custom band colors
+        _BandColorA ("Custom Band Color A", Color) = (0.125, 0, 0.094, 1) // #200018
+        _BandColorB ("Custom Band Color B", Color) = (0,0,0,1)
     }
     SubShader
     {
@@ -35,6 +45,14 @@ Shader "Custom/EbruMarble_TwoColorBands"
             float _Rotation;
             float _ColorMode;
             float _BlackBandRatio;
+
+            float4 _VelvetColor;
+            float _VelvetIntensity;
+            float _VelvetSoftness;
+            float4 _VelvetDirection;
+
+            float4 _BandColorA;
+            float4 _BandColorB;
 
             struct appdata
             {
@@ -86,6 +104,8 @@ Shader "Custom/EbruMarble_TwoColorBands"
                 // --- Two-color bands with adjustable black band ratio ---
                 float band = frac(bandPos / 1.0); // Each band is 1.0 wide
                 float3 colorA;
+                float3 colorB = float3(0,0,0); // Black
+
                 if(_ColorMode < 0.5)
                 {
                     colorA = float3(0.0, 0.15, 0.1); // Dark green
@@ -94,11 +114,15 @@ Shader "Custom/EbruMarble_TwoColorBands"
                 {
                     colorA = float3(0.12, 0.05, 0.03); // Darker brown
                 }
-                else
+                else if(_ColorMode < 2.5)
                 {
                     colorA = float3(0.1, 0.1, 0.1); // White
-                } 
-                float3 colorB = float3(0,0,0); // Black
+                }
+                else
+                {
+                    colorA = _BandColorA.rgb; // Custom color
+                    colorB = _BandColorB.rgb;
+                }
 
                 float3 col;
                 if (band < (1.0 - _BlackBandRatio))
@@ -109,6 +133,16 @@ Shader "Custom/EbruMarble_TwoColorBands"
                 // Soften band edges
                 float bandEdge = smoothstep(_BandWidth, _BandWidth * 0.7, frac(bandPos));
                 col = lerp(col, float3(1,1,1), bandEdge * 0.2);
+
+                // --- Velvet effect ---
+                // Fake normal: radial from center
+                float2 center = float2(0,0);
+                float2 normal = normalize(combedUV - center);
+                float2 lightDir = normalize(_VelvetDirection.xy);
+
+                // Velvet highlight: strongest at grazing angles
+                float velvet = pow(1.0 - abs(dot(normal, lightDir)), _VelvetSoftness) * _VelvetIntensity;
+                col = lerp(col, _VelvetColor.rgb, velvet);
 
                 return float4(col, 1.0);
             }

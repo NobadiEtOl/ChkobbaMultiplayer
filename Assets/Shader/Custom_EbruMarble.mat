@@ -32,9 +32,16 @@ Material:
     - _BandCount: 1
     - _BandWidth: 0
     - _BlackBandRatio: 0.25
+    - _CircleGrid: 5
+    - _CircleRadius: 0.15
+    - _CircleSoftness: 0.02
     - _ColorMode: 0
     - _CombAmplitude: 1
     - _CombFrequency: 1
+    - _DiamondGrid: 4
+    - _DiamondRadius: 0.2
+    - _DiamondSoftness: 0.02
+    - _DiamondThickness: 0.08
     - _DotCount: 10
     - _DotRadius: 3
     - _DropCount: 1
@@ -54,17 +61,30 @@ Material:
     - _GelgitFrequency: 1
     - _MaxDrops: 4
     - _Rotation: 0
+    - _StarDiamondRadius: 0.2
+    - _StarGrid: 3
+    - _StarRadius: 0.2
+    - _StarSharpness: 12
+    - _StarSize: 0.08
+    - _StarSoftness: 0.01
     - _SwirlAmplitude: 1
     - _SwirlCount: 3
     - _SwirlFrequency: 8
     - _SwirlStrength: 1
     - _TimeSpeed: 1
+    - _VelvetIntensity: 0.1
+    - _VelvetSoftness: 2
     - _Zoom: 10
     m_Colors:
+    - _BGColor: {r: 1, g: 1, b: 1, a: 1}
+    - _BandColorA: {r: 0.12499998, g: 0, b: 0.09399996, a: 1}
+    - _BandColorB: {r: 0, g: 0, b: 0, a: 1}
+    - _CircleColor: {r: 1, g: 1, b: 1, a: 1}
     - _ColorA: {r: 0.19999996, g: 0.39999998, b: 0.7, a: 1}
     - _ColorB: {r: 1, g: 0.9, b: 0.7, a: 1}
     - _ColorC: {r: 0.8, g: 0.5, b: 0.19999996, a: 1}
     - _ColorD: {r: 0.19999996, g: 0.7, b: 0.39999998, a: 1}
+    - _DiamondColor: {r: 0.7609999, g: 0.24699995, b: 0.101999976, a: 1}
     - _DropCenter: {r: 0.5, g: 0.5, b: 0, a: 0}
     - _DropCenter0: {r: 1, g: 1, b: 1, a: 1}
     - _DropCenter1: {r: 0.2, g: 0.8, b: 0, a: 0}
@@ -76,4 +96,7 @@ Material:
     - _DropColor3: {r: 1, g: 1, b: 0, a: 1}
     - _DropColors: {r: 1, g: 1, b: 1, a: 1}
     - _DropPositions: {r: 0, g: 0, b: 0, a: 0}
+    - _StarColor: {r: 1, g: 0.9, b: 0.19999996, a: 1}
+    - _VelvetColor: {r: 1, g: 0.9, b: 0.8, a: 1}
+    - _VelvetDirection: {r: 0, g: 1, b: 0, a: 0}
   m_BuildTextureStacks: []
