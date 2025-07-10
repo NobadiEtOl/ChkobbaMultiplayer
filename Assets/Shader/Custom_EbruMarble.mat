@@ -22,23 +22,58 @@ Material:
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
-    m_TexEnvs: []
+    m_TexEnvs:
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _BandCount: 8
-    - _BandWidth: 0.18
-    - _CombAmplitude: 0.1
-    - _CombFrequency: 10
-    - _DotCount: 8
-    - _DotRadius: 0.12
-    - _GelgitAmplitude: 0.1
-    - _GelgitFrequency: 10
+    - _BandCount: 1
+    - _BandWidth: 0
+    - _BlackBandRatio: 0.25
+    - _ColorMode: 0
+    - _CombAmplitude: 1
+    - _CombFrequency: 1
+    - _DotCount: 10
+    - _DotRadius: 3
+    - _DropCount: 1
+    - _DropDissolveTime: 1
+    - _DropDuration: 3
+    - _DropEdgeSoftness: 1
+    - _DropInterval: 0.1
+    - _DropLife: 1
+    - _DropRadius: 1
+    - _DropSoftness: 0
+    - _DropSpeed: 1
+    - _DropStartTime0: 0
+    - _DropStartTime1: 1
+    - _DropStartTime2: 2
+    - _DropStartTime3: 3
+    - _GelgitAmplitude: 1
+    - _GelgitFrequency: 1
+    - _MaxDrops: 4
+    - _Rotation: 0
+    - _SwirlAmplitude: 1
     - _SwirlCount: 3
-    - _TimeSpeed: 0.1
-    - _Zoom: 0.2
+    - _SwirlFrequency: 8
+    - _SwirlStrength: 1
+    - _TimeSpeed: 1
+    - _Zoom: 10
     m_Colors:
     - _ColorA: {r: 0.19999996, g: 0.39999998, b: 0.7, a: 1}
     - _ColorB: {r: 1, g: 0.9, b: 0.7, a: 1}
     - _ColorC: {r: 0.8, g: 0.5, b: 0.19999996, a: 1}
     - _ColorD: {r: 0.19999996, g: 0.7, b: 0.39999998, a: 1}
+    - _DropCenter: {r: 0.5, g: 0.5, b: 0, a: 0}
+    - _DropCenter0: {r: 1, g: 1, b: 1, a: 1}
+    - _DropCenter1: {r: 0.2, g: 0.8, b: 0, a: 0}
+    - _DropCenter2: {r: 0.8, g: 0.3, b: 0, a: 0}
+    - _DropCenter3: {r: 0.7, g: 0.7, b: 0, a: 0}
+    - _DropColor0: {r: 1, g: 0, b: 0, a: 1}
+    - _DropColor1: {r: 0, g: 1, b: 0, a: 1}
+    - _DropColor2: {r: 0, g: 0, b: 1, a: 1}
+    - _DropColor3: {r: 1, g: 1, b: 0, a: 1}
+    - _DropColors: {r: 1, g: 1, b: 1, a: 1}
+    - _DropPositions: {r: 0, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []

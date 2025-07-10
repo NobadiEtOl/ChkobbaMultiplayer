@@ -1,4 +1,4 @@
-Shader "Custom/EbruMarble_NightingaleCombedGelgit"
+Shader "Custom/EbruMarble_TwoColorBands"
 {
     Properties
     {
@@ -7,7 +7,12 @@ Shader "Custom/EbruMarble_NightingaleCombedGelgit"
         _GelgitAmplitude ("Gelgit Amplitude", Float) = 0.08
         _CombFrequency ("Comb Frequency", Float) = 20
         _CombAmplitude ("Comb Amplitude", Float) = 0.12
-        _Zoom ("Zoom", Float) = 0.6 // <--- Add this line
+        _BandCount ("Band Count", Float) = 8
+        _BandWidth ("Band Width", Float) = 0.18
+        _Zoom ("Zoom", Float) = 0.6
+        _Rotation ("Rotation (Degrees)", Range(0,360)) = 0
+        _ColorMode ("Color Mode (0=DarkGreenBlack, 1=BrownBlack, 2=WhiteBlack)", Range(0,2)) = 0
+        _BlackBandRatio ("Black Band Ratio (0-1)", Range(0.05,0.5)) = 0.2
     }
     SubShader
     {
@@ -24,7 +29,12 @@ Shader "Custom/EbruMarble_NightingaleCombedGelgit"
             float _GelgitAmplitude;
             float _CombFrequency;
             float _CombAmplitude;
-            float _Zoom; // <--- Add this line
+            float _BandCount;
+            float _BandWidth;
+            float _Zoom;
+            float _Rotation;
+            float _ColorMode;
+            float _BlackBandRatio;
 
             struct appdata
             {
@@ -46,58 +56,59 @@ Shader "Custom/EbruMarble_NightingaleCombedGelgit"
                 return o;
             }
 
-            float3 palette(float t, float3 a, float3 b, float3 c, float3 d)
+            float2 rotate2D(float2 p, float angle)
             {
-                return a + b * cos(6.28318 * (c * t + d));
-            }
-
-            float swirl(float2 p, float2 center, float t, float freq, float speed)
-            {
-                float2 rel = p - center;
-                float a = atan2(rel.y, rel.x);
-                float r = length(rel);
-                return sin(a * freq + r * freq - t * speed);
+                float s = sin(angle);
+                float c = cos(angle);
+                return float2(c * p.x - s * p.y, s * p.x + c * p.y);
             }
 
             fixed4 frag(v2f i) : SV_Target
             {
-                // Apply zoom to UVs
                 float2 uv = (i.uv * 2.0 - 1.0) * _Zoom;
                 float t = _Time.x * _TimeSpeed;
 
-                // --- Gel-Git (Back-and-Forth) effect ---
+                float angle = radians(_Rotation);
+                uv = rotate2D(uv, angle);
+
                 float gelgit = sin(uv.x * _GelgitFrequency + t);
                 uv.y += gelgit * _GelgitAmplitude;
 
-                // --- Tarakli (Combed) effect ---
-                float angle = t * 0.5;
-                float2 dir = float2(cos(angle), sin(angle));
+                float combAngle = t * 0.5;
+                float2 dir = float2(cos(combAngle), sin(combAngle));
                 float combAxis = dot(uv, dir);
                 float comb = sin(combAxis * _CombFrequency + t);
                 float2 combedUV = uv + dir * (comb * _CombAmplitude);
 
-                // --- Bülbül Yuvası (Nightingale’s Nest) ---
-                float swirlSum = 0.0;
-                int swirlCount = 3;
-                for (int j = 0; j < swirlCount; j++)
-                {
-                    float swirlAngle = t * (0.3 + 0.2 * j) + j * 2.1;
-                    float2 center = float2(cos(swirlAngle), sin(swirlAngle)) * (0.3 + 0.2 * j);
-                    swirlSum += swirl(combedUV, center, t, 8.0 + 2.0 * j, 0.5 + 0.2 * j);
-                }
-                swirlSum /= swirlCount;
-
                 float r = length(combedUV);
-                float bandPos = r * 8.0 + swirlSum - t * 0.5;
-                float3 col = palette(
-                    bandPos,
-                    float3(0.5, 0.5, 0.2),
-                    float3(0.5, 0.5, 0.5),
-                    float3(1.0, 1.0, 1.0),
-                    float3(0.0, 0.33, 0.67)
-                );
-                float bandEdge = smoothstep(0.18, 0.18 * 0.7, frac(bandPos));
-                col *= lerp(1.2, 0.8, bandEdge);
+                float bandPos = r * _BandCount - t * 0.5;
+
+                // --- Two-color bands with adjustable black band ratio ---
+                float band = frac(bandPos / 1.0); // Each band is 1.0 wide
+                float3 colorA;
+                if(_ColorMode < 0.5)
+                {
+                    colorA = float3(0.0, 0.15, 0.1); // Dark green
+                }
+                else if(_ColorMode < 1.5)
+                {
+                    colorA = float3(0.12, 0.05, 0.03); // Darker brown
+                }
+                else
+                {
+                    colorA = float3(0.1, 0.1, 0.1); // White
+                } 
+                float3 colorB = float3(0,0,0); // Black
+
+                float3 col;
+                if (band < (1.0 - _BlackBandRatio))
+                    col = colorA;
+                else
+                    col = colorB;
+
+                // Soften band edges
+                float bandEdge = smoothstep(_BandWidth, _BandWidth * 0.7, frac(bandPos));
+                col = lerp(col, float3(1,1,1), bandEdge * 0.2);
 
                 return float4(col, 1.0);
             }
