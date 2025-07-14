@@ -129,7 +129,6 @@ public class SuperPowerSpawner : MonoBehaviour
 
     private void OnTokenClicked()
     {
-        centerGameObject.transform.position = centerPosition;
         Debug.Log("Activate button clicked for " + SuperPowerToken.ActiveInstance?.power.name);
         SuperPowerToken.ActiveInstance.OnTokenClicked();
     }
@@ -141,12 +140,10 @@ public class SuperPowerSpawner : MonoBehaviour
         activateButton.gameObject.SetActive(false);
         closeButton.gameObject.SetActive(false);
         SuperPowerToken.ActiveInstance = null; // Clear the active instance
-        centerGameObject.transform.position = centerPosition;
     }
 
     public void OpenInfoBox(SuperPowerToken superPowerToken)
     {
-        centerGameObject.transform.position = new Vector3(centerPosition.x + 2500, centerPosition.y, centerPosition.z);
         Debug.Log("Opening InfoBox for " + superPowerToken.power.name);
         if (SuperPowerToken.ActiveInstance != null && SuperPowerToken.ActiveInstance != this)
         {

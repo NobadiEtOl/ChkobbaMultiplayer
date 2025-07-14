@@ -57,6 +57,7 @@ public class NetworkRelay : NetworkBehaviour
     [ClientRpc(RequireOwnership = false)]
     public void DealCardPrefabsToCenterClientRPC(SerializableCard serializableCard)
     {
+        Debug.Log("DealCardPrefabsToCenterClientRPC called");
         GameManager.LocalInstance.CardPrefabsToCenter(serializableCard);
     }
 
@@ -230,6 +231,12 @@ public class NetworkRelay : NetworkBehaviour
     }
 
     //ServerRPC
+    [ServerRpc(RequireOwnership = false)]
+    public void NotifyDealCenterFinishedServerRPC(ulong clientId)
+    {
+        server.OnClientDealCenterFinished(clientId);
+    }
+
     [ServerRpc(RequireOwnership = false)]
     public void ActivateYandimAnamOnCardServerRPC(string cardUniqueID)
     {

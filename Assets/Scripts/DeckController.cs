@@ -38,6 +38,7 @@ public class DeckController : MonoBehaviour
     private int normalScale = 750; // Scale for the normal cards
     private int centerScale = 900; // Scale for the center cards
     private int myCardsScale = 1200; // Scale for the player's cards
+    
     //private GameObject cardPool;
 
     void Awake()
@@ -363,8 +364,9 @@ public class DeckController : MonoBehaviour
 
     private int startingPlayerNoCounter = -1;
     //Deals to center according to the playerCount
-    public void DealCenter(List<string> centerCardIDs)
+    public IEnumerator DealCenter(List<string> centerCardIDs)
     {
+        Debug.LogWarning("DealCenter called with centerCardIDs: " + string.Join(", ", centerCardIDs));
         startingPlayerNoCounter++;
         SendCardInteractionsToGameManager();
         List<GameObject> cardObjects = new List<GameObject>();
@@ -384,9 +386,6 @@ public class DeckController : MonoBehaviour
                 // Calculate position based on centerTransform
                 Vector3 centerPosition = centerTransform.position;
                 Vector3 centerRotation = centerTransform.rotation.eulerAngles;
-                //positions.Add(new Vector3(centerPosition.x, centerPosition.y, centerPosition.z + i * -10));
-                //else positions.Add(new Vector3(centerPosition.x, centerPosition.y, centerPosition.z - 10 + i * -10 ));
-
 
                 gameManager.centerCardsObjects.Add(tempCenterCard);
                 gameManager.centerCards.Add(uniqueCardID, CardInteraction.cardLookup[uniqueCardID].GetCardID());
@@ -405,8 +404,18 @@ public class DeckController : MonoBehaviour
             }
         }
 
-        StartCoroutine(ChainMoveCards(positions, cardObjects, 10, rotations, scales));
+        yield return StartCoroutine(ChainMoveCards(positions, cardObjects, 10, rotations, scales));
+
+        // Move centerTransform up a little after dealing
+        Vector3 originalPos = centerTransform.position;
+        Vector3 targetPos = originalPos + new Vector3(0, 0, 500); // Move up by 100 units (adjust as needed)
+        float duration = 0.3f;
+        yield return StartCoroutine(TweenMoveTransform(centerTransform, targetPos, centerTransform.rotation, centerTransform.localScale, duration));
+        // After DealCenter animation/logic is done:
+        NetworkRelay.Instance.NotifyDealCenterFinishedServerRPC(NetworkManager.Singleton.LocalClientId);
+
     }
+
 
     public IEnumerator DiscardCapturedCards(string playedCard, SerializableCard serializedCard, int playerNumber)
     {

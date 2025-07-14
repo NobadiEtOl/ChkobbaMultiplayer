@@ -35,6 +35,7 @@ public class Server : NetworkBehaviour
     // Server.cs
     private Dictionary<string, string> copiedCardMap = new Dictionary<string, string>();
     private bool oynayamazsinPending = false;
+    private HashSet<ulong> dealCenterFinishedClients = new HashSet<ulong>();
 
     public void ResetAllServerVariables()
     {
@@ -172,17 +173,18 @@ public class Server : NetworkBehaviour
     }
     private IEnumerator InitialDealCoroutine()
     {
+        Debug.LogWarning("InitialDealCoroutine started");
         // Initialize cardObjects
 
-        AudioManager.Instance.PlayAudio(0, 5, false);
+        //AudioManager.Instance.PlayAudio(0, 5, false);
 
         yield return new WaitForSeconds(3.5f);
 
         DealCardsToCenter();
 
-        yield return new WaitForSeconds(1.25f);
+        //yield return new WaitForSeconds(1.25f);
 
-        DealCardsToPlayerHands();
+        //DealCardsToPlayerHands();
     }
     private void ServerStart()
     {
@@ -673,7 +675,7 @@ public class Server : NetworkBehaviour
     //Add remaining cards in the center to the pool of the player who last captured a card.
     public void AddRemainingCardsToPlayerPool()
     {
-        if(endTestFlag)return;
+        if (endTestFlag) return;
         if (centerCardsDict == null) return;
         foreach (var kvp in centerCardsDict)
         {
@@ -721,7 +723,7 @@ public class Server : NetworkBehaviour
                 piştiCounts[1]++;
             }
         }
-        
+
         networkRelay.ShowPistiTextClientRPC(playerID, jPiştiFlag);
     }
 
@@ -811,7 +813,7 @@ public class Server : NetworkBehaviour
             {
                 int team = (playerNumber % 2);
                 points[team] -= centerCardCount;
-                Debug.LogWarning("Ver Zehri active, removing points"+ centerCardCount +"from team " + team);
+                Debug.LogWarning("Ver Zehri active, removing points" + centerCardCount + "from team " + team);
                 networkRelay.ShowVerZehriEffectClientRPC(playerNumber, -5);
                 verZehriActive = false;
                 networkRelay.SetVerZehriActiveClientRPC(false); // Notify clients to stop effect
@@ -820,7 +822,7 @@ public class Server : NetworkBehaviour
             {
                 int team = (playerNumber % 2);
                 points[team] += centerCardCount;
-                Debug.LogWarning("KutsalDeste active, removing points"+ centerCardCount +"from team " + team);
+                Debug.LogWarning("KutsalDeste active, removing points" + centerCardCount + "from team " + team);
                 networkRelay.ShowKutsalDesteEffectClientRPC(playerNumber, 5);
                 kutsalDesteActive = false;
                 networkRelay.SetKutsalDesteActiveClientRPC(false); // Notify clients to stop effect
@@ -1122,7 +1124,7 @@ public class Server : NetworkBehaviour
     }
 
 
-    bool endTestFlag=false;
+    bool endTestFlag = false;
     [ContextMenu("RandomlyDistributeCardsAndDecideWinner")]
     public void RandomlyDistributeCardsAndDecideWinner()
     {
@@ -1156,9 +1158,26 @@ public class Server : NetworkBehaviour
 
         Debug.Log("Randomly distributed all cards to player pools. Calling DecideWinner...");
         // Example: Assign pools for showcase
-        
+
         networkRelay.AssignCardsToPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs));
         DecideWinner();
+    }
+
+
+    public void OnClientDealCenterFinished(ulong clientId)
+    {
+        dealCenterFinishedClients.Add(clientId);
+        Debug.Log($"Client {clientId} finished DealCenter. Count: {dealCenterFinishedClients.Count}/{connectedPlayerCount}");
+
+        if (dealCenterFinishedClients.Count == connectedPlayerCount)
+        {
+            // All clients finished DealCenter, now deal player hands
+            dealCenterFinishedClients.Clear(); // Reset for next round
+
+            // FIX: Make sure hands are dealt before sending them!
+            DealCardsToPlayerHands();
+            // Now Delayed_DealCardPrefabsToPlayers will be called inside DealCardsToPlayerHands
+        }
     }
 
 

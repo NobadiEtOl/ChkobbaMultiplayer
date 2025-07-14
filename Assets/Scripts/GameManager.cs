@@ -182,8 +182,8 @@ public class GameManager : MonoBehaviour
             Touch touch = Input.GetTouch(0);
             if (touch.phase == TouchPhase.Began)
             {
-                if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject(touch.fingerId))
-                    return; // Don't raycast or close anything if over UI
+                //if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject(touch.fingerId))
+                    //return; // Don't raycast or close anything if over UI
             }
             Vector3 touchPosition = touch.position;
             Ray ray = Camera.main.ScreenPointToRay(touchPosition);
@@ -320,10 +320,7 @@ public class GameManager : MonoBehaviour
 
     private IEnumerator DelayedDealPlayers(int playerCount, Dictionary<int, List<string>> playerHands)
     {
-        //Needed so that hands dont get updated before the previous ordeals are done
-        yield return new WaitForSeconds(1.5f);
-
-        if (deckController) deckController.DealPlayers(playerCount, playerHands);
+        deckController.DealPlayers(playerCount, playerHands);
 
         yield return new WaitForSeconds(0f);
 
@@ -333,11 +330,13 @@ public class GameManager : MonoBehaviour
     //Gets message from the server to start dealing cards to center
     public void CardPrefabsToCenter(SerializableCard serializableCard)
     {
+        Debug.Log("CardPrefabsToCenter called with serializableCard: " + serializableCard.ToString());
         //Converts serializablelist to a normal list
         List<string> centerCardIDs = serializableCard.ToDictionary().Keys.ToList();
 
         //Informs the deckController to deal the center cards
-        if (deckController) deckController.DealCenter(centerCardIDs);
+        if (deckController) StartCoroutine(deckController.DealCenter(centerCardIDs));
+        else Debug.LogError("DeckController is not assigned in GameManager.");  
         //turnTimerText.text = "";
     }
 

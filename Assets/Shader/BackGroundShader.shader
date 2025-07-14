@@ -2,26 +2,24 @@ Shader "Unlit/CircleGridPattern_WithStarsAttached"
 {
     Properties
     {
-        // Circle & Diamond
-        _ColorA     ("Circle Color A",       Color) = (0.075,0.114,0.329,1)
-        _ColorB     ("Circle Color B",       Color) = (0.973,0.843,0.675,1)
-        _ColorC     ("Diamond Color",        Color) = (0.761,0.247,0.102,1)
-        _Zoom1      ("Grid 1 Zoom",          Float) = 7
-        _Zoom2      ("Grid 2 Zoom",          Float) = 3
-        _Radius1    ("Grid 1 Circle Radius", Float) = 0.23
-        _Radius2    ("Grid 2 Diamond Radius",Float) = 0.2
-        _AnimSpeed  ("Animation Speed",      Float) = 1
-
-        // ★ Star (attached to diamonds) ★
-        _StarColor       ("Star Color",        Color) = (1,0.9,0.2,1)
-        _StarRadius      ("Star Radius",       Range(0.01,0.5)) = 0.18
-        _StarSharpness   ("Star Sharpness",    Range(2,32))     = 12
-        _StarSoftness    ("Star Edge Softness",Range(0.001,0.2))= 0.02
+        _MainTex ("Sprite Texture", 2D) = "white" {}
+        _ColorA ("Circle Color A", Color) = (0.075,0.114,0.329,1)
+        _ColorB ("Circle Color B", Color) = (0.973,0.843,0.675,1)
+        _ColorC ("Diamond Color", Color) = (0.761,0.247,0.102,1)
+        _Zoom1 ("Grid 1 Zoom", Float) = 7
+        _Zoom2 ("Grid 2 Zoom", Float) = 3
+        _Radius1 ("Grid 1 Circle Radius", Float) = 0.23
+        _Radius2 ("Grid 2 Diamond Radius", Float) = 0.2
+        _AnimSpeed ("Animation Speed", Float) = 1
+        _StarColor ("Star Color", Color) = (1,0.9,0.2,1)
+        _StarRadius ("Star Radius", Range(0.01,0.5)) = 0.18
+        _StarSharpness ("Star Sharpness", Range(2,32)) = 12
+        _StarSoftness ("Star Edge Softness", Range(0.001,0.2)) = 0.02
     }
 
     SubShader
     {
-        Tags { "RenderType"="Opaque" }
+        Tags { "RenderType"="Transparent" "Queue"="Transparent" }
         LOD 100
 
         Pass
@@ -31,22 +29,30 @@ Shader "Unlit/CircleGridPattern_WithStarsAttached"
             #pragma fragment frag
             #include "UnityCG.cginc"
 
-            // Circle & Diamond
+            sampler2D _MainTex;
+            float4 _MainTex_ST;
+
             float4 _ColorA, _ColorB, _ColorC;
             float _Zoom1, _Zoom2, _Radius1, _Radius2, _AnimSpeed;
-
-            // ★ Star
             float4 _StarColor;
-            float  _StarRadius, _StarSharpness, _StarSoftness;
+            float _StarRadius, _StarSharpness, _StarSoftness;
 
-            struct appdata { float4 vertex : POSITION; float2 uv : TEXCOORD0; };
-            struct v2f     { float2 uv     : TEXCOORD0; float4 vertex : SV_POSITION; };
+            struct appdata
+            {
+                float4 vertex : POSITION;
+                float2 uv : TEXCOORD0;
+            };
+            struct v2f
+            {
+                float2 uv : TEXCOORD0;
+                float4 vertex : SV_POSITION;
+            };
 
             v2f vert(appdata v)
             {
                 v2f o;
                 o.vertex = UnityObjectToClipPos(v.vertex);
-                o.uv     = v.uv;
+                o.uv = TRANSFORM_TEX(v.uv, _MainTex);
                 return o;
             }
 
@@ -56,7 +62,6 @@ Shader "Unlit/CircleGridPattern_WithStarsAttached"
                 return frac(st);
             }
 
-            // Ring of 4 circles
             float circle(float2 st, float radius)
             {
                 float2 pos = 0.5 - st;
@@ -73,7 +78,6 @@ Shader "Unlit/CircleGridPattern_WithStarsAttached"
                     circle(st + float2( 0.5,0), radius);
             }
 
-            // Ring of 4 diamonds
             float diamond(float2 st, float radius)
             {
                 float2 pos = 0.5 - st;
@@ -90,7 +94,6 @@ Shader "Unlit/CircleGridPattern_WithStarsAttached"
                     diamond(st + float2( 0.5,0), radius);
             }
 
-            // Single 12-point star mask
             float starMask(float2 st, float radius, float sharp, float soft)
             {
                 float2 p = st - 0.5;
@@ -100,7 +103,6 @@ Shader "Unlit/CircleGridPattern_WithStarsAttached"
                 float edge   = lerp(radius*0.5, radius, spikes);
                 return 1 - smoothstep(edge - soft, edge + soft, len);
             }
-            // Ring of 4 stars (same offsets as diamonds)
             float starPattern(float2 st, float radius, float sharp, float soft)
             {
                 return
@@ -130,13 +132,16 @@ Shader "Unlit/CircleGridPattern_WithStarsAttached"
                 col = lerp(col, _ColorC.rgb, saturate(d2));
 
                 // 3) ★ Stars attached at each diamond center ★
-                // Use the same grid g2 and diamond offsets
                 float rawStars   = starPattern(g2, _StarRadius, _StarSharpness, _StarSoftness);
                 float diamondHit = saturate(diamondPattern(g2, _Radius2));
                 float sMask      = saturate(rawStars * diamondHit);
                 col = lerp(col, _StarColor.rgb, sMask);
 
-                return float4(col, 1);
+                // Multiply by sprite alpha for proper transparency
+                fixed4 spriteCol = tex2D(_MainTex, i.uv);
+                col *= spriteCol.a;
+
+                return float4(col, spriteCol.a);
             }
             ENDCG
         }
