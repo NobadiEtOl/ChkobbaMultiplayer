@@ -1,0 +1,47 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <ui:ScrollView>
+        <ui:VisualElement name="Logo" style="background-image: url(&quot;project://database/Assets/AntoineCherel/OnlineFonts2TextMeshPro/Editor/Core/UIToolkit/Resources/OF2TMP-Banner.png?fileID=2800000&amp;guid=3a1934147e8b64f6b970b6d058e3ceab&amp;type=3#OF2TMP-Banner&quot;); width: 512px; height: 128px; max-width: 100%; min-width: 100%; background-color: rgb(247, 245, 235); -unity-background-scale-mode: scale-to-fit; flex-direction: row-reverse; align-items: flex-end; justify-content: space-between;">
+            <ui:Button display-tooltip-when-elided="true" name="CloseToolButton" enable-rich-text="false" text="Close window" style="flex-direction: row-reverse; flex-basis: 100px; justify-content: flex-start; align-items: flex-start; flex-grow: 0; flex-shrink: 20; flex-wrap: nowrap;" />
+            <ui:Button display-tooltip-when-elided="true" name="OpenDocumentationButton" enable-rich-text="false" text="Documentation" style="flex-direction: row-reverse; flex-basis: 100px; justify-content: flex-start; align-items: flex-start; flex-grow: 0; flex-shrink: 20; flex-wrap: nowrap;" />
+        </ui:VisualElement>
+        <ui:VisualElement name="Downloader" style="margin-top: 10px;">
+            <ui:Label text="Font Downloader" display-tooltip-when-elided="true" name="FontDownloaderTitle" style="-unity-text-align: upper-left; margin-bottom: 5px; font-size: 14px; -unity-font-style: bold;" />
+            <ui:Foldout text="Google Fonts" name="GoogleFontsFoldout" style="font-size: 14px; -unity-font-style: bold;">
+                <ui:Button text="Browse Google Fonts" display-tooltip-when-elided="true" name="OpenGoogleFontsButton" style="white-space: nowrap; -unity-text-align: middle-center;" />
+                <ui:TextField picking-mode="Ignore" label="Font name or URL" text="Poiret One / https://fonts.google.com/specimen/Poiret+One" name="DownloadGoogleFontsTextField" readonly="false" style="flex-direction: column; -unity-font-style: normal; font-size: 12px;">
+                    <ui:Button text="Download" display-tooltip-when-elided="true" name="DownloadGoogleFontsButton" style="display: flex; visibility: visible;" />
+                </ui:TextField>
+            </ui:Foldout>
+            <ui:Foldout text="Font Squirrel" name="FontSquirrelFoldout" value="false" style="font-size: 14px; -unity-font-style: bold;">
+                <ui:Button text="Browse Font Squirrel" display-tooltip-when-elided="true" name="OpenFontSquirrelButton" style="white-space: nowrap; -unity-text-align: middle-center;" />
+                <ui:TextField picking-mode="Ignore" label="Font name or URL" text="Outfit / https://www.fontsquirrel.com/fonts/outfit" name="DownloadFontSquirrelTextField" style="flex-direction: column; -unity-font-style: normal; font-size: 12px;">
+                    <ui:Button text="Download" display-tooltip-when-elided="true" name="DownloadFontSquirrelButton" style="display: flex; visibility: visible;" />
+                </ui:TextField>
+            </ui:Foldout>
+            <ui:Foldout text="Fontshare" name="FontshareFoldout" value="false" style="font-size: 14px; -unity-font-style: bold;">
+                <ui:Button text="Browse Fontshare" display-tooltip-when-elided="true" name="OpenFontshareButton" style="white-space: nowrap; -unity-text-align: middle-center;" />
+                <ui:TextField picking-mode="Ignore" label="Font name or URL" text="Satoshi / https://www.fontshare.com/fonts/satoshi" name="DownloadFontshareTextField" style="flex-direction: column; -unity-font-style: normal; font-size: 12px;">
+                    <ui:Button text="Download" display-tooltip-when-elided="true" name="DownloadFontshareButton" style="display: flex; visibility: visible;" />
+                </ui:TextField>
+            </ui:Foldout>
+            <ui:ProgressBar value="0" name="DownloadProgressBar" title="Download status" />
+            <ui:Label text="The quick brown fox jumps over the lazy dog " display-tooltip-when-elided="true" name="DownloadFontPreviewLabel" style="-unity-text-align: upper-center; white-space: normal; -unity-font-definition: initial;" />
+        </ui:VisualElement>
+        <ui:Foldout text="Settings" name="Settings" value="false" style="-unity-font-style: bold; font-size: 14px; -unity-text-align: upper-left;">
+            <ui:TextField label="Test phrase" name="SettingsTestPhraseTextField" value="The quick brown fox jumps over the lazy dog" text="The quick brown fox jumps over the lazy dog" multiline="true" style="-unity-font-style: normal; font-size: 12px; align-items: stretch; white-space: normal;" />
+            <ui:VisualElement name="SettingsFontsFolder" style="flex-direction: row; justify-content: space-around;">
+                <ui:TextField picking-mode="Ignore" label="Fonts root folder" value="/Fonts" text="/Fonts" name="SettingsFontsRootFolderTextField" style="-unity-font-style: normal; font-size: 12px; justify-content: flex-end; flex-basis: auto; flex-grow: 100; align-items: center;" />
+                <ui:Button text="Create" display-tooltip-when-elided="true" name="SettingsFontsRootFolderCreateButton" style="align-items: stretch; justify-content: flex-start; flex-direction: column; flex-wrap: nowrap; display: flex;" />
+            </ui:VisualElement>
+            <ui:TextField picking-mode="Ignore" label="TMP_FontAsset prefix" name="SettingsTMPFontAssetPrefixTextField" style="-unity-font-style: normal; font-size: 12px;" />
+            <ui:TextField picking-mode="Ignore" label="TMP_FontAsset suffix" value=" SDF" text=" SDF" name="SettingsTMPFontAssetSuffixTextField" style="-unity-font-style: normal; font-size: 12px;" />
+            <ui:Label text="these settings will create TMP Font Assets like so:" display-tooltip-when-elided="true" name="SettingsLabel" style="font-size: 12px; -unity-font-style: italic; color: rgb(255, 205, 66); white-space: normal;" />
+            <ui:Label text="PoiretOne-Regular SDF.asset" display-tooltip-when-elided="true" name="SettingsTMPFontAssetExampleLabel" style="font-size: 12px; -unity-font-style: bold-and-italic; color: rgb(255, 205, 66); white-space: normal; -unity-text-align: upper-center;" />
+            <ui:Toggle label="Download &apos;static&apos; folder" name="SettingsDownloadStaticToggle" tooltip="variable fonts also have a &apos;static&apos; folder, with each independent ttf files, with different font weights." value="true" style="font-size: 12px; -unity-font-style: normal; flex-direction: row; white-space: normal; flex-wrap: wrap; overflow: hidden; align-items: flex-end;" />
+            <ui:Label text="variable fonts also have a &apos;static&apos; folder, with each independent ttf files, with different font weights. Ticking this will download them and create a TMP_FontAsset for each." display-tooltip-when-elided="true" name="SettingsLabel" style="font-size: 10px; -unity-font-style: italic; color: rgb(255, 205, 66); white-space: normal;" />
+            <ui:Toggle label="&apos;UI Toolkit&apos; font assets" name="SettingsCreateUIToolkitFontAssetToggle" tooltip="enabling this will also create a font asset for UIToolkit (the new UI system from Unity)" value="false" style="font-size: 12px; -unity-font-style: normal; flex-direction: row; white-space: normal; flex-wrap: wrap; overflow: hidden; align-items: flex-end;" />
+            <ui:Label text="enabling this will also create a font asset for UIToolkit (the new UI system from Unity), when downloading a font from Google Fonts." display-tooltip-when-elided="true" name="SettingsLabel" style="font-size: 10px; -unity-font-style: italic; color: rgb(255, 205, 66); white-space: normal;" />
+            <ui:Toggle label="Open folder after download " name="SettingsOpenFolderAfterDownloadToggle" tooltip="enabling this will open the font&apos;s parent folder in your file explorer after download" value="false" style="font-size: 12px; -unity-font-style: normal; flex-direction: row; white-space: normal; flex-wrap: wrap; overflow: hidden; align-items: flex-end; flex-grow: 0;" />
+        </ui:Foldout>
+    </ui:ScrollView>
+</ui:UXML>

@@ -34,8 +34,8 @@ public class DeckController : MonoBehaviour
     int offsetCounter2 = -1;
     private int zOffsetCounter = 0;
 
-    private int initialScale = 600; // Initial scale for the cards
-    private int normalScale = 750; // Scale for the normal cards
+    private int initialScale = 750; // Initial scale for the cards
+    private int normalScale = 500; // Scale for the normal cards
     private int centerScale = 900; // Scale for the center cards
     private int myCardsScale = 1200; // Scale for the player's cards
     
@@ -366,6 +366,8 @@ public class DeckController : MonoBehaviour
     //Deals to center according to the playerCount
     public IEnumerator DealCenter(List<string> centerCardIDs)
     {
+        //To make sure the center position is correct each round
+        centerTransform.position = new Vector3(0, 50, 0);
         Debug.LogWarning("DealCenter called with centerCardIDs: " + string.Join(", ", centerCardIDs));
         startingPlayerNoCounter++;
         SendCardInteractionsToGameManager();
@@ -669,7 +671,6 @@ public class DeckController : MonoBehaviour
         }
 
         int totalCards = playerCards.Count;
-        Debug.LogError("totalCards: " + totalCards);
         if (totalCards == 0) return;
 
         // Calculate the offset multiplier
@@ -1184,8 +1185,6 @@ public class DeckController : MonoBehaviour
         moveSeq.Join(cardObject.transform.DORotateQuaternion(rotation, duration));
         moveSeq.Join(cardObject.transform.DOScale(scale, duration));
 
-        Debug.LogError("!!!!Moving card to position: " + endPos + " with speed: " + speedMultiplier);
-
         yield return moveSeq.WaitForCompletion();
     }
 
@@ -1360,6 +1359,7 @@ public class DeckController : MonoBehaviour
     public void GetPlayerCount(int playerC)
     {
         playerCount = playerC;
+        ElHolderScript.LocalInstance.SetHandMode(playerCount);
     }
 
     private void InitialDeckSetUp()

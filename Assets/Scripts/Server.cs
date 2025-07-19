@@ -780,9 +780,7 @@ public class Server : NetworkBehaviour
 
     public void GetMove(string selectedHandCardUniqueID, SerializableCard serializableCard, int playerNumber, int sumValue)
     {
-        // selectedHandCardUniqueID is the uniqueID of the played card
-        Debug.LogWarning("GetMove called with selectedHandCardUniqueID: " + selectedHandCardUniqueID);
-
+        
         int[] selectedHandCard = allCardLookup[selectedHandCardUniqueID];
         // Oynayamazsın: force this card to be blocked (add to center, no capture)
         if (blockCount > 0)

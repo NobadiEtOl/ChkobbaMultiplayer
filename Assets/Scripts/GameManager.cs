@@ -39,7 +39,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private List<Transform> playerHandTransforms;
     [SerializeField] private List<Transform> playerPoolTransforms;
     [SerializeField] private List<Transform> playerPiştiPoolTransforms;
-    [SerializeField] private Transform centerTransform;
+    [SerializeField] public Transform centerTransform;
     bool alreadySubbed = false;
     public bool movePlayedLocally = false;
     private GameObject waitingScreen;
@@ -590,9 +590,17 @@ public class GameManager : MonoBehaviour
     private int turnCounter;
     public void UpdateCurrentPlayer(int playerNumber, int turnC)
     {
+        // Update ElHolderScript first (stop current, start new)
+        if (ElHolderScript.LocalInstance != null)
+        {
+            ElHolderScript.LocalInstance.UpdateCurrentPlayer(playerNumber);
+        }
+
+        // Then update the current player
         currentPlayerNo = playerNumber;
         turnCounter = turnC;
     }
+
 
     public void UpdateCenterCardIDList(SerializableCard serializableCard)
     {
@@ -635,7 +643,7 @@ public class GameManager : MonoBehaviour
     public void ShowWinScreen(string message, int winnerSide, int point0, int point1)
     {
 
-        //turnTimerText.text = "";
+        ElHolderScript.LocalInstance.ReturnAllHandsToIdle();
 
         winScreen.SetActive(true);
         roundOverText.text = message;
@@ -1560,13 +1568,16 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    public void ShowcaseSuperPower(string powerName, float fadeDuration = 0.5f, float displayDuration = 2f)
+    public void ShowcaseSuperPower(string powerName, float fadeDuration = 0.5f, float displayDuration = 1f)
     {
         StartCoroutine(ShowcaseSuperPowerCoroutine(powerName, fadeDuration, displayDuration));
+        ElHolderScript.LocalInstance.PlayTokenAnimationOnce(currentPlayerNo);   
+        ElHolderScript.LocalInstance.ShowcasePower(currentPlayerNo, powerName);
     }
 
     private IEnumerator ShowcaseSuperPowerCoroutine(string powerName, float fadeDuration, float displayDuration)
     {
+        yield return new WaitForSeconds(1.1f);
         if (superPowerText == null || superPowerTextGroup == null)
             yield break;
 

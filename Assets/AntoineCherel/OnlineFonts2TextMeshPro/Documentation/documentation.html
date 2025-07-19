@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Online Fonts 2 TextMesh Pro documentation</title>
+    <link href="https://fonts.cdnfonts.com/css/inter" rel="stylesheet">
+    <style>
+        * {
+    /* outline: 1px solid red; */
+    box-sizing: border-box;
+}
+
+/* THESE ENSURE THE WEBVIEW WILL BE OF CORRECT HEIGHT
+  * =======================================================================
+  */
+
+html {
+    margin: 0px;
+    padding: 0px;
+    font-family: 'Inter';
+    background-color: #F7F5EB;
+}
+
+body {
+    margin: 0px;
+    padding: 0px;
+}
+
+body :first-child {
+    margin-top: 0px;
+}
+
+body :last-child {
+    margin-bottom: 0px;
+}
+
+/* FIXES SCROLLING 
+ * =======================================================================
+ */
+
+html,
+body {
+    overflow-x: hidden;
+}
+
+/* MAIN STYLING
+ * =======================================================================
+ */
+
+:root {
+    --default-text-color: #333333;
+    --muted-text-color: #666666;
+    --link-color: #f05675;
+
+    --muted-border-color: #dddddd;
+    --muted-background-color: #eeeeee;
+
+    --codeblock-background-color: #222222;
+    --codeblock-text-color: #ffffff;
+}
+
+body {
+    padding: 16px;
+
+    line-height: 1.5rem;
+    color: var(--default-text-color);
+
+    word-wrap: break-word;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+}
+
+h1 {
+    font-size: 1.6rem;
+}
+
+h2 {
+    font-size: 1.45rem;
+}
+
+h3 {
+    font-size: 1.3rem;
+}
+
+h4 {
+    font-size: 1.2rem;
+}
+
+h5 {
+    font-size: 1.1rem;
+}
+
+h6 {
+    font-size: 1.05rem;
+}
+
+h1,
+h2 {
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--muted-border-color);
+}
+
+ul,
+ol {
+    padding-inline-start: 1.8rem;
+}
+
+a {
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+    color: var(--link-color);
+}
+
+del {
+    color: var(--muted-text-color);
+}
+
+pre {
+    padding: 1rem;
+    border-radius: 4px;
+
+    color: var(--codeblock-text-color);
+    background-color: var(--codeblock-background-color);
+
+    overflow-x: auto;
+}
+
+:not(pre)>code {
+    background-color: var(--muted-background-color);
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+}
+
+blockquote {
+    margin-inline: 0px;
+    padding-block: 12px;
+    padding-left: 16px;
+
+    color: var(--muted-text-color);
+    border-left: 2px solid var(--muted-border-color);
+    font-style: italic;
+}
+
+blockquote :last-child {
+    margin-bottom: 0px;
+}
+
+
+table {
+    display: block;
+    overflow-x: auto;
+
+    border-collapse: collapse;
+}
+
+th,
+td {
+    padding: 0.6rem 1rem;
+}
+
+th,
+td {
+    border: 1px solid var(--muted-border-color)
+}
+
+th {
+    font-size: 1rem;
+    background-color: var(--muted-background-color);
+    border-bottom-width: 2px;
+}
+
+img {
+    max-width: 100%;
+}
+    </style>
+  </head>
+  <body>
+    <h1 id="online-fonts-2-textmesh-pro">Online Fonts 2 TextMesh Pro</h1>
+<p><img src="./Resources/OF2TMP-Banner.png" alt="banner" /><br />
+available on the <a href="https://assetstore.unity.com/packages/slug/323130" rel="noopener noreferrer" target="_blank">Asset Store</a></p>
+<h2 id="documentation">Documentation</h2>
+<h3 id="opening-the-online-fonts-2-textmesh-pro-window">Opening the <em>Online fonts 2 TextMesh Pro</em> window</h3>
+<p>Under <code>Tools</code>, you will find <code>Online Fonts 2 TextMesh Pro</code>. This will open a new window.</p>
+<h3 id="downloading-a-font">Downloading a font</h3>
+<ol>
+<li>Browse one of the font catalogs and look for a font you would like</li>
+<li>Either copy its name, or the URL</li>
+<li>Paste the name or the URL in the corresponding text field, and click the <em>Download</em> button</li>
+<li>Enjoy ! The <code>TMP_FontAsset</code>(s) will be created under a folder for each font family, side by side with the original font files</li>
+</ol>
+<h3 id="available-font-catalogs">Available font catalogs</h3>
+<ul>
+<li><a href="https://fonts.google.com/" target="_blank">Google Fonts</a></li>
+<li><a href="https://www.fontsquirrel.com/" target="_blank">Font Squirrel</a> (only the fonts hosted directly, not the "offsite" downloads)</li>
+<li><a href="https://www.fontshare.com/" target="_blank">Fontshare</a></li>
+</ul>
+<p>if you would like another font catalog, please reach out to me (contact at antoinecherel.dev)</p>
+<h3 id="demo">Demo</h3>
+<p>a demo video is available <a href="https://www.youtube.com/watch?v=UUjiELP7VOk" rel="noopener noreferrer" target="_blank">here</a>, on YouTube.</p>
+<h3 id="overview">Overview</h3>
+<p><img src="./Resources/OF2TMP_Screenshot.png" alt="window screenshot" /></p>
+<h3 id="settings">Settings</h3>
+<ul>
+<li><em>Test phrase</em>: the sentence used to display fonts after downloading</li>
+<li><em>Fonts root folder</em>: where the folders with the downloaded fonts should be located (based on the <code>Assets</code> folder (ie: by default <code>Assets/Fonts</code>))</li>
+<li><em>TMP_FontAsset prefix</em>: characters that should always be added before the name of the TMP_FontAsset.</li>
+<li><em>TMP_FontAsset suffix</em>: characters that should always be added after the name of the TMP_FontAsset.</li>
+<li><em>Download 'static' folder</em>: Variables fonts come with a .ttf file that can be varied (on supporting software). To my knowledge, TextMesh Pro doesn't support that. Beside these variable fonts, a 'static' folder is provided with more .ttf files, detailing all possible combinasions of font weights and styles. Unticking that will make it download less </li>
+<li><em>'UI Toolkit' font assets</em>: Unity's new UI system is <a href="https://docs.unity3d.com/Manual/UIElements.html" rel="noopener noreferrer" target="_blank">UI Toolkit</a>. Ticking this checkbox will also create <code>FontAsset</code> for each downloaded fonts, and these can be used with this new UI system.</li>
+<li><em>Open folder after download</em>: Ticking this will open the font's parent folder in your file explorer after download.</li>
+</ul>
+<h2 id="credits">Credits</h2>
+<p>The Plugin 'Online fonts 2 TextMesh Pro' is not associated with Google nor with Unity.</p>
+<p>The only purpose of this plugin is to make it easier to download, import and make use of Open Source fonts distributed throught Google Fonts, Font Squirrel &amp; Fontshare. <br />
+More info on licensing on these fonts can be found <a href="https://developers.google.com/fonts/faq" target="_blank">here</a>, <a href="https://www.fontsquirrel.com/faq" target="_blank">here</a> and <a href="https://www.fontshare.com/licenses/itf-ffl" target="_blank">here</a>.<br />
+Unity Plugin, developped by <a href="https://www.antoinecherel.dev/" target="_blank">Antoine Cherel</a><br />
+Arrow by Mila Yunita from <a href="https://thenounproject.com/browse/icons/term/arrow/" target="_blank" title="Arrow Icons">Noun Project</a> (CC BY 3.0)</p>  
+  </body>
+</html>
