@@ -255,7 +255,7 @@ public class ElHolderScript : MonoBehaviour
 
     private IEnumerator ShowcasePowerCoroutine(int handIndex, string powerName, GameObject powerPrefab)
     {
-        yield return new WaitForSeconds(1f);
+        yield return new WaitForSeconds(0.5f);
         Debug.Log($"Showcasing power: {powerName} for hand index: {handIndex}");
 
         // Get the starting transform
@@ -275,7 +275,7 @@ public class ElHolderScript : MonoBehaviour
         //centerPosition.z = powerInstance.transform.position.z; // Keep same Z
 
         // Animation duration
-        float moveDuration = 0.5f; // 70% of 1.5f
+        float moveDuration = 0.1f; // 70% of 1.5f
         float fadeDuration = 0.25f; // 30% of 1.5f
 
         Vector3 endScale = new Vector3(200, 200, 200); // End bigger
@@ -283,13 +283,25 @@ public class ElHolderScript : MonoBehaviour
         // Create a sequence for the animations 
         Sequence powerSequence = DOTween.Sequence();
 
-        powerSequence.AppendInterval(1f);
+        powerSequence.AppendInterval(0.35f);
 
         // Move to center and scale up simultaneously
         powerSequence.Append(powerInstance.transform.DOMove(centerPosition, moveDuration));
         powerSequence.Join(powerInstance.transform.DOScale(endScale, moveDuration));
 
-        powerSequence.AppendInterval(1f);
+        powerSequence.AppendInterval(0);
+
+        powerSequence.Append(powerInstance.transform.DORotate(powerInstance.transform.rotation.eulerAngles + new Vector3(0, 0, 15), 0.025f).SetLoops(2, LoopType.Yoyo));
+        powerSequence.Append(powerInstance.transform.DORotate(powerInstance.transform.rotation.eulerAngles + new Vector3(0, 0, -12), 0.025f).SetLoops(2, LoopType.Yoyo));
+        powerSequence.Join(powerInstance.transform.DOMove(centerPosition + new Vector3(0, 0, 170), 0.15f).SetLoops(2, LoopType.Yoyo));
+        powerSequence.Append(powerInstance.transform.DORotate(powerInstance.transform.rotation.eulerAngles + new Vector3(0, 0, 13), 0.025f).SetLoops(2, LoopType.Yoyo));
+        powerSequence.Append(powerInstance.transform.DORotate(powerInstance.transform.rotation.eulerAngles + new Vector3(0, 0, -16), 0.025f).SetLoops(2, LoopType.Yoyo));
+        powerSequence.Join(powerInstance.transform.DOMove(centerPosition + new Vector3(0, 0, 100), 0.15f).SetLoops(2, LoopType.Yoyo));
+        powerSequence.Append(powerInstance.transform.DORotate(powerInstance.transform.rotation.eulerAngles + new Vector3(0, 0, 17), 0.025f).SetLoops(2, LoopType.Yoyo));
+        powerSequence.Append(powerInstance.transform.DORotate(powerInstance.transform.rotation.eulerAngles + new Vector3(0, 0, -17), 0.025f).SetLoops(2, LoopType.Yoyo));
+        powerSequence.Join(powerInstance.transform.DOMove(centerPosition + new Vector3(0, 0, 50), 0.15f).SetLoops(2, LoopType.Yoyo));
+
+        powerSequence.AppendInterval(0f);
 
 
         // Fade out

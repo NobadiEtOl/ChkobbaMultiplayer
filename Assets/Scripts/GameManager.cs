@@ -32,8 +32,10 @@ public class GameManager : MonoBehaviour
     private List<Text> pointTexts = new List<Text>();
     private CanvasGroup superPowerTextGroup;
     private TextMeshProUGUI superPowerText;
+    private TextMeshProUGUI superPowerTextB;
     private CanvasGroup pistiTextGroup;
     private TextMeshProUGUI pistiText;
+    private TextMeshProUGUI pistiTextB;
     public Sprite cardBackSprite;
     [SerializeField] public GameObject cardIndicator;
     [SerializeField] private List<Transform> playerHandTransforms;
@@ -778,9 +780,11 @@ public class GameManager : MonoBehaviour
 
         superPowerTextGroup = GameObject.Find("SuperPowerTextContainer").GetComponent<CanvasGroup>();
         superPowerText = GameObject.Find("SuperPowerText").GetComponent<TextMeshProUGUI>();
+        superPowerTextB = GameObject.Find("SuperPowerTextB").GetComponent<TextMeshProUGUI>();
         superPowerTextGroup.gameObject.SetActive(false);
         pistiTextGroup = GameObject.Find("PiştiTextContainer").GetComponent<CanvasGroup>();
         pistiText = GameObject.Find("PiştiText").GetComponent<TextMeshProUGUI>();
+        pistiTextB = GameObject.Find("PiştiTextB").GetComponent<TextMeshProUGUI>();
         pistiTextGroup.gameObject.SetActive(false);
 
         GetNecessaryTransforms();
@@ -1577,11 +1581,15 @@ public class GameManager : MonoBehaviour
 
     private IEnumerator ShowcaseSuperPowerCoroutine(string powerName, float fadeDuration, float displayDuration)
     {
-        yield return new WaitForSeconds(1.1f);
+        yield return new WaitForSeconds(0f);
         if (superPowerText == null || superPowerTextGroup == null)
             yield break;
 
+        // Assign text to both components
         superPowerText.text = powerName;
+        if (superPowerTextB != null)
+            superPowerTextB.text = powerName;
+
         superPowerTextGroup.gameObject.SetActive(true);
 
         // Fade in
@@ -1609,6 +1617,7 @@ public class GameManager : MonoBehaviour
         superPowerTextGroup.gameObject.SetActive(false);
     }
 
+
     public void ShowPistiText(string message, float fadeDuration = 0.5f, float displayDuration = 2f)
     {
         StartCoroutine(ShowPistiTextCoroutine(message, fadeDuration, displayDuration));
@@ -1619,7 +1628,11 @@ public class GameManager : MonoBehaviour
         if (pistiText == null || pistiTextGroup == null)
             yield break;
 
+        // Assign text to both components
         pistiText.text = message;
+        if (pistiTextB != null)
+            pistiTextB.text = message;
+
         pistiTextGroup.gameObject.SetActive(true);
 
         // Fade in
@@ -1646,6 +1659,7 @@ public class GameManager : MonoBehaviour
         pistiTextGroup.alpha = 0f;
         pistiTextGroup.gameObject.SetActive(false);
     }
+
 
     public void ActivateYandimAnamPower()
     {
