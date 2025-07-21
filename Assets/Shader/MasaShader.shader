@@ -2,7 +2,8 @@ Shader "Unlit/PatternLinesNoise"
 {
     Properties
     {
-        _MainColor ("Main Color", Color) = (0.12, 0.05, 0.03, 1) // Dark brown
+        _MainColor ("Background Color", Color) = (0.8, 0.6, 0.4, 1) // Light background
+        _LineColor ("Line Color", Color) = (0.12, 0.05, 0.03, 1) // Dark lines
         _ScaleX ("Pattern Scale X", Float) = 10
         _ScaleY ("Pattern Scale Y", Float) = 3
         _LineScale ("Line Scale", Float) = 10
@@ -22,6 +23,7 @@ Shader "Unlit/PatternLinesNoise"
             #include "UnityCG.cginc"
 
             float4 _MainColor;
+            float4 _LineColor;
             float _ScaleX;
             float _ScaleY;
             float _LineScale;
@@ -98,7 +100,10 @@ Shader "Unlit/PatternLinesNoise"
 
                 float pattern = lines(pos, 0.5, t);
 
-                return float4(_MainColor.rgb * pattern, 1.0);
+                // Blend between background color and line color based on pattern
+                float3 finalColor = lerp(_MainColor.rgb, _LineColor.rgb, pattern);
+
+                return float4(finalColor, 1.0);
             }
             ENDCG
         }

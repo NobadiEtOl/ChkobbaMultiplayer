@@ -8,6 +8,7 @@ public class ElHolderScript : MonoBehaviour
 {
     public static ElHolderScript LocalInstance; // Make it static and public
     List<Animator> animatorHands = new List<Animator>();
+    [SerializeField] public List<GameObject> frameObjects = new List<GameObject>();
     private int currentActivePlayer = -1; // Track currently active player
     [SerializeField] public List<GameObject> powerTransformObjects = new List<GameObject>();
     [SerializeField] public List<GameObject> powerDictionary = new List<GameObject>();
@@ -56,29 +57,38 @@ public class ElHolderScript : MonoBehaviour
 
     public void UpdateCurrentPlayer(int newPlayerNumber)
     {
-        // Stop current player's turn animation if there is one
+        // Reset previous player's frame background color if there was one
         if (currentActivePlayer != -1)
         {
             int currentHandIndex = GetHandIndex(currentActivePlayer);
+
+            // Stop current player's turn animation
             if (currentHandIndex >= 0 && currentHandIndex < animatorHands.Count)
             {
                 // Force immediate stop
                 animatorHands[currentHandIndex].SetBool("turnLoop", false);
                 animatorHands[currentHandIndex].Play("Idle", 0, 0f);
             }
+
+            // Reset current player's frame background color (using player number)
+            ResetFrameBackgroundColor(currentActivePlayer);
+        }
+
+        // Set new player's frame to white and start their turn animation
+        int newHandIndex = GetHandIndex(newPlayerNumber);
+        if (newHandIndex >= 0 && newHandIndex < animatorHands.Count)
+        {
+            // Set new player's frame background to white (using player number)
+            SetFrameBackgroundToWhite(newPlayerNumber);
+
+            // Start new player's turn animation immediately
+            animatorHands[newHandIndex].SetBool("turnLoop", true);
+            // Force immediate transition to turn state
+            animatorHands[newHandIndex].Play("ElPlayingAnimationClip", 0, 0f);
         }
 
         // Update current player
         currentActivePlayer = newPlayerNumber;
-
-        // Start new player's turn animation immediately
-        int newHandIndex = GetHandIndex(newPlayerNumber);
-        if (newHandIndex >= 0 && newHandIndex < animatorHands.Count)
-        {
-            animatorHands[newHandIndex].SetBool("turnLoop", true);
-            // Force immediate transition to turn state
-            animatorHands[newHandIndex].Play("ElPlayingAnimationClip", 0, 0f); // Replace with actual turn state name
-        }
     }
 
 
@@ -265,10 +275,12 @@ public class ElHolderScript : MonoBehaviour
         GameObject powerInstance = Instantiate(powerPrefab);
         powerInstance.transform.SetParent(centerTransform.parent, true);
         SpriteRenderer sr = powerInstance.GetComponent<SpriteRenderer>();
+        GameObject smokeObject = powerInstance.transform.GetChild(0).gameObject;
+        smokeObject.SetActive(false); // Hide smoke initially
 
         // Set initial position and scale
         powerInstance.transform.position = startTransform.position;
-        powerInstance.transform.localScale = Vector3.one * 50f; // Start small
+        powerInstance.transform.localScale = Vector3.one * 100f; // Start small
 
         // Get center position
         Vector3 centerPosition = centerTransform.position;
@@ -276,7 +288,7 @@ public class ElHolderScript : MonoBehaviour
 
         // Animation duration
         float moveDuration = 0.1f; // 70% of 1.5f
-        float fadeDuration = 0.25f; // 30% of 1.5f
+        float fadeDuration = 0.2f; // 30% of 1.5f
 
         Vector3 endScale = new Vector3(200, 200, 200); // End bigger
 
@@ -297,21 +309,44 @@ public class ElHolderScript : MonoBehaviour
         powerSequence.Append(powerInstance.transform.DORotate(powerInstance.transform.rotation.eulerAngles + new Vector3(0, 0, 13), 0.025f).SetLoops(2, LoopType.Yoyo));
         powerSequence.Append(powerInstance.transform.DORotate(powerInstance.transform.rotation.eulerAngles + new Vector3(0, 0, -16), 0.025f).SetLoops(2, LoopType.Yoyo));
         powerSequence.Join(powerInstance.transform.DOMove(centerPosition + new Vector3(0, 0, 100), 0.15f).SetLoops(2, LoopType.Yoyo));
-        powerSequence.Append(powerInstance.transform.DORotate(powerInstance.transform.rotation.eulerAngles + new Vector3(0, 0, 17), 0.025f).SetLoops(2, LoopType.Yoyo));
-        powerSequence.Append(powerInstance.transform.DORotate(powerInstance.transform.rotation.eulerAngles + new Vector3(0, 0, -17), 0.025f).SetLoops(2, LoopType.Yoyo));
-        powerSequence.Join(powerInstance.transform.DOMove(centerPosition + new Vector3(0, 0, 50), 0.15f).SetLoops(2, LoopType.Yoyo));
+        //powerSequence.Append(powerInstance.transform.DORotate(powerInstance.transform.rotation.eulerAngles + new Vector3(0, 0, 17), 0.025f).SetLoops(2, LoopType.Yoyo));
+        //powerSequence.Append(powerInstance.transform.DORotate(powerInstance.transform.rotation.eulerAngles + new Vector3(0, 0, -17), 0.025f).SetLoops(2, LoopType.Yoyo));
+        //powerSequence.Join(powerInstance.transform.DOMove(centerPosition + new Vector3(0, 0, 50), 0.15f).SetLoops(2, LoopType.Yoyo));
 
-        powerSequence.AppendInterval(0f);
+        yield return powerSequence.WaitForCompletion();
 
+        Sequence fadeSequence = DOTween.Sequence();
 
         // Fade out
         if (sr != null)
         {
-            //powerSequence.Append(sr.DOFade(0f, fadeDuration).SetEase(Ease.InQuad));
+            fadeSequence.Append(sr.DOFade(0f, fadeDuration).SetEase(Ease.InQuad));
+        }
+
+        smokeObject.SetActive(true);
+        Debug.LogError($"Activating power instance: {powerInstance.name}");
+
+        // Get the child's animator and play animation if it exists
+        Animator childAnimator = smokeObject.GetComponent<Animator>();
+        if (childAnimator != null)
+        {
+            // Play the child's animation and wait for it to complete
+            childAnimator.Play(0); // Play first animation state
+
+            // Get animation length to wait for completion
+            AnimatorStateInfo stateInfo = childAnimator.GetCurrentAnimatorStateInfo(0);
+            float animationLength = stateInfo.length;
+
+            fadeSequence.AppendInterval(animationLength);
+        }
+        else
+        {
+            // If no animator, just wait a bit for any other effects
+            fadeSequence.AppendInterval(0.5f);
         }
 
         // Wait for the sequence to complete
-        yield return powerSequence.WaitForCompletion();
+        yield return fadeSequence.WaitForCompletion();
 
         // Destroy the power instance
         Debug.LogError($"Destroying power instance: {powerInstance.name}");
@@ -385,5 +420,104 @@ public class ElHolderScript : MonoBehaviour
         }
     }
 
+    public void SetFrameBackgroundColor(int frameIndex, Color backgroundColor)
+    {
+        // Use the hand index directly (since frameIndex should already be mapped through GetHandIndex)
+        // Bounds check for frame index
+        if (frameIndex < 0 || frameIndex >= frameObjects.Count)
+        {
+            Debug.LogWarning($"Invalid frame index {frameIndex}. Available frames: {frameObjects.Count}");
+            return;
+        }
+
+        // Check if the frame object exists and is active
+        if (frameObjects[frameIndex] == null || !frameObjects[frameIndex].activeInHierarchy)
+        {
+            Debug.LogWarning($"Frame {frameIndex} is null or inactive");
+            return;
+        }
+
+        // Get the renderer component
+        Renderer frameRenderer = frameObjects[frameIndex].GetComponent<Renderer>();
+        if (frameRenderer == null)
+        {
+            Debug.LogWarning($"Frame {frameIndex} does not have a Renderer component");
+            return;
+        }
+
+        // Create a new MaterialPropertyBlock to modify properties without affecting other objects
+        MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
+
+        // Get existing property block (in case there are other custom properties)
+        frameRenderer.GetPropertyBlock(propertyBlock);
+
+        // Set the background color (assuming your shader uses "_MainColor" property)
+        propertyBlock.SetColor("_MainColor", backgroundColor);
+
+        // Apply the property block to the renderer
+        frameRenderer.SetPropertyBlock(propertyBlock);
+
+        Debug.Log($"Set frame {frameIndex} background color to {backgroundColor}");
+    }
+
+
+    // Convenience function to set background color to white
+    // Modified function to work with player numbers instead of direct frame indices
+    public void SetFrameBackgroundToWhite(int playerNumber)
+    {
+        int frameIndex = GetHandIndex(playerNumber);
+        SetFrameBackgroundColor(frameIndex, Color.white);
+    }
+
+
+    // Function to reset frame background color to original
+    // Modified function to work with player numbers instead of direct frame indices  
+    public void ResetFrameBackgroundColor(int playerNumber)
+    {
+        int frameIndex = GetHandIndex(playerNumber);
+
+        // Bounds check for frame index
+        if (frameIndex < 0 || frameIndex >= frameObjects.Count)
+        {
+            Debug.LogWarning($"Invalid frame index {frameIndex}. Available frames: {frameObjects.Count}");
+            return;
+        }
+
+        // Check if the frame object exists and is active
+        if (frameObjects[frameIndex] == null)
+        {
+            Debug.LogWarning($"Frame {frameIndex} is null");
+            return;
+        }
+
+        // Get the renderer component
+        Renderer frameRenderer = frameObjects[frameIndex].GetComponent<Renderer>();
+        if (frameRenderer == null)
+        {
+            Debug.LogWarning($"Frame {frameIndex} does not have a Renderer component");
+            return;
+        }
+
+        // Clear the property block to use original material properties
+        frameRenderer.SetPropertyBlock(null);
+
+        Debug.Log($"Reset frame {frameIndex} to original background color");
+    }
+
+
+    // Function to set background color for current active player's frame
+    [ContextMenu("Set Active Player Frame to White")]
+    public void SetActivePlayerFrameToWhite()
+    {
+        if (currentActivePlayer >= 0)
+        {
+            int handIndex = GetHandIndex(currentActivePlayer);
+            SetFrameBackgroundToWhite(handIndex);
+        }
+        else
+        {
+            Debug.LogWarning("No active player set");
+        }
+    }
 
 }
