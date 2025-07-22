@@ -11,18 +11,23 @@ Shader "Custom/EbruMarble_TwoColorBands_Velvet"
         _BandWidth ("Band Width", Float) = 0.18
         _Zoom ("Zoom", Float) = 0.6
         _Rotation ("Rotation (Degrees)", Range(0,360)) = 0
-        _ColorMode ("Color Mode (0=DarkGreenBlack, 1=BrownBlack, 2=WhiteBlack, 3=Custom)", Range(0,3)) = 0
+        _ColorMode ("Color Mode (0=Preset Colors, 1=Custom Colors)", Range(0,1)) = 0
         _BlackBandRatio ("Black Band Ratio (0-1)", Range(0.05,0.5)) = 0.2
 
-        // Velvet controls
+        _MainBandColor ("Main Band Color", Color) = (0.0, 0.15, 0.1, 1)
+        _SecondaryBandColor ("Secondary Band Color", Color) = (0, 0, 0, 1)
+        
+        _BandEdgeColor ("Band Edge Color", Color) = (1, 1, 1, 1)
+        _BandEdgeIntensity ("Band Edge Intensity", Range(0,1)) = 0.2
+
         _VelvetColor ("Velvet Color", Color) = (1,0.9,0.8,1)
         _VelvetIntensity ("Velvet Intensity", Range(0,1)) = 0.25
         _VelvetSoftness ("Velvet Softness", Range(0.5,8)) = 2.5
         _VelvetDirection ("Velvet Light Direction", Vector) = (0,1,0,0)
 
-        // Custom band colors
-        _BandColorA ("Custom Band Color A", Color) = (0.125, 0, 0.094, 1) // #200018
-        _BandColorB ("Custom Band Color B", Color) = (0,0,0,1)
+        _PresetColorMode ("Preset (0=DarkGreen, 1=Brown, 2=Gray, 3=Custom)", Range(0,3)) = 0
+        _BandColorA ("Preset Custom Color A", Color) = (0.125, 0, 0.094, 1)
+        _BandColorB ("Preset Custom Color B", Color) = (0,0,0,1)
     }
     SubShader
     {
@@ -45,6 +50,12 @@ Shader "Custom/EbruMarble_TwoColorBands_Velvet"
             float _Rotation;
             float _ColorMode;
             float _BlackBandRatio;
+            float _PresetColorMode;
+
+            float4 _MainBandColor;
+            float4 _SecondaryBandColor;
+            float4 _BandEdgeColor;
+            float _BandEdgeIntensity;
 
             float4 _VelvetColor;
             float _VelvetIntensity;
@@ -66,7 +77,7 @@ Shader "Custom/EbruMarble_TwoColorBands_Velvet"
                 float4 vertex : SV_POSITION;
             };
 
-            v2f vert (appdata v)
+            v2f vert(appdata v)
             {
                 v2f o;
                 o.vertex = UnityObjectToClipPos(v.vertex);
@@ -101,46 +112,23 @@ Shader "Custom/EbruMarble_TwoColorBands_Velvet"
                 float r = length(combedUV);
                 float bandPos = r * _BandCount - t * 0.5;
 
-                // --- Two-color bands with adjustable black band ratio ---
-                float band = frac(bandPos / 1.0); // Each band is 1.0 wide
-                float3 colorA;
-                float3 colorB = float3(0,0,0); // Black
+                float3 colorA = _MainBandColor.rgb;
+                float3 colorB = _SecondaryBandColor.rgb;
 
-                if(_ColorMode < 0.5)
-                {
-                    colorA = float3(0.0, 0.15, 0.1); // Dark green
-                }
-                else if(_ColorMode < 1.5)
-                {
-                    colorA = float3(0.12, 0.05, 0.03); // Darker brown
-                }
-                else if(_ColorMode < 2.5)
-                {
-                    colorA = float3(0.1, 0.1, 0.1); // White
-                }
-                else
-                {
-                    colorA = _BandColorA.rgb; // Custom color
-                    colorB = _BandColorB.rgb;
-                }
-
+                float band = frac(bandPos / 1.0);
                 float3 col;
                 if (band < (1.0 - _BlackBandRatio))
                     col = colorA;
                 else
                     col = colorB;
 
-                // Soften band edges
                 float bandEdge = smoothstep(_BandWidth, _BandWidth * 0.7, frac(bandPos));
-                col = lerp(col, float3(1,1,1), bandEdge * 0.2);
+                col = lerp(col, _BandEdgeColor.rgb, bandEdge * _BandEdgeIntensity);
 
-                // --- Velvet effect ---
-                // Fake normal: radial from center
                 float2 center = float2(0,0);
                 float2 normal = normalize(combedUV - center);
                 float2 lightDir = normalize(_VelvetDirection.xy);
 
-                // Velvet highlight: strongest at grazing angles
                 float velvet = pow(1.0 - abs(dot(normal, lightDir)), _VelvetSoftness) * _VelvetIntensity;
                 col = lerp(col, _VelvetColor.rgb, velvet);
 

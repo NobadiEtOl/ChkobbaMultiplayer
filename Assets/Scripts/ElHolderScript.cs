@@ -6,13 +6,18 @@ using UnityEngine.UIElements;
 
 public class ElHolderScript : MonoBehaviour
 {
-    public static ElHolderScript LocalInstance; // Make it static and public
+    public static ElHolderScript LocalInstance;
     List<Animator> animatorHands = new List<Animator>();
     [SerializeField] public List<GameObject> frameObjects = new List<GameObject>();
-    private int currentActivePlayer = -1; // Track currently active player
+    private int currentActivePlayer = -1;
     [SerializeField] public List<GameObject> powerTransformObjects = new List<GameObject>();
     [SerializeField] public List<GameObject> powerDictionary = new List<GameObject>();
-    [SerializeField] private Transform centerTransform; // Center position for showcasing powers
+    [SerializeField] private Transform centerTransform;
+
+    // Only keep these two variables for Ebru shader
+    [SerializeField] private float bandWidth = 0.18f;
+    [SerializeField] private float fadeDuration = 0.3f;
+
     void Start()
     {
         if (LocalInstance == null)
@@ -29,6 +34,7 @@ public class ElHolderScript : MonoBehaviour
         foreach (Transform child in gameObject.transform)
         {
             handObjects.Add(child.gameObject);
+            frameObjects.Add(child.gameObject);
             Animator animator = child.GetComponent<Animator>();
             if (animator != null)
             {
@@ -37,60 +43,46 @@ public class ElHolderScript : MonoBehaviour
         }
     }
 
-    // Convert logical player number to hand index based on game mode
     private int GetHandIndex(int playerNumber)
     {
-        // Get player count from DeckController to determine game mode
         int playerCount = DeckController.LocalInstance?.playerCount ?? 4;
 
-        if (playerCount == 2) // 1v1 mode
+        if (playerCount == 2)
         {
-            // In 1v1: player 0 -> hand 0, player 1 -> hand 2 (across from each other)
             return playerNumber == 0 ? 0 : 2;
         }
-        else // 2v2 mode (4 players)
+        else
         {
-            // In 2v2: direct mapping player 0 -> hand 0, player 1 -> hand 1, etc.
             return playerNumber;
         }
     }
 
     public void UpdateCurrentPlayer(int newPlayerNumber)
     {
-        // Reset previous player's frame background color if there was one
         if (currentActivePlayer != -1)
         {
             int currentHandIndex = GetHandIndex(currentActivePlayer);
 
-            // Stop current player's turn animation
             if (currentHandIndex >= 0 && currentHandIndex < animatorHands.Count)
             {
-                // Force immediate stop
                 animatorHands[currentHandIndex].SetBool("turnLoop", false);
                 animatorHands[currentHandIndex].Play("Idle", 0, 0f);
             }
 
-            // Reset current player's frame background color (using player number)
             ResetFrameBackgroundColor(currentActivePlayer);
         }
 
-        // Set new player's frame to white and start their turn animation
         int newHandIndex = GetHandIndex(newPlayerNumber);
         if (newHandIndex >= 0 && newHandIndex < animatorHands.Count)
         {
-            // Set new player's frame background to white (using player number)
             SetFrameBackgroundToWhite(newPlayerNumber);
 
-            // Start new player's turn animation immediately
             animatorHands[newHandIndex].SetBool("turnLoop", true);
-            // Force immediate transition to turn state
             animatorHands[newHandIndex].Play("ElPlayingAnimationClip", 0, 0f);
         }
 
-        // Update current player
         currentActivePlayer = newPlayerNumber;
     }
-
 
     void Update()
     {
@@ -100,7 +92,7 @@ public class ElHolderScript : MonoBehaviour
     [ContextMenu("TokenActionTrue")]
     public void TokenActionTrue()
     {
-        TokenActionTrue(0); // Default to player 0 for context menu
+        TokenActionTrue(0);
     }
 
     public void TokenActionTrue(int playerNumber)
@@ -108,11 +100,9 @@ public class ElHolderScript : MonoBehaviour
         if (playerNumber >= 0 && playerNumber < animatorHands.Count)
         {
             animatorHands[playerNumber].SetBool("tokenAction", true);
-            // Force immediate transition to token animation
-            animatorHands[playerNumber].Play("ElTokenAnimationClip", 0, 0f); // Replace with actual token state name
+            animatorHands[playerNumber].Play("ElTokenAnimationClip", 0, 0f);
         }
     }
-
 
     public void OnTokenAnimationEnd(int playerNumber)
     {
@@ -122,7 +112,7 @@ public class ElHolderScript : MonoBehaviour
     [ContextMenu("TokenActionFalse")]
     public void TokenActionFalse()
     {
-        TokenActionFalse(0); // Default to player 0 for context menu
+        TokenActionFalse(0);
     }
 
     public void TokenActionFalse(int playerNumber)
@@ -137,7 +127,7 @@ public class ElHolderScript : MonoBehaviour
     [ContextMenu("TurnLoopTrue")]
     public void TurnActionTrue()
     {
-        TurnActionTrue(0); // Default to player 0 for context menu
+        TurnActionTrue(0);
     }
 
     public void TurnActionTrue(int playerNumber)
@@ -145,11 +135,9 @@ public class ElHolderScript : MonoBehaviour
         if (playerNumber >= 0 && playerNumber < animatorHands.Count)
         {
             animatorHands[playerNumber].SetBool("turnLoop", true);
-            // Force immediate transition to turn animation
-            animatorHands[playerNumber].Play("ElPlayingAnimationClip", 0, 0f); // Replace with actual turn state name
+            animatorHands[playerNumber].Play("ElPlayingAnimationClip", 0, 0f);
         }
     }
-
 
     public void OnTurnAnimationEnd(int playerNumber)
     {
@@ -159,7 +147,7 @@ public class ElHolderScript : MonoBehaviour
     [ContextMenu("TurnLoopFalse")]
     public void TurnActionFalse()
     {
-        TurnActionFalse(0); // Default to player 0 for context menu
+        TurnActionFalse(0);
     }
 
     public void TurnActionFalse(int playerNumber)
@@ -167,13 +155,10 @@ public class ElHolderScript : MonoBehaviour
         if (playerNumber >= 0 && playerNumber < animatorHands.Count)
         {
             animatorHands[playerNumber].SetBool("turnLoop", false);
-            // Force immediate transition to idle state
-            animatorHands[playerNumber].Play("Idle", 0, 0f); // Replace "Idle" with your actual idle state name
+            animatorHands[playerNumber].Play("Idle", 0, 0f);
         }
     }
 
-
-    // Helper method to control all hands at once (if needed)
     public void TokenActionTrueAll()
     {
         for (int i = 0; i < animatorHands.Count; i++)
@@ -197,14 +182,13 @@ public class ElHolderScript : MonoBehaviour
             TurnActionFalse(i);
             TokenActionFalse(i);
         }
-        currentActivePlayer = -1; // Reset current active player
+        currentActivePlayer = -1;
     }
 
     public void SetHandMode(int playerCount)
     {
         if (playerCount == 2)
         {
-            // In 1v1 mode, deactivate hands at index 1 and 3
             if (animatorHands.Count > 1)
                 animatorHands[1].gameObject.SetActive(false);
             if (animatorHands.Count > 3)
@@ -212,7 +196,6 @@ public class ElHolderScript : MonoBehaviour
         }
         else if (playerCount == 4)
         {
-            // In 2v2 mode, make sure all hands are active
             for (int i = 0; i < animatorHands.Count; i++)
             {
                 animatorHands[i].gameObject.SetActive(true);
@@ -225,23 +208,20 @@ public class ElHolderScript : MonoBehaviour
         Debug.Log($"Showcasing power: {powerName} for player {playerNumber}");
         int handIndex = GetHandIndex(playerNumber);
         if (playerNumber == DeckController.LocalInstance.thisPlayerNumber) return;
-        powerName = powerName.Replace(" ", ""); // Remove spaces for matching
+        powerName = powerName.Replace(" ", "");
 
-        // Bounds check for hand index
         if (handIndex < 0 || handIndex >= powerTransformObjects.Count)
         {
             Debug.LogWarning($"Invalid hand index {handIndex} for player {playerNumber}");
             return;
         }
 
-        // Check if the hand is active (important for 1v1 mode)
         if (!powerTransformObjects[handIndex].activeInHierarchy)
         {
             Debug.LogWarning($"Hand {handIndex} is inactive, skipping power showcase");
             return;
         }
 
-        // Find the correct power prefab by name
         GameObject powerPrefab = null;
         string targetName = powerName + "_Token";
 
@@ -268,36 +248,28 @@ public class ElHolderScript : MonoBehaviour
         yield return new WaitForSeconds(0.5f);
         Debug.Log($"Showcasing power: {powerName} for hand index: {handIndex}");
 
-        // Get the starting transform
         Transform startTransform = powerTransformObjects[handIndex].transform;
 
-        // Create the power sprite instance
         GameObject powerInstance = Instantiate(powerPrefab);
         powerInstance.transform.SetParent(centerTransform.parent, true);
         SpriteRenderer sr = powerInstance.GetComponent<SpriteRenderer>();
         GameObject smokeObject = powerInstance.transform.GetChild(0).gameObject;
-        smokeObject.SetActive(false); // Hide smoke initially
+        smokeObject.SetActive(false);
 
-        // Set initial position and scale
         powerInstance.transform.position = startTransform.position;
-        powerInstance.transform.localScale = Vector3.one * 100f; // Start small
+        powerInstance.transform.localScale = Vector3.one * 100f;
 
-        // Get center position
         Vector3 centerPosition = centerTransform.position;
-        //centerPosition.z = powerInstance.transform.position.z; // Keep same Z
 
-        // Animation duration
-        float moveDuration = 0.1f; // 70% of 1.5f
-        float fadeDuration = 0.2f; // 30% of 1.5f
+        float moveDuration = 0.1f;
+        float fadeDuration = 0.2f;
 
-        Vector3 endScale = new Vector3(200, 200, 200); // End bigger
+        Vector3 endScale = new Vector3(200, 200, 200);
 
-        // Create a sequence for the animations 
         Sequence powerSequence = DOTween.Sequence();
 
         powerSequence.AppendInterval(0.35f);
 
-        // Move to center and scale up simultaneously
         powerSequence.Append(powerInstance.transform.DOMove(centerPosition, moveDuration));
         powerSequence.Join(powerInstance.transform.DOScale(endScale, moveDuration));
 
@@ -309,15 +281,11 @@ public class ElHolderScript : MonoBehaviour
         powerSequence.Append(powerInstance.transform.DORotate(powerInstance.transform.rotation.eulerAngles + new Vector3(0, 0, 13), 0.025f).SetLoops(2, LoopType.Yoyo));
         powerSequence.Append(powerInstance.transform.DORotate(powerInstance.transform.rotation.eulerAngles + new Vector3(0, 0, -16), 0.025f).SetLoops(2, LoopType.Yoyo));
         powerSequence.Join(powerInstance.transform.DOMove(centerPosition + new Vector3(0, 0, 100), 0.15f).SetLoops(2, LoopType.Yoyo));
-        //powerSequence.Append(powerInstance.transform.DORotate(powerInstance.transform.rotation.eulerAngles + new Vector3(0, 0, 17), 0.025f).SetLoops(2, LoopType.Yoyo));
-        //powerSequence.Append(powerInstance.transform.DORotate(powerInstance.transform.rotation.eulerAngles + new Vector3(0, 0, -17), 0.025f).SetLoops(2, LoopType.Yoyo));
-        //powerSequence.Join(powerInstance.transform.DOMove(centerPosition + new Vector3(0, 0, 50), 0.15f).SetLoops(2, LoopType.Yoyo));
 
         yield return powerSequence.WaitForCompletion();
 
         Sequence fadeSequence = DOTween.Sequence();
 
-        // Fade out
         if (sr != null)
         {
             fadeSequence.Append(sr.DOFade(0f, fadeDuration).SetEase(Ease.InQuad));
@@ -326,14 +294,11 @@ public class ElHolderScript : MonoBehaviour
         smokeObject.SetActive(true);
         Debug.LogError($"Activating power instance: {powerInstance.name}");
 
-        // Get the child's animator and play animation if it exists
         Animator childAnimator = smokeObject.GetComponent<Animator>();
         if (childAnimator != null)
         {
-            // Play the child's animation and wait for it to complete
-            childAnimator.Play(0); // Play first animation state
+            childAnimator.Play(0);
 
-            // Get animation length to wait for completion
             AnimatorStateInfo stateInfo = childAnimator.GetCurrentAnimatorStateInfo(0);
             float animationLength = stateInfo.length;
 
@@ -341,45 +306,38 @@ public class ElHolderScript : MonoBehaviour
         }
         else
         {
-            // If no animator, just wait a bit for any other effects
             fadeSequence.AppendInterval(0.5f);
         }
 
-        // Wait for the sequence to complete
         yield return fadeSequence.WaitForCompletion();
 
-        // Destroy the power instance
         Debug.LogError($"Destroying power instance: {powerInstance.name}");
         Destroy(powerInstance);
     }
-    
+
     public void PlayTokenAnimationOnce(int playerNumber)
     {
         int handIndex = GetHandIndex(playerNumber);
-        
-        // Bounds check for hand index
+
         if (handIndex < 0 || handIndex >= animatorHands.Count)
         {
             Debug.LogWarning($"Invalid hand index {handIndex} for player {playerNumber}");
             return;
         }
-        
-        // Check if the hand is active (important for 1v1 mode)
+
         if (!animatorHands[handIndex].gameObject.activeInHierarchy)
         {
             Debug.LogWarning($"Hand {handIndex} is inactive, skipping token animation");
             return;
         }
-        
-        // Play token animation once
+
         StartCoroutine(TokenAnimationOnceCoroutine(handIndex));
     }
 
     private IEnumerator TokenAnimationOnceCoroutine(int handIndex)
     {
-        // Force immediate start of token animation
         animatorHands[handIndex].SetBool("tokenAction", true);
-        animatorHands[handIndex].Play("ElTokenAnimationClip", 0, 0f); // Replace with actual token state name
+        animatorHands[handIndex].Play("ElTokenAnimationClip", 0, 0f);
 
         AnimatorStateInfo stateInfo = animatorHands[handIndex].GetCurrentAnimatorStateInfo(0);
         float animationDuration = stateInfo.length;
@@ -388,19 +346,17 @@ public class ElHolderScript : MonoBehaviour
 
         yield return new WaitForSeconds(animationDuration);
 
-        // Force immediate transition back to turn animation
         animatorHands[handIndex].SetBool("tokenAction", false);
 
-        // Check if this hand belongs to the current active player
         int playerNumber = GetPlayerNumberFromHandIndex(handIndex);
         if (playerNumber == currentActivePlayer)
         {
             animatorHands[handIndex].SetBool("turnLoop", true);
-            animatorHands[handIndex].Play("ElPlayingAnimationClip", 0, 0f); // Force immediate turn animation
+            animatorHands[handIndex].Play("ElPlayingAnimationClip", 0, 0f);
         }
         else
         {
-            animatorHands[handIndex].Play("ElDrumRollAnimationClip", 0, 0f); // Force to idle
+            animatorHands[handIndex].Play("ElDrumRollAnimationClip", 0, 0f);
         }
     }
 
@@ -408,36 +364,31 @@ public class ElHolderScript : MonoBehaviour
     {
         int playerCount = DeckController.LocalInstance?.playerCount ?? 4;
 
-        if (playerCount == 2) // 1v1 mode
+        if (playerCount == 2)
         {
-            // In 1v1: hand 0 -> player 0, hand 2 -> player 1
             return handIndex == 0 ? 0 : 1;
         }
-        else // 2v2 mode (4 players)
+        else
         {
-            // In 2v2: direct mapping hand index -> player number
             return handIndex;
         }
     }
 
-    public void SetFrameBackgroundColor(int frameIndex, Color backgroundColor)
+    // Ebru Shader Methods
+    public void SetFrameBackgroundColor(int frameIndex, Color mainBandColor, Color secondaryBandColor)
     {
-        // Use the hand index directly (since frameIndex should already be mapped through GetHandIndex)
-        // Bounds check for frame index
         if (frameIndex < 0 || frameIndex >= frameObjects.Count)
         {
             Debug.LogWarning($"Invalid frame index {frameIndex}. Available frames: {frameObjects.Count}");
             return;
         }
 
-        // Check if the frame object exists and is active
         if (frameObjects[frameIndex] == null || !frameObjects[frameIndex].activeInHierarchy)
         {
             Debug.LogWarning($"Frame {frameIndex} is null or inactive");
             return;
         }
 
-        // Get the renderer component
         Renderer frameRenderer = frameObjects[frameIndex].GetComponent<Renderer>();
         if (frameRenderer == null)
         {
@@ -445,79 +396,263 @@ public class ElHolderScript : MonoBehaviour
             return;
         }
 
-        // Create a new MaterialPropertyBlock to modify properties without affecting other objects
         MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
-
-        // Get existing property block (in case there are other custom properties)
         frameRenderer.GetPropertyBlock(propertyBlock);
 
-        // Set the background color (assuming your shader uses "_MainColor" property)
-        propertyBlock.SetColor("_MainColor", backgroundColor);
+        propertyBlock.SetColor("_MainBandColor", mainBandColor);
+        propertyBlock.SetColor("_SecondaryBandColor", secondaryBandColor);
+        propertyBlock.SetFloat("_BandWidth", bandWidth);
 
-        // Apply the property block to the renderer
         frameRenderer.SetPropertyBlock(propertyBlock);
 
-        Debug.Log($"Set frame {frameIndex} background color to {backgroundColor}");
+        Debug.Log($"Set frame {frameIndex} main band color to {mainBandColor} and secondary band color to {secondaryBandColor}");
     }
 
-
-    // Convenience function to set background color to white
-    // Modified function to work with player numbers instead of direct frame indices
     public void SetFrameBackgroundToWhite(int playerNumber)
     {
         int frameIndex = GetHandIndex(playerNumber);
-        SetFrameBackgroundColor(frameIndex, Color.white);
+        StartCoroutine(FadeFrameBandWidth(frameIndex, bandWidth * 2f, fadeDuration));
     }
 
 
-    // Function to reset frame background color to original
-    // Modified function to work with player numbers instead of direct frame indices  
+
     public void ResetFrameBackgroundColor(int playerNumber)
     {
         int frameIndex = GetHandIndex(playerNumber);
+        StartCoroutine(FadeFrameBandWidthToOriginal(frameIndex, fadeDuration));
+    }
 
-        // Bounds check for frame index
+    private IEnumerator FadeFrameBandWidth(int frameIndex, float targetBandWidth, float duration)
+    {
         if (frameIndex < 0 || frameIndex >= frameObjects.Count)
         {
             Debug.LogWarning($"Invalid frame index {frameIndex}. Available frames: {frameObjects.Count}");
-            return;
+            yield break;
         }
 
-        // Check if the frame object exists and is active
-        if (frameObjects[frameIndex] == null)
+        if (frameObjects[frameIndex] == null || !frameObjects[frameIndex].activeInHierarchy)
         {
-            Debug.LogWarning($"Frame {frameIndex} is null");
-            return;
+            Debug.LogWarning($"Frame {frameIndex} is null or inactive");
+            yield break;
         }
 
-        // Get the renderer component
         Renderer frameRenderer = frameObjects[frameIndex].GetComponent<Renderer>();
         if (frameRenderer == null)
         {
             Debug.LogWarning($"Frame {frameIndex} does not have a Renderer component");
-            return;
+            yield break;
         }
 
-        // Clear the property block to use original material properties
+        // Get the original band width only
+        float originalBandWidth = frameRenderer.material.GetFloat("_BandWidth");
+
+        MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
+        frameRenderer.GetPropertyBlock(propertyBlock);
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, elapsed / duration);
+
+            // Only animate band width, no color changes
+            float currentBandWidth = Mathf.Lerp(originalBandWidth, targetBandWidth, t);
+            propertyBlock.SetFloat("_BandWidth", currentBandWidth);
+
+            frameRenderer.SetPropertyBlock(propertyBlock);
+
+            yield return null;
+        }
+
+        // Final value
+        propertyBlock.SetFloat("_BandWidth", targetBandWidth);
+        frameRenderer.SetPropertyBlock(propertyBlock);
+
+        Debug.Log($"Highlighted frame {frameIndex} with band width: {targetBandWidth}");
+    }
+
+    private IEnumerator FadeFrameBandWidthToOriginal(int frameIndex, float duration)
+    {
+        if (frameIndex < 0 || frameIndex >= frameObjects.Count)
+        {
+            Debug.LogWarning($"Invalid frame index {frameIndex}. Available frames: {frameObjects.Count}");
+            yield break;
+        }
+
+        if (frameObjects[frameIndex] == null)
+        {
+            Debug.LogWarning($"Frame {frameIndex} is null");
+            yield break;
+        }
+
+        Renderer frameRenderer = frameObjects[frameIndex].GetComponent<Renderer>();
+        if (frameRenderer == null)
+        {
+            Debug.LogWarning($"Frame {frameIndex} does not have a Renderer component");
+            yield break;
+        }
+
+        // Get the original band width
+        float originalBandWidth = frameRenderer.material.GetFloat("_BandWidth");
+        float currentBandWidth = bandWidth * 2f; // Current highlighted band width
+
+        MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
+        frameRenderer.GetPropertyBlock(propertyBlock);
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, elapsed / duration);
+
+            // Only animate band width back to original
+            float lerpedBandWidth = Mathf.Lerp(currentBandWidth, originalBandWidth, t);
+            propertyBlock.SetFloat("_BandWidth", lerpedBandWidth);
+
+            frameRenderer.SetPropertyBlock(propertyBlock);
+
+            yield return null;
+        }
+
+        // Clear property block to return to original material
         frameRenderer.SetPropertyBlock(null);
 
-        Debug.Log($"Reset frame {frameIndex} to original background color");
+        Debug.Log($"Faded frame {frameIndex} back to original band width");
+    }
+
+    private IEnumerator FadeFrameBackgroundColor(int frameIndex, Color targetMainColor, Color targetSecondaryColor, float duration)
+    {
+        if (frameIndex < 0 || frameIndex >= frameObjects.Count)
+        {
+            Debug.LogWarning($"Invalid frame index {frameIndex}. Available frames: {frameObjects.Count}");
+            yield break;
+        }
+
+        if (frameObjects[frameIndex] == null || !frameObjects[frameIndex].activeInHierarchy)
+        {
+            Debug.LogWarning($"Frame {frameIndex} is null or inactive");
+            yield break;
+        }
+
+        Renderer frameRenderer = frameObjects[frameIndex].GetComponent<Renderer>();
+        if (frameRenderer == null)
+        {
+            Debug.LogWarning($"Frame {frameIndex} does not have a Renderer component");
+            yield break;
+        }
+
+        // Get the original material colors and band width
+        Color originalMainColor = frameRenderer.material.GetColor("_MainBandColor");
+        Color originalSecondaryColor = frameRenderer.material.GetColor("_SecondaryBandColor");
+        float originalBandWidth = frameRenderer.material.GetFloat("_BandWidth");
+
+        MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
+        frameRenderer.GetPropertyBlock(propertyBlock);
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, elapsed / duration);
+
+            // Keep colors the same, only animate band width
+            Color currentMainColor = Color.Lerp(originalMainColor, targetMainColor, t);
+            Color currentSecondaryColor = Color.Lerp(originalSecondaryColor, targetSecondaryColor, t);
+
+            // Animate band width to highlight effect (increase band width for highlight)
+            float currentBandWidth = Mathf.Lerp(originalBandWidth, bandWidth * 2f, t); // Double the band width for highlight
+
+            propertyBlock.SetColor("_MainBandColor", currentMainColor);
+            propertyBlock.SetColor("_SecondaryBandColor", currentSecondaryColor);
+            propertyBlock.SetFloat("_BandWidth", currentBandWidth);
+
+            frameRenderer.SetPropertyBlock(propertyBlock);
+
+            yield return null;
+        }
+
+        // Final values
+        propertyBlock.SetColor("_MainBandColor", targetMainColor);
+        propertyBlock.SetColor("_SecondaryBandColor", targetSecondaryColor);
+        propertyBlock.SetFloat("_BandWidth", bandWidth * 2f); // Final highlight band width
+
+        frameRenderer.SetPropertyBlock(propertyBlock);
+
+        Debug.Log($"Highlighted frame {frameIndex} with enhanced band width, keeping colors: main: {targetMainColor}, secondary: {targetSecondaryColor}");
     }
 
 
-    // Function to set background color for current active player's frame
+    private IEnumerator FadeFrameBackgroundToOriginal(int frameIndex, float duration)
+    {
+        if (frameIndex < 0 || frameIndex >= frameObjects.Count)
+        {
+            Debug.LogWarning($"Invalid frame index {frameIndex}. Available frames: {frameObjects.Count}");
+            yield break;
+        }
+
+        if (frameObjects[frameIndex] == null)
+        {
+            Debug.LogWarning($"Frame {frameIndex} is null");
+            yield break;
+        }
+
+        Renderer frameRenderer = frameObjects[frameIndex].GetComponent<Renderer>();
+        if (frameRenderer == null)
+        {
+            Debug.LogWarning($"Frame {frameIndex} does not have a Renderer component");
+            yield break;
+        }
+
+        // Get the original material colors and band width
+        Color originalMainColor = frameRenderer.material.GetColor("_MainBandColor");
+        Color originalSecondaryColor = frameRenderer.material.GetColor("_SecondaryBandColor");
+        float originalBandWidth = frameRenderer.material.GetFloat("_BandWidth");
+
+        // Current highlighted values
+        Color currentMainColor = originalMainColor; // Keep same colors
+        Color currentSecondaryColor = originalSecondaryColor; // Keep same colors
+        float currentBandWidth = bandWidth * 2f; // Current highlighted band width
+
+        MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
+        frameRenderer.GetPropertyBlock(propertyBlock);
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, elapsed / duration);
+
+            // Colors stay the same, only animate band width back to original
+            Color lerpedMainColor = originalMainColor; // No color change
+            Color lerpedSecondaryColor = originalSecondaryColor; // No color change
+            float lerpedBandWidth = Mathf.Lerp(currentBandWidth, originalBandWidth, t);
+
+            propertyBlock.SetColor("_MainBandColor", lerpedMainColor);
+            propertyBlock.SetColor("_SecondaryBandColor", lerpedSecondaryColor);
+            propertyBlock.SetFloat("_BandWidth", lerpedBandWidth);
+
+            frameRenderer.SetPropertyBlock(propertyBlock);
+
+            yield return null;
+        }
+
+        // Clear property block to return to original material
+        frameRenderer.SetPropertyBlock(null);
+
+        Debug.Log($"Faded frame {frameIndex} back to original band width, colors unchanged");
+    }
+
+
     [ContextMenu("Set Active Player Frame to White")]
     public void SetActivePlayerFrameToWhite()
     {
         if (currentActivePlayer >= 0)
         {
-            int handIndex = GetHandIndex(currentActivePlayer);
-            SetFrameBackgroundToWhite(handIndex);
+            SetFrameBackgroundToWhite(currentActivePlayer);
         }
         else
         {
             Debug.LogWarning("No active player set");
         }
     }
-
 }

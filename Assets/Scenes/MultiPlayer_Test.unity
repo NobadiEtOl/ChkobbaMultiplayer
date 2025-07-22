@@ -2166,7 +2166,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 568be9ad248d82d41bfd8f21dd7cb375, type: 2}
+  - {fileID: 2100000, guid: 8cb59fc2a0295264fb32a2e96ca174ca, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -2697,7 +2697,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 568be9ad248d82d41bfd8f21dd7cb375, type: 2}
+  - {fileID: 2100000, guid: 8cb59fc2a0295264fb32a2e96ca174ca, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -4180,7 +4180,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 568be9ad248d82d41bfd8f21dd7cb375, type: 2}
+  - {fileID: 2100000, guid: 8cb59fc2a0295264fb32a2e96ca174ca, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -7899,7 +7899,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 568be9ad248d82d41bfd8f21dd7cb375, type: 2}
+  - {fileID: 2100000, guid: 8cb59fc2a0295264fb32a2e96ca174ca, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -9360,9 +9360,25 @@ PrefabInstance:
       value: -15
       objectReference: {fileID: 0}
     - target: {fileID: 2552258500018963382, guid: d630c013e4530c24681e26f6a7802e2a, type: 3}
+      propertyPath: bandWidth
+      value: 0.05
+      objectReference: {fileID: 0}
+    - target: {fileID: 2552258500018963382, guid: d630c013e4530c24681e26f6a7802e2a, type: 3}
       propertyPath: centerTransform
       value: 
       objectReference: {fileID: 2067094341}
+    - target: {fileID: 2552258500018963382, guid: d630c013e4530c24681e26f6a7802e2a, type: 3}
+      propertyPath: backgroundColor.b
+      value: 0.030809572
+      objectReference: {fileID: 0}
+    - target: {fileID: 2552258500018963382, guid: d630c013e4530c24681e26f6a7802e2a, type: 3}
+      propertyPath: backgroundColor.g
+      value: 0.16981131
+      objectReference: {fileID: 0}
+    - target: {fileID: 2552258500018963382, guid: d630c013e4530c24681e26f6a7802e2a, type: 3}
+      propertyPath: backgroundColor.r
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 2552258500018963382, guid: d630c013e4530c24681e26f6a7802e2a, type: 3}
       propertyPath: frameObjects.Array.size
       value: 4

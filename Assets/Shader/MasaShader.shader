@@ -9,6 +9,12 @@ Shader "Unlit/PatternLinesNoise"
         _LineScale ("Line Scale", Float) = 10
         _NoiseStrength ("Noise Strength", Float) = 1
         _Speed ("Animation Speed", Float) = 1
+        
+        // Mode system like Ebru shader
+        _ColorMode ("Color Mode (0=Original, 1=Enhanced)", Range(0,1)) = 0
+        _BandWidth ("Band Width", Float) = 0.18
+        _BandColor ("Band Edge Color", Color) = (0.7, 0.7, 0.7, 1) // Gray band color
+        _BandIntensity ("Band Edge Intensity", Range(0,1)) = 0.3
     }
     SubShader
     {
@@ -29,6 +35,11 @@ Shader "Unlit/PatternLinesNoise"
             float _LineScale;
             float _NoiseStrength;
             float _Speed;
+            
+            float _ColorMode;
+            float _BandWidth;
+            float4 _BandColor;
+            float _BandIntensity;
 
             struct appdata
             {
@@ -100,8 +111,21 @@ Shader "Unlit/PatternLinesNoise"
 
                 float pattern = lines(pos, 0.5, t);
 
-                // Blend between background color and line color based on pattern
+                // Base color blend between background and line color
                 float3 finalColor = lerp(_MainColor.rgb, _LineColor.rgb, pattern);
+
+                // Enhanced mode with band edges (copied from Ebru shader logic)
+                if (_ColorMode > 0.5)
+                {
+                    // Use the pattern value as band position (similar to Ebru's bandPos)
+                    float bandPos = pattern * _LineScale;
+                    
+                    // Create band edge effect exactly like Ebru shader
+                    float bandEdge = smoothstep(_BandWidth, _BandWidth * 0.7, frac(bandPos));
+                    
+                    // Apply band color as edge effect (like Ebru's halftone effect)
+                    finalColor = lerp(finalColor, _BandColor.rgb, bandEdge * _BandIntensity);
+                }
 
                 return float4(finalColor, 1.0);
             }

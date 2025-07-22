@@ -30,6 +30,8 @@ Material:
     m_Ints: []
     m_Floats:
     - _BandCount: 1
+    - _BandEdgeIntensity: 0.2
+    - _BandIntensity: 0.3
     - _BandWidth: 0
     - _BlackBandRatio: 0.25
     - _CircleGrid: 5
@@ -59,8 +61,14 @@ Material:
     - _DropStartTime3: 3
     - _GelgitAmplitude: 1
     - _GelgitFrequency: 1
+    - _LineScale: 10
     - _MaxDrops: 4
+    - _NoiseStrength: 1
+    - _PresetColorMode: 0
     - _Rotation: 0
+    - _ScaleX: 10
+    - _ScaleY: 3
+    - _Speed: 1
     - _StarDiamondRadius: 0.2
     - _StarGrid: 3
     - _StarRadius: 0.2
@@ -77,8 +85,10 @@ Material:
     - _Zoom: 10
     m_Colors:
     - _BGColor: {r: 1, g: 1, b: 1, a: 1}
+    - _BandColor: {r: 0.7, g: 0.7, b: 0.7, a: 1}
     - _BandColorA: {r: 0.12499998, g: 0, b: 0.09399996, a: 1}
     - _BandColorB: {r: 0, g: 0, b: 0, a: 1}
+    - _BandEdgeColor: {r: 1, g: 1, b: 1, a: 1}
     - _CircleColor: {r: 1, g: 1, b: 1, a: 1}
     - _ColorA: {r: 0.19999996, g: 0.39999998, b: 0.7, a: 1}
     - _ColorB: {r: 1, g: 0.9, b: 0.7, a: 1}
@@ -96,6 +106,10 @@ Material:
     - _DropColor3: {r: 1, g: 1, b: 0, a: 1}
     - _DropColors: {r: 1, g: 1, b: 1, a: 1}
     - _DropPositions: {r: 0, g: 0, b: 0, a: 0}
+    - _LineColor: {r: 0.11999995, g: 0.049999982, b: 0.03, a: 1}
+    - _MainBandColor: {r: 0, g: 0.42352942, b: 0.3529412, a: 1}
+    - _MainColor: {r: 0.8, g: 0.6, b: 0.39999998, a: 1}
+    - _SecondaryBandColor: {r: 0, g: 0, b: 0, a: 1}
     - _StarColor: {r: 1, g: 0.9, b: 0.19999996, a: 1}
     - _VelvetColor: {r: 1, g: 0.9, b: 0.8, a: 1}
     - _VelvetDirection: {r: 0, g: 1, b: 0, a: 0}

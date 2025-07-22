@@ -25,12 +25,16 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _LineScale: 15
-    - _NoiseStrength: 2
-    - _ScaleX: 0.001
-    - _ScaleY: 0.001
-    - _Speed: 0.01
+    - _BandIntensity: 0.1
+    - _BandWidth: 0.005
+    - _ColorMode: 1
+    - _LineScale: 20
+    - _NoiseStrength: 3
+    - _ScaleX: 0.0005
+    - _ScaleY: 0.0008
+    - _Speed: 1
     m_Colors:
+    - _BandColor: {r: 1, g: 0, b: 0, a: 1}
     - _LineColor: {r: 0, g: 0, b: 0, a: 1}
     - _MainColor: {r: 0.07924521, g: 0.078796655, b: 0.078796655, a: 1}
   m_BuildTextureStacks: []
