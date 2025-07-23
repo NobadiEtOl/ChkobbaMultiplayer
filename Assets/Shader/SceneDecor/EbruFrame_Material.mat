@@ -25,20 +25,21 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _BandCount: 5
+    - _BandCount: 1
     - _BandEdgeIntensity: 0.5
     - _BandWidth: 0
-    - _BlackBandRatio: 0.45
+    - _BlackBandRatio: 0.25
     - _ColorMode: 1
     - _CombAmplitude: 1
     - _CombFrequency: 1
-    - _GelgitAmplitude: 1
-    - _GelgitFrequency: 1
-    - _Rotation: 45
+    - _GelgitAmplitude: 2
+    - _GelgitFrequency: 10
+    - _Rotation: 200
+    - _TimeSpeed: 7.5
     - _VelvetIntensity: 0
-    - _Zoom: 0.0005
+    - _Zoom: 0.0003
     m_Colors:
     - _BandEdgeColor: {r: 0, g: 0.42352945, b: 0.3529412, a: 1}
-    - _MainBandColor: {r: 0.08176088, g: 0.08176088, b: 0.08176088, a: 1}
+    - _MainBandColor: {r: 0.04, g: 0.04, b: 0.04, a: 1}
     - _SecondaryBandColor: {r: 0, g: 0, b: 0, a: 1}
   m_BuildTextureStacks: []

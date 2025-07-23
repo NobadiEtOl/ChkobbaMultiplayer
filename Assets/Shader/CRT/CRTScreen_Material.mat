@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: FrameMaterial
-  m_Shader: {fileID: 4800000, guid: c85474ede28a00a468c84fa2edd3cd63, type: 3}
+  m_Name: CRTScreen_Material
+  m_Shader: {fileID: 4800000, guid: b7b97034c54641943bf836c6027f12b9, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -22,19 +22,15 @@ Material:
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
-    m_TexEnvs: []
+    m_TexEnvs:
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _BandIntensity: 0.1
-    - _BandWidth: 0.005
-    - _ColorMode: 1
-    - _LineScale: 20
-    - _NoiseStrength: 3
-    - _ScaleX: 0.0005
-    - _ScaleY: 0.0008
-    - _Speed: 1
-    m_Colors:
-    - _BandColor: {r: 1, g: 0, b: 0, a: 1}
-    - _LineColor: {r: 0, g: 0, b: 0, a: 1}
-    - _MainColor: {r: 0.07924521, g: 0.078796655, b: 0.078796655, a: 1}
+    - _AberrationOffset: 0.0003
+    - _DistortionStrength: 0.1
+    - _ScanlineIntensity: 0.5
+    m_Colors: []
   m_BuildTextureStacks: []
