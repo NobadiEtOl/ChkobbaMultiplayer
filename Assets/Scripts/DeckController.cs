@@ -300,7 +300,12 @@ public class DeckController : MonoBehaviour
         {
             int i = (startingPlayerNoCounter + n) % 4;
             relativeIndex = (i - thisPlayerNumber + playerCount) % playerCount;
-            if (relativeIndex == 0) gameManager.myCards = new List<string>();
+            Debug.LogWarning("relativeIndex: " + relativeIndex);
+
+            if (relativeIndex == 0)
+            {
+                gameManager.myCards = new List<string>();
+            }
 
             for (int j = 0; j < 4; j++)
             {
@@ -316,9 +321,9 @@ public class DeckController : MonoBehaviour
 
                 cardObjects.Add(tempCardObject);
 
-                var playerHandTransform = playerHandTransforms[GetPoolIndex(relativeIndex)];
+                tempCardObject.transform.parent = playerHandTransforms[GetPoolIndex(relativeIndex)].transform;
 
-                tempCardObject.transform.parent = playerHandTransform.transform;
+                var playerHandTransform = playerHandTransforms[GetPoolIndex(relativeIndex)];
                 Vector3 basePos = playerHandTransform.position;
                 Vector3 centerRotation = playerHandTransform.rotation.eulerAngles;
                 Vector3 offset = Vector3.zero;
@@ -332,22 +337,18 @@ public class DeckController : MonoBehaviour
                     case 0: // Bottom (Player 0)
                         offset = new Vector3(randomOffset1 * randomOffset2, j * 5, randomOffset1 * randomOffset2);
                         rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + (randomOffset1 * 3), centerRotation.z);
-                        //scales.Add(new Vector3(800, 800, 800));
                         break;
                     case 1: // Right (Player 1)
                         offset = new Vector3(randomOffset1 * randomOffset2, j * 5, randomOffset1 * randomOffset2);
                         rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + 90 + (randomOffset1 * 3), centerRotation.z);
-                        //scales.Add(new Vector3(700, 700, 700));
                         break;
                     case 2: // Top (Player 2)
                         offset = new Vector3(randomOffset1 * randomOffset2, j * 5, randomOffset1 * randomOffset2);
                         rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + (randomOffset1 * 3), centerRotation.z);
-                        //scales.Add(new Vector3(600, 600, 600));
                         break;
                     case 3: // Left (Player 3)
                         offset = new Vector3(randomOffset1 * randomOffset2, j * 5, randomOffset1 * randomOffset2);
                         rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + 90 + (randomOffset1 * 3), centerRotation.z);
-                        //scales.Add(new Vector3(700, 700, 700));
                         break;
                 }
 
@@ -361,6 +362,7 @@ public class DeckController : MonoBehaviour
         UpdateCurrentPlayerHandLayout();
         StartCoroutine(SetAutoRotateFlagTrue(myCardObjects));
     }
+
 
     private int startingPlayerNoCounter = -1;
     //Deals to center according to the playerCount
@@ -725,7 +727,6 @@ public class DeckController : MonoBehaviour
             playerNumber = GameManager.currentPlayerNo;
         }
 
-
         if (currentPlayerHand.childCount == 1)
         {
             return;
@@ -742,7 +743,6 @@ public class DeckController : MonoBehaviour
         }
 
         int totalCards = playerCards.Count;
-        Debug.LogError("totalCards: " + totalCards);
         if (totalCards == 0) return;
 
         // Calculate the offset multiplier
@@ -753,39 +753,42 @@ public class DeckController : MonoBehaviour
         {
             Vector3 offset = Vector3.zero;
             Quaternion rotation = Quaternion.identity;
-            Vector3 centerRotation = playerHandTransforms[relativeIndex].rotation.eulerAngles;
+            Vector3 centerRotation = playerHandTransforms[playerNumber].rotation.eulerAngles;
+
             Vector3 currentScale = playerCards[i].transform.localScale; // Use the current scale of the card
+
+            float cardZ = playerCards[i].transform.rotation.eulerAngles.y;
+            Quaternion cardRotation = playerCards[i].transform.rotation;
 
             switch (playerNumber)
             {
                 case 0: // Bottom (Player 0)
                     offset = new Vector3(spacing * 15f * (i - offsetMult), 1000, 0);
-                    rotation = Quaternion.Euler(-centerRotation.x, centerRotation.y, centerRotation.z);
+                    rotation = cardRotation;//Quaternion.Euler(-centerRotation.x, cardZ, centerRotation.z);
                     currentScale = new Vector3(myCardsScale, myCardsScale, myCardsScale);
                     break;
                 case 1: // Right (Player 1)
                     offset = new Vector3(0, i * 10, spacing * 3f * (i - offsetMult));
-                    rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + 90, centerRotation.z);
-                    currentScale = new Vector3 (normalScale,normalScale,normalScale);
+                    rotation = Quaternion.Euler(centerRotation.x, cardZ, centerRotation.z);
+                    currentScale = new Vector3(normalScale, normalScale, normalScale);
                     break;
                 case 2: // Top (Player 2)
-                    offset = new Vector3(spacing * 3f * (i - offsetMult), i * 10, 0);
-                    rotation = Quaternion.Euler(centerRotation.x, centerRotation.y, centerRotation.z);
-                    currentScale = new Vector3 (normalScale,normalScale,normalScale);
+                    offset = new Vector3(spacing * 3f * (i - offsetMult), 1000 + (i * 10), 0);
+                    rotation = Quaternion.Euler(centerRotation.x, cardZ, centerRotation.z);
+                    currentScale = new Vector3(normalScale, normalScale, normalScale);
                     break;
                 case 3: // Left (Player 3)
                     offset = new Vector3(0, i * 10, spacing * 3f * (i - offsetMult));
-                    rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + 90, centerRotation.z);
-                    currentScale = new Vector3 (normalScale,normalScale,normalScale);
+                    rotation = Quaternion.Euler(centerRotation.x, cardZ, centerRotation.z);
+                    currentScale = new Vector3(normalScale, normalScale, normalScale);
                     break;
             }
 
             Vector3 targetPosition = playerHandTransforms[playerNumber].position + offset;
             MoveCard(targetPosition, playerCards[i], 10, rotation, currentScale);
         }
-        //if (playerNumber == 0) StartCoroutine(SetAutoRotateFlagTrue(playerCards));
-        //Debug.LogWarning(playerNumber);
     }
+
 
     public IEnumerator SetAutoRotateFlagTrue(List<GameObject> cardObjects)
     {

@@ -49,6 +49,7 @@ public class MainUIScript : MonoBehaviour
 
     public void OnQuickPlayCloseButtonClicked()
     {
+        Debug.Log("Quick Play Close Button Clicked");
         quickPlayUI.SetActive(false);
     }
     public void OnCreateRoomCloseButtonClicked()

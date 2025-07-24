@@ -97,7 +97,7 @@ public class SuperPowerSpawner : MonoBehaviour
         // Find the InfoBoxCanvas under this token only
 
         // Now find UI elements under this canvas only
-        backgroundPanel = GameObject.Find("BackGroundPanel")?.gameObject;
+        backgroundPanel = GameObject.Find("InfoBoxBackGroundPanel")?.gameObject;
         nameText = backgroundPanel.transform.Find("NamePanel/NameText")?.GetComponent<Text>();
         descriptionText = backgroundPanel.transform.Find("DescriptionPanel/DescriptionText")?.GetComponent<Text>();
         activateButton = GameObject.Find("ActivateButton")?.GetComponent<Button>();
