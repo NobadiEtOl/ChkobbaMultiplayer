@@ -22,7 +22,9 @@ public class SuperPowerToken : MonoBehaviour
         
         SuperPowerSpawner.LocalInstance.RemoveSpawnedSuperPower(gameObject);
         SuperPowerSpawner.LocalInstance.UpdateTokenPositions();
-        SuperPowerSpawner.LocalInstance.CloseInfoBox();
+        
+        // FIXED: Start the close coroutine instead of calling CloseInfoBox directly
+        StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
         StartCoroutine(FadeOutSprite()); // Destroy the token after activation
     }
 

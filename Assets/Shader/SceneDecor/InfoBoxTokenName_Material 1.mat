@@ -1,0 +1,116 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: InfoBoxTokenName_Material 1
+  m_Shader: {fileID: 4800000, guid: 972c74c77953fef4d88874f701d02f83, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _BandCount: 0.1
+    - _BandEdgeIntensity: 0.2
+    - _BandIntensity: 0.3
+    - _BandWidth: 0.3
+    - _BlackBandRatio: 0.25
+    - _CircleGrid: 5
+    - _CircleRadius: 0.15
+    - _CircleSoftness: 0.02
+    - _ColorMode: 1
+    - _CombAmplitude: 2.54
+    - _CombFrequency: 0.4
+    - _DiamondGrid: 4
+    - _DiamondRadius: 0.2
+    - _DiamondSoftness: 0.02
+    - _DiamondThickness: 0.08
+    - _DotCount: 10
+    - _DotRadius: 3
+    - _DropCount: 1
+    - _DropDissolveTime: 1
+    - _DropDuration: 3
+    - _DropEdgeSoftness: 1
+    - _DropInterval: 0.1
+    - _DropLife: 1
+    - _DropRadius: 1
+    - _DropSoftness: 0
+    - _DropSpeed: 1
+    - _DropStartTime0: 0
+    - _DropStartTime1: 1
+    - _DropStartTime2: 2
+    - _DropStartTime3: 3
+    - _GelgitAmplitude: 5.57
+    - _GelgitFrequency: 0.66
+    - _LineScale: 10
+    - _MaxDrops: 4
+    - _NoiseStrength: 1
+    - _PresetColorMode: 0
+    - _Rotation: 0
+    - _ScaleX: 10
+    - _ScaleY: 3
+    - _Speed: 1
+    - _StarDiamondRadius: 0.2
+    - _StarGrid: 3
+    - _StarRadius: 0.2
+    - _StarSharpness: 12
+    - _StarSize: 0.08
+    - _StarSoftness: 0.01
+    - _SwirlAmplitude: 1
+    - _SwirlCount: 3
+    - _SwirlFrequency: 8
+    - _SwirlStrength: 1
+    - _TimeSpeed: 1
+    - _VelvetIntensity: 0.1
+    - _VelvetSoftness: 2
+    - _Zoom: 5
+    m_Colors:
+    - _BGColor: {r: 1, g: 1, b: 1, a: 1}
+    - _BandColor: {r: 0.7, g: 0.7, b: 0.7, a: 1}
+    - _BandColorA: {r: 0.12499998, g: 0, b: 0.09399996, a: 1}
+    - _BandColorB: {r: 0, g: 0, b: 0, a: 1}
+    - _BandEdgeColor: {r: 1, g: 1, b: 1, a: 1}
+    - _CircleColor: {r: 1, g: 1, b: 1, a: 1}
+    - _ColorA: {r: 0.19999996, g: 0.39999998, b: 0.7, a: 1}
+    - _ColorB: {r: 1, g: 0.9, b: 0.7, a: 1}
+    - _ColorC: {r: 0.8, g: 0.5, b: 0.19999996, a: 1}
+    - _ColorD: {r: 0.19999996, g: 0.7, b: 0.39999998, a: 1}
+    - _DiamondColor: {r: 0.7609999, g: 0.24699995, b: 0.101999976, a: 1}
+    - _DropCenter: {r: 0.5, g: 0.5, b: 0, a: 0}
+    - _DropCenter0: {r: 1, g: 1, b: 1, a: 1}
+    - _DropCenter1: {r: 0.2, g: 0.8, b: 0, a: 0}
+    - _DropCenter2: {r: 0.8, g: 0.3, b: 0, a: 0}
+    - _DropCenter3: {r: 0.7, g: 0.7, b: 0, a: 0}
+    - _DropColor0: {r: 1, g: 0, b: 0, a: 1}
+    - _DropColor1: {r: 0, g: 1, b: 0, a: 1}
+    - _DropColor2: {r: 0, g: 0, b: 1, a: 1}
+    - _DropColor3: {r: 1, g: 1, b: 0, a: 1}
+    - _DropColors: {r: 1, g: 1, b: 1, a: 1}
+    - _DropPositions: {r: 0, g: 0, b: 0, a: 0}
+    - _LineColor: {r: 0.11999995, g: 0.049999982, b: 0.03, a: 1}
+    - _MainBandColor: {r: 0.5647059, g: 0.4039216, b: 0.77647066, a: 1}
+    - _MainColor: {r: 0.8, g: 0.6, b: 0.39999998, a: 1}
+    - _SecondaryBandColor: {r: 1, g: 0.9411765, b: 0.3529412, a: 1}
+    - _StarColor: {r: 1, g: 0.9, b: 0.19999996, a: 1}
+    - _VelvetColor: {r: 1, g: 0.9, b: 0.8, a: 1}
+    - _VelvetDirection: {r: 0, g: 1, b: 0, a: 0}
+  m_BuildTextureStacks: []
