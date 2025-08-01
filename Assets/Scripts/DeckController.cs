@@ -571,9 +571,9 @@ public class DeckController : MonoBehaviour
     {
         float spacing = 500f;
         int handCount = playerHandTransforms.Count;
-        int startIdx = 1; // Skip playerHandTransforms[0] (your hand)
+        int startIdx = 0; // Include your own hand
 
-        // Layout for other hands (showcase)
+        // Layout for all hands (showcase)
         for (int handIdx = startIdx; handIdx < handCount; handIdx++)
         {
             Transform hand = playerHandTransforms[handIdx];
@@ -599,34 +599,109 @@ public class DeckController : MonoBehaviour
 
                 // Store original transform and flags if not already stored
                 if (!showcaseOriginalTransforms.ContainsKey(card))
-                    showcaseOriginalTransforms[card] = (card.transform.position, card.transform.rotation, card.transform.localScale, false);
+                    showcaseOriginalTransforms[card] = (card.transform.position, card.transform.rotation, card.transform.localScale, ci.isAutoRotating);
 
                 Vector3 offset = Vector3.zero;
-                Quaternion rotation = card.transform.rotation;
-                Vector3 scale = new Vector3(centerScale, centerScale, centerScale);
+                Quaternion rotation = card.transform.rotation; // Default to current rotation
+                Vector3 scale = new Vector3(centerScale, centerScale, centerScale); // All cards use center scale
+                Vector3 targetPosition = Vector3.zero;
 
                 switch (handIdx)
                 {
+                    case 0: // Bottom (Your hand - Player 0)
+                        offset = new Vector3(spacing * 3f * (i - offsetMult), i * 10, 0);
+                        targetPosition = basePos + offset;
+                        
+                        // For your cards: Only change position and scale, keep current rotation
+                        StartCoroutine(MoveCardPositionAndScaleOnly(card, targetPosition, scale));
+                        break;
+                        
                     case 1: // Right
                     case 3: // Left
                         offset = new Vector3(0, i * 10, spacing * 3f * (i - offsetMult));
                         rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + 90, centerRotation.z);
+                        targetPosition = basePos + offset;
+                        MoveCard(targetPosition, card, 10, rotation, scale);
                         break;
+                        
                     case 2: // Top
                         offset = new Vector3(spacing * 3f * (i - offsetMult), i * 10, 0);
                         rotation = Quaternion.Euler(centerRotation.x, centerRotation.y, centerRotation.z);
+                        targetPosition = basePos + offset;
+                        MoveCard(targetPosition, card, 10, rotation, scale);
                         break;
+                        
                     default:
                         offset = new Vector3(spacing * 3f * (i - offsetMult), i * 10, 0);
                         rotation = Quaternion.Euler(centerRotation.x, centerRotation.y, centerRotation.z);
+                        targetPosition = basePos + offset;
+                        MoveCard(targetPosition, card, 10, rotation, scale);
                         break;
                 }
 
-                Vector3 targetPosition = basePos + offset;
-                MoveCard(targetPosition, card, 10, rotation, scale);
-
-                ci.StartAutoRotateFaceDown();
+                // Set auto-rotate behavior based on hand
+                if (handIdx == 0) // Your hand (Player 0)
+                {
+                    // Keep auto-rotate as is for your cards (don't change it)
+                    // Your cards continue auto-rotating during showcase
+                }
+                else // Other players' hands
+                {
+                    ci.StartAutoRotateFaceDown();
+                }
             }
+        }
+    }
+
+    /// <summary>
+    /// Moves a card's position and scale only, preserving its current rotation
+    /// </summary>
+    private IEnumerator MoveCardPositionAndScaleOnly(GameObject cardObject, Vector3 targetPosition, Vector3 targetScale)
+    {
+        float duration = 0.1f; // Same as speed 10 in MoveCard (1f/10)
+
+        // Create a DOTween sequence for position and scale only (no rotation)
+        DG.Tweening.Sequence moveSeq = DOTween.Sequence();
+        moveSeq.Join(cardObject.transform.DOMove(targetPosition, duration));
+        moveSeq.Join(cardObject.transform.DOScale(targetScale, duration));
+
+        yield return moveSeq.WaitForCompletion();
+    }
+
+
+    private bool isShowcaseAllActive = false;
+    public Dictionary<GameObject, (Vector3 pos, Quaternion rot, Vector3 scale, bool autoRotateFlag)> showcaseOriginalTransforms = new Dictionary<GameObject, (Vector3, Quaternion, Vector3, bool)>();
+
+    [ContextMenu("ExitShowcaseAllOtherHands")]
+    public void ExitShowcaseAllOtherHands()
+    {
+        isShowcaseAllActive = false;
+        // Restore all cards to their stored transforms and flags
+        foreach (var kvp in showcaseOriginalTransforms)
+        {
+            GameObject card = kvp.Key;
+            var (pos, rot, scale, autoRotateFlag) = kvp.Value;
+            MoveCard(pos, card, 10, rot, scale);
+
+            var ci = card.GetComponent<CardInteraction>();
+            if (ci != null)
+            {
+                ci.StopAutoRotate();
+            }
+        }
+        showcaseOriginalTransforms.Clear();
+
+        // After restoring, update layout to ensure flags are correct for your hand
+        UpdateCurrentPlayerHandLayout();
+    }
+
+    public void UpdateShowcaseOriginalsAfterSwap(GameObject card)
+    {
+        if (isShowcaseAllActive && showcaseOriginalTransforms.ContainsKey(card))
+        {
+            var ci = card.GetComponent<CardInteraction>();
+            bool autoRotate = ci != null ? false : false;
+            showcaseOriginalTransforms[card] = (card.transform.position, card.transform.rotation, card.transform.localScale, autoRotate);
         }
     }
 
@@ -1928,41 +2003,6 @@ public class DeckController : MonoBehaviour
     }
 
 
-    private bool isShowcaseAllActive = false;
-    public Dictionary<GameObject, (Vector3 pos, Quaternion rot, Vector3 scale, bool autoRotateFlag)> showcaseOriginalTransforms = new Dictionary<GameObject, (Vector3, Quaternion, Vector3, bool)>();
-
-    [ContextMenu("ExitShowcaseAllOtherHands")]
-    public void ExitShowcaseAllOtherHands()
-    {
-        isShowcaseAllActive = false;
-        // Restore all cards to their stored transforms and flags
-        foreach (var kvp in showcaseOriginalTransforms)
-        {
-            GameObject card = kvp.Key;
-            var (pos, rot, scale, autoRotateFlag) = kvp.Value;
-            MoveCard(pos, card, 10, rot, scale);
-
-            var ci = card.GetComponent<CardInteraction>();
-            if (ci != null && !ci.gameObject.transform.parent.name.Contains("PlayerHand1"))
-            {
-                ci.StopAutoRotate();// = autoRotateFlag;
-            }
-        }
-        showcaseOriginalTransforms.Clear();
-
-        // After restoring, update layout to ensure flags are correct for your hand
-        UpdateCurrentPlayerHandLayout();
-    }
-
-    public void UpdateShowcaseOriginalsAfterSwap(GameObject card)
-    {
-        if (isShowcaseAllActive && showcaseOriginalTransforms.ContainsKey(card))
-        {
-            var ci = card.GetComponent<CardInteraction>();
-            bool autoRotate = ci != null ? false : false;
-            showcaseOriginalTransforms[card] = (card.transform.position, card.transform.rotation, card.transform.localScale, autoRotate);
-        }
-    }
 
     /// <summary>
     /// Assigns card GameObjects to player pools based on a dictionary of playerNo -> List of card IDs.

@@ -30,12 +30,18 @@ public class CardInteraction : MonoBehaviour
     private static int currentSelections = 0;
     public string activePowerEffect = "none";
 
+    // ADD THIS PROPERTY
+    public bool isAutoRotating 
+    { 
+        get { return autoRotateActive; } 
+    }
 
     public int[] GetCardID()
     {
         // Return a copy of the cardID to prevent external modification
         return (int[])cardID.Clone();
     }
+    
     public void SetUniqueID(string uniqueId, int[] cardID)
     {
         uniqueCardInstanceID = uniqueId;
@@ -341,6 +347,9 @@ public class CardInteraction : MonoBehaviour
         transform.localRotation = Quaternion.Euler(0, 0, 0);
         InitializeCardInd();
         InitializeCardBack();
+        
+        // Store original data after initialization
+        StoreOriginalCardData();
     }
 
     private void InitializeCardInd()
@@ -390,6 +399,9 @@ public class CardInteraction : MonoBehaviour
         }
         if (originalSprite != null)
             GetComponent<SpriteRenderer>().sprite = originalSprite;
+        
+        // Reset power effect
+        activePowerEffect = "none";
     }
 
     public void SetCardIDAndSprite(int[] newCardID, Sprite newSprite)
@@ -451,16 +463,18 @@ public class CardInteraction : MonoBehaviour
         if (autoRotateSequence != null && autoRotateSequence.IsActive()) autoRotateSequence.Kill();
         transform.DOKill();
 
-        // Always start from face up
-        //transform.rotation = Quaternion.Euler(90, 0, 0);
+        // Get the current rotation
+        Vector3 currentEuler = transform.localRotation.eulerAngles;
+        float currentZ = currentEuler.z;
 
-        // Pick a random angle for this cycle
-        float angle = UnityEngine.Random.Range(minAngle, maxAngle);
+        // Pick a random angle offset between minAngle and maxAngle
+        float angleOffset = UnityEngine.Random.Range(minAngle, maxAngle);
 
+        // Rotate around z axis: currentZ + angleOffset, then currentZ - angleOffset, then back to currentZ
         autoRotateSequence = DOTween.Sequence();
-        autoRotateSequence.Append(transform.DORotate(new Vector3(-90, 0, angle), duration).SetEase(Ease.OutSine));
-        autoRotateSequence.Append(transform.DORotate(new Vector3(-90, 0, -angle), duration * 2).SetEase(Ease.InOutSine));
-        autoRotateSequence.Append(transform.DORotate(new Vector3(-90, 0, 0), duration).SetEase(Ease.InSine));
+        autoRotateSequence.Append(transform.DORotate(new Vector3(-90, 0, currentZ + angleOffset), duration).SetEase(Ease.OutSine));
+        autoRotateSequence.Append(transform.DORotate(new Vector3(-90, 0, currentZ - angleOffset), duration * 2).SetEase(Ease.InOutSine));
+        autoRotateSequence.Append(transform.DORotate(new Vector3(-90, 0, currentZ), duration).SetEase(Ease.InSine));
         autoRotateSequence.SetLoops(1)
             .OnComplete(() =>
             {
@@ -533,7 +547,4 @@ public class CardInteraction : MonoBehaviour
         while (DOTween.IsTweening(target))
             yield return null;
     }
-
-
-
 }
