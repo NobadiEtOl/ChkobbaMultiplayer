@@ -25,27 +25,32 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
+    - _BandIntensity: 0.3
+    - _BandWidth: -0.54
+    - _ColorMode: 0
     - _GrainAmplitude: 0.15
     - _GrainContrast: 1.2
     - _GrainFrequency: 12
     - _GrainIntensity: 0.7
     - _GrainScale: 8
     - _GrainSharpness: 0.8
-    - _LineScale: 20
+    - _LineScale: 5.06
     - _NoiseScale: 15
-    - _NoiseStrength: 0.2
+    - _NoiseStrength: 0.4
     - _RingAmplitude: 0.08
     - _RingDistortion: 0.3
     - _RingFrequency: 20
     - _RingScale: 3
-    - _ScaleX: 5
-    - _ScaleY: 5
+    - _ScaleX: 10.54
+    - _ScaleY: 10.2
     - _Smoothness: 0.3
-    - _Speed: 0.1
+    - _Speed: 0.5
     - _TimeSpeed: 1
     m_Colors:
+    - _AccentColor: {r: 0.307, g: 0.234949, b: 0.1769949, a: 1}
+    - _BandColor: {r: 0.7, g: 0.7, b: 0.7, a: 1}
     - _FlowDirection: {r: 1, g: 0.2, b: 0, a: 0}
     - _GrainColor: {r: 0.39999998, g: 0.19999996, b: 0.09999997, a: 1}
-    - _LineColor: {r: 0, g: 0, b: 0, a: 1}
-    - _MainColor: {r: 0.1254902, g: 0, b: 0.09411766, a: 1}
+    - _LineColor: {r: 0.015686275, g: 0.015686275, b: 0.015686275, a: 1}
+    - _MainColor: {r: 0.117, g: 0.019381242, b: 0.018396227, a: 1}
   m_BuildTextureStacks: []

@@ -13,10 +13,16 @@ public class ElHolderScript : MonoBehaviour
     [SerializeField] public List<GameObject> powerTransformObjects = new List<GameObject>();
     [SerializeField] public List<GameObject> powerDictionary = new List<GameObject>();
     [SerializeField] private Transform centerTransform;
+    
+    // Material for the frames - assign this in the inspector
+    [SerializeField] private Material frameMaterial;
 
-    // Only keep these two variables for Ebru shader
-    [SerializeField] private float bandWidth = 0.18f;
+    // Variables for FrameShader turn indication
+    [SerializeField] private float activePlayerIntensity = 0.8f;
+    [SerializeField] private float inactivePlayerIntensity = 0.3f;
     [SerializeField] private float fadeDuration = 0.3f;
+    [SerializeField] private Color turnIndicationColor = Color.green;
+    [SerializeField] private float color3AnimationSpeed = 0.5f;
 
     void Start()
     {
@@ -41,6 +47,9 @@ public class ElHolderScript : MonoBehaviour
                 animatorHands.Add(animator);
             }
         }
+
+        // Apply the assigned material to all frames
+        ApplyFrameMaterial();
     }
 
     private int GetHandIndex(int playerNumber)
@@ -374,8 +383,8 @@ public class ElHolderScript : MonoBehaviour
         }
     }
 
-    // Ebru Shader Methods
-    public void SetFrameBackgroundColor(int frameIndex, Color mainBandColor, Color secondaryBandColor)
+    // Custom_SimpleTwoColorLines Shader Methods
+    public void SetFrameBackgroundColor(int frameIndex, Color color1, Color color2)
     {
         if (frameIndex < 0 || frameIndex >= frameObjects.Count)
         {
@@ -396,22 +405,32 @@ public class ElHolderScript : MonoBehaviour
             return;
         }
 
+        // Check if the material uses the Custom_SimpleTwoColorLines shader
+        if (frameRenderer.material.shader.name != "Custom/SimpleTwoColorLines")
+        {
+            Debug.LogWarning($"Frame {frameIndex} material does not use Custom/SimpleTwoColorLines shader. Current shader: {frameRenderer.material.shader.name}");
+            return;
+        }
+
         MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
         frameRenderer.GetPropertyBlock(propertyBlock);
 
-        propertyBlock.SetColor("_MainBandColor", mainBandColor);
-        propertyBlock.SetColor("_SecondaryBandColor", secondaryBandColor);
-        propertyBlock.SetFloat("_BandWidth", bandWidth);
+        propertyBlock.SetColor("_Color1", color1);
+        propertyBlock.SetColor("_Color2", color2);
 
         frameRenderer.SetPropertyBlock(propertyBlock);
 
-        Debug.Log($"Set frame {frameIndex} main band color to {mainBandColor} and secondary band color to {secondaryBandColor}");
+        Debug.Log($"Set frame {frameIndex} color1 to {color1} and color2 to {color2}");
     }
 
     public void SetFrameBackgroundToWhite(int playerNumber)
     {
         int frameIndex = GetHandIndex(playerNumber);
-        StartCoroutine(FadeFrameBandWidth(frameIndex, bandWidth * 2f, fadeDuration));
+        Debug.Log($"SetFrameBackgroundToWhite called for player {playerNumber}, frame index: {frameIndex}");
+        
+        // Set Color3 to green for turn indication
+        SetFrameColor3ToGreen(frameIndex);
+        StartCoroutine(FadeFrameColor3Intensity(frameIndex, activePlayerIntensity, fadeDuration));
     }
 
 
@@ -419,10 +438,14 @@ public class ElHolderScript : MonoBehaviour
     public void ResetFrameBackgroundColor(int playerNumber)
     {
         int frameIndex = GetHandIndex(playerNumber);
-        StartCoroutine(FadeFrameBandWidthToOriginal(frameIndex, fadeDuration));
+        Debug.Log($"ResetFrameBackgroundColor called for player {playerNumber}, frame index: {frameIndex}");
+        
+        // Reset Color3 back to original
+        ResetFrameColor3ToOriginal(frameIndex);
+        StartCoroutine(FadeFrameColor3IntensityToOriginal(frameIndex, fadeDuration));
     }
 
-    private IEnumerator FadeFrameBandWidth(int frameIndex, float targetBandWidth, float duration)
+    private IEnumerator FadeFrameColor3Intensity(int frameIndex, float targetIntensity, float duration)
     {
         if (frameIndex < 0 || frameIndex >= frameObjects.Count)
         {
@@ -443,8 +466,24 @@ public class ElHolderScript : MonoBehaviour
             yield break;
         }
 
-        // Get the original band width only
-        float originalBandWidth = frameRenderer.material.GetFloat("_BandWidth");
+        // Check if the material uses the Custom_SimpleTwoColorLines shader
+        if (frameRenderer.material.shader.name != "Custom/SimpleTwoColorLines")
+        {
+            Debug.LogWarning($"Frame {frameIndex} material does not use Custom/SimpleTwoColorLines shader. Current shader: {frameRenderer.material.shader.name}");
+            yield break;
+        }
+
+        // Get the original Color3Intensity
+        float originalIntensity = 0.3f; // Default value
+        if (frameRenderer.material.HasProperty("_Color3Intensity"))
+        {
+            originalIntensity = frameRenderer.material.GetFloat("_Color3Intensity");
+        }
+        else
+        {
+            Debug.LogWarning($"Material on {frameObjects[frameIndex].name} does not have _Color3Intensity property. Using default value.");
+            // If the material doesn't have the property, we'll use the default value
+        }
 
         MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
         frameRenderer.GetPropertyBlock(propertyBlock);
@@ -455,9 +494,9 @@ public class ElHolderScript : MonoBehaviour
             elapsed += Time.deltaTime;
             float t = Mathf.SmoothStep(0f, 1f, elapsed / duration);
 
-            // Only animate band width, no color changes
-            float currentBandWidth = Mathf.Lerp(originalBandWidth, targetBandWidth, t);
-            propertyBlock.SetFloat("_BandWidth", currentBandWidth);
+            // Animate Color3Intensity for turn indication
+            float currentIntensity = Mathf.Lerp(originalIntensity, targetIntensity, t);
+            propertyBlock.SetFloat("_Color3Intensity", currentIntensity);
 
             frameRenderer.SetPropertyBlock(propertyBlock);
 
@@ -465,13 +504,13 @@ public class ElHolderScript : MonoBehaviour
         }
 
         // Final value
-        propertyBlock.SetFloat("_BandWidth", targetBandWidth);
+        propertyBlock.SetFloat("_Color3Intensity", targetIntensity);
         frameRenderer.SetPropertyBlock(propertyBlock);
 
-        Debug.Log($"Highlighted frame {frameIndex} with band width: {targetBandWidth}");
+        Debug.Log($"Highlighted frame {frameIndex} with Color3Intensity: {targetIntensity}");
     }
 
-    private IEnumerator FadeFrameBandWidthToOriginal(int frameIndex, float duration)
+    private IEnumerator FadeFrameColor3IntensityToOriginal(int frameIndex, float duration)
     {
         if (frameIndex < 0 || frameIndex >= frameObjects.Count)
         {
@@ -492,9 +531,25 @@ public class ElHolderScript : MonoBehaviour
             yield break;
         }
 
-        // Get the original band width
-        float originalBandWidth = frameRenderer.material.GetFloat("_BandWidth");
-        float currentBandWidth = bandWidth * 2f; // Current highlighted band width
+        // Check if the material uses the Custom_SimpleTwoColorLines shader
+        if (frameRenderer.material.shader.name != "Custom/SimpleTwoColorLines")
+        {
+            Debug.LogWarning($"Frame {frameIndex} material does not use Custom/SimpleTwoColorLines shader. Current shader: {frameRenderer.material.shader.name}");
+            yield break;
+        }
+
+        // Get the original Color3Intensity
+        float originalIntensity = 0.3f; // Default value
+        if (frameRenderer.material.HasProperty("_Color3Intensity"))
+        {
+            originalIntensity = frameRenderer.material.GetFloat("_Color3Intensity");
+        }
+        else
+        {
+            Debug.LogWarning($"Material on {frameObjects[frameIndex].name} does not have _Color3Intensity property. Using default value.");
+            // If the material doesn't have the property, we'll use the default value
+        }
+        float currentIntensity = activePlayerIntensity; // Current highlighted intensity
 
         MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
         frameRenderer.GetPropertyBlock(propertyBlock);
@@ -505,9 +560,9 @@ public class ElHolderScript : MonoBehaviour
             elapsed += Time.deltaTime;
             float t = Mathf.SmoothStep(0f, 1f, elapsed / duration);
 
-            // Only animate band width back to original
-            float lerpedBandWidth = Mathf.Lerp(currentBandWidth, originalBandWidth, t);
-            propertyBlock.SetFloat("_BandWidth", lerpedBandWidth);
+            // Animate Color3Intensity back to original
+            float lerpedIntensity = Mathf.Lerp(currentIntensity, originalIntensity, t);
+            propertyBlock.SetFloat("_Color3Intensity", lerpedIntensity);
 
             frameRenderer.SetPropertyBlock(propertyBlock);
 
@@ -517,10 +572,10 @@ public class ElHolderScript : MonoBehaviour
         // Clear property block to return to original material
         frameRenderer.SetPropertyBlock(null);
 
-        Debug.Log($"Faded frame {frameIndex} back to original band width");
+        Debug.Log($"Faded frame {frameIndex} back to original Color3Intensity");
     }
 
-    private IEnumerator FadeFrameBackgroundColor(int frameIndex, Color targetMainColor, Color targetSecondaryColor, float duration)
+    private IEnumerator FadeFrameBackgroundColor(int frameIndex, Color targetColor1, Color targetColor2, float duration)
     {
         if (frameIndex < 0 || frameIndex >= frameObjects.Count)
         {
@@ -541,10 +596,10 @@ public class ElHolderScript : MonoBehaviour
             yield break;
         }
 
-        // Get the original material colors and band width
-        Color originalMainColor = frameRenderer.material.GetColor("_MainBandColor");
-        Color originalSecondaryColor = frameRenderer.material.GetColor("_SecondaryBandColor");
-        float originalBandWidth = frameRenderer.material.GetFloat("_BandWidth");
+        // Get the original material colors and Color3Intensity
+        Color originalColor1 = frameRenderer.material.GetColor("_Color1");
+        Color originalColor2 = frameRenderer.material.GetColor("_Color2");
+        float originalColor3Intensity = frameRenderer.material.GetFloat("_Color3Intensity");
 
         MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
         frameRenderer.GetPropertyBlock(propertyBlock);
@@ -555,16 +610,14 @@ public class ElHolderScript : MonoBehaviour
             elapsed += Time.deltaTime;
             float t = Mathf.SmoothStep(0f, 1f, elapsed / duration);
 
-            // Keep colors the same, only animate band width
-            Color currentMainColor = Color.Lerp(originalMainColor, targetMainColor, t);
-            Color currentSecondaryColor = Color.Lerp(originalSecondaryColor, targetSecondaryColor, t);
+            // Animate colors and Color3Intensity for highlight effect
+            Color currentColor1 = Color.Lerp(originalColor1, targetColor1, t);
+            Color currentColor2 = Color.Lerp(originalColor2, targetColor2, t);
+            float currentColor3Intensity = Mathf.Lerp(originalColor3Intensity, activePlayerIntensity, t);
 
-            // Animate band width to highlight effect (increase band width for highlight)
-            float currentBandWidth = Mathf.Lerp(originalBandWidth, bandWidth * 2f, t); // Double the band width for highlight
-
-            propertyBlock.SetColor("_MainBandColor", currentMainColor);
-            propertyBlock.SetColor("_SecondaryBandColor", currentSecondaryColor);
-            propertyBlock.SetFloat("_BandWidth", currentBandWidth);
+            propertyBlock.SetColor("_Color1", currentColor1);
+            propertyBlock.SetColor("_Color2", currentColor2);
+            propertyBlock.SetFloat("_Color3Intensity", currentColor3Intensity);
 
             frameRenderer.SetPropertyBlock(propertyBlock);
 
@@ -572,13 +625,13 @@ public class ElHolderScript : MonoBehaviour
         }
 
         // Final values
-        propertyBlock.SetColor("_MainBandColor", targetMainColor);
-        propertyBlock.SetColor("_SecondaryBandColor", targetSecondaryColor);
-        propertyBlock.SetFloat("_BandWidth", bandWidth * 2f); // Final highlight band width
+        propertyBlock.SetColor("_Color1", targetColor1);
+        propertyBlock.SetColor("_Color2", targetColor2);
+        propertyBlock.SetFloat("_Color3Intensity", activePlayerIntensity);
 
         frameRenderer.SetPropertyBlock(propertyBlock);
 
-        Debug.Log($"Highlighted frame {frameIndex} with enhanced band width, keeping colors: main: {targetMainColor}, secondary: {targetSecondaryColor}");
+        Debug.Log($"Highlighted frame {frameIndex} with enhanced Color3Intensity, colors: color1: {targetColor1}, color2: {targetColor2}");
     }
 
 
@@ -603,15 +656,15 @@ public class ElHolderScript : MonoBehaviour
             yield break;
         }
 
-        // Get the original material colors and band width
-        Color originalMainColor = frameRenderer.material.GetColor("_MainBandColor");
-        Color originalSecondaryColor = frameRenderer.material.GetColor("_SecondaryBandColor");
-        float originalBandWidth = frameRenderer.material.GetFloat("_BandWidth");
+        // Get the original material colors and Color3Intensity
+        Color originalColor1 = frameRenderer.material.GetColor("_Color1");
+        Color originalColor2 = frameRenderer.material.GetColor("_Color2");
+        float originalColor3Intensity = frameRenderer.material.GetFloat("_Color3Intensity");
 
         // Current highlighted values
-        Color currentMainColor = originalMainColor; // Keep same colors
-        Color currentSecondaryColor = originalSecondaryColor; // Keep same colors
-        float currentBandWidth = bandWidth * 2f; // Current highlighted band width
+        Color currentColor1 = originalColor1; // Keep same colors
+        Color currentColor2 = originalColor2; // Keep same colors
+        float currentColor3Intensity = activePlayerIntensity; // Current highlighted intensity
 
         MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
         frameRenderer.GetPropertyBlock(propertyBlock);
@@ -622,14 +675,14 @@ public class ElHolderScript : MonoBehaviour
             elapsed += Time.deltaTime;
             float t = Mathf.SmoothStep(0f, 1f, elapsed / duration);
 
-            // Colors stay the same, only animate band width back to original
-            Color lerpedMainColor = originalMainColor; // No color change
-            Color lerpedSecondaryColor = originalSecondaryColor; // No color change
-            float lerpedBandWidth = Mathf.Lerp(currentBandWidth, originalBandWidth, t);
+            // Colors stay the same, only animate Color3Intensity back to original
+            Color lerpedColor1 = originalColor1; // No color change
+            Color lerpedColor2 = originalColor2; // No color change
+            float lerpedColor3Intensity = Mathf.Lerp(currentColor3Intensity, originalColor3Intensity, t);
 
-            propertyBlock.SetColor("_MainBandColor", lerpedMainColor);
-            propertyBlock.SetColor("_SecondaryBandColor", lerpedSecondaryColor);
-            propertyBlock.SetFloat("_BandWidth", lerpedBandWidth);
+            propertyBlock.SetColor("_Color1", lerpedColor1);
+            propertyBlock.SetColor("_Color2", lerpedColor2);
+            propertyBlock.SetFloat("_Color3Intensity", lerpedColor3Intensity);
 
             frameRenderer.SetPropertyBlock(propertyBlock);
 
@@ -639,7 +692,7 @@ public class ElHolderScript : MonoBehaviour
         // Clear property block to return to original material
         frameRenderer.SetPropertyBlock(null);
 
-        Debug.Log($"Faded frame {frameIndex} back to original band width, colors unchanged");
+        Debug.Log($"Faded frame {frameIndex} back to original Color3Intensity, colors unchanged");
     }
 
 
@@ -654,5 +707,245 @@ public class ElHolderScript : MonoBehaviour
         {
             Debug.LogWarning("No active player set");
         }
+    }
+
+    // Method to apply the assigned frame material to all frames
+    [ContextMenu("Apply Frame Material")]
+    public void ApplyFrameMaterial()
+    {
+        if (frameMaterial == null)
+        {
+            Debug.LogError("Frame material is not assigned! Please assign a material in the inspector.\n" +
+                "UnityEngine.Debug:LogError (object)\n" +
+                "ElHolderScript:ApplyFrameMaterial () (at Assets/Scripts/ElHolderScript.cs:" + 
+                (new System.Diagnostics.StackTrace(true)).GetFrame(0).GetFileLineNumber() + ")\n" +
+                "ElHolderScript:Start () (at Assets/Scripts/ElHolderScript.cs:50)");
+            return;
+        }
+
+        // Apply the material to all frame objects
+        foreach (GameObject frameObject in frameObjects)
+        {
+            if (frameObject != null)
+            {
+                Renderer renderer = frameObject.GetComponent<Renderer>();
+                if (renderer != null)
+                {
+                    renderer.material = frameMaterial;
+                    Debug.Log($"Applied frame material to {frameObject.name}");
+                }
+                else
+                {
+                    Debug.LogWarning($"Frame object {frameObject.name} does not have a Renderer component");
+                }
+            }
+        }
+    }
+
+    // Method to apply the assigned frame material to a specific frame
+    public void ApplyFrameMaterialToFrame(int frameIndex)
+    {
+        if (frameIndex < 0 || frameIndex >= frameObjects.Count)
+        {
+            Debug.LogWarning($"Invalid frame index {frameIndex}. Available frames: {frameObjects.Count}");
+            return;
+        }
+
+        GameObject frameObject = frameObjects[frameIndex];
+        if (frameObject == null)
+        {
+            Debug.LogWarning($"Frame object at index {frameIndex} is null");
+            return;
+        }
+
+        if (frameMaterial == null)
+        {
+            Debug.LogError("Frame material is not assigned! Please assign a material in the inspector.");
+            return;
+        }
+
+        Renderer renderer = frameObject.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            renderer.material = frameMaterial;
+            Debug.Log($"Applied frame material to frame {frameIndex} ({frameObject.name})");
+        }
+        else
+        {
+            Debug.LogWarning($"Frame object {frameObject.name} does not have a Renderer component");
+        }
+    }
+
+    // Method to set custom colors for a specific frame using MaterialPropertyBlock
+    public void SetFrameCustomColors(int frameIndex, Color color1, Color color2, Color color3)
+    {
+        if (frameIndex < 0 || frameIndex >= frameObjects.Count)
+        {
+            Debug.LogWarning($"Invalid frame index {frameIndex}. Available frames: {frameObjects.Count}");
+            return;
+        }
+
+        GameObject frameObject = frameObjects[frameIndex];
+        if (frameObject == null)
+        {
+            Debug.LogWarning($"Frame object at index {frameIndex} is null");
+            return;
+        }
+
+        Renderer renderer = frameObject.GetComponent<Renderer>();
+        if (renderer == null)
+        {
+            Debug.LogWarning($"Frame object {frameObject.name} does not have a Renderer component");
+            return;
+        }
+
+        // Use MaterialPropertyBlock to modify properties without changing the original material
+        MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
+        renderer.GetPropertyBlock(propertyBlock);
+
+        // Set colors if the shader has these properties
+        if (renderer.material.HasProperty("_Color1"))
+            propertyBlock.SetColor("_Color1", color1);
+        if (renderer.material.HasProperty("_Color2"))
+            propertyBlock.SetColor("_Color2", color2);
+        if (renderer.material.HasProperty("_Color3"))
+            propertyBlock.SetColor("_Color3", color3);
+
+        renderer.SetPropertyBlock(propertyBlock);
+
+        Debug.Log($"Set frame {frameIndex} colors: Color1={color1}, Color2={color2}, Color3={color3}");
+    }
+
+    // Method to set custom colors for all frames
+    public void SetAllFramesCustomColors(Color color1, Color color2, Color color3)
+    {
+        for (int i = 0; i < frameObjects.Count; i++)
+        {
+            SetFrameCustomColors(i, color1, color2, color3);
+        }
+    }
+
+    // Method to set custom shader properties for a specific frame using MaterialPropertyBlock
+    public void SetFrameShaderProperties(int frameIndex, float lineScale = 50f, float animationSpeed = 0.5f, 
+        float sharpness = 5f, float waveAmount = 0.5f, float waveFrequency = 10f, float turbulence = 0.3f)
+    {
+        if (frameIndex < 0 || frameIndex >= frameObjects.Count)
+        {
+            Debug.LogWarning($"Invalid frame index {frameIndex}. Available frames: {frameObjects.Count}");
+            return;
+        }
+
+        GameObject frameObject = frameObjects[frameIndex];
+        if (frameObject == null)
+        {
+            Debug.LogWarning($"Frame object at index {frameIndex} is null");
+            return;
+        }
+
+        Renderer renderer = frameObject.GetComponent<Renderer>();
+        if (renderer == null)
+        {
+            Debug.LogWarning($"Frame object {frameObject.name} does not have a Renderer component");
+            return;
+        }
+
+        // Use MaterialPropertyBlock to modify properties without changing the original material
+        MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
+        renderer.GetPropertyBlock(propertyBlock);
+
+        // Set properties if the shader has them
+        if (renderer.material.HasProperty("_LineScale"))
+            propertyBlock.SetFloat("_LineScale", lineScale);
+        if (renderer.material.HasProperty("_AnimationSpeed"))
+            propertyBlock.SetFloat("_AnimationSpeed", animationSpeed);
+        if (renderer.material.HasProperty("_Sharpness"))
+            propertyBlock.SetFloat("_Sharpness", sharpness);
+        if (renderer.material.HasProperty("_WaveAmount"))
+            propertyBlock.SetFloat("_WaveAmount", waveAmount);
+        if (renderer.material.HasProperty("_WaveFrequency"))
+            propertyBlock.SetFloat("_WaveFrequency", waveFrequency);
+        if (renderer.material.HasProperty("_Turbulence"))
+            propertyBlock.SetFloat("_Turbulence", turbulence);
+
+        renderer.SetPropertyBlock(propertyBlock);
+
+        Debug.Log($"Set frame {frameIndex} shader properties: LineScale={lineScale}, AnimationSpeed={animationSpeed}, Sharpness={sharpness}");
+    }
+
+    // Method to set Color3 to green for turn indication
+    private void SetFrameColor3ToGreen(int frameIndex)
+    {
+        if (frameIndex < 0 || frameIndex >= frameObjects.Count)
+        {
+            Debug.LogWarning($"Invalid frame index {frameIndex}. Available frames: {frameObjects.Count}");
+            return;
+        }
+
+        GameObject frameObject = frameObjects[frameIndex];
+        if (frameObject == null)
+        {
+            Debug.LogWarning($"Frame object at index {frameIndex} is null");
+            return;
+        }
+
+        Renderer renderer = frameObject.GetComponent<Renderer>();
+        if (renderer == null)
+        {
+            Debug.LogWarning($"Frame object {frameObject.name} does not have a Renderer component");
+            return;
+        }
+
+        // Use MaterialPropertyBlock to set Color3 to green
+        MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
+        renderer.GetPropertyBlock(propertyBlock);
+
+        if (renderer.material.HasProperty("_Color3"))
+        {
+            propertyBlock.SetColor("_Color3", turnIndicationColor);
+            renderer.SetPropertyBlock(propertyBlock);
+            Debug.Log($"Set frame {frameIndex} Color3 to {turnIndicationColor} for turn indication");
+        }
+        
+        // Set Color3 animation speed if the shader has this property
+        if (renderer.material.HasProperty("_Color3AnimationSpeed"))
+        {
+            MaterialPropertyBlock speedPropertyBlock = new MaterialPropertyBlock();
+            renderer.GetPropertyBlock(speedPropertyBlock);
+            speedPropertyBlock.SetFloat("_Color3AnimationSpeed", color3AnimationSpeed);
+            renderer.SetPropertyBlock(speedPropertyBlock);
+            Debug.Log($"Set frame {frameIndex} Color3 animation speed to {color3AnimationSpeed}");
+        }
+        else
+        {
+            Debug.LogWarning($"Frame {frameIndex} material does not have _Color3 property");
+        }
+    }
+
+    // Method to reset Color3 back to original material value
+    private void ResetFrameColor3ToOriginal(int frameIndex)
+    {
+        if (frameIndex < 0 || frameIndex >= frameObjects.Count)
+        {
+            Debug.LogWarning($"Invalid frame index {frameIndex}. Available frames: {frameObjects.Count}");
+            return;
+        }
+
+        GameObject frameObject = frameObjects[frameIndex];
+        if (frameObject == null)
+        {
+            Debug.LogWarning($"Frame object at index {frameIndex} is null");
+            return;
+        }
+
+        Renderer renderer = frameObject.GetComponent<Renderer>();
+        if (renderer == null)
+        {
+            Debug.LogWarning($"Frame object {frameObject.name} does not have a Renderer component");
+            return;
+        }
+
+        // Clear the MaterialPropertyBlock to return to original material values
+        renderer.SetPropertyBlock(null);
+        Debug.Log($"Reset frame {frameIndex} Color3 and Color3 animation speed to original material values");
     }
 }

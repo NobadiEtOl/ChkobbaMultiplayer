@@ -592,10 +592,11 @@ public class GameManager : MonoBehaviour
     private int turnCounter;
     public void UpdateCurrentPlayer(int playerNumber, int turnC)
     {
-        // Update ElHolderScript first (stop current, start new)
+        // --- Use relative index logic for turn indication ---
+        int relativeIndex = (playerNumber - DeckController.LocalInstance.thisPlayerNumber + DeckController.LocalInstance.playerCount) % DeckController.LocalInstance.playerCount;
         if (ElHolderScript.LocalInstance != null)
         {
-            ElHolderScript.LocalInstance.UpdateCurrentPlayer(playerNumber);
+            ElHolderScript.LocalInstance.UpdateCurrentPlayer(relativeIndex);
         }
 
         // Then update the current player

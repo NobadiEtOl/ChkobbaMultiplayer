@@ -10,6 +10,9 @@ using DG.Tweening;
 /// </summary>
 public class KeseController : MonoBehaviour
 {
+    [Header("Coin Settings")]
+    [SerializeField] private int coinAmount = 5; // Set this in the Inspector
+
     [Header("Idle Animation")]
     public Sprite[] animationFrames;
     public float frameRate = 10f;
@@ -119,6 +122,7 @@ public class KeseController : MonoBehaviour
                 rightHandObject.transform.position = target;
                 handApproachingReachPoint = false;
                 shouldHandFollowCoin = true;
+                Debug.Log("[KeseController] Hand reached coin reach point, now following coin.");
             }
             else
             {
@@ -127,8 +131,22 @@ public class KeseController : MonoBehaviour
         }
         else if ((isDraggingCoin || shouldHandFollowCoin) && currentCoin != null && rightHandObject != null && coinReachPoint != null)
         {
-            // Snap to reach point (follow exactly)
-            rightHandObject.transform.position = coinReachPoint.position;
+            // --- DEBUG: Log hand/coin positions ---
+            Debug.Log($"[KeseController] Coin at {currentCoin.transform.position}, Hand at {rightHandObject.transform.position}, Reach at {coinReachPoint.position}, HandStart at {rightHandStartPoint.position}");
+
+            // Check if hand is at its starting position (within a small threshold)
+            float handToStartDist = Vector3.Distance(rightHandObject.transform.position, rightHandStartPoint.position);
+            if (handToStartDist < 0.01f)
+            {
+                // If hand is at start, keep it at start instead of following the coin
+                rightHandObject.transform.position = rightHandStartPoint.position;
+                Debug.Log("[KeseController] Hand is at starting position, not following coin.");
+            }
+            else
+            {
+                // Snap to reach point (follow exactly)
+                rightHandObject.transform.position = coinReachPoint.position;
+            }
         }
 
         // Coin drag follow
@@ -330,6 +348,15 @@ public class KeseController : MonoBehaviour
         if (coinMoveSequence != null) coinMoveSequence.Kill();
         if (handMoveSequence != null) handMoveSequence.Kill();
 
+        // --- Pass spawn origin and scale to SuperPowerSpawner ---
+        if (SuperPowerSpawner.LocalInstance != null)
+        {
+            Vector3 spawnOrigin = coinDestinationPoint.position;
+            float spawnScale = 1.5f; // Or any "big" scale you want
+            Debug.Log($"[KeseController] AcceptCoin: Spawning super power at {spawnOrigin} with scale {spawnScale}, coinAmount={coinAmount}");
+            SuperPowerSpawner.LocalInstance.ReadyToSpawnSuperPowers(1, spawnOrigin, spawnScale, coinAmount);
+        }
+        
         // Move coin and hand to destination together
         coinMoveSequence = DOTween.Sequence();
         coinMoveSequence.Join(currentCoin.transform.DOMove(coinDestinationPoint.position, coinMoveSpeed).SetEase(moveEase));
@@ -342,6 +369,7 @@ public class KeseController : MonoBehaviour
             if (pouchAnimCoroutine != null) StopCoroutine(pouchAnimCoroutine);
             if (pouchImage != null && pouchAcceptFrames.Length > 0)
                 pouchAnimCoroutine = StartCoroutine(PlayPouchAcceptAnimation());
+            
 
             // Move hand back to start and stop following
             if (rightHandObject != null && rightHandStartPoint != null)
@@ -364,6 +392,8 @@ public class KeseController : MonoBehaviour
         // While the coin is returning, the hand should approach and then follow the coin's reach point
         handApproachingReachPoint = true;
         shouldHandFollowCoin = false;
+
+        Debug.Log("[KeseController] ReturnCoin: Coin returning to start, hand will approach reach point then follow.");
 
         // Move coin back to start
         coinMoveSequence = DOTween.Sequence();

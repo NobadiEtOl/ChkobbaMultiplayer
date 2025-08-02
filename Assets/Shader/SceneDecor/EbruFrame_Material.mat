@@ -26,20 +26,21 @@ Material:
     m_Ints: []
     m_Floats:
     - _BandCount: 1
-    - _BandEdgeIntensity: 0.5
-    - _BandWidth: 0
-    - _BlackBandRatio: 0.25
-    - _ColorMode: 1
+    - _BandEdgeIntensity: 1
+    - _BandWidth: 0.1
+    - _BlackBandRatio: 0.5
+    - _ColorMode: 0
     - _CombAmplitude: 1
     - _CombFrequency: 1
     - _GelgitAmplitude: 2
     - _GelgitFrequency: 10
-    - _Rotation: 200
+    - _Rotation: 145
     - _TimeSpeed: 7.5
-    - _VelvetIntensity: 0
-    - _Zoom: 0.0003
+    - _VelvetIntensity: 1
+    - _VelvetSoftness: 5.04
+    - _Zoom: 0.0001
     m_Colors:
-    - _BandEdgeColor: {r: 0, g: 0.42352945, b: 0.3529412, a: 1}
-    - _MainBandColor: {r: 0.04, g: 0.04, b: 0.04, a: 1}
+    - _BandEdgeColor: {r: 0.16981131, g: 0.16981131, b: 0.16981131, a: 1}
+    - _MainBandColor: {r: 0.113000005, g: 0.113000005, b: 0.113000005, a: 1}
     - _SecondaryBandColor: {r: 0, g: 0, b: 0, a: 1}
   m_BuildTextureStacks: []

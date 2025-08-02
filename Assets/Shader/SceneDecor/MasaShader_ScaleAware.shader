@@ -1,4 +1,4 @@
-Shader "Unlit/PatternLinesNoise"
+Shader "Unlit/PatternLinesNoise_ScaleAware"
 {
     Properties
     {
@@ -14,6 +14,18 @@ Shader "Unlit/PatternLinesNoise"
         _BandWidth ("Band Width", Float) = 0.18
         _BandColor ("Band Edge Color", Color) = (0.7, 0.7, 0.7, 1)
         _BandIntensity ("Band Edge Intensity", Range(0,1)) = 0.3
+        
+        // Scale-aware properties
+        _ObjectScale ("Object Scale", Vector) = (1, 1, 1, 1)
+        _ScaleFactor ("Scale Factor", Float) = 1
+        _AspectRatio ("Aspect Ratio", Float) = 1
+        _ThicknessFactor ("Thickness Factor", Float) = 1
+        _NormalizedScale ("Normalized Scale", Vector) = (1, 1, 1, 1)
+        
+        // Rotation support for 90° and 270°
+        _Rotation90 ("90° Rotation", Range(0,1)) = 0
+        _Rotation270 ("270° Rotation", Range(0,1)) = 0
+        _AutoDetectRotation ("Auto Detect Rotation", Range(0,1)) = 1
     }
     SubShader
     {
@@ -39,6 +51,18 @@ Shader "Unlit/PatternLinesNoise"
             float _BandWidth;
             float4 _BandColor;
             float _BandIntensity;
+            
+            // Scale-aware properties
+            float4 _ObjectScale;
+            float _ScaleFactor;
+            float _AspectRatio;
+            float _ThicknessFactor;
+            float4 _NormalizedScale;
+            
+            // Rotation properties
+            float _Rotation90;
+            float _Rotation270;
+            float _AutoDetectRotation;
 
             struct appdata
             {
@@ -88,11 +112,19 @@ Shader "Unlit/PatternLinesNoise"
                 );
             }
 
-            // More playful, wavy, and layered lines
+            // Scale-aware pattern generation
             float lines(float2 pos, float t)
             {
-                float scale = _LineScale;
-                pos *= scale;
+                // Apply scale-aware adjustments
+                float adjustedLineScale = _LineScale * _ScaleFactor;
+                
+                // Adjust for extreme aspect ratios
+                if (_AspectRatio > 10.0) // Very thin objects
+                {
+                    adjustedLineScale *= _AspectRatio * 0.1;
+                }
+                
+                pos *= adjustedLineScale;
 
                 // Add multiple sine waves for richer lines
                 float baseLine = sin((pos.x + t) * 3.1415);
@@ -116,12 +148,76 @@ Shader "Unlit/PatternLinesNoise"
                 return smoothstep(0.3, 0.7, 0.5 + 0.5 * wave);
             }
 
+            // Auto-detect rotation based on object scale
+            float detectRotation()
+            {
+                if (_AutoDetectRotation > 0.5)
+                {
+                    // If object is very thin (high aspect ratio), likely rotated 90° or 270°
+                    if (_AspectRatio > 5.0)
+                    {
+                        // Check if it's more like 90° or 270° based on scale values
+                        if (_ObjectScale.x < _ObjectScale.y * 0.1)
+                        {
+                            return 1.0; // 90° rotation
+                        }
+                        else if (_ObjectScale.y < _ObjectScale.x * 0.1)
+                        {
+                            return 2.0; // 270° rotation
+                        }
+                    }
+                }
+                return 0.0; // No rotation
+            }
+
             fixed4 frag(v2f i) : SV_Target
             {
                 float2 st = i.uv;
                 st.y *= _ScreenParams.y / _ScreenParams.x;
 
-                float2 pos = st.yx * float2(_ScaleX, _ScaleY);
+                // Apply scale-aware UV adjustments
+                float2 adjustedUV = st;
+                
+                // Adjust UV based on object scale
+                if (_ObjectScale.x > 0.0 && _ObjectScale.y > 0.0)
+                {
+                    // Normalize UVs based on object scale
+                    adjustedUV.x *= _ObjectScale.x;
+                    adjustedUV.y *= _ObjectScale.y;
+                }
+                
+                // Apply aspect ratio correction
+                if (_AspectRatio > 1.0)
+                {
+                    adjustedUV.x *= _AspectRatio;
+                }
+                else if (_AspectRatio < 1.0)
+                {
+                    adjustedUV.y *= 1.0 / _AspectRatio;
+                }
+
+                float2 pos = adjustedUV.yx * float2(_ScaleX, _ScaleY);
+
+                // Apply rotation if detected or manually set
+                float rotationType = detectRotation();
+                if (rotationType > 0.0 || _Rotation90 > 0.5 || _Rotation270 > 0.5)
+                {
+                    float rotationAngle = 0.0;
+                    
+                    if (_Rotation90 > 0.5 || rotationType == 1.0)
+                    {
+                        rotationAngle = 1.5708; // 90° in radians
+                    }
+                    else if (_Rotation270 > 0.5 || rotationType == 2.0)
+                    {
+                        rotationAngle = 4.7124; // 270° in radians
+                    }
+                    
+                    if (rotationAngle != 0.0)
+                    {
+                        pos = rotate2d(pos, rotationAngle);
+                    }
+                }
 
                 float t = _Time.y * _Speed;
 
@@ -163,4 +259,4 @@ Shader "Unlit/PatternLinesNoise"
             ENDCG
         }
     }
-}
+} 

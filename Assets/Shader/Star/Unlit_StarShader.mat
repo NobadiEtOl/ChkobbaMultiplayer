@@ -19,7 +19,7 @@ Material:
   m_CustomRenderQueue: -1
   stringTagMap: {}
   disabledShaderPasses: []
-  m_LockedProperties: 
+  m_LockedProperties: _EmissionOffset
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
@@ -29,23 +29,61 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _AccentFrequency: 3
+    - _AccentIntensity: 0.093
+    - _AccentSpeed: 1
     - _AnimationAmount: 0.5
     - _AnimationSpeed: 1
+    - _ColorBlendMode: 0
+    - _EmissionCount: 16
+    - _EmissionIntensity: 2
+    - _EmissionLength: 2
+    - _EmissionOffset: 0.1
+    - _EmissionRotation: 152
+    - _EmissionSpeed: 1.05
+    - _EmissionStarPoints: 5
+    - _EmissionThickness: 0.05
+    - _EmissionWaveAmplitude: 0.0611
+    - _EmissionWaveFrequency: 20
     - _ExpansionSpeed: 0.1
     - _FadeOut: 2
     - _FadeStart: 0.8
+    - _GlowIntensity: 0.5
+    - _GlowRadius: 0.8
     - _InnerRadius: 0.4
     - _LargeStarSize: 0.15
-    - _LineThickness: 0.0384
+    - _LineThickness: 0.1
     - _LineVariation: 0.3
     - _MaxDistance: 1.5
-    - _MaxSize: 0.99
+    - _MaxSize: 1.18
     - _MediumStarSize: 0.08
+    - _OutlineIntensity: 2
+    - _OutlineWidth: 0.05
     - _PointSharpness: 0.5
+    - _PulseAmplitude: 0.1
+    - _PulseSpeed: 1
     - _RandomSeed: 100
     - _ScaleAmount: 0.5
     - _ScaleSpeed: 1
     - _SmallStarSize: 0.03
+    - _SmokeFlowDirection: 260
+    - _SmokeFlowSpeed: 1.93
+    - _SmokeIntensity: 1
+    - _SmokePoint1Intensity: 1
+    - _SmokePoint2Intensity: 1
+    - _SmokePoint3Intensity: 1
+    - _SmokePoint4Intensity: 1
+    - _SmokePoint5Intensity: 1
+    - _SmokeReach: 1.3
+    - _SmokeScale: 5
+    - _SmokeSpeed: 0.1
+    - _SmokeTextureScale: 1
+    - _SmokeThickness: 1.64
+    - _SmokeTurbulence: 3.52
+    - _SparkleCount: 6
+    - _SparkleIntensity: 0.5
+    - _SparkleSize: 0.8
+    - _SparkleSpeed: 1
     - _StarBrightness: 3
     - _StarDelay: 0.3
     - _StarDensity: 20
@@ -55,13 +93,31 @@ Material:
     - _StarSize: 0.221
     - _StarSpeed: 1
     - _StarThickness: 0.05
-    - _StartSize: 0.02
+    - _StartSize: 0.01
+    - _TurbulentDistortion: 0
+    - _TurbulentIntensity: 0.68
+    - _TurbulentScale: 0.1
+    - _TurbulentSpeed: 3.34
     - _Twinkle: 0.3
+    - _TwistAmplitude: 0.02
+    - _TwistSpeed: 1
     - _WaveAmplitude: 0.05
     - _WaveFrequency: 20
-    - _WaveSpeed: 2.99
+    - _WaveSpeed: 2
     - _XLStarSize: 0.25
     m_Colors:
+    - _AccentColor: {r: 0, g: 0, b: 0, a: 1}
     - _BackgroundColor: {r: 0, g: 0.7294118, b: 0.41960788, a: 1}
-    - _StarColor: {r: 0, g: 1, b: 0.57526875, a: 1}
+    - _EmissionColor: {r: 0.53400004, g: 0.5053929, b: 0.37904468, a: 1}
+    - _OutlineColor: {r: 0, g: 0, b: 0, a: 1}
+    - _SmokeColor: {r: 0.5924529, g: 0.5610887, b: 0, a: 1}
+    - _SmokePoint1: {r: 0.3, g: 0.3, b: 0, a: 0}
+    - _SmokePoint2: {r: 0.7, g: 0.3, b: 0, a: 0}
+    - _SmokePoint3: {r: 0.5, g: 0.8, b: 0, a: 0}
+    - _SmokePoint4: {r: 0.2, g: 0.9, b: 0, a: 0}
+    - _SmokePoint5: {r: 0.8, g: 0.9, b: 0, a: 0}
+    - _SmokeTextureOffset: {r: 0, g: 0, b: 0, a: 0}
+    - _SparkleColor: {r: 1, g: 0.5, b: 0, a: 1}
+    - _StarColor: {r: 0, g: 0.5, b: 0.28763437, a: 1}
+    - _TurbulentColor: {r: 0.7660377, g: 0.75137067, b: 0.5940405, a: 1}
   m_BuildTextureStacks: []

@@ -6171,7 +6171,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 8cb59fc2a0295264fb32a2e96ca174ca, type: 2}
+  - {fileID: 2100000, guid: d1792f4977fcd33498c31b3f5d4ad041, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -7473,13 +7473,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 710044175}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.5, y: -0.5, z: -0.5, w: 0.5}
+  m_LocalRotation: {x: 0.4999996, y: -0.5000004, z: -0.5000004, w: 0.4999996}
   m_LocalPosition: {x: -0.40904, y: 0.552, z: 10}
   m_LocalScale: {x: 0.00010250792, y: 1.1023182, z: 0.0001050186}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 141345767}
-  m_LocalEulerAnglesHint: {x: 180, y: 90, z: 90}
+  m_LocalEulerAnglesHint: {x: 180.0001, y: 90, z: 90}
 --- !u!64 &710044177
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -7530,7 +7530,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 8cb59fc2a0295264fb32a2e96ca174ca, type: 2}
+  - {fileID: 2100000, guid: d1792f4977fcd33498c31b3f5d4ad041, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -10564,7 +10564,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 8cb59fc2a0295264fb32a2e96ca174ca, type: 2}
+  - {fileID: 2100000, guid: d1792f4977fcd33498c31b3f5d4ad041, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -12643,7 +12643,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &1386298420
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -18063,13 +18063,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2002780064}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.5, y: 0.5, z: 0.5, w: 0.5}
+  m_LocalRotation: {x: 0.5000005, y: 0.49999958, z: 0.49999958, w: 0.5000005}
   m_LocalPosition: {x: 0.413, y: -0.546, z: 10}
   m_LocalScale: {x: 0.00010250792, y: 1.1023182, z: 0.0001050186}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 141345767}
-  m_LocalEulerAnglesHint: {x: 0, y: 90, z: 90}
+  m_LocalEulerAnglesHint: {x: 0.0001, y: 90, z: 90}
 --- !u!64 &2002780066
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -18120,7 +18120,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 8cb59fc2a0295264fb32a2e96ca174ca, type: 2}
+  - {fileID: 2100000, guid: d1792f4977fcd33498c31b3f5d4ad041, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -18603,6 +18603,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 896f3170304134e4792a817e2dc4e67c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  coinAmount: 5
   animationFrames:
   - {fileID: 21300000, guid: c86caa484ec07a0419454ff3b88ae531, type: 3}
   frameRate: 1
@@ -19424,6 +19425,10 @@ PrefabInstance:
       value: 0.1
       objectReference: {fileID: 0}
     - target: {fileID: 2552258500018963382, guid: d630c013e4530c24681e26f6a7802e2a, type: 3}
+      propertyPath: frameMaterial
+      value: 
+      objectReference: {fileID: 2100000, guid: d1792f4977fcd33498c31b3f5d4ad041, type: 2}
+    - target: {fileID: 2552258500018963382, guid: d630c013e4530c24681e26f6a7802e2a, type: 3}
       propertyPath: centerTransform
       value: 
       objectReference: {fileID: 2067094341}
@@ -19438,6 +19443,14 @@ PrefabInstance:
     - target: {fileID: 2552258500018963382, guid: d630c013e4530c24681e26f6a7802e2a, type: 3}
       propertyPath: backgroundColor.r
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2552258500018963382, guid: d630c013e4530c24681e26f6a7802e2a, type: 3}
+      propertyPath: turnIndicationColor.b
+      value: 0.58333325
+      objectReference: {fileID: 0}
+    - target: {fileID: 2552258500018963382, guid: d630c013e4530c24681e26f6a7802e2a, type: 3}
+      propertyPath: turnIndicationColor.g
+      value: 0.7
       objectReference: {fileID: 0}
     - target: {fileID: 2552258500018963382, guid: d630c013e4530c24681e26f6a7802e2a, type: 3}
       propertyPath: frameObjects.Array.size

@@ -601,22 +601,84 @@ public class SuperPowerSpawner : MonoBehaviour
     }
 
     [ContextMenu("Ready to Spawn Super Powers")]
-    public void ReadyToSpawnSuperPowers()
+    // Add new parameters to ReadyToSpawnSuperPowers and SpawnSuperPower
+    public void ReadyToSpawnSuperPowers(int numberOfSuperPowersToSpawn = 2, Vector3? spawnOrigin = null, float spawnScale = 150f, int coinAmount = -1)
     {
-        StartCoroutine(ReadyToSpawnSuperPower());
+        StartCoroutine(ReadyToSpawnSuperPower(numberOfSuperPowersToSpawn, spawnOrigin, spawnScale, coinAmount));
     }
 
-    private IEnumerator ReadyToSpawnSuperPower()
+    private IEnumerator ReadyToSpawnSuperPower(int numberOfSuperPowersToSpawn, Vector3? spawnOrigin, float spawnScale, int coinAmount)
     {
         yield return new WaitForSeconds(1f);
         for (int i = 0; i < numberOfSuperPowersToSpawn; i++)
         {
-            StartCoroutine(SpawnSuperPower(GetRandomSuperPower()));
+            StartCoroutine(SpawnSuperPower(GetWeightedRandomSuperPower(coinAmount), spawnOrigin, spawnScale));
             yield return new WaitForSeconds(0.5f);
         }
     }
 
-    private IEnumerator SpawnSuperPower(SuperPower superPower)
+    private SuperPower GetWeightedRandomSuperPower(int coinAmount)
+    {
+        if (superPowerPrefabs.Count == 0)
+            return null;
+
+        // If coinAmount is not set, fallback to uniform random
+        if (coinAmount < 0)
+            return GetRandomSuperPower();
+
+        List<SuperPower> powers = new List<SuperPower>(superPowerPrefabs.Keys);
+        List<float> weights = new List<float>();
+        float totalWeight = 0f;
+
+        Debug.Log($"[SuperPowerSpawner] Calculating weights for coinAmount={coinAmount}:");
+        for (int i = 0; i < powers.Count; i++)
+        {
+            var power = powers[i];
+            int rarity = power.rarityMultiplier;
+            float weight = 1f / (1f + Mathf.Abs(rarity - coinAmount));
+            weights.Add(weight);
+            totalWeight += weight;
+            Debug.Log($"  Power: {power.name}, Rarity: {rarity}, Weight: {weight:F4}");
+        }
+
+        // Print normalized probabilities
+        Debug.Log("[SuperPowerSpawner] Normalized probabilities:");
+        for (int i = 0; i < powers.Count; i++)
+        {
+            float prob = weights[i] / totalWeight;
+            Debug.Log($"  {powers[i].name}: {prob:P2}");
+        }
+
+        float rand = Random.value * totalWeight;
+        Debug.Log($"[SuperPowerSpawner] Random value: {rand:F4} (totalWeight={totalWeight:F4})");
+        float cumulative = 0f;
+        for (int i = 0; i < powers.Count; i++)
+        {
+            cumulative += weights[i];
+            if (rand <= cumulative)
+            {
+                Debug.Log($"[SuperPowerSpawner] Selected: {powers[i].name}");
+                return powers[i];
+            }
+        }
+        Debug.LogWarning("[SuperPowerSpawner] Fallback: selected last power.");
+        return powers[powers.Count - 1]; // fallback
+    }
+
+    private SuperPower GetRandomSuperPower()
+    {
+        if (superPowerList.Count == 0)
+        {
+            Debug.LogWarning("No super powers available to spawn.");
+            return null;
+        }
+        int randomIndex = Random.Range(0, superPowerList.Count);
+        Debug.Log($"[SuperPowerSpawner] Uniform random selection: index={randomIndex}, power={superPowerList[randomIndex].name}");
+        return superPowerList[randomIndex];
+    }
+
+    // Update SpawnSuperPower to accept origin and scale
+    private IEnumerator SpawnSuperPower(SuperPower superPower, Vector3? spawnOrigin, float spawnScale)
     {
         if (superPower == null)
         {
@@ -634,12 +696,20 @@ public class SuperPowerSpawner : MonoBehaviour
         spawnedSuperPowers.Add(placeholder);
         UpdateTokenPositions();
 
-        yield return new WaitForSeconds(1.5f);
+        yield return new WaitForSeconds(1f);
 
         if (superPowerPrefabs.TryGetValue(superPower, out GameObject prefab))
         {
-            Vector3 spawnPos = placeholder.transform.position;
-            GameObject instance = Instantiate(prefab, spawnPos, transform.rotation);
+            // Use spawnOrigin if provided, otherwise use placeholder position
+            Vector3 startPos = spawnOrigin ?? placeholder.transform.position;
+            Vector3 targetPos = placeholder.transform.position;
+
+            GameObject instance = Instantiate(prefab, startPos, transform.rotation);
+
+            // Set initial scale
+            float bigScale = spawnScale;
+            float normalScale = 100f;
+            instance.transform.localScale = Vector3.one * bigScale;
 
             var tokenScript = instance.GetComponent<SuperPowerToken>();
             if (tokenScript != null)
@@ -656,6 +726,28 @@ public class SuperPowerSpawner : MonoBehaviour
 
             Debug.Log($"{superPower.name} spawned.");
             UpdateTokenPositions();
+
+            // Animate to target position and scale
+            float moveDuration = 0.5f;
+            float scaleDuration = 0.5f;
+            float elapsed = 0f;
+            Vector3 initialScale = instance.transform.localScale;
+            Vector3 finalScale = Vector3.one * normalScale;
+            Vector3 initialPos = startPos;
+            Vector3 finalPos = targetPos;
+
+            while (elapsed < moveDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / moveDuration);
+                instance.transform.position = Vector3.Lerp(initialPos, finalPos, t);
+                instance.transform.localScale = Vector3.Lerp(initialScale, finalScale, t);
+                yield return null;
+            }
+            instance.transform.position = finalPos;
+            instance.transform.localScale = finalScale;
+
+            UpdateTokenPositions();
         }
         else
         {
@@ -665,16 +757,6 @@ public class SuperPowerSpawner : MonoBehaviour
         }
     }
 
-    private SuperPower GetRandomSuperPower()
-    {
-        if (superPowerList.Count == 0)
-        {
-            Debug.LogWarning("No super powers available to spawn.");
-            return null;
-        }
-        int randomIndex = Random.Range(0, superPowerList.Count);
-        return superPowerList[randomIndex];
-    }
 
     public void UpdateTokenPositions(float moveDuration = 0.25f)
     {
@@ -693,17 +775,23 @@ public class SuperPowerSpawner : MonoBehaviour
 
     private IEnumerator MoveTokenToPosition(GameObject token, Vector3 targetPosition, float duration)
     {
+        if (token == null) yield break; // Early exit if token is already destroyed
+
         Vector3 startPos = token.transform.position;
         float elapsed = 0f;
         while (elapsed < duration)
         {
+            if (token == null) yield break; // Stop if token was destroyed during the animation
+
             elapsed += Time.deltaTime;
             float t = Mathf.Clamp01(elapsed / duration);
             token.transform.position = Vector3.Lerp(startPos, targetPosition, t);
             yield return null;
         }
-        token.transform.position = targetPosition;
+        if (token != null)
+            token.transform.position = targetPosition;
     }
+
 
     public void RemoveSpawnedSuperPower(GameObject token)
     {
