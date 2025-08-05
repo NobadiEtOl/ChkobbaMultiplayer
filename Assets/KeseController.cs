@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
+using System.Collections.Generic;
 using DG.Tweening;
 
 /// <summary>
@@ -53,6 +54,10 @@ public class KeseController : MonoBehaviour
     private Quaternion coinOriginalRotation;
     private Vector3 handOriginalScale;
     private Quaternion handOriginalRotation;
+    
+    // Timer tracking for hesap makinesi
+    private float coinTouchStartTime = 0f;
+    private bool coinIsBeingHeld = false;
 
     // For pouch animation
     private int pouchCurrentFrame = 0;
@@ -79,6 +84,27 @@ public class KeseController : MonoBehaviour
     [SerializeField] private float handApproachSpeed = 8f; // Units per second (tweak as needed)
 
     [SerializeField] private Animator smokeAnimator;
+    
+    [Header("Hesap Makinesi Integration")]
+    [SerializeField] private HesapMakinesiController hesapMakinesiController;
+    [SerializeField] private float quickDropTimeThreshold = 0.5f; // Time limit for "quick drop"
+    
+    // Token data structure (same as in HesapMakinesiController)
+    [System.Serializable]
+    public class TokenData
+    {
+        public int value;
+        public int count;
+        
+        public TokenData(int value, int count)
+        {
+            this.value = value;
+            this.count = count;
+        }
+    }
+    
+    // Coin token data
+    private List<TokenData> coinTokenData = new List<TokenData>();
 
     void Start()
     {
@@ -108,6 +134,9 @@ public class KeseController : MonoBehaviour
 #elif UNITY_ANDROID || UNITY_IOS
         HandleTouchInput();
 #endif
+
+        // Check for hesap makinesi timer logic
+        CheckHesapMakinesiTimer();
 
         // --- DRAG FOLLOW LOGIC & HAND APPROACH ---
         if (handApproachingReachPoint && rightHandObject != null && coinReachPoint != null)
@@ -209,6 +238,13 @@ public class KeseController : MonoBehaviour
             Vector3 screenPos = Input.mousePosition;
             if (IsPointerOverCoin(screenPos))
                 OnCoinTouchDown(screenPos);
+            else if (IsPointerOverCalculatorButton(screenPos))
+            {
+                // Let the button handle its own click event
+                // Don't close the calculator
+            }
+            else if (!IsPointerOverHesapMakinesi(screenPos))
+                OnOtherClickDetected();
         }
         else if (Input.GetMouseButton(0))
         {
@@ -233,6 +269,13 @@ public class KeseController : MonoBehaviour
             case TouchPhase.Began:
                 if (IsPointerOverCoin(screenPos))
                     OnCoinTouchDown(screenPos);
+                else if (IsPointerOverCalculatorButton(screenPos))
+                {
+                    // Let the button handle its own click event
+                    // Don't close the calculator
+                }
+                else if (!IsPointerOverHesapMakinesi(screenPos))
+                    OnOtherClickDetected();
                 break;
             case TouchPhase.Moved:
             case TouchPhase.Stationary:
@@ -259,6 +302,66 @@ public class KeseController : MonoBehaviour
         {
             if (hit.collider != null && hit.collider.gameObject == currentCoin)
                 return true;
+        }
+        return false;
+    }
+    
+    /// <summary>
+    /// Checks for hesap makinesi timer logic
+    /// </summary>
+    private void CheckHesapMakinesiTimer()
+    {
+        // Removed automatic closing when coin returns to start
+        // Hesap makinesi will only close when something else is clicked
+    }
+    
+    /// <summary>
+    /// Called when something other than the coin is clicked
+    /// </summary>
+    private void OnOtherClickDetected()
+    {
+        if (hesapMakinesiController != null)
+        {
+            Debug.Log("[KeseController] Something else was clicked, force closing hesap makinesi");
+            hesapMakinesiController.ForceClose();
+        }
+    }
+    
+    /// <summary>
+    /// Checks if the pointer is over the hesap makinesi
+    /// </summary>
+    private bool IsPointerOverHesapMakinesi(Vector3 screenPos)
+    {
+        if (hesapMakinesiController == null) return false;
+        
+        Ray ray = Camera.main.ScreenPointToRay(screenPos);
+        RaycastHit hit;
+        if (Physics.Raycast(ray, out hit))
+        {
+            // Check if the hit object is the hesap makinesi
+            if (hit.collider.gameObject == hesapMakinesiController.gameObject)
+                return true;
+        }
+        return false;
+    }
+    
+    /// <summary>
+    /// Checks if the pointer is over any calculator button
+    /// </summary>
+    private bool IsPointerOverCalculatorButton(Vector3 screenPos)
+    {
+        if (hesapMakinesiController == null) return false;
+        
+        Ray ray = Camera.main.ScreenPointToRay(screenPos);
+        RaycastHit[] hits = Physics.RaycastAll(ray);
+        
+        foreach (RaycastHit hit in hits)
+        {
+            // Check if the hit object is a calculator button
+            if (hesapMakinesiController.IsPointerOverCalculatorButton(hit.collider.gameObject))
+            {
+                return true;
+            }
         }
         return false;
     }
@@ -305,6 +408,11 @@ public class KeseController : MonoBehaviour
         shouldHandFollowCoin = false;
         handApproachingReachPoint = true; // Start approach
         dragTargetPosition = ScreenToWorld(screenPos);
+        
+        // Start timer for hesap makinesi
+        coinTouchStartTime = Time.time;
+        coinIsBeingHeld = true;
+        Debug.Log("[KeseController] Coin touch started, timer begins for hesap makinesi");
     }
 
     /// <summary>
@@ -324,9 +432,25 @@ public class KeseController : MonoBehaviour
         if (!isDraggingCoin || currentCoin == null) return;
         isDraggingCoin = false;
 
+        // Check for quick drop for hesap makinesi
+        if (coinIsBeingHeld)
+        {
+            float holdTime = Time.time - coinTouchStartTime;
+            coinIsBeingHeld = false;
+            
+            Debug.Log($"[KeseController] Coin dropped after {holdTime:F2} seconds");
+            
+            // If coin was held for a short time, notify hesap makinesi
+            if (holdTime <= quickDropTimeThreshold && hesapMakinesiController != null)
+            {
+                Debug.Log($"[KeseController] Quick drop detected! Notifying hesap makinesi");
+                hesapMakinesiController.OnQuickDropDetected();
+            }
+        }
+
         float distToDest = Vector3.Distance(currentCoin.transform.position, coinDestinationPoint.position);
 
-        if (distToDest <= acceptRadius)
+        if (distToDest <= acceptRadius && coinTokenData.Count > 0)
         {
             // Accept: move coin and hand to destination, play pouch accept, reset coin
             shouldHandFollowCoin = false;
@@ -353,8 +477,21 @@ public class KeseController : MonoBehaviour
         {
             Vector3 spawnOrigin = coinDestinationPoint.position;
             float spawnScale = 1.5f; // Or any "big" scale you want
-            Debug.Log($"[KeseController] AcceptCoin: Spawning super power at {spawnOrigin} with scale {spawnScale}, coinAmount={coinAmount}");
-            SuperPowerSpawner.LocalInstance.ReadyToSpawnSuperPowers(1, spawnOrigin, spawnScale, coinAmount);
+            
+            // Use token data if available, otherwise use default coinAmount
+            int totalTokens = GetTotalTokenCount();
+            Debug.Log($"[KeseController] AcceptCoin: Spawning tokens at {spawnOrigin} with scale {spawnScale}, totalTokens={totalTokens}");
+            
+            if (coinTokenData.Count > 0)
+            {
+                // Spawn tokens based on calculator data
+                SpawnTokensFromCalculatorData(spawnOrigin, spawnScale);
+            }
+            else
+            {
+                // Use default behavior
+                SuperPowerSpawner.LocalInstance.ReadyToSpawnSuperPowers(1, spawnOrigin, spawnScale, coinAmount);
+            }
         }
         
         // Move coin and hand to destination together
@@ -431,6 +568,9 @@ public class KeseController : MonoBehaviour
         currentCoin.transform.position = coinStartPoint.position;
         currentCoin.transform.rotation = coinStartPoint.rotation;
         currentCoin.transform.localScale = Vector3.one * 1000; // or your intended scale
+
+        // Don't clear token data when coin is reset - keep it until calculator changes it
+        // ClearCoinTokenData();
 
         yield return new WaitForSeconds(0.25f); // Optional delay before fading in
 
@@ -551,6 +691,66 @@ public class KeseController : MonoBehaviour
         PlayPageChangeAnimation();
     }
 
+    /// <summary>
+    /// Receives token data from HesapMakinesiController
+    /// </summary>
+    public void SetCoinTokenData(List<TokenData> tokens)
+    {
+        coinTokenData.Clear();
+        coinTokenData.AddRange(tokens);
+        
+        Debug.Log($"[KeseController] Received token data: {tokens.Count} token types");
+        foreach (var token in tokens)
+        {
+            Debug.Log($"[KeseController] Token: {token.count}x {token.value} value");
+        }
+    }
+    
+    /// <summary>
+    /// Gets the total number of tokens from calculator data
+    /// </summary>
+    private int GetTotalTokenCount()
+    {
+        int total = 0;
+        foreach (var token in coinTokenData)
+        {
+            total += token.count;
+        }
+        return total;
+    }
+    
+    /// <summary>
+    /// Spawns tokens based on calculator data
+    /// </summary>
+    private void SpawnTokensFromCalculatorData(Vector3 spawnOrigin, float spawnScale)
+    {
+        if (SuperPowerSpawner.LocalInstance == null) return;
+        
+        Debug.Log($"[KeseController] Spawning tokens from calculator data");
+        
+        foreach (var token in coinTokenData)
+        {
+            for (int i = 0; i < token.count; i++)
+            {
+                // Spawn each token with its specific value
+                // You might need to modify SuperPowerSpawner to accept token values
+                SuperPowerSpawner.LocalInstance.ReadyToSpawnSuperPowers(1, spawnOrigin, spawnScale, token.value);
+            }
+        }
+        
+        // Clear token data after spawning
+        //coinTokenData.Clear();
+    }
+    
+    /// <summary>
+    /// Clears the coin token data (called when coin is reset)
+    /// </summary>
+    public void ClearCoinTokenData()
+    {
+        coinTokenData.Clear();
+        Debug.Log("[KeseController] Cleared coin token data");
+    }
+    
     private void OnDrawGizmosSelected()
     {
         if (coinDestinationPoint != null)
