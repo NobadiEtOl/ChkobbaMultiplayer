@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using TMPro;
 
 public class SuperPowerSpawner : MonoBehaviour
 {
@@ -24,6 +25,15 @@ public class SuperPowerSpawner : MonoBehaviour
     private Button falseActivateButton;
     private Button closeButton;
 
+    [Header("Gold System")]
+    [SerializeField] private TextMeshProUGUI goldDisplayText; // Gold display text
+    [SerializeField] private int startingGold = 20; // Starting gold amount
+    [SerializeField] private int maxGold = 100; // Maximum gold cap
+    
+    private int currentGold; // Current gold amount
+    private int playerNumber; // Local player number
+
+    
     [Header("InfoBox Animation Settings")]
     [SerializeField] private Transform infoBoxStartLocation; // Starting position for the info box
     [SerializeField] private float animationDuration = 0.5f; // Duration of the movement animation
@@ -55,6 +65,9 @@ public class SuperPowerSpawner : MonoBehaviour
         {
             infoBoxOriginalPosition = backgroundPanel.transform.position;
         }
+        
+        // Initialize gold system
+        InitializeGoldSystem();
     }
 
     void Update()
@@ -899,5 +912,199 @@ public class SuperPowerSpawner : MonoBehaviour
             }
         }
         NetworkRelay.Instance.ReportZaferPuaniServerRPC(playerNo, totalPoints);
+    }
+    
+    // ===== GOLD SYSTEM METHODS =====
+    
+    /// <summary>
+    /// Initializes the gold system
+    /// </summary>
+    private void InitializeGoldSystem()
+    {
+        currentGold = startingGold;
+        UpdateGoldDisplay();
+        Debug.Log($"[SuperPowerSpawner] Gold system initialized with {currentGold} gold");
+    }
+    
+    /// <summary>
+    /// Resets gold to starting amount (called when new game starts)
+    /// </summary>
+    public void ResetGoldToStarting()
+    {
+        currentGold = startingGold;
+        UpdateGoldDisplay();
+        Debug.Log($"[SuperPowerSpawner] Gold reset to {currentGold} (new game started)");
+    }
+    
+    /// <summary>
+    /// Updates the gold display text
+    /// </summary>
+    private void UpdateGoldDisplay()
+    {
+        if (goldDisplayText != null)
+        {
+            goldDisplayText.text = $"{currentGold}";
+        }
+    }
+    
+    /// <summary>
+    /// Adds gold to the player's balance
+    /// </summary>
+    public void AddGold(int amount)
+    {
+        currentGold = Mathf.Min(currentGold + amount, maxGold);
+        UpdateGoldDisplay();
+        Debug.Log($"[SuperPowerSpawner] Added {amount} gold. New balance: {currentGold}");
+    }
+    
+    /// <summary>
+    /// Spends gold if player has enough
+    /// </summary>
+    public bool SpendGold(int amount)
+    {
+        if (currentGold >= amount)
+        {
+            currentGold -= amount;
+            UpdateGoldDisplay();
+            Debug.Log($"[SuperPowerSpawner] Spent {amount} gold. New balance: {currentGold}");
+            return true;
+        }
+        else
+        {
+            Debug.Log($"[SuperPowerSpawner] Insufficient gold! Need {amount}, have {currentGold}");
+            OnInsufficientGoldFeedback();
+            return false;
+        }
+    }
+    
+    /// <summary>
+    /// Calculates the total value of cards in the center
+    /// </summary>
+    public int CalculateCenterCardsValue()
+    {
+        int totalValue = 0;
+        
+        // Add value of all center cards
+        foreach (var centerCard in GameManager.LocalInstance.centerCardsObjects)
+        {
+            CardInteraction cardInteraction = centerCard.GetComponent<CardInteraction>();
+            if (cardInteraction != null)
+            {
+                Debug.Log($"[SuperPowerSpawner] Center card: {cardInteraction.GetCardID()}");
+                totalValue += GetCardValue(cardInteraction.GetCardID());
+            }
+        }
+        
+        Debug.Log($"[SuperPowerSpawner] Center cards total value: {totalValue}");
+        return totalValue;
+    }
+    
+    /// <summary>
+    /// Gets the value of a card based on its ID
+    /// </summary>
+    private int GetCardValue(int[] cardID)
+    {
+        if (cardID == null || cardID.Length < 2) return 0;
+        
+        int suit = cardID[0];
+        int rank = cardID[1];
+        
+        return rank; // 2-10
+    }
+    
+    /// <summary>
+    /// Called when a capture happens locally
+    /// </summary>
+    public void OnLocalCapture(string playedCard)
+    {
+        int captureValue = CalculateCenterCardsValue();
+        captureValue += CardInteraction.cardLookup[playedCard].GetCardID()[1];
+        
+        // Check if it's 1v1 or 2v2 mode
+        Debug.Log($"[SuperPowerSpawner] Is2v2Mode: {Is2v2Mode()}"); 
+        if (Is2v2Mode())
+        {
+            // Share gold with teammate (50/50 split)
+            int sharedGold = captureValue / 2;
+            AddGold(sharedGold);
+            
+            // Send gold share to teammate via network
+            int teammateNumber = GetTeammateNumber();
+            GameManager.LocalInstance.networkRelay.ShareGoldWithTeammateServerRPC(teammateNumber, sharedGold);
+        }
+        else
+        {
+            // 1v1 mode - player gets full amount
+            AddGold(captureValue);
+        }
+        
+        Debug.Log($"[SuperPowerSpawner] Local capture! Value: {captureValue}, Gold added: {captureValue}");
+    }
+    
+    /// <summary>
+    /// Called when receiving gold from teammate in 2v2 mode
+    /// </summary>
+    public void ReceiveGoldFromTeammate(int amount)
+    {
+        AddGold(amount);
+        Debug.Log($"[SuperPowerSpawner] Received {amount} gold from teammate");
+    }
+    
+    /// <summary>
+    /// Checks if current game mode is 2v2
+    /// </summary>
+    private bool Is2v2Mode()
+    {
+        // You may need to adjust this based on how you determine game mode
+        // For now, assuming 2v2 if there are 4 players
+        Debug.Log($"[SuperPowerSpawner] Is2v2Mode: {DeckController.LocalInstance.playerCount}");    
+        return DeckController.LocalInstance != null && GameManager.LocalInstance.networkRelay != null && DeckController.LocalInstance.playerCount == 4;
+    }
+    
+    /// <summary>
+    /// Gets teammate number in 2v2 mode
+    /// </summary>
+    private int GetTeammateNumber()
+    {
+        // 0-2 and 1-3 are teammates
+        if (playerNumber == 0) return 2;
+        if (playerNumber == 1) return 3;
+        if (playerNumber == 2) return 0;
+        if (playerNumber == 3) return 1;
+        return -1;
+    }
+    
+    /// <summary>
+    /// Sets the local player number
+    /// </summary>
+    public void SetPlayerNumber(int number)
+    {
+        playerNumber = number;
+        Debug.Log($"[SuperPowerSpawner] Player number set to {number}");
+    }
+    
+    /// <summary>
+    /// Gets current gold amount
+    /// </summary>
+    public int GetCurrentGold()
+    {
+        return currentGold;
+    }
+    
+    /// <summary>
+    /// Checks if player has enough gold for a purchase
+    /// </summary>
+    public bool HasEnoughGold(int requiredAmount)
+    {
+        return currentGold >= requiredAmount;
+    }
+    
+    /// <summary>
+    /// Called when there's insufficient gold for a purchase
+    /// </summary>
+    private void OnInsufficientGoldFeedback()
+    {
+        // Empty function for feedback - you can fill this later
+        Debug.Log("[SuperPowerSpawner] Insufficient gold feedback triggered");
     }
 }

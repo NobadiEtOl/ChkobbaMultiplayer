@@ -345,6 +345,8 @@ public class GameManager : MonoBehaviour
     //Called when a card is selected in the player's hand
     private void CardSelected(string cardID)
     {
+        currentSelectedHandCard = cardID;
+
         if (isSunuDegisTokusActive)
         {
             // Only allow selecting a card outside your own hand for the second selection
@@ -399,7 +401,6 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        currentSelectedHandCard = cardID;
         SuperPowerSpawner.LocalInstance.SetActiveActivateButtonTrue();
     }
 
@@ -425,7 +426,8 @@ public class GameManager : MonoBehaviour
         SerializableCard serializableCard = new SerializableCard(centerCards);
 
         int sumValue = centerCards.Count > 0 ? centerCards.Last().Value[1] : 0;
-        int cardValue = CardInteraction.cardLookup[currentSelectedHandCard].GetCardID()[1];
+        int cardValue = CardInteraction.currentlySelectedCard.GetCardID()[1];
+        Debug.Log($"CardValue: {cardValue}, SumValue: {sumValue}");
 
         if (oynayamazsinActive)
         {
@@ -554,16 +556,58 @@ public class GameManager : MonoBehaviour
 
     public void GetCardThatCaptured(string playedCard, SerializableCard serializedCard, int playerNumber)
     {
-        Debug.Log("Discarding hand cards: " + movePlayedLocally);
-        if (!movePlayedLocally)
+        Debug.Log($"GameManager: Card {playedCard} captured cards for player {playerNumber}");
+        var cardDictionary = serializedCard.ToDictionary();
+
+        // Add captured cards to player's pool
+        if (cardDictionary != null)
         {
-            DiscardCapturedCards(playedCard, serializedCard, playerNumber);
+            // Convert SerializableCard to dictionary and get the card ID for the played card
+            
+            if (cardDictionary.ContainsKey(playedCard))
+            {
+                int[] cardID = cardDictionary[playedCard];
+                
+                // Create a GameObject for the captured card
+                GameObject capturedCard = Instantiate(cardBack, Vector3.zero, Quaternion.identity);
+                capturedCard.transform.SetParent(playerPoolTransforms[playerNumber]);
+                capturedCard.transform.localPosition = Vector3.zero;
+                capturedCard.transform.localScale = Vector3.one;
+                
+                // Add to center cards objects list
+                centerCardsObjects.Add(capturedCard);
+                
+                // Add to center cards dictionary
+                centerCards[playedCard] = cardID;
+                
+                Debug.Log($"[GameManager] Added capture card {playedCard} with value [{cardID[0]},{cardID[1]}] to center cards");
+            }
+            
+            // Add all captured cards to center cards dictionary for gold calculation
+            foreach (var kvp in cardDictionary)
+            {
+                if (!centerCards.ContainsKey(kvp.Key))
+                {
+                    centerCards[kvp.Key] = kvp.Value;
+                    Debug.Log($"[GameManager] Added captured card {kvp.Key} with value [{kvp.Value[0]},{kvp.Value[1]}] to center cards");
+                }
+            }
         }
-        else
+        
+        // Handle gold gain for local player
+        if (playerNumber == deckController.thisPlayerNumber && SuperPowerSpawner.LocalInstance != null)
         {
-            movePlayedLocally = false;
+            // Ensure the capture card is included in the center cards before calculating gold
+            // The capture card should already be in centerCards by now
+            Debug.Log($"[GameManager] Center cards before gold calculation: {centerCards.Count} cards");
+            foreach (var kvp in centerCards)
+            {
+                Debug.Log($"[GameManager] Center card: {kvp.Key} -> [{kvp.Value[0]}, {kvp.Value[1]}]");
+            }
+            SuperPowerSpawner.LocalInstance.OnLocalCapture(playedCard);
         }
     }
+
 
     public void DiscardCapturedCards(string playedCard, SerializableCard serializedCard, int playerNumber)
     {

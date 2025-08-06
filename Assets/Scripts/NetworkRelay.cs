@@ -230,6 +230,17 @@ public class NetworkRelay : NetworkBehaviour
         GameManager.LocalInstance.OnYandimAnamCardChanged(cardUniqueID);
     }
 
+    [ClientRpc(RequireOwnership = false)]
+    public void ReceiveGoldFromTeammateClientRPC(int goldAmount)
+    {
+        Debug.Log($"[NetworkRelay] Received {goldAmount} gold from teammate");
+        if (SuperPowerSpawner.LocalInstance != null)
+        {
+            SuperPowerSpawner.LocalInstance.ReceiveGoldFromTeammate(goldAmount);
+        }
+    } 
+
+
     //ServerRPC
     [ServerRpc(RequireOwnership = false)]
     public void NotifyDealCenterFinishedServerRPC(ulong clientId)
@@ -428,5 +439,18 @@ public class NetworkRelay : NetworkBehaviour
         server.SunuDegisBunuTokusSwap(myPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID, myHandIndex);
         UseSunuDegisBunuTokusClientRPC(myPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID, myHandIndex, readyToExit);
     }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void ShareGoldWithTeammateServerRPC(int teammateNumber, int goldAmount)
+    {
+        Debug.Log($"[NetworkRelay] Player sharing {goldAmount} gold with teammate {teammateNumber}");
+        // Server validation - just debug print for now
+        if (server != null)
+        {
+            // You can add server-side validation here if needed
+            Debug.Log($"[NetworkRelay] Server validated gold sharing: {goldAmount} to player {teammateNumber}");
+        }
+    }
+
 
 }

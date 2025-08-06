@@ -728,14 +728,36 @@ public class KeseController : MonoBehaviour
         
         Debug.Log($"[KeseController] Spawning tokens from calculator data");
         
+        // Calculate total cost
+        int totalCost = 0;
         foreach (var token in coinTokenData)
         {
-            for (int i = 0; i < token.count; i++)
+            totalCost += token.value * token.count;
+        }
+        
+        // Check if player has enough gold
+        if (SuperPowerSpawner.LocalInstance.HasEnoughGold(totalCost))
+        {
+            // Spend the gold
+            SuperPowerSpawner.LocalInstance.SpendGold(totalCost);
+            
+            // Spawn the tokens
+            foreach (var token in coinTokenData)
             {
-                // Spawn each token with its specific value
-                // You might need to modify SuperPowerSpawner to accept token values
-                SuperPowerSpawner.LocalInstance.ReadyToSpawnSuperPowers(1, spawnOrigin, spawnScale, token.value);
+                for (int i = 0; i < token.count; i++)
+                {
+                    // Spawn each token with its specific value
+                    SuperPowerSpawner.LocalInstance.ReadyToSpawnSuperPowers(1, spawnOrigin, spawnScale, token.value);
+                }
             }
+            
+            Debug.Log($"[KeseController] Successfully spent {totalCost} gold and spawned tokens");
+        }
+        else
+        {
+            // Not enough gold - return coin to start
+            Debug.Log($"[KeseController] Insufficient gold! Need {totalCost}, have {SuperPowerSpawner.LocalInstance.GetCurrentGold()}");
+            ReturnCoin();
         }
         
         // Clear token data after spawning

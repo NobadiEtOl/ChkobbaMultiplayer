@@ -66,7 +66,7 @@ public class CardInteraction : MonoBehaviour
     void Start()
     {
         //InitializeCard();
-        StopAutoRotate(); // Ensure auto-rotation is stopped at the start
+        StartCoroutine(StopAutoRotate()); // Ensure auto-rotation is stopped at the start
     }
 
     void Update()
@@ -261,12 +261,19 @@ public class CardInteraction : MonoBehaviour
 
     public void OnTouchUp()
     {
+        StartCoroutine(OnTouchUpCoroutine());
+    }
+    
+    public IEnumerator OnTouchUpCoroutine()
+    {
+        // Kill all active DOTween animations on this card before proceeding
+        //yield return StartCoroutine(WaitForAllTweens());
         // Prevent touch up while swap powers are active
         if (stopPower)
-            return;
+            yield return null;
 
         Debug.Log("OnTouchUp called for card: " + gameObject.name);
-        if (!isDragging) return;
+        if (!isDragging) yield return null;
 
         isDragging = false;
 
@@ -281,7 +288,8 @@ public class CardInteraction : MonoBehaviour
             {
                 // Invoke OnCardsPlayed
                 //Debug.Log("OnCardsPlayed invoked!");
-                StopAutoRotate(); // Stop auto-rotation when the card is played
+                yield return StartCoroutine(StopAutoRotate()); // Stop auto-rotation when the card is played
+                
                 OnCardsPlayed?.Invoke(this.uniqueCardInstanceID, this.gameObject, GameManager.currentPlayerNo);
 
                 if (activeCardIndicator != null)
@@ -325,16 +333,36 @@ public class CardInteraction : MonoBehaviour
 
         //transform.DOKill(); // Stop any previous tweens
         popSequence = DOTween.Sequence();
-        popSequence.Append(transform.DOScale(transform.localScale * 1.25f, 0.1f).SetLoops(2, LoopType.Yoyo));
-        popSequence.Append(transform.DOScale(transform.localScale * 1.1f, 0.1f).SetLoops(2, LoopType.Yoyo));
+        // Scale up to 1.25x
+        popSequence.Append(transform.DOScale(transform.localScale * 1.25f, 0.1f));
+        // Scale back to original
+        popSequence.Append(transform.DOScale(transform.localScale, 0.1f));
+        // Scale up to 1.1x
+        popSequence.Append(transform.DOScale(transform.localScale * 1.1f, 0.1f));
+        // Scale back to original
+        popSequence.Append(transform.DOScale(transform.localScale, 0.1f));
+
         // Or for a jiggle:
         jiggleSequence = DOTween.Sequence();
-        jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, 15), 0.025f).SetLoops(2, LoopType.Yoyo));
-        jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, -12), 0.025f).SetLoops(2, LoopType.Yoyo));
-        jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, 13), 0.025f).SetLoops(2, LoopType.Yoyo));
-        jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, -16), 0.025f).SetLoops(2, LoopType.Yoyo));
-        jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, 17), 0.025f).SetLoops(2, LoopType.Yoyo));
-        jiggleSequence.Append(transform.DORotate(transform.rotation.eulerAngles + new Vector3(0, 0, -17), 0.025f).SetLoops(2, LoopType.Yoyo));
+        var startEuler = transform.rotation.eulerAngles;
+        // +15, back
+        jiggleSequence.Append(transform.DORotate(startEuler + new Vector3(0, 0, 15), 0.025f));
+        jiggleSequence.Append(transform.DORotate(startEuler, 0.025f));
+        // -12, back
+        jiggleSequence.Append(transform.DORotate(startEuler + new Vector3(0, 0, -12), 0.025f));
+        jiggleSequence.Append(transform.DORotate(startEuler, 0.025f));
+        // +13, back
+        jiggleSequence.Append(transform.DORotate(startEuler + new Vector3(0, 0, 13), 0.025f));
+        jiggleSequence.Append(transform.DORotate(startEuler, 0.025f));
+        // -16, back
+        jiggleSequence.Append(transform.DORotate(startEuler + new Vector3(0, 0, -16), 0.025f));
+        jiggleSequence.Append(transform.DORotate(startEuler, 0.025f));
+        // +17, back
+        jiggleSequence.Append(transform.DORotate(startEuler + new Vector3(0, 0, 17), 0.025f));
+        jiggleSequence.Append(transform.DORotate(startEuler, 0.025f));
+        // -17, back
+        jiggleSequence.Append(transform.DORotate(startEuler + new Vector3(0, 0, -17), 0.025f));
+        jiggleSequence.Append(transform.DORotate(startEuler, 0.025f));
     }
 
 
@@ -485,11 +513,11 @@ public class CardInteraction : MonoBehaviour
     }
 
 
-    public void StopAutoRotate()
+    public IEnumerator StopAutoRotate()
     {
         autoRotateActive = false;
+        yield return StartCoroutine(WaitForAllTweens());
         KillAllTweens();
-        WaitForAllTweens();
     }
 
     /// <summary>
@@ -530,6 +558,25 @@ public class CardInteraction : MonoBehaviour
 
         // Kill auto-rotate sequence if active
         if (autoRotateSequence != null && autoRotateSequence.IsActive()) autoRotateSequence.Kill();
+    }
+    
+    public void KillAllTweens(int a)
+    {
+        // Force complete any active sequences immediately
+        if (popSequence != null && popSequence.IsActive())
+        {
+            popSequence.Complete(true); // true = with callbacks
+            popSequence = null;
+        }
+        
+        if (jiggleSequence != null && jiggleSequence.IsActive())
+        {
+            jiggleSequence.Complete(true);
+            jiggleSequence = null;
+        }
+        
+        // Also force complete any other tweens on this object
+        DOTween.Complete(this);
     }
 
     public IEnumerator WaitForAllTweens()

@@ -24,7 +24,7 @@ public class DeckController : MonoBehaviour
     private List<CardInteraction> cardInteractionList; // List to store CardInteraction references
     public List<Transform> playerHandTransforms = new List<Transform>();
     private List<Transform> playerPoolTransforms = new List<Transform>();
-    private Transform centerTransform;
+    public Transform centerTransform;
     private List<Transform> playerPiştiPoolTransforms = new List<Transform>();
     private int relativeIndex = 0;
     public int playerCount = 0;
@@ -36,7 +36,7 @@ public class DeckController : MonoBehaviour
 
     private int initialScale = 750; // Initial scale for the cards
     private int normalScale = 500; // Scale for the normal cards
-    private int centerScale = 900; // Scale for the center cards
+    public int centerScale = 900; // Scale for the center cards
     private int myCardsScale = 1200; // Scale for the player's cards
     
     //private GameObject cardPool;
