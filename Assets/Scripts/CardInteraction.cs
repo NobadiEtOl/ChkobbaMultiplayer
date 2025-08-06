@@ -280,6 +280,7 @@ public class CardInteraction : MonoBehaviour
         // Calculate the distance the card has moved in screen space
         float distanceMoved = Vector3.Distance(Camera.main.WorldToScreenPoint(transform.position), originalScreenPosition);
 
+
         // Try to add the card to the center if moved enough distance
         if (distanceMoved > snapBackThreshold)
         {
@@ -289,6 +290,8 @@ public class CardInteraction : MonoBehaviour
                 // Invoke OnCardsPlayed
                 //Debug.Log("OnCardsPlayed invoked!");
                 yield return StartCoroutine(StopAutoRotate()); // Stop auto-rotation when the card is played
+
+                yield return new WaitForSeconds(0.05f);
                 
                 OnCardsPlayed?.Invoke(this.uniqueCardInstanceID, this.gameObject, GameManager.currentPlayerNo);
 

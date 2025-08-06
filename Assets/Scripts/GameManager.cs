@@ -426,7 +426,7 @@ public class GameManager : MonoBehaviour
         SerializableCard serializableCard = new SerializableCard(centerCards);
 
         int sumValue = centerCards.Count > 0 ? centerCards.Last().Value[1] : 0;
-        int cardValue = CardInteraction.currentlySelectedCard.GetCardID()[1];
+        int cardValue = CardInteraction.cardLookup[currentSelectedHandCard].GetCardID()[1];
         Debug.Log($"CardValue: {cardValue}, SumValue: {sumValue}");
 
         if (oynayamazsinActive)
