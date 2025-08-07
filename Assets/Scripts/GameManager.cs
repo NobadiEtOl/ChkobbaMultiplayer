@@ -12,6 +12,60 @@ using UnityEngine.EventSystems;
 
 public class GameManager : MonoBehaviour
 {
+    // Static logging system for collecting debug messages
+    private static string debugLog = "";
+    private static bool loggingEnabled = true;
+
+    public static void AddToDebugLog(string message)
+    {
+        if (loggingEnabled)
+        {
+            debugLog += $"[{DateTime.Now:HH:mm:ss.fff}] {message}\n";
+        }
+    }
+
+    public static void AddToDebugLogError(string message)
+    {
+        if (loggingEnabled)
+        {
+            debugLog += $"[{DateTime.Now:HH:mm:ss.fff}] ERROR: {message}\n";
+        }
+    }
+
+    public static void AddToDebugLogWarning(string message)
+    {
+        if (loggingEnabled)
+        {
+            debugLog += $"[{DateTime.Now:HH:mm:ss.fff}] WARNING: {message}\n";
+        }
+    }
+
+    [ContextMenu("Print All Debug Logs")]
+    public void PrintAllDebugLogs()
+    {
+        if (string.IsNullOrEmpty(debugLog))
+        {
+            Debug.Log("No debug logs to print. Use 'Reset Debug Logs' to start fresh logging.");
+            return;
+        }
+        
+        Debug.Log("=== DEBUG LOG START ===\n" + debugLog + "=== DEBUG LOG END ===");
+    }
+
+    [ContextMenu("Reset Debug Logs")]
+    public void ResetDebugLogs()
+    {
+        debugLog = "";
+        Debug.Log("Debug logs reset. New logs will be collected.");
+    }
+
+    [ContextMenu("Toggle Debug Logging")]
+    public void ToggleDebugLogging()
+    {
+        loggingEnabled = !loggingEnabled;
+        Debug.Log($"Debug logging {(loggingEnabled ? "enabled" : "disabled")}");
+    }
+
     //Scripts
     public static GameManager LocalInstance { get; private set; }
     [SerializeField] private DeckController deckController;
@@ -44,6 +98,8 @@ public class GameManager : MonoBehaviour
     [SerializeField] public Transform centerTransform;
     bool alreadySubbed = false;
     public bool movePlayedLocally = false;
+    public bool isProcessingCapture = false;
+    private bool hasAlreadySentRPC = false;
     private GameObject waitingScreen;
     private GameObject mainScreen;
     private GameObject explosionObject;
@@ -64,6 +120,10 @@ public class GameManager : MonoBehaviour
 
     public void ResetForNewRound()
     {
+        AddToDebugLog("[GameManager] ResetForNewRound called");
+        AddToDebugLog($"[GameManager] currentSelectedHandCard before reset: {currentSelectedHandCard}");
+        AddToDebugLog($"[GameManager] CardInteraction.currentlySelectedCard before reset: {CardInteraction.currentlySelectedCard?.gameObject.name}");
+        
         foreach (var cardScript in cardInteractionsScripts)
             cardScript.ResetToOriginalCard();
         currentSelectedHandCard = null;
@@ -74,8 +134,14 @@ public class GameManager : MonoBehaviour
         if (centerCardIDList != null) centerCardIDList.Clear();
         if (myCards != null) myCards.Clear();
         turnTimer = 0f;
+        AddToDebugLog($"[GameManager] ResetForNewRound: Setting movePlayedLocally to false");
         movePlayedLocally = false;
+        hasAlreadySentRPC = false;
+        isProcessingCapture = false;
         // Set currentPlayerNo to the
+
+        AddToDebugLog($"[GameManager] currentSelectedHandCard after reset: {currentSelectedHandCard}");
+        AddToDebugLog($"[GameManager] CardInteraction.currentlySelectedCard after reset: {CardInteraction.currentlySelectedCard?.gameObject.name}");
 
         if (roundCount != 0)
         {
@@ -182,6 +248,8 @@ public class GameManager : MonoBehaviour
         if (Input.touchCount > 0)
         {
             Touch touch = Input.GetTouch(0);
+            AddToDebugLog($"[GameManager] Touch detected - Phase: {touch.phase}, Position: {touch.position}");
+            
             if (touch.phase == TouchPhase.Began)
             {
                 //if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject(touch.fingerId))
@@ -194,17 +262,20 @@ public class GameManager : MonoBehaviour
                 CardInteraction card = hit.collider.GetComponent<CardInteraction>();
                 if (touch.phase == TouchPhase.Began && card != null)
                 {
+                    AddToDebugLog($"[GameManager] Touch OnCardTouched called for card: {card.gameObject.name}");
                     card.OnCardTouched(touchPosition);
                     tempCard = card; // Store the card for later use
                 }
                 else if (card == null && touch.phase == TouchPhase.Began)
                 {
+                    AddToDebugLog($"[GameManager] Touch - No card found, calling TryStopShowcasePlayerPoolCards");
                     deckController.TryStopShowcasePlayerPoolCards();
                 }
                 else if (touch.phase == TouchPhase.Moved && tempCard != null)
                 {
                     if (CardInteraction.currentlySelectedCard == tempCard)
                     {
+                        AddToDebugLog($"[GameManager] Touch OnTouchDrag called for card: {tempCard.gameObject.name}");
                         tempCard.OnTouchDrag(touchPosition);
                     }
                 }
@@ -214,48 +285,15 @@ public class GameManager : MonoBehaviour
             {
                 if (CardInteraction.currentlySelectedCard == tempCard)
                 {
+                    AddToDebugLog($"[GameManager] Touch OnTouchUp called for card: {tempCard.gameObject.name}");
                     tempCard.OnTouchUp();
                 }
                 tempCard = null;
             }
         }
         
-        if (Input.GetMouseButtonDown(0) || Input.GetMouseButton(0))
-        {
-            Vector3 mousePosition = Input.mousePosition;
-            Ray ray = Camera.main.ScreenPointToRay(mousePosition);
-            if (Physics.Raycast(ray, out RaycastHit hit))
-            {
-                CardInteraction card = hit.collider.GetComponent<CardInteraction>();
-                if (Input.GetMouseButtonDown(0) && card != null)
-                {
-                    card.OnCardTouched(mousePosition);
-                    tempCard = card; // Store the card for later use
-                }
-                else if (card == null && Input.GetMouseButtonDown(0))
-                {
-                    //Debug.LogError("CardInteraction is null, trying to stop showcase player pool cards");
-                    deckController.TryStopShowcasePlayerPoolCards();
-                }
-                else if (Input.GetMouseButton(0) && tempCard != null)
-                {
-                    if (CardInteraction.currentlySelectedCard == tempCard)
-                    {
-                        tempCard.OnTouchDrag(mousePosition); // If you have this method/event
-                    }
-                }
-            }
-        }
-
-        else if (Input.GetMouseButtonUp(0))
-        {
-            if (CardInteraction.currentlySelectedCard != null)
-            {
-                CardInteraction.currentlySelectedCard.OnTouchUp();
-                //CardInteraction.currentlySelectedCard = null;
-                tempCard = null; // Reset the stored card
-            }
-        }
+        // Mouse input handling removed - touch system handles both mobile and mouse input
+        // This prevents double processing of the same interaction
     }
 
     void FixedUpdate()
@@ -345,14 +383,20 @@ public class GameManager : MonoBehaviour
     //Called when a card is selected in the player's hand
     private void CardSelected(string cardID)
     {
+        AddToDebugLog($"[GameManager] CardSelected called with cardID: {cardID}");
+        AddToDebugLog($"[GameManager] currentSelectedHandCard before setting: {currentSelectedHandCard}");
+        
         currentSelectedHandCard = cardID;
+        
+        AddToDebugLog($"[GameManager] currentSelectedHandCard after setting: {currentSelectedHandCard}");
 
         if (isSunuDegisTokusActive)
         {
+            AddToDebugLog($"[GameManager] ŞunuDeğişTokuş is active, checking if card is from own hand");
             // Only allow selecting a card outside your own hand for the second selection
             if (myCards.Contains(cardID))
             {
-                Debug.LogWarning("You must select a card from another player's hand for ŞunuDeğişTokuş.");
+                AddToDebugLogWarning("You must select a card from another player's hand for ŞunuDeğişTokuş.");
                 return;
             }
             // Send swap request to server
@@ -365,16 +409,17 @@ public class GameManager : MonoBehaviour
         // ŞunuDeğişBunuTokuş logic
         if (isSunuDegisBunuTokusActive)
         {
+            AddToDebugLog($"[GameManager] ŞunuDeğişBunuTokuş is active, checking if card is from own hand");
             // Only allow selecting a card from another player's hand
             if (myCards.Contains(cardID))
             {
-                Debug.LogWarning("You must select a card from another player's hand for ŞunuDeğişBunuTokuş.");
+                AddToDebugLogWarning("You must select a card from another player's hand for ŞunuDeğişBunuTokuş.");
                 return;
             }
             // Get my hand snapshot and current swap index
             if (sunuDegisBunuTokusMyHandSnapshot == null || sunuDegisBunuTokusSwapIndex >= sunuDegisBunuTokusMyHandSnapshot.Count)
             {
-                Debug.LogWarning("No more cards to swap for ŞunuDeğişBunuTokuş.");
+                AddToDebugLogWarning("No more cards to swap for ŞunuDeğişBunuTokuş.");
                 isSunuDegisBunuTokusActive = false;
                 return;
             }
@@ -392,27 +437,44 @@ public class GameManager : MonoBehaviour
                 isSunuDegisBunuTokusActive = false;
                 sunuDegisBunuTokusMyHandSnapshot = null;
                 sunuDegisBunuTokusSwapIndex = 0;
-                Debug.Log("ŞunuDeğişBunuTokuş: All swaps done.");
+                AddToDebugLog("ŞunuDeğişBunuTokuş: All swaps done.");
             }
             else
             {
-                Debug.Log($"ŞunuDeğişBunuTokuş: Select card {sunuDegisBunuTokusSwapIndex + 1} to swap.");
+                AddToDebugLog($"ŞunuDeğişBunuTokuş: Select card {sunuDegisBunuTokusSwapIndex + 1} to swap.");
             }
             return;
         }
 
+        AddToDebugLog($"[GameManager] CardSelected completed, calling SuperPowerSpawner.SetActiveActivateButtonTrue()");
         SuperPowerSpawner.LocalInstance.SetActiveActivateButtonTrue();
     }
 
     //Called when the player tries to play the selected card with one or two center cards
     private void CardsPlayed(string cardID, GameObject cardObject, int playerNumber)
     {
+        AddToDebugLog($"[GameManager] CardsPlayed called with cardID: {cardID}, playerNumber: {playerNumber}");
+        AddToDebugLog($"[GameManager] currentSelectedHandCard at start of CardsPlayed: {currentSelectedHandCard}");
+        AddToDebugLog($"[GameManager] CardInteraction.currentlySelectedCard at start of CardsPlayed: {CardInteraction.currentlySelectedCard?.gameObject.name}");
+        
         CheckIfLegal(playerNumber);
     }
 
     //Checks if played move is legal before sending it to the server
     public void CheckIfLegal(int playerNumber)
     {
+        AddToDebugLog($"[GameManager] CheckIfLegal called with playerNumber: {playerNumber}");
+        AddToDebugLog($"[GameManager] hasAlreadySentRPC: {hasAlreadySentRPC}");
+        
+        if (hasAlreadySentRPC)
+        {
+            AddToDebugLog($"[GameManager] RPC already sent, skipping duplicate call");
+            return;
+        }
+        
+        AddToDebugLog($"[GameManager] currentSelectedHandCard at start of CheckIfLegal: {currentSelectedHandCard}");
+        AddToDebugLog($"[GameManager] CardInteraction.currentlySelectedCard at start of CheckIfLegal: {CardInteraction.currentlySelectedCard?.gameObject.name}");
+        
         //if(currentSelectedHandCard[0] == 0 || currentSelectedHandCard[1]==0)return false;
 
         Dictionary<string, int[]> cardsToRemove = new Dictionary<string, int[]>();
@@ -426,31 +488,76 @@ public class GameManager : MonoBehaviour
         SerializableCard serializableCard = new SerializableCard(centerCards);
 
         int sumValue = centerCards.Count > 0 ? centerCards.Last().Value[1] : 0;
+        
+        AddToDebugLog($"[GameManager] About to access CardInteraction.cardLookup[currentSelectedHandCard]");
+        AddToDebugLog($"[GameManager] currentSelectedHandCard value: {currentSelectedHandCard}");
+        AddToDebugLog($"[GameManager] CardInteraction.cardLookup contains key: {CardInteraction.cardLookup.ContainsKey(currentSelectedHandCard)}");
+        
+        if (currentSelectedHandCard == null)
+        {
+            AddToDebugLogError($"[GameManager] ERROR: currentSelectedHandCard is NULL!");
+            return;
+        }
+        
+        if (!CardInteraction.cardLookup.ContainsKey(currentSelectedHandCard))
+        {
+            AddToDebugLogError($"[GameManager] ERROR: CardInteraction.cardLookup does not contain key: {currentSelectedHandCard}");
+            AddToDebugLogError($"[GameManager] Available keys in cardLookup: {string.Join(", ", CardInteraction.cardLookup.Keys)}");
+            return;
+        }
+        
         int cardValue = CardInteraction.cardLookup[currentSelectedHandCard].GetCardID()[1];
-        Debug.Log($"CardValue: {cardValue}, SumValue: {sumValue}");
+        AddToDebugLog($"CardValue: {cardValue}, SumValue: {sumValue}");
 
         if (oynayamazsinActive)
         {
-            PlayCardToCenter(currentSelectedHandCard, CardInteraction.cardLookup[currentSelectedHandCard].GetCardID());
+            AddToDebugLog($"[GameManager] oynayamazsinActive is true, playing card to center");
             movePlayedLocally = true;
+            PlayCardToCenter(currentSelectedHandCard, CardInteraction.cardLookup[currentSelectedHandCard].GetCardID());
+            
         }
         else if (cardValue == sumValue || (cardValue == 11 && sumValue != 0))
         {
+            AddToDebugLog($"[GameManager] Card can capture, calling DiscardCapturedCards");
+            AddToDebugLog($"[GameManager] currentSelectedHandCard before calling DiscardCapturedCards: {currentSelectedHandCard}");
+            AddToDebugLog($"[GameManager] movePlayedLocally before calling DiscardCapturedCards: {movePlayedLocally}");
+            isProcessingCapture = true;
+            AddToDebugLog($"[GameManager] isProcessingCapture set to true");
+            AddToDebugLog($"[GameManager] About to call DiscardCapturedCards with playedCard: {currentSelectedHandCard}");
             DiscardCapturedCards(currentSelectedHandCard, serializableCard, playerNumber);
-            movePlayedLocally = true;
+            AddToDebugLog($"[GameManager] DiscardCapturedCards completed, currentSelectedHandCard: {currentSelectedHandCard}");
+            AddToDebugLog($"[GameManager] movePlayedLocally after DiscardCapturedCards: {movePlayedLocally}");
+            isProcessingCapture = false;
+            AddToDebugLog($"[GameManager] isProcessingCapture set to false");
+            
         }
         else
         {
-            PlayCardToCenter(currentSelectedHandCard, CardInteraction.cardLookup[currentSelectedHandCard].GetCardID());
+            AddToDebugLog($"[GameManager] Card cannot capture, playing to center");
             movePlayedLocally = true;
+            PlayCardToCenter(currentSelectedHandCard, CardInteraction.cardLookup[currentSelectedHandCard].GetCardID());
+            
         }
 
+        AddToDebugLog($"[GameManager] About to call SendMoveToServerRPC");
+        AddToDebugLog($"[GameManager] currentSelectedHandCard before RPC call: {currentSelectedHandCard}");
+        AddToDebugLog($"[GameManager] movePlayedLocally before RPC call: {movePlayedLocally}");
+        AddToDebugLog($"[GameManager] serializableCard contains {serializableCard.ToDictionary().Count} cards");
+        hasAlreadySentRPC = true;
+        AddToDebugLog($"[GameManager] Set hasAlreadySentRPC to true");
         networkRelay.SendMoveToServerRPC(currentSelectedHandCard, serializableCard, playerNumber, sumValue);
+        AddToDebugLog($"[GameManager] SendMoveToServerRPC completed");
+        AddToDebugLog($"[GameManager] currentSelectedHandCard after RPC call: {currentSelectedHandCard}");
         myCards.Remove(currentSelectedHandCard);
 
+        AddToDebugLog($"[GameManager] About to set CardInteraction.currentlySelectedCard to null");
         CardInteraction.currentlySelectedCard = null;
+        AddToDebugLog($"[GameManager] About to call SetCurrentSelectedHandCardNull()");
         SetCurrentSelectedHandCardNull();
+        AddToDebugLog($"[GameManager] About to call SuperPowerSpawner.CheckIfBackgroundPanelOpen()");
         SuperPowerSpawner.LocalInstance.CheckIfBackgroundPanelOpen();
+        
+        AddToDebugLog($"[GameManager] CheckIfLegal completed successfully");
 
     }
 
@@ -556,6 +663,9 @@ public class GameManager : MonoBehaviour
 
     public void GetCardThatCaptured(string playedCard, SerializableCard serializedCard, int playerNumber)
     {
+        AddToDebugLog($"[GameManager] GetCardThatCaptured called with playedCard: {playedCard}, playerNumber: {playerNumber}");
+        AddToDebugLog($"[GameManager] This is local player: {playerNumber == deckController.thisPlayerNumber}");
+        
         Debug.Log($"GameManager: Card {playedCard} captured cards for player {playerNumber}");
         var cardDictionary = serializedCard.ToDictionary();
 
@@ -580,6 +690,7 @@ public class GameManager : MonoBehaviour
                 // Add to center cards dictionary
                 centerCards[playedCard] = cardID;
                 
+                AddToDebugLog($"[GameManager] Added capture card {playedCard} with value [{cardID[0]},{cardID[1]}] to center cards");
                 Debug.Log($"[GameManager] Added capture card {playedCard} with value [{cardID[0]},{cardID[1]}] to center cards");
             }
             
@@ -589,9 +700,17 @@ public class GameManager : MonoBehaviour
                 if (!centerCards.ContainsKey(kvp.Key))
                 {
                     centerCards[kvp.Key] = kvp.Value;
+                    AddToDebugLog($"[GameManager] Added captured card {kvp.Key} with value [{kvp.Value[0]},{kvp.Value[1]}] to center cards");
                     Debug.Log($"[GameManager] Added captured card {kvp.Key} with value [{kvp.Value[0]},{kvp.Value[1]}] to center cards");
                 }
             }
+        }
+        
+        // For non-local players, we need to call DiscardCapturedCards to move the cards to their pool
+        if (playerNumber != deckController.thisPlayerNumber)
+        {
+            AddToDebugLog($"[GameManager] Calling DiscardCapturedCards for non-local player {playerNumber}");
+            DiscardCapturedCards(playedCard, serializedCard, playerNumber);
         }
         
         // Handle gold gain for local player
@@ -599,9 +718,11 @@ public class GameManager : MonoBehaviour
         {
             // Ensure the capture card is included in the center cards before calculating gold
             // The capture card should already be in centerCards by now
+            AddToDebugLog($"[GameManager] Center cards before gold calculation: {centerCards.Count} cards");
             Debug.Log($"[GameManager] Center cards before gold calculation: {centerCards.Count} cards");
             foreach (var kvp in centerCards)
             {
+                AddToDebugLog($"[GameManager] Center card: {kvp.Key} -> [{kvp.Value[0]}, {kvp.Value[1]}]");
                 Debug.Log($"[GameManager] Center card: {kvp.Key} -> [{kvp.Value[0]}, {kvp.Value[1]}]");
             }
             SuperPowerSpawner.LocalInstance.OnLocalCapture(playedCard);
@@ -611,19 +732,43 @@ public class GameManager : MonoBehaviour
 
     public void DiscardCapturedCards(string playedCard, SerializableCard serializedCard, int playerNumber)
     {
-        StartCoroutine(deckController.DiscardCapturedCards(playedCard, serializedCard, playerNumber));
+        AddToDebugLog($"[GameManager] DiscardCapturedCards called with playedCard: {playedCard}, playerNumber: {playerNumber}");
+        AddToDebugLog($"[GameManager] currentPlayerNo: {currentPlayerNo}, deckController.thisPlayerNumber: {deckController.thisPlayerNumber}");
+        AddToDebugLog($"[GameManager] This is local player: {playerNumber == deckController.thisPlayerNumber}");
+        AddToDebugLog($"[GameManager] serializedCard contains {serializedCard.ToDictionary().Count} cards");
+        
+        if (playerNumber == deckController.thisPlayerNumber)
+        {
+            AddToDebugLog($"[GameManager] Processing local player's capture, calling deckController.DiscardCapturedCards for visual processing");
+            AddToDebugLog($"[GameManager] Setting movePlayedLocally to true before visual processing");
+            movePlayedLocally = true;
+            StartCoroutine(deckController.DiscardCapturedCards(playedCard, serializedCard, playerNumber));
+        }
+        else
+        {
+            AddToDebugLog($"[GameManager] This is non-local player's capture, calling deckController.DiscardCapturedCards");
+            StartCoroutine(deckController.DiscardCapturedCards(playedCard, serializedCard, playerNumber));
+        }
     }
 
     public void GetCardAddedToCenter(string uniqueCardID, int[] cardID)
     {
+        AddToDebugLog($"[GameManager] GetCardAddedToCenter called with uniqueCardID: {uniqueCardID}");
+        AddToDebugLog($"[GameManager] GetCardAddedToCenter: movePlayedLocally = {movePlayedLocally}");
+        AddToDebugLog($"[GameManager] GetCardAddedToCenter: isProcessingCapture = {isProcessingCapture}");
         Debug.Log("Discarding hand cards: " + movePlayedLocally);
         if (!movePlayedLocally)
         {
             PlayCardToCenter(uniqueCardID, cardID);
         }
+        else if (!isProcessingCapture)
+        {
+            AddToDebugLog($"[GameManager] GetCardAddedToCenter: Setting movePlayedLocally to false");
+            movePlayedLocally = false;
+        }
         else
         {
-            movePlayedLocally = false;
+            AddToDebugLog($"[GameManager] GetCardAddedToCenter: Skipping movePlayedLocally reset because isProcessingCapture is true");
         }
     }
 
@@ -636,6 +781,9 @@ public class GameManager : MonoBehaviour
     private int turnCounter;
     public void UpdateCurrentPlayer(int playerNumber, int turnC)
     {
+        AddToDebugLog($"[GameManager] UpdateCurrentPlayer called with playerNumber: {playerNumber}, turnC: {turnC}");
+        AddToDebugLog($"[GameManager] Previous currentPlayerNo: {currentPlayerNo}, deckController.thisPlayerNumber: {deckController.thisPlayerNumber}");
+        
         // --- Use relative index logic for turn indication ---
         int relativeIndex = (playerNumber - DeckController.LocalInstance.thisPlayerNumber + DeckController.LocalInstance.playerCount) % DeckController.LocalInstance.playerCount;
         if (ElHolderScript.LocalInstance != null)
@@ -645,6 +793,7 @@ public class GameManager : MonoBehaviour
 
         // Then update the current player
         currentPlayerNo = playerNumber;
+        AddToDebugLog($"[GameManager] Updated currentPlayerNo to: {currentPlayerNo}");
         turnCounter = turnC;
     }
 
@@ -869,9 +1018,10 @@ public class GameManager : MonoBehaviour
 
     public void TellServerTurnEnded()
     {
-        if (turnCounter == 47) NotifyZaferPuaniAtRoundEnd();
+        AddToDebugLog($"[GameManager] TellServerTurnEnded called, currentPlayerNo: {currentPlayerNo}, thisPlayerNumber: {deckController.thisPlayerNumber}");
+        AddToDebugLog($"[GameManager] hasAlreadySentRPC: {hasAlreadySentRPC}");
         networkRelay.NotifyTurnIsReadyToEndServerRPC();
-        //Debug.LogError("Turn ended");
+        AddToDebugLog($"[GameManager] NotifyTurnIsReadyToEndServerRPC called");
     }
 
     private void GetNecessaryTransforms()
@@ -1589,7 +1739,12 @@ public class GameManager : MonoBehaviour
 
     public void SetCurrentSelectedHandCardNull()
     {
+        AddToDebugLog($"[GameManager] SetCurrentSelectedHandCardNull called");
+        AddToDebugLog($"[GameManager] currentSelectedHandCard before setting to null: {currentSelectedHandCard}");
         currentSelectedHandCard = null;
+        hasAlreadySentRPC = false;
+        AddToDebugLog($"[GameManager] currentSelectedHandCard after setting to null: {currentSelectedHandCard}");
+        AddToDebugLog($"[GameManager] hasAlreadySentRPC reset to false");
     }
 
     public string GetCurrentSelectedHandCard()

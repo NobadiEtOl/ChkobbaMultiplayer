@@ -291,7 +291,7 @@ public class CardInteraction : MonoBehaviour
                 //Debug.Log("OnCardsPlayed invoked!");
                 yield return StartCoroutine(StopAutoRotate()); // Stop auto-rotation when the card is played
 
-                yield return new WaitForSeconds(0.05f);
+                //yield return new WaitForSeconds(1f);
                 
                 OnCardsPlayed?.Invoke(this.uniqueCardInstanceID, this.gameObject, GameManager.currentPlayerNo);
 

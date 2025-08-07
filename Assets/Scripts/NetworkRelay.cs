@@ -396,7 +396,10 @@ public class NetworkRelay : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void SendMoveToServerRPC(string selectedHandCard, SerializableCard serializableCard, int playerNumber, int sumValue)
     {
+        GameManager.AddToDebugLog($"[NetworkRelay] SendMoveToServerRPC called with selectedHandCard: {selectedHandCard}, playerNumber: {playerNumber}, sumValue: {sumValue}");
+        GameManager.AddToDebugLog($"[NetworkRelay] serializableCard contains {serializableCard.ToDictionary().Count} cards");
         server.GetMove(selectedHandCard, serializableCard, playerNumber, sumValue);
+        GameManager.AddToDebugLog($"[NetworkRelay] GetMove called on server");
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -420,6 +423,7 @@ public class NetworkRelay : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void NotifyTurnIsReadyToEndServerRPC()
     {
+        Debug.Log($"[NetworkRelay] NotifyTurnIsReadyToEndServerRPC called by client {OwnerClientId}");
         server.EndTurnCheck();
     }
 

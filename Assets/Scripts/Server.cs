@@ -393,8 +393,10 @@ public class Server : NetworkBehaviour
         //if(!singleDebuggingMode)
         //{
         readyToEndTurnCounter++;
+        Debug.Log($"[Server] EndTurnCheck called, readyToEndTurnCounter: {readyToEndTurnCounter}, connectedPlayerCount: {connectedPlayerCount}, currentPlayer: {currentPlayer}");
         if (readyToEndTurnCounter == connectedPlayerCount)
         {
+            Debug.Log($"[Server] All players ready, calling EndTurn()");
             EndTurn();
             readyToEndTurnCounter = 0;
         }
@@ -780,8 +782,28 @@ public class Server : NetworkBehaviour
 
     public void GetMove(string selectedHandCardUniqueID, SerializableCard serializableCard, int playerNumber, int sumValue)
     {
+        Debug.Log($"[Server] GetMove called with selectedHandCardUniqueID: {selectedHandCardUniqueID}, playerNumber: {playerNumber}, sumValue: {sumValue}");
+        Debug.Log($"[Server] allCardLookup contains key: {allCardLookup.ContainsKey(selectedHandCardUniqueID)}");
+        Debug.Log($"[Server] allCardLookup count: {allCardLookup.Count}");
+        Debug.Log($"[Server] selectedHandCardUniqueID is null: {selectedHandCardUniqueID == null}");
+        Debug.Log($"[Server] selectedHandCardUniqueID length: {(selectedHandCardUniqueID?.Length ?? 0)}");
+        
+        if (selectedHandCardUniqueID == null)
+        {
+            Debug.LogError($"[Server] ERROR: selectedHandCardUniqueID is NULL!");
+            return;
+        }
+        
+        if (!allCardLookup.ContainsKey(selectedHandCardUniqueID))
+        {
+            Debug.LogError($"[Server] ERROR: allCardLookup does not contain key: {selectedHandCardUniqueID}");
+            Debug.LogError($"[Server] Available keys in allCardLookup: {string.Join(", ", allCardLookup.Keys)}");
+            return;
+        }
         
         int[] selectedHandCard = allCardLookup[selectedHandCardUniqueID];
+        Debug.Log($"[Server] selectedHandCard: [{selectedHandCard[0]}, {selectedHandCard[1]}]");
+        
         // Oynayamazsın: force this card to be blocked (add to center, no capture)
         if (blockCount > 0)
         {

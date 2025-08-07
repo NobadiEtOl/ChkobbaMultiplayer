@@ -423,70 +423,88 @@ public class DeckController : MonoBehaviour
 
     public IEnumerator DiscardCapturedCards(string playedCard, SerializableCard serializedCard, int playerNumber)
     {
-        if (!GameManager.LocalInstance.movePlayedLocally)
+        GameManager.AddToDebugLog($"[DeckController] DiscardCapturedCards called with playedCard: {playedCard}, playerNumber: {playerNumber}");
+        GameManager.AddToDebugLog($"[DeckController] movePlayedLocally: {GameManager.LocalInstance.movePlayedLocally}");
+        GameManager.AddToDebugLog($"[DeckController] isProcessingCapture: {GameManager.LocalInstance.isProcessingCapture}");
+        GameManager.AddToDebugLog($"[DeckController] thisPlayerNumber: {thisPlayerNumber}, playerNumber: {playerNumber}");
+        GameManager.AddToDebugLog($"[DeckController] Is local player: {playerNumber == thisPlayerNumber}");
+        
+        bool isLocalPlayer = (playerNumber == thisPlayerNumber);
+        
+        // Always do visual processing for captures
+        GameManager.AddToDebugLog($"[DeckController] Processing capture visual updates");
+        Vector3 centerPosition = new Vector3(centerTransform.position.x, centerTransform.position.y + 10 * GameManager.LocalInstance.centerCardsObjects.Count, centerTransform.position.z);
+        Quaternion centerRotation = Quaternion.Euler( 90, centerTransform.rotation.y, centerTransform.rotation.z);
+        yield return StartCoroutine(MoveCardCoroutine(centerPosition, CardInteraction.cardLookup[playedCard].gameObject, 10, centerRotation, new Vector3(centerScale, centerScale, centerScale)));
+
+        List<string> selectedCenterCards = serializedCard.ToDictionary().Keys.ToList();
+        List<string> selectedCards = new List<string>(selectedCenterCards);
+        selectedCards.Add(playedCard);
+        GameManager.LocalInstance.cardObjectsToBeDiscarted.Clear();
+
+        //yield return StartCoroutine(PlayHandCardToCenter(playedCard, CardInteraction.cardLookup[playedCard].GetCardID(), true));
+
+        foreach (string cardID in selectedCards)
         {
-            Vector3 centerPosition = new Vector3(centerTransform.position.x, centerTransform.position.y + 10 * GameManager.LocalInstance.centerCardsObjects.Count, centerTransform.position.z);
-            Quaternion centerRotation = Quaternion.Euler( 90, centerTransform.rotation.y, centerTransform.rotation.z);
-            yield return StartCoroutine(MoveCardCoroutine(centerPosition, CardInteraction.cardLookup[playedCard].gameObject, 10, centerRotation, new Vector3(centerScale, centerScale, centerScale)));
+            GameObject tempCardObject = CardInteraction.cardLookup[cardID].gameObject;
+            tempCardObject.transform.parent = null;
 
-            List<string> selectedCenterCards = serializedCard.ToDictionary().Keys.ToList();
-            List<string> selectedCards = new List<string>(selectedCenterCards);
-            selectedCards.Add(playedCard);
-            GameManager.LocalInstance.cardObjectsToBeDiscarted.Clear();
-
-            //yield return StartCoroutine(PlayHandCardToCenter(playedCard, CardInteraction.cardLookup[playedCard].GetCardID(), true));
-
-            foreach (string cardID in selectedCards)
+            if (cardID == playedCard)
             {
-                GameObject tempCardObject = CardInteraction.cardLookup[cardID].gameObject;
-                tempCardObject.transform.parent = null;
-
-                if (cardID == playedCard)
-                {
-                    //tempCardObject.transform.rotation = Quaternion.Euler(90, 0, 0);
-                    //tempCardObject.transform.position = (centerTransform.position + tempCardObject.transform.position) / 2;
-                }
-
-                if (tempCardObject != null)
-                {
-                    GameManager.LocalInstance.cardObjectsToBeDiscarted.Add(tempCardObject);
-                }
-                else
-                {
-                    Debug.LogWarning("No card found with the tag: " + cardID[0] + "_" + cardID[1]);
-                }
+                //tempCardObject.transform.rotation = Quaternion.Euler(90, 0, 0);
+                //tempCardObject.transform.position = (centerTransform.position + tempCardObject.transform.position) / 2;
             }
 
-            bool piştiHappened = false;
-
-            if (selectedCards.Count == 2)
+            if (tempCardObject != null)
             {
-                if (CardInteraction.cardLookup[selectedCards[selectedCards.Count - 1]].GetCardID()[1] == CardInteraction.cardLookup[selectedCards[selectedCards.Count - 2]].GetCardID()[1])
-                {
-                    Debug.LogError("Pişti happened!");
-                    piştiHappened = true;
-                }
+                GameManager.LocalInstance.cardObjectsToBeDiscarted.Add(tempCardObject);
             }
-
-            MoveCardsToPlayerPool(GameManager.LocalInstance.cardObjectsToBeDiscarted, playerNumber, piştiHappened);
-            UpdateCurrentPlayerHandLayout();
-            
-
-            foreach (string uniqueCardId in selectedCenterCards)
+            else
             {
-                var selectedCardId = CardInteraction.cardLookup[uniqueCardId].GetCardID();
-                GameManager.LocalInstance.centerCards = GameManager.LocalInstance.centerCards
-                    .Where(card => !(card.Value[0] == selectedCardId[0] && card.Value[1] == selectedCardId[1]))
-                    .ToDictionary(card => card.Key, card => card.Value);
+                Debug.LogWarning("No card found with the tag: " + cardID[0] + "_" + cardID[1]);
             }
         }
-        else
+
+        bool piştiHappened = false;
+
+        if (selectedCards.Count == 2)
         {
+            if (CardInteraction.cardLookup[selectedCards[selectedCards.Count - 1]].GetCardID()[1] == CardInteraction.cardLookup[selectedCards[selectedCards.Count - 2]].GetCardID()[1])
+            {
+                Debug.LogError("Pişti happened!");
+                piştiHappened = true;
+            }
+        }
+
+        MoveCardsToPlayerPool(GameManager.LocalInstance.cardObjectsToBeDiscarted, playerNumber, piştiHappened);
+        UpdateCurrentPlayerHandLayout();
+        
+
+        foreach (string uniqueCardId in selectedCenterCards)
+        {
+            var selectedCardId = CardInteraction.cardLookup[uniqueCardId].GetCardID();
+            GameManager.LocalInstance.centerCards = GameManager.LocalInstance.centerCards
+                .Where(card => !(card.Value[0] == selectedCardId[0] && card.Value[1] == selectedCardId[1]))
+                .ToDictionary(card => card.Key, card => card.Value);
+        }
+        
+        // Reset flags and call TellServerTurnEnded for local player captures
+        if (isLocalPlayer)
+        {
+            GameManager.AddToDebugLog($"[DeckController] This is local player's capture, calling TellServerTurnEnded()");
+            //gameManager.TellServerTurnEnded();
+            GameManager.AddToDebugLog($"[DeckController] TellServerTurnEnded() called for local player capture");
+            GameManager.AddToDebugLog($"[DeckController] Setting movePlayedLocally to false");
             GameManager.LocalInstance.movePlayedLocally = false;
             CardInteraction.isOneCardSelected = false;
             GameManager.LocalInstance.currentSelectedHandCard = null;
-            GameManager.LocalInstance.centerCards.Clear();
         }
+        else
+        {
+            GameManager.AddToDebugLog($"[DeckController] This is non-local player's capture, no flag reset needed");
+        }
+        
+        yield return null;
     }
 
     private void SendCardInteractionsToGameManager()
