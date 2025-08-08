@@ -7,6 +7,7 @@ using TMPro;
 
 public class SuperPowerSpawner : MonoBehaviour
 {
+    [SerializeField] private GameObject infoBoxReachPoint;
     public static SuperPowerSpawner LocalInstance { get; private set; }
     [SerializeField] private List<GameObject> superPowerTokens = new List<GameObject>();
     private Dictionary<SuperPower, GameObject> superPowerPrefabs = new Dictionary<SuperPower, GameObject>();
@@ -19,8 +20,9 @@ public class SuperPowerSpawner : MonoBehaviour
     [SerializeField] private GameObject centerGameObject;
     private Vector3 centerPosition;
     private GameObject backgroundPanel;
-    private Text nameText;
-    private Text descriptionText;
+    private GameObject infoBoxCanvas;
+    private TextMeshPro nameText;
+    private TextMeshPro descriptionText;
     private Button activateButton;
     private Button falseActivateButton;
     private Button closeButton;
@@ -35,7 +37,6 @@ public class SuperPowerSpawner : MonoBehaviour
 
     
     [Header("InfoBox Animation Settings")]
-    [SerializeField] private Transform infoBoxStartLocation; // Starting position for the info box
     [SerializeField] private float animationDuration = 0.5f; // Duration of the movement animation
     [SerializeField] private float infoChangeDelay = 0.25f; // Delay before info changes (to match page change animation transition)
     [SerializeField] private float fadeDuration = 0.15f; // Duration of fade in/out animations
@@ -64,6 +65,17 @@ public class SuperPowerSpawner : MonoBehaviour
         if (backgroundPanel != null)
         {
             infoBoxOriginalPosition = backgroundPanel.transform.position;
+            Debug.Log($"[SuperPowerSpawner] Stored original position: {infoBoxOriginalPosition}");
+        }
+        
+        // Validate reach point
+        if (infoBoxReachPoint == null)
+        {
+            Debug.LogWarning("[SuperPowerSpawner] infoBoxReachPoint is not assigned! InfoBox will not animate to reach point.");
+        }
+        else
+        {
+            Debug.Log($"[SuperPowerSpawner] Reach point position: {infoBoxReachPoint.transform.position}");
         }
         
         // Initialize gold system
@@ -124,19 +136,55 @@ public class SuperPowerSpawner : MonoBehaviour
     private void GetUIElements()
     {
         backgroundPanel = GameObject.Find("InfoBoxBackGroundPanel")?.gameObject;
-        nameText = backgroundPanel.transform.Find("NamePanel/NameText")?.GetComponent<Text>();
-        descriptionText = backgroundPanel.transform.Find("DescriptionPanel/DescriptionText")?.GetComponent<Text>();
-        activateButton = GameObject.Find("ActivateButton")?.GetComponent<Button>();
-        falseActivateButton = GameObject.Find("FalseActivateButton")?.GetComponent<Button>();
-        closeButton = GameObject.Find("CloseButton")?.GetComponent<Button>();
+        
+        if (backgroundPanel == null)
+        {
+            Debug.LogError("InfoBoxBackGroundPanel not found!");
+            return;
+        }
+        
+        infoBoxCanvas = backgroundPanel.transform.Find("InfoBoxCanvas")?.gameObject;
+        
+        if (infoBoxCanvas == null)
+        {
+            Debug.LogError("InfoBoxCanvas not found as child of InfoBoxBackGroundPanel!");
+            return;
+        }
+        
+        // Find UI elements within the InfoBoxCanvas
+        nameText = infoBoxCanvas.transform.Find("NamePanel/NameText")?.GetComponent<TextMeshPro>();
+        descriptionText = infoBoxCanvas.transform.Find("DescriptionPanel/DescriptionText")?.GetComponent<TextMeshPro>();
+        
+        // These buttons might be in the canvas or as separate GameObjects
+        activateButton = infoBoxCanvas.transform.Find("ActivateButton")?.GetComponent<Button>();
+        if (activateButton == null)
+            activateButton = GameObject.Find("ActivateButton")?.GetComponent<Button>();
+            
+        falseActivateButton = infoBoxCanvas.transform.Find("FalseActivateButton")?.GetComponent<Button>();
+        if (falseActivateButton == null)
+            falseActivateButton = GameObject.Find("FalseActivateButton")?.GetComponent<Button>();
+            
+        closeButton = infoBoxCanvas.transform.Find("CloseButton")?.GetComponent<Button>();
+        if (closeButton == null)
+            closeButton = GameObject.Find("CloseButton")?.GetComponent<Button>();
+
+        // Debug what we found
+        Debug.Log($"[SuperPowerSpawner] UI Elements found:");
+        Debug.Log($"  - backgroundPanel: {(backgroundPanel != null ? "✓" : "✗")}");
+        Debug.Log($"  - infoBoxCanvas: {(infoBoxCanvas != null ? "✓" : "✗")}");
+        Debug.Log($"  - nameText: {(nameText != null ? "✓" : "✗")}");
+        Debug.Log($"  - descriptionText: {(descriptionText != null ? "✓" : "✗")}");
+        Debug.Log($"  - activateButton: {(activateButton != null ? "✓" : "✗")}");
+        Debug.Log($"  - falseActivateButton: {(falseActivateButton != null ? "✓" : "✗")}");
+        Debug.Log($"  - closeButton: {(closeButton != null ? "✓" : "✗")}");
 
         if (nameText == null || descriptionText == null || activateButton == null || closeButton == null)
         {
             Debug.LogError("One or more UI elements not found in InfoBoxCanvas for " + gameObject.name);
-            if (nameText == null) Debug.LogError("NameText not found");
-            if (descriptionText == null) Debug.LogError("DescriptionText not found");
-            if (activateButton == null) Debug.LogError("ActivateButton not found");
-            if (closeButton == null) Debug.LogError("CloseButton not found");
+            if (nameText == null) Debug.LogError("NameText not found at path: InfoBoxCanvas/NamePanel/NameText");
+            if (descriptionText == null) Debug.LogError("DescriptionText not found at path: InfoBoxCanvas/DescriptionPanel/DescriptionText");
+            if (activateButton == null) Debug.LogError("ActivateButton not found in InfoBoxCanvas or as standalone GameObject");
+            if (closeButton == null) Debug.LogError("CloseButton not found in InfoBoxCanvas or as standalone GameObject");
             return;
         }
 
@@ -160,7 +208,7 @@ public class SuperPowerSpawner : MonoBehaviour
     }
 
     /// <summary>
-    /// Case 1: InfoBox was closed and gets opened (moves from start to original position)
+    /// Case 1: InfoBox was closed and gets opened (moves from original position to reach point)
     /// Case 2: InfoBox is already open (no movement, just update content)
     /// </summary>
     public IEnumerator OpenInfoBox(SuperPowerToken superPowerToken)
@@ -195,7 +243,11 @@ public class SuperPowerSpawner : MonoBehaviour
             // Case 2: InfoBox was already open, just switching tokens - no movement animation
             Debug.Log("Case 2: Switching between tokens - no movement, with info delay and fade");
             backgroundPanel.SetActive(true);
-            backgroundPanel.transform.position = infoBoxOriginalPosition; // Ensure it's at the right position
+            // Keep it at the reach point position (don't move it back to original)
+            if (infoBoxReachPoint != null)
+            {
+                backgroundPanel.transform.position = infoBoxReachPoint.transform.position;
+            }
             isInfoBoxOpen = true; // Restore the open state
 
             // NEW: Play page change animation first
@@ -210,23 +262,30 @@ public class SuperPowerSpawner : MonoBehaviour
         }
         else if (!isInfoBoxOpen)
         {
-            // Case 1: InfoBox was truly closed - animate from start position to original position
-            Debug.Log("Case 1: InfoBox was closed - animating to open");
+            // Case 1: InfoBox was truly closed - animate from original position to reach point
+            Debug.Log("Case 1: InfoBox was closed - animating to reach point");
             backgroundPanel.SetActive(true);
 
-            // Set to start position
-            if (infoBoxStartLocation != null)
-            {
-                backgroundPanel.transform.position = infoBoxStartLocation.position;
-            }
+            // Set to original position (off-screen)
+            backgroundPanel.transform.position = infoBoxOriginalPosition;
+            Debug.Log($"[SuperPowerSpawner] Set InfoBox to original position: {infoBoxOriginalPosition}");
 
             // Update content immediately for Case 1 (no delay needed for initial opening)
             UpdateInfoBoxContent(superPowerToken);
 
-            // Animate to original position
-            currentAnimationCoroutine = StartCoroutine(AnimateInfoBoxPosition(infoBoxOriginalPosition));
-            yield return currentAnimationCoroutine;
-            currentAnimationCoroutine = null;
+            // Animate to reach point
+            if (infoBoxReachPoint != null)
+            {
+                Debug.Log($"[SuperPowerSpawner] Starting animation to reach point: {infoBoxReachPoint.transform.position}");
+                currentAnimationCoroutine = StartCoroutine(AnimateInfoBoxPosition(infoBoxReachPoint.transform.position));
+                yield return currentAnimationCoroutine;
+                currentAnimationCoroutine = null;
+                Debug.Log("[SuperPowerSpawner] Animation to reach point completed");
+            }
+            else
+            {
+                Debug.LogWarning("[SuperPowerSpawner] infoBoxReachPoint is null, InfoBox will not animate to reach point");
+            }
 
             isInfoBoxOpen = true;
 
@@ -237,7 +296,15 @@ public class SuperPowerSpawner : MonoBehaviour
         {
             // Fallback: ensure it's active and positioned correctly
             backgroundPanel.SetActive(true);
-            backgroundPanel.transform.position = infoBoxOriginalPosition;
+            // Position at reach point if available, otherwise at original position
+            if (infoBoxReachPoint != null)
+            {
+                backgroundPanel.transform.position = infoBoxReachPoint.transform.position;
+            }
+            else
+            {
+                backgroundPanel.transform.position = infoBoxOriginalPosition;
+            }
 
             // NEW: Play page change animation for fallback case too
             UIFrameAnimator frameAnimator = backgroundPanel.GetComponent<UIFrameAnimator>();
@@ -253,49 +320,27 @@ public class SuperPowerSpawner : MonoBehaviour
 
     /// <summary>
     /// Handles the fade out, delay, and fade in sequence for info changes
-    /// UPDATED: Only affects child elements, not the parent backgroundPanel
+    /// UPDATED: Works with the new InfoBoxCanvas structure
     /// </summary>
     private IEnumerator FadeInfoWithDelay(SuperPowerToken superPowerToken)
     {
-        // Get only the child UI elements that need to fade (not the parent backgroundPanel)
-        List<CanvasGroup> fadeGroups = new List<CanvasGroup>();
+        // Fade the entire InfoBoxCanvas instead of individual elements
+        CanvasGroup canvasGroup = null;
         
-        // Add specific child elements to fade
-        if (nameText != null)
-            fadeGroups.Add(GetOrAddCanvasGroup(nameText.gameObject));
-        
-        if (descriptionText != null)
-            fadeGroups.Add(GetOrAddCanvasGroup(descriptionText.gameObject));
-        
-        if (activateButton != null && activateButton.transform.parent != backgroundPanel.transform)
-            fadeGroups.Add(GetOrAddCanvasGroup(activateButton.transform.parent.gameObject));
-        
-        // Alternative: Find all direct children of backgroundPanel and fade them
-        // This ensures we fade child content panels but not the backgroundPanel itself
-        foreach (Transform child in backgroundPanel.transform)
+        if (infoBoxCanvas != null)
         {
-            // Skip if it's one of the specific elements we already added
-            bool alreadyAdded = false;
-            foreach (var group in fadeGroups)
-            {
-                if (group.gameObject == child.gameObject)
-                {
-                    alreadyAdded = true;
-                    break;
-                }
-            }
-            
-            if (!alreadyAdded)
-            {
-                // Add canvas group to direct children (like panels containing the UI elements)
-                CanvasGroup childGroup = GetOrAddCanvasGroup(child.gameObject);
-                if (childGroup != null)
-                    fadeGroups.Add(childGroup);
-            }
+            canvasGroup = GetOrAddCanvasGroup(infoBoxCanvas);
+        }
+        
+        if (canvasGroup == null)
+        {
+            Debug.LogWarning("InfoBoxCanvas or its CanvasGroup not found, updating content without fade");
+            UpdateInfoBoxContent(superPowerToken);
+            yield break;
         }
 
-        // Phase 1: Fade out current info (only child elements)
-        yield return StartCoroutine(FadeCanvasGroups(fadeGroups.ToArray(), 0f, fadeDuration));
+        // Phase 1: Fade out current info (entire canvas)
+        yield return StartCoroutine(FadeCanvasGroups(new CanvasGroup[] { canvasGroup }, 0f, fadeDuration));
 
         // Phase 2: Wait for the remaining delay (accounting for fade out time)
         float remainingDelay = Mathf.Max(0f, infoChangeDelay - fadeDuration);
@@ -307,8 +352,8 @@ public class SuperPowerSpawner : MonoBehaviour
         // Phase 3: Update content while faded out
         UpdateInfoBoxContent(superPowerToken);
 
-        // Phase 4: Fade in new info (only child elements)
-        yield return StartCoroutine(FadeCanvasGroups(fadeGroups.ToArray(), 1f, fadeDuration));
+        // Phase 4: Fade in new info (entire canvas)
+        yield return StartCoroutine(FadeCanvasGroups(new CanvasGroup[] { canvasGroup }, 1f, fadeDuration));
     }
 
     /// <summary>
@@ -327,19 +372,35 @@ public class SuperPowerSpawner : MonoBehaviour
     }
 
     /// <summary>
-    /// Fades multiple CanvasGroups to a target alpha value
+    /// Fades multiple CanvasGroups and also fades TextMeshProUGUI components (nameText, descriptionText) to a target alpha value
     /// </summary>
     private IEnumerator FadeCanvasGroups(CanvasGroup[] canvasGroups, float targetAlpha, float duration)
     {
-        if (canvasGroups == null || canvasGroups.Length == 0) yield break;
-        
-        float[] startAlphas = new float[canvasGroups.Length];
-
-        // Store starting alpha values
-        for (int i = 0; i < canvasGroups.Length; i++)
+        // Prepare canvas group alphas
+        float[] startAlphas = canvasGroups != null ? new float[canvasGroups.Length] : null;
+        if (canvasGroups != null)
         {
-            if (canvasGroups[i] != null)
-                startAlphas[i] = canvasGroups[i].alpha;
+            for (int i = 0; i < canvasGroups.Length; i++)
+            {
+                if (canvasGroups[i] != null)
+                    startAlphas[i] = canvasGroups[i].alpha;
+            }
+        }
+
+        // Prepare TextMeshPro alphas
+        float nameStartAlpha = 1f, descStartAlpha = 1f;
+        Color nameOrigColor = Color.white, descOrigColor = Color.white;
+        bool hasNameText = nameText != null;
+        bool hasDescText = descriptionText != null;
+        if (hasNameText)
+        {
+            nameOrigColor = nameText.color;
+            nameStartAlpha = nameOrigColor.a;
+        }
+        if (hasDescText)
+        {
+            descOrigColor = descriptionText.color;
+            descStartAlpha = descOrigColor.a;
         }
 
         float elapsedTime = 0f;
@@ -350,23 +411,55 @@ public class SuperPowerSpawner : MonoBehaviour
             float progress = Mathf.Clamp01(elapsedTime / duration);
 
             // Apply smooth easing
-            progress = Mathf.SmoothStep(0f, 1f, progress);
+            float easedProgress = Mathf.SmoothStep(0f, 1f, progress);
 
-            // Update all canvas groups
-            for (int i = 0; i < canvasGroups.Length; i++)
+            // Fade canvas groups
+            if (canvasGroups != null)
             {
-                if (canvasGroups[i] != null)
-                    canvasGroups[i].alpha = Mathf.Lerp(startAlphas[i], targetAlpha, progress);
+                for (int i = 0; i < canvasGroups.Length; i++)
+                {
+                    if (canvasGroups[i] != null)
+                        canvasGroups[i].alpha = Mathf.Lerp(startAlphas[i], targetAlpha, easedProgress);
+                }
+            }
+
+            // Fade TextMeshProUGUI components
+            if (hasNameText)
+            {
+                Color c = nameOrigColor;
+                c.a = Mathf.Lerp(nameStartAlpha, targetAlpha, easedProgress);
+                nameText.color = c;
+            }
+            if (hasDescText)
+            {
+                Color c = descOrigColor;
+                c.a = Mathf.Lerp(descStartAlpha, targetAlpha, easedProgress);
+                descriptionText.color = c;
             }
 
             yield return null;
         }
 
         // Ensure final alpha values are exact
-        for (int i = 0; i < canvasGroups.Length; i++)
+        if (canvasGroups != null)
         {
-            if (canvasGroups[i] != null)
-                canvasGroups[i].alpha = targetAlpha;
+            for (int i = 0; i < canvasGroups.Length; i++)
+            {
+                if (canvasGroups[i] != null)
+                    canvasGroups[i].alpha = targetAlpha;
+            }
+        }
+        if (hasNameText)
+        {
+            Color c = nameText.color;
+            c.a = targetAlpha;
+            nameText.color = c;
+        }
+        if (hasDescText)
+        {
+            Color c = descriptionText.color;
+            c.a = targetAlpha;
+            descriptionText.color = c;
         }
     }
 
@@ -398,42 +491,23 @@ public class SuperPowerSpawner : MonoBehaviour
 
     /// <summary>
     /// Ensures all UI elements are fully visible (used for initialization and Case 1)
-    /// UPDATED: Only affects child elements, not the parent backgroundPanel
+    /// UPDATED: Works with the new InfoBoxCanvas structure
     /// </summary>
     private void EnsureUIElementsVisible()
     {
-        // Only reset alpha for child elements, not the backgroundPanel itself
-        foreach (Transform child in backgroundPanel.transform)
+        // Ensure the InfoBoxCanvas is fully visible
+        if (infoBoxCanvas != null)
         {
-            CanvasGroup childGroup = child.gameObject.GetComponent<CanvasGroup>();
-            if (childGroup != null)
+            CanvasGroup canvasGroup = infoBoxCanvas.GetComponent<CanvasGroup>();
+            if (canvasGroup != null)
             {
-                childGroup.alpha = 1f;
+                canvasGroup.alpha = 1f;
             }
-        }
-
-        // Also ensure specific UI elements are visible
-        if (nameText != null)
-        {
-            CanvasGroup nameCanvasGroup = nameText.gameObject.GetComponent<CanvasGroup>();
-            if (nameCanvasGroup != null) nameCanvasGroup.alpha = 1f;
-        }
-        
-        if (descriptionText != null)
-        {
-            CanvasGroup descCanvasGroup = descriptionText.gameObject.GetComponent<CanvasGroup>();
-            if (descCanvasGroup != null) descCanvasGroup.alpha = 1f;
-        }
-        
-        if (activateButton != null && activateButton.transform.parent != backgroundPanel.transform)
-        {
-            CanvasGroup buttonCanvasGroup = activateButton.transform.parent.gameObject.GetComponent<CanvasGroup>();
-            if (buttonCanvasGroup != null) buttonCanvasGroup.alpha = 1f;
         }
     }
 
     /// <summary>
-    /// Case 3: InfoBox is open and gets closed (moves from original position to start position)
+    /// Case 3: InfoBox is open and gets closed (moves from reach point back to original position)
     /// </summary>
     public IEnumerator CloseInfoBox()
     {
@@ -454,13 +528,12 @@ public class SuperPowerSpawner : MonoBehaviour
         // Ensure UI elements are visible before closing
         EnsureUIElementsVisible();
 
-        // Case 3: Animate from original position to start position
-        if (infoBoxStartLocation != null)
-        {
-            currentAnimationCoroutine = StartCoroutine(AnimateInfoBoxPosition(infoBoxStartLocation.position));
-            yield return currentAnimationCoroutine;
-            currentAnimationCoroutine = null;
-        }
+        // Case 3: Animate from reach point back to original position
+        Debug.Log($"[SuperPowerSpawner] Starting close animation to original position: {infoBoxOriginalPosition}");
+        currentAnimationCoroutine = StartCoroutine(AnimateInfoBoxPosition(infoBoxOriginalPosition));
+        yield return currentAnimationCoroutine;
+        currentAnimationCoroutine = null;
+        Debug.Log("[SuperPowerSpawner] Close animation completed");
 
         // Hide and reset
         backgroundPanel.SetActive(false);
@@ -493,8 +566,16 @@ public class SuperPowerSpawner : MonoBehaviour
     /// </summary>
     private IEnumerator AnimateInfoBoxPosition(Vector3 targetPosition)
     {
+        if (backgroundPanel == null)
+        {
+            Debug.LogError("BackgroundPanel is null, cannot animate position");
+            yield break;
+        }
+
         Vector3 startPosition = backgroundPanel.transform.position;
         float elapsedTime = 0f;
+        
+        Debug.Log($"[SuperPowerSpawner] Animating InfoBox from {startPosition} to {targetPosition} over {animationDuration} seconds");
 
         while (elapsedTime < animationDuration)
         {
@@ -504,12 +585,15 @@ public class SuperPowerSpawner : MonoBehaviour
             // Use smooth easing (you can change this to other easing functions)
             progress = Mathf.SmoothStep(0f, 1f, progress);
             
-            backgroundPanel.transform.position = Vector3.Lerp(startPosition, targetPosition, progress);
+            Vector3 currentPosition = Vector3.Lerp(startPosition, targetPosition, progress);
+            backgroundPanel.transform.position = currentPosition;
+            
             yield return null;
         }
 
         // Ensure final position is exact
         backgroundPanel.transform.position = targetPosition;
+        Debug.Log($"[SuperPowerSpawner] Animation completed. Final position: {backgroundPanel.transform.position}");
     }
 
     // Rest of your existing code remains the same...

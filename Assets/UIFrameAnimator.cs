@@ -12,7 +12,7 @@ public class UIFrameAnimator : MonoBehaviour
     public Sprite[] pageChangeFrames;
     public float pageChangeFrameRate = 15f;
 
-    private Image img;
+    private SpriteRenderer spriteRenderer;
     private int currentFrame;
     private float timer;
     private bool isPlayingPageChange = false;
@@ -20,7 +20,7 @@ public class UIFrameAnimator : MonoBehaviour
 
     void Start()
     {
-        img = GetComponent<Image>();
+        spriteRenderer = GetComponent<SpriteRenderer>();
         currentFrame = 0;
         timer = 0f;
     }
@@ -42,7 +42,7 @@ public class UIFrameAnimator : MonoBehaviour
         if (timer >= 1f / frameRate)
         {
             currentFrame = (currentFrame + 1) % animationFrames.Length;
-            img.sprite = animationFrames[currentFrame];
+            spriteRenderer.sprite = animationFrames[currentFrame];
             timer = 0f;
         }
     }
@@ -67,7 +67,7 @@ public class UIFrameAnimator : MonoBehaviour
         // Play page change animation
         for (int i = 0; i < pageChangeFrames.Length; i++)
         {
-            img.sprite = pageChangeFrames[i];
+            spriteRenderer.sprite = pageChangeFrames[i];
             yield return new WaitForSeconds(1f / pageChangeFrameRate);
         }
 
@@ -86,7 +86,7 @@ public class UIFrameAnimator : MonoBehaviour
             // If disabling idle and no page change is playing, show first idle frame
             if (animationFrames.Length > 0)
             {
-                img.sprite = animationFrames[0];
+                spriteRenderer.sprite = animationFrames[0];
             }
         }
     }

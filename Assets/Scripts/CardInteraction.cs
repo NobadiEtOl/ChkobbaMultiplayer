@@ -10,7 +10,7 @@ public class CardInteraction : MonoBehaviour
     public static bool isOneCardSelected = false;
     public static CardInteraction currentlySelectedCard = null; // Tracks the currently selected card
     public bool isPlayable = false;
-    private Vector3 originalScreenPosition; // Original position in screen space
+    public Vector3 originalScreenPosition; // Original position in screen space
     private Vector3 offset; // Offset between touch position and card position in screen space
     private bool isDragging = false;
     private float snapBackThreshold = 175f;
@@ -66,7 +66,7 @@ public class CardInteraction : MonoBehaviour
     void Start()
     {
         //InitializeCard();
-        StartCoroutine(StopAutoRotate()); // Ensure auto-rotation is stopped at the start
+        StopAutoRotate(); // Ensure auto-rotation is stopped at the start
     }
 
     void Update()
@@ -289,7 +289,7 @@ public class CardInteraction : MonoBehaviour
             {
                 // Invoke OnCardsPlayed
                 //Debug.Log("OnCardsPlayed invoked!");
-                yield return StartCoroutine(StopAutoRotate()); // Stop auto-rotation when the card is played
+                StopAutoRotate(); // Stop auto-rotation when the card is played
 
                 //yield return new WaitForSeconds(1f);
                 
@@ -516,10 +516,10 @@ public class CardInteraction : MonoBehaviour
     }
 
 
-    public IEnumerator StopAutoRotate()
+    public void StopAutoRotate()
     {
         autoRotateActive = false;
-        yield return StartCoroutine(WaitForAllTweens());
+        //yield return StartCoroutine(WaitForAllTweens());
         KillAllTweens();
     }
 
@@ -596,5 +596,33 @@ public class CardInteraction : MonoBehaviour
         // Wait until there are no active tweens on this transform
         while (DOTween.IsTweening(target))
             yield return null;
+    }
+
+    /// <summary>
+    /// Snaps the card back to its original position and resets selection state.
+    /// </summary>
+    public void SnapBackToOriginalPosition()
+    {
+        // Reset position to original screen position
+        if (originalScreenPosition != Vector3.zero)
+        {
+            transform.position = Camera.main.ScreenToWorldPoint(originalScreenPosition);
+        }
+        
+        // Reset drag state
+        isDragging = false;
+        
+        // Deactivate card indicator if this card is selected
+        if (selectedCardIndicator != null && selectedCardIndicator.activeSelf)
+        {
+            selectedCardIndicator.SetActive(false);
+        }
+        
+        // Reset static selection state if this is the selected card
+        if (currentlySelectedCard == this)
+        {
+            currentlySelectedCard = null;
+            isOneCardSelected = false;
+        }
     }
 }

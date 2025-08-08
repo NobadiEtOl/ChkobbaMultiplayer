@@ -67,6 +67,7 @@ public class GameManager : MonoBehaviour
     }
 
     //Scripts
+    [SerializeField ] private bool editorMode = true;
     public static GameManager LocalInstance { get; private set; }
     [SerializeField] private DeckController deckController;
     public NetworkRelay networkRelay;
@@ -456,6 +457,20 @@ public class GameManager : MonoBehaviour
         AddToDebugLog($"[GameManager] CardsPlayed called with cardID: {cardID}, playerNumber: {playerNumber}");
         AddToDebugLog($"[GameManager] currentSelectedHandCard at start of CardsPlayed: {currentSelectedHandCard}");
         AddToDebugLog($"[GameManager] CardInteraction.currentlySelectedCard at start of CardsPlayed: {CardInteraction.currentlySelectedCard?.gameObject.name}");
+        
+        // Check if player can play on their turn
+        if(!editorMode)
+        {
+            if (!CanPlayerPlay(cardObject))
+            {
+                AddToDebugLogWarning($"[GameManager] Player cannot play - not their turn or restrictions active");
+                AddToDebugLogWarning($"[GameManager] Current turn: Player {currentPlayerNo}, This player: {deckController.thisPlayerNumber}");
+                OnPlayerTriedToPlayOutOfTurn();
+                return;
+            }
+        }
+
+        AddToDebugLog($"[GameManager] Player can play - proceeding with move validation");
         
         CheckIfLegal(playerNumber);
     }
@@ -1014,6 +1029,105 @@ public class GameManager : MonoBehaviour
     public void SkipTurn()
     {
         if (currentPlayerNo == deckController.thisPlayerNumber) Invoke("PlayAfterTimeOut", 1);
+    }
+
+    /// <summary>
+    /// Checks if the current player can play a card from their hand.
+    /// Returns false if it's not their turn, unless special powers allow it.
+    /// </summary>
+    public bool CanPlayerPlay(GameObject cardObj)
+    {
+        AddToDebugLog($"[GameManager] CanPlayerPlay check - currentPlayerNo: {currentPlayerNo}, thisPlayerNumber: {deckController.thisPlayerNumber}");
+
+        // Check if it's the player's turn
+        bool isMyTurn = (currentPlayerNo == deckController.thisPlayerNumber);
+        AddToDebugLog($"[GameManager] Is my turn: {isMyTurn}");
+
+        // Check if the card's parent is "PlayerHand1"
+        bool isInPlayerHand1 = false;
+        if (cardObj != null && cardObj.transform.parent != null)
+        {
+            isInPlayerHand1 = cardObj.transform.parent.name == "PlayerHand1";
+        }
+        AddToDebugLog($"[GameManager] Card parent is PlayerHand1: {isInPlayerHand1}");
+
+        // Player can play only if it's their turn AND the card is in PlayerHand1
+        if (isMyTurn && isInPlayerHand1)
+        {
+            return true;
+        }
+
+        // If it's not their turn, check if any special powers allow playing
+        if (!isMyTurn)
+        {
+            bool specialPowerAllowsPlay = IsSpecialPowerAllowingPlay();
+            AddToDebugLog($"[GameManager] Special power allows play: {specialPowerAllowsPlay}");
+            return specialPowerAllowsPlay;
+        }
+
+        // If it's their turn but the card is not in PlayerHand1, do not allow play
+        return false;
+    }
+
+    /// <summary>
+    /// Checks if any active special powers allow the player to play out of turn.
+    /// Override this method to add specific power logic.
+    /// </summary>
+    public bool IsSpecialPowerAllowingPlay()
+    {
+        AddToDebugLog($"[GameManager] Checking special powers that allow out-of-turn play");
+        
+        // Check for powers that allow selecting other players' cards or playing out of turn
+        if (isKapkacPending)
+        {
+            AddToDebugLog($"[GameManager] Kapkaç pending - allowing out-of-turn interaction");
+            return true;
+        }
+        
+        if (isYandimAnamPending)
+        {
+            AddToDebugLog($"[GameManager] Yandım Anam pending - allowing out-of-turn interaction");
+            return true;
+        }
+        
+        if (isKopyalaActive)
+        {
+            AddToDebugLog($"[GameManager] Kopyala active - allowing out-of-turn interaction");
+            return true;
+        }
+        
+        // Add other special powers here as needed
+        // if (someOtherSpecialPowerActive) return true;
+        
+        return false;
+    }
+
+    /// <summary>
+    /// Called when a player tries to play a card but it's not their turn.
+    /// This method can be used to show feedback to the player or handle special cases.
+    /// </summary>
+    public void OnPlayerTriedToPlayOutOfTurn()
+    {
+        AddToDebugLog($"[GameManager] Player tried to play out of turn!");
+        
+        // You can add feedback here, such as:
+        // - Show a message to the player
+        // - Play a sound effect
+        // - Highlight whose turn it is
+        // - Return the card to its original position
+        
+        // Reset the card selection and position
+        if (CardInteraction.currentlySelectedCard != null)
+        {
+            AddToDebugLog($"[GameManager] Resetting card selection due to out-of-turn play attempt");
+            CardInteraction.currentlySelectedCard.SnapBackToOriginalPosition();
+        }
+        
+        // Reset selection state
+        currentSelectedHandCard = null;
+        
+        // TODO: Add visual/audio feedback for the player
+        // TODO: Optionally highlight whose turn it is
     }
 
     public void TellServerTurnEnded()
