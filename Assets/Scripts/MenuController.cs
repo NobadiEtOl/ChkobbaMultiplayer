@@ -56,6 +56,10 @@ public class MenuController : MonoBehaviour
     [SerializeField] private GameObject tokenDisplayArea;
     [SerializeField] private GameObject displayBackgroundPanel;
     [SerializeField] private GameObject scrollContainer;
+    [SerializeField] private GameObject openButtonGameObject;
+    
+    // Public property to access openButtonGameObject
+    public GameObject OpenButtonGameObject => openButtonGameObject;
 
     [Header("Scroll Settings")]
     [SerializeField] private float scrollSensitivity = 2f;
@@ -529,6 +533,7 @@ public class MenuController : MonoBehaviour
     
     private void SetMenuActive(bool active)
     {
+        Debug.Log($"[MenuController] Setting menu active: {active}");
         if (tokenDisplayArea != null)
         {
             tokenDisplayArea.SetActive(active);
@@ -540,12 +545,34 @@ public class MenuController : MonoBehaviour
         }
         
         isMenuActive = active;
-        if (!active) 
+        
+        // Reset scroll position when activating
+        if (active)
+        {
+            currentScrollOffset = 0f;
+            if (scrollContainer != null)
+            {
+                Vector3 resetPosition = scrollContainer.transform.localPosition;
+                resetPosition.y = 0f;
+                scrollContainer.transform.localPosition = resetPosition;
+            }
+        }
+        else
         {
             currentScrollOffset = 0f;
             // Clean up menu token when closing
             CleanupMenuToken();
         }
+    }
+    
+    /// <summary>
+    /// Called by SuperPowerSpawner when a different token page is opened
+    /// This ensures the menu is properly hidden when switching to other pages
+    /// </summary>
+    public void OnOtherPageOpened()
+    {
+        Debug.Log("[MenuController] Other page opened, deactivating menu");
+        SetMenuActive(false);
     }
     
     private void CleanupMenuToken()

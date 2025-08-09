@@ -7,6 +7,7 @@ using TMPro;
 
 public class SuperPowerSpawner : MonoBehaviour
 {
+    [SerializeField] private Transform infoBoxOriginalPosition; // Original position stored at Start
     [SerializeField] private GameObject infoBoxReachPoint;
     public static SuperPowerSpawner LocalInstance { get; private set; }
     [SerializeField] private List<GameObject> superPowerTokens = new List<GameObject>();
@@ -40,8 +41,7 @@ public class SuperPowerSpawner : MonoBehaviour
     [SerializeField] private float animationDuration = 0.5f; // Duration of the movement animation
     [SerializeField] private float infoChangeDelay = 0.25f; // Delay before info changes (to match page change animation transition)
     [SerializeField] private float fadeDuration = 0.15f; // Duration of fade in/out animations
-
-    private Vector3 infoBoxOriginalPosition; // Original position stored at Start
+    [SerializeField] private float buttonFadeDuration = 0.3f; // Duration of button fade animations
     private bool isInfoBoxOpen = false; // Track if info box is currently open
     private Coroutine currentAnimationCoroutine; // Track current animation to prevent overlaps
 
@@ -61,12 +61,6 @@ public class SuperPowerSpawner : MonoBehaviour
 
     void Start()
     {
-        // Store the original position of the info box
-        if (backgroundPanel != null)
-        {
-            infoBoxOriginalPosition = backgroundPanel.transform.position;
-            Debug.Log($"[SuperPowerSpawner] Stored original position: {infoBoxOriginalPosition}");
-        }
         
         // Validate reach point
         if (infoBoxReachPoint == null)
@@ -76,6 +70,40 @@ public class SuperPowerSpawner : MonoBehaviour
         else
         {
             Debug.Log($"[SuperPowerSpawner] Reach point position: {infoBoxReachPoint.transform.position}");
+        }
+        
+        // Initialize InfoBox state (closed but active)
+        if (backgroundPanel != null)
+        {
+            // Ensure InfoBox is active but positioned at original (off-screen) position
+            backgroundPanel.SetActive(true);
+            backgroundPanel.transform.position = infoBoxOriginalPosition.position;
+            
+            // Start with idle animation disabled (InfoBox is "closed")
+            UIFrameAnimator frameAnimator = backgroundPanel.GetComponent<UIFrameAnimator>();
+            if (frameAnimator != null)
+            {
+                try
+                {
+                    frameAnimator.SetIdleAnimationEnabled(false);
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogWarning($"[SuperPowerSpawner] Failed to disable idle animation in Start: {e.Message}");
+                }
+            }
+        }
+        
+        // Initialize open button state (should be visible when InfoBox is closed)
+        MenuController menuController = FindObjectOfType<MenuController>();
+        if (menuController != null && menuController.OpenButtonGameObject != null)
+        {
+            menuController.OpenButtonGameObject.SetActive(true);
+            CanvasGroup buttonCanvasGroup = GetOrAddCanvasGroup(menuController.OpenButtonGameObject);
+            if (buttonCanvasGroup != null)
+            {
+                buttonCanvasGroup.alpha = 1f; // Ensure it's fully visible
+            }
         }
         
         // Initialize gold system
@@ -236,6 +264,13 @@ public class SuperPowerSpawner : MonoBehaviour
 
         // Set the active instance early (before info update)
         SuperPowerToken.ActiveInstance = superPowerToken;
+        
+        // Notify MenuController if it exists that another page is being opened
+        MenuController menuController = FindObjectOfType<MenuController>();
+        if (menuController != null)
+        {
+            menuController.OnOtherPageOpened();
+        }
 
         // FIXED: Check if we were switching tokens (Case 2) or opening fresh (Case 1)
         if (isSwitchingTokens && wasBoxOpenBeforeSwitch)
@@ -259,6 +294,19 @@ public class SuperPowerSpawner : MonoBehaviour
 
             // NEW: Fade out current info, wait for delay, then fade in new info
             yield return StartCoroutine(FadeInfoWithDelay(superPowerToken));
+            
+            // Start idle animation after page change completes
+            if (frameAnimator != null)
+            {
+                try
+                {
+                    frameAnimator.SetIdleAnimationEnabled(true);
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogWarning($"[SuperPowerSpawner] Failed to enable idle animation after page change: {e.Message}");
+                }
+            }
         }
         else if (!isInfoBoxOpen)
         {
@@ -267,7 +315,7 @@ public class SuperPowerSpawner : MonoBehaviour
             backgroundPanel.SetActive(true);
 
             // Set to original position (off-screen)
-            backgroundPanel.transform.position = infoBoxOriginalPosition;
+            backgroundPanel.transform.position = infoBoxOriginalPosition.position;
             Debug.Log($"[SuperPowerSpawner] Set InfoBox to original position: {infoBoxOriginalPosition}");
 
             // Update content immediately for Case 1 (no delay needed for initial opening)
@@ -289,6 +337,23 @@ public class SuperPowerSpawner : MonoBehaviour
 
             isInfoBoxOpen = true;
 
+            // Start idle animation after opening
+            UIFrameAnimator frameAnimator = backgroundPanel.GetComponent<UIFrameAnimator>();
+            if (frameAnimator != null)
+            {
+                try
+                {
+                    frameAnimator.SetIdleAnimationEnabled(true);
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogWarning($"[SuperPowerSpawner] Failed to enable idle animation after opening: {e.Message}");
+                }
+            }
+
+            // Fade out the open button since InfoBox is now open
+            StartCoroutine(FadeOpenButtonOut());
+
             // Don't play page change animation for initial opening
             Debug.Log("Case 1: No page change animation - initial opening");
         }
@@ -303,7 +368,7 @@ public class SuperPowerSpawner : MonoBehaviour
             }
             else
             {
-                backgroundPanel.transform.position = infoBoxOriginalPosition;
+                backgroundPanel.transform.position = infoBoxOriginalPosition.position;
             }
 
             // NEW: Play page change animation for fallback case too
@@ -315,6 +380,19 @@ public class SuperPowerSpawner : MonoBehaviour
 
             // NEW: Fade out current info, wait for delay, then fade in new info
             yield return StartCoroutine(FadeInfoWithDelay(superPowerToken));
+            
+            // Start idle animation after fallback page change completes
+            if (frameAnimator != null)
+            {
+                try
+                {
+                    frameAnimator.SetIdleAnimationEnabled(true);
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogWarning($"[SuperPowerSpawner] Failed to enable idle animation after fallback page change: {e.Message}");
+                }
+            }
         }
     }
 
@@ -530,16 +608,33 @@ public class SuperPowerSpawner : MonoBehaviour
 
         // Case 3: Animate from reach point back to original position
         Debug.Log($"[SuperPowerSpawner] Starting close animation to original position: {infoBoxOriginalPosition}");
-        currentAnimationCoroutine = StartCoroutine(AnimateInfoBoxPosition(infoBoxOriginalPosition));
+        currentAnimationCoroutine = StartCoroutine(AnimateInfoBoxPosition(infoBoxOriginalPosition.position));
         yield return currentAnimationCoroutine;
         currentAnimationCoroutine = null;
         Debug.Log("[SuperPowerSpawner] Close animation completed");
 
-        // Hide and reset
-        backgroundPanel.SetActive(false);
+        // Hide UI elements and stop idle animation, but keep InfoBox active at original position
         activateButton.gameObject.SetActive(false);
         falseActivateButton.gameObject.SetActive(false);
         closeButton.gameObject.SetActive(false);
+        
+        // Stop idle animation
+        UIFrameAnimator frameAnimator = backgroundPanel.GetComponent<UIFrameAnimator>();
+        if (frameAnimator != null)
+        {
+            try
+            {
+                frameAnimator.SetIdleAnimationEnabled(false);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[SuperPowerSpawner] Failed to disable idle animation: {e.Message}");
+            }
+        }
+        
+        // Fade in the open button since InfoBox is now closed
+        StartCoroutine(FadeOpenButtonIn());
+        
         SuperPowerToken.ActiveInstance = null;
         isInfoBoxOpen = false;
     }
@@ -552,10 +647,31 @@ public class SuperPowerSpawner : MonoBehaviour
         // Ensure UI elements are visible before closing
         EnsureUIElementsVisible();
 
-        backgroundPanel.SetActive(false);
+        // Move InfoBox to original position immediately (no animation)
+        if (backgroundPanel != null)
+        {
+            backgroundPanel.transform.position = infoBoxOriginalPosition.position;
+        }
+
+        // Hide UI elements and stop idle animation, but keep InfoBox active
         activateButton.gameObject.SetActive(false);
         falseActivateButton.gameObject.SetActive(false);
         closeButton.gameObject.SetActive(false);
+        
+        // Stop idle animation
+        UIFrameAnimator frameAnimator = backgroundPanel.GetComponent<UIFrameAnimator>();
+        if (frameAnimator != null)
+        {
+            try
+            {
+                frameAnimator.SetIdleAnimationEnabled(false);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[SuperPowerSpawner] Failed to disable idle animation: {e.Message}");
+            }
+        }
+        
         SuperPowerToken.ActiveInstance = null;
         isInfoBoxOpen = false;
         yield return null;
@@ -1262,5 +1378,85 @@ public class SuperPowerSpawner : MonoBehaviour
     {
         // Empty function for feedback - you can fill this later
         Debug.Log("[SuperPowerSpawner] Insufficient gold feedback triggered");
+    }
+    
+    /// <summary>
+    /// Fades the open button out when InfoBox opens
+    /// </summary>
+    private IEnumerator FadeOpenButtonOut()
+    {
+        MenuController menuController = FindObjectOfType<MenuController>();
+        if (menuController == null || menuController.OpenButtonGameObject == null)
+        {
+            yield break;
+        }
+        
+        GameObject openButton = menuController.OpenButtonGameObject;
+        
+        // Get or add CanvasGroup for fading
+        CanvasGroup buttonCanvasGroup = GetOrAddCanvasGroup(openButton);
+        if (buttonCanvasGroup == null)
+        {
+            Debug.LogWarning("[SuperPowerSpawner] Could not get/add CanvasGroup to open button");
+            openButton.SetActive(false);
+            yield break;
+        }
+        
+        // Fade out
+        float startAlpha = buttonCanvasGroup.alpha;
+        float elapsedTime = 0f;
+        
+        while (elapsedTime < buttonFadeDuration)
+        {
+            elapsedTime += Time.deltaTime;
+            float progress = elapsedTime / buttonFadeDuration;
+            buttonCanvasGroup.alpha = Mathf.Lerp(startAlpha, 0f, progress);
+            yield return null;
+        }
+        
+        buttonCanvasGroup.alpha = 0f;
+        openButton.SetActive(false);
+        Debug.Log("[SuperPowerSpawner] Open button faded out and deactivated");
+    }
+    
+    /// <summary>
+    /// Fades the open button in when InfoBox closes
+    /// </summary>
+    private IEnumerator FadeOpenButtonIn()
+    {
+        MenuController menuController = FindObjectOfType<MenuController>();
+        if (menuController == null || menuController.OpenButtonGameObject == null)
+        {
+            yield break;
+        }
+        
+        GameObject openButton = menuController.OpenButtonGameObject;
+        
+        // Get or add CanvasGroup for fading
+        CanvasGroup buttonCanvasGroup = GetOrAddCanvasGroup(openButton);
+        if (buttonCanvasGroup == null)
+        {
+            Debug.LogWarning("[SuperPowerSpawner] Could not get/add CanvasGroup to open button");
+            openButton.SetActive(true);
+            yield break;
+        }
+        
+        // Ensure button is active but invisible
+        openButton.SetActive(true);
+        buttonCanvasGroup.alpha = 0f;
+        
+        // Fade in
+        float elapsedTime = 0f;
+        
+        while (elapsedTime < buttonFadeDuration)
+        {
+            elapsedTime += Time.deltaTime;
+            float progress = elapsedTime / buttonFadeDuration;
+            buttonCanvasGroup.alpha = Mathf.Lerp(0f, 1f, progress);
+            yield return null;
+        }
+        
+        buttonCanvasGroup.alpha = 1f;
+        Debug.Log("[SuperPowerSpawner] Open button faded in and activated");
     }
 }

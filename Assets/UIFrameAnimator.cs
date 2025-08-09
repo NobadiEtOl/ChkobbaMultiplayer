@@ -21,6 +21,10 @@ public class UIFrameAnimator : MonoBehaviour
     void Start()
     {
         spriteRenderer = GetComponent<SpriteRenderer>();
+        if (spriteRenderer == null)
+        {
+            Debug.LogWarning("[UIFrameAnimator] SpriteRenderer component not found on " + gameObject.name);
+        }
         currentFrame = 0;
         timer = 0f;
     }
@@ -36,7 +40,7 @@ public class UIFrameAnimator : MonoBehaviour
 
     private void PlayIdleAnimation()
     {
-        if (animationFrames.Length == 0) return;
+        if (animationFrames.Length == 0 || spriteRenderer == null) return;
 
         timer += Time.deltaTime;
         if (timer >= 1f / frameRate)
@@ -67,7 +71,10 @@ public class UIFrameAnimator : MonoBehaviour
         // Play page change animation
         for (int i = 0; i < pageChangeFrames.Length; i++)
         {
-            spriteRenderer.sprite = pageChangeFrames[i];
+            if (spriteRenderer != null)
+            {
+                spriteRenderer.sprite = pageChangeFrames[i];
+            }
             yield return new WaitForSeconds(1f / pageChangeFrameRate);
         }
 
@@ -84,7 +91,7 @@ public class UIFrameAnimator : MonoBehaviour
         if (!enabled && !isPlayingPageChange)
         {
             // If disabling idle and no page change is playing, show first idle frame
-            if (animationFrames.Length > 0)
+            if (animationFrames.Length > 0 && spriteRenderer != null)
             {
                 spriteRenderer.sprite = animationFrames[0];
             }
