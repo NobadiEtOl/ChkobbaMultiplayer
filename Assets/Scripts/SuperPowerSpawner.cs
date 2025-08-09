@@ -1168,6 +1168,78 @@ public class SuperPowerSpawner : MonoBehaviour
     }
     
     /// <summary>
+    /// Get all token data for the token menu system
+    /// </summary>
+    public List<(GameObject tokenPrefab, SuperPower power)> GetAllTokenData()
+    {
+        List<(GameObject, SuperPower)> tokenData = new List<(GameObject, SuperPower)>();
+        
+        Debug.Log($"[SuperPowerSpawner] GetAllTokenData called - checking {superPowerTokens.Count} tokens");
+        
+        foreach (GameObject tokenPrefab in superPowerTokens)
+        {
+            if (tokenPrefab == null)
+            {
+                Debug.LogWarning("[SuperPowerSpawner] Null token prefab found in superPowerTokens list!");
+                continue;
+            }
+            
+            SuperPowerToken tokenScript = tokenPrefab.GetComponent<SuperPowerToken>();
+            if (tokenScript == null)
+            {
+                Debug.LogWarning($"[SuperPowerSpawner] Token prefab {tokenPrefab.name} does not have SuperPowerToken component!");
+                continue;
+            }
+            
+            SuperPower power = null;
+            
+            // Try to use the assigned power first
+            if (tokenScript.power != null)
+            {
+                power = tokenScript.power;
+                Debug.Log($"[SuperPowerSpawner] Using assigned power for {tokenPrefab.name}: {power.name}");
+            }
+            // If no assigned power, try to create from className
+            else if (!string.IsNullOrEmpty(tokenScript.superPowerClassName))
+            {
+                Debug.Log($"[SuperPowerSpawner] No assigned power for {tokenPrefab.name}, trying to create from className: {tokenScript.superPowerClassName}");
+                
+                var type = System.Type.GetType(tokenScript.superPowerClassName);
+                if (type != null && typeof(SuperPower).IsAssignableFrom(type))
+                {
+                    power = ScriptableObject.CreateInstance(type) as SuperPower;
+                    if (power != null)
+                    {
+                        Debug.Log($"[SuperPowerSpawner] Successfully created power from className: {power.name}");
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[SuperPowerSpawner] Failed to create SuperPower instance for {tokenScript.superPowerClassName}");
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning($"[SuperPowerSpawner] Could not find SuperPower type for {tokenScript.superPowerClassName}");
+                }
+            }
+            else
+            {
+                Debug.LogWarning($"[SuperPowerSpawner] Token {tokenPrefab.name} has no power assigned and no superPowerClassName!");
+                continue;
+            }
+            
+            if (power != null)
+            {
+                tokenData.Add((tokenPrefab, power));
+                Debug.Log($"[SuperPowerSpawner] Added token data: {tokenPrefab.name} -> {power.name} (rarity: {power.rarityMultiplier})");
+            }
+        }
+        
+        Debug.Log($"[SuperPowerSpawner] GetAllTokenData returning {tokenData.Count} tokens");
+        return tokenData;
+    }
+    
+    /// <summary>
     /// Gets current gold amount
     /// </summary>
     public int GetCurrentGold()
