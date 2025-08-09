@@ -547,7 +547,7 @@ public class SuperPowerSpawner : MonoBehaviour
     /// <summary>
     /// Immediately close the info box without animation (used for initialization or quick switches)
     /// </summary>
-    private IEnumerator CloseInfoBoxImmediate()
+    public IEnumerator CloseInfoBoxImmediate()
     {
         // Ensure UI elements are visible before closing
         EnsureUIElementsVisible();
