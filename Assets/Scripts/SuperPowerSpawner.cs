@@ -33,8 +33,26 @@ public class SuperPowerSpawner : MonoBehaviour
     [SerializeField] private int startingGold = 20; // Starting gold amount
     [SerializeField] private int maxGold = 100; // Maximum gold cap
     
+    [Header("Gold Popup Animation")]
+    [SerializeField] private Transform goldPopupLocation;
+    [SerializeField] private GameObject goldPopupPrefab; // Prefab for gold popup text (will be created if null)
+    [SerializeField] private float popupFadeDuration = 0.3f; // Duration for fade in/out
+    [SerializeField] private float popupScaleDuration = 0.2f; // Duration for scale animation
+    [SerializeField] private float popupMoveDuration = 1.0f; // Duration for upward movement
+    [SerializeField] private float popupMoveDistance = 100f; // How far upward the popup moves
+    [SerializeField] private float popupStartScale = 0.5f; // Starting scale of popup
+    [SerializeField] private float popupEndScale = 1.2f; // Maximum scale before shrinking
+    [SerializeField] private Color popupTextColor = Color.yellow; // Color of popup text
+    [SerializeField] private int popupFontSize = 24; // Font size of popup text
+    [SerializeField] private float cardProcessingDelay = 0.1f; // Delay between processing each card
+    [SerializeField] private float popupDisplayDelay = 0.3f; // Delay between showing each popup in queue
+    
     private int currentGold; // Current gold amount
     private int playerNumber; // Local player number
+    
+    // Gold popup queue system
+    private Queue<int> goldPopupQueue = new Queue<int>();
+    private bool isProcessingPopupQueue = false;
 
     
     [Header("InfoBox Animation Settings")]
@@ -61,6 +79,21 @@ public class SuperPowerSpawner : MonoBehaviour
 
     void Start()
     {
+        // Validate UI elements are properly initialized
+        if (backgroundPanel == null || infoBoxCanvas == null || nameText == null || 
+            descriptionText == null || activateButton == null || falseActivateButton == null || closeButton == null)
+        {
+            Debug.LogError("[SuperPowerSpawner] One or more UI elements are null after initialization. Attempting to re-initialize...");
+            GetUIElements();
+            
+            // Check again after re-initialization
+            if (backgroundPanel == null || infoBoxCanvas == null || nameText == null || 
+                descriptionText == null || activateButton == null || falseActivateButton == null || closeButton == null)
+            {
+                Debug.LogError("[SuperPowerSpawner] UI elements still null after re-initialization. InfoBox functionality will be disabled.");
+                return;
+            }
+        }
         
         // Validate reach point
         if (infoBoxReachPoint == null)
@@ -104,6 +137,17 @@ public class SuperPowerSpawner : MonoBehaviour
             {
                 buttonCanvasGroup.alpha = 1f; // Ensure it's fully visible
             }
+        }
+        
+        // Validate gold display text and popup location
+        if (goldDisplayText == null)
+        {
+            Debug.LogWarning("[SuperPowerSpawner] goldDisplayText is not assigned! Gold display will not work.");
+        }
+        
+        if (goldPopupLocation == null)
+        {
+            Debug.LogWarning("[SuperPowerSpawner] goldPopupLocation is not assigned! Gold popups will use fallback positioning.");
         }
         
         // Initialize gold system
@@ -242,6 +286,19 @@ public class SuperPowerSpawner : MonoBehaviour
     public IEnumerator OpenInfoBox(SuperPowerToken superPowerToken)
     {
         Debug.Log("Opening InfoBox for " + superPowerToken.power.name);
+
+        // Check for null references
+        if (backgroundPanel == null)
+        {
+            Debug.LogError("[SuperPowerSpawner] backgroundPanel is null in OpenInfoBox. Cannot open info box.");
+            yield break;
+        }
+
+        if (superPowerToken == null || superPowerToken.power == null)
+        {
+            Debug.LogError("[SuperPowerSpawner] superPowerToken or its power is null in OpenInfoBox.");
+            yield break;
+        }
 
         // Stop any current animation
         if (currentAnimationCoroutine != null)
@@ -546,6 +603,14 @@ public class SuperPowerSpawner : MonoBehaviour
     /// </summary>
     private void UpdateInfoBoxContent(SuperPowerToken superPowerToken)
     {
+        // Check for null references before updating content
+        if (activateButton == null || falseActivateButton == null || closeButton == null || 
+            nameText == null || descriptionText == null)
+        {
+            Debug.LogError("[SuperPowerSpawner] One or more UI elements are null in UpdateInfoBoxContent. Cannot update content.");
+            return;
+        }
+
         // Update content
         bool canActivate = CheckIfCardShouldBeSelected(superPowerToken.power.name);
         activateButton.gameObject.SetActive(canActivate);
@@ -591,6 +656,13 @@ public class SuperPowerSpawner : MonoBehaviour
     {
         Debug.Log("Closing InfoBox for " + SuperPowerToken.ActiveInstance?.power.name);
 
+        // Check for null references
+        if (backgroundPanel == null)
+        {
+            Debug.LogError("[SuperPowerSpawner] backgroundPanel is null in CloseInfoBox. Cannot close info box.");
+            yield break;
+        }
+
         if (!isInfoBoxOpen)
         {
             yield break; // Already closed
@@ -614,9 +686,9 @@ public class SuperPowerSpawner : MonoBehaviour
         Debug.Log("[SuperPowerSpawner] Close animation completed");
 
         // Hide UI elements and stop idle animation, but keep InfoBox active at original position
-        activateButton.gameObject.SetActive(false);
-        falseActivateButton.gameObject.SetActive(false);
-        closeButton.gameObject.SetActive(false);
+        if (activateButton != null) activateButton.gameObject.SetActive(false);
+        if (falseActivateButton != null) falseActivateButton.gameObject.SetActive(false);
+        if (closeButton != null) closeButton.gameObject.SetActive(false);
         
         // Stop idle animation
         UIFrameAnimator frameAnimator = backgroundPanel.GetComponent<UIFrameAnimator>();
@@ -1054,6 +1126,12 @@ public class SuperPowerSpawner : MonoBehaviour
 
     private IEnumerator ShowErrorMessageCoroutine()
     {
+        if (nameText == null || descriptionText == null || activateButton == null || falseActivateButton == null)
+        {
+            Debug.LogError("[SuperPowerSpawner] UI elements are null in ShowErrorMessageCoroutine.");
+            yield break;
+        }
+        
         nameText.text = "Hatan var";
         descriptionText.text = "Bu gücü kullanabilmek için önce bir kart seçmelisin";
         activateButton.gameObject.SetActive(false);
@@ -1072,6 +1150,12 @@ public class SuperPowerSpawner : MonoBehaviour
 
     private void ResetInfoBoxText()
     {
+        if (nameText == null || descriptionText == null || activateButton == null || falseActivateButton == null)
+        {
+            Debug.LogError("[SuperPowerSpawner] UI elements are null in ResetInfoBoxText.");
+            return;
+        }
+        
         nameText.text = currentNameText;
         descriptionText.text = currentDescriptionText;
 
@@ -1091,10 +1175,23 @@ public class SuperPowerSpawner : MonoBehaviour
 
     public void CheckIfBackgroundPanelOpen()
     {
+        if (backgroundPanel == null)
+        {
+            Debug.LogWarning("[SuperPowerSpawner] backgroundPanel is null in CheckIfBackgroundPanelOpen.");
+            return;
+        }
+        
         if (!backgroundPanel.activeSelf) return;
         else
         {
-            StartCoroutine(OpenInfoBox(SuperPowerToken.ActiveInstance));
+            if (SuperPowerToken.ActiveInstance != null)
+            {
+                StartCoroutine(OpenInfoBox(SuperPowerToken.ActiveInstance));
+            }
+            else
+            {
+                Debug.LogWarning("[SuperPowerSpawner] SuperPowerToken.ActiveInstance is null in CheckIfBackgroundPanelOpen.");
+            }
         }
     }
 
@@ -1133,6 +1230,7 @@ public class SuperPowerSpawner : MonoBehaviour
     {
         currentGold = startingGold;
         UpdateGoldDisplay();
+        ClearGoldPopupQueue(); // Clear any pending popups
         Debug.Log($"[SuperPowerSpawner] Gold reset to {currentGold} (new game started)");
     }
     
@@ -1214,31 +1312,30 @@ public class SuperPowerSpawner : MonoBehaviour
     
     /// <summary>
     /// Called when a capture happens locally
+    /// Note: Gold is now added individually per card in the new system.
+    /// For 2v2 mode, teammate sharing is handled by sending the appropriate amount to teammate.
     /// </summary>
     public void OnLocalCapture(string playedCard)
     {
-        int captureValue = CalculateCenterCardsValue();
-        captureValue += CardInteraction.cardLookup[playedCard].GetCardID()[1];
-        
-        // Check if it's 1v1 or 2v2 mode
-        Debug.Log($"[SuperPowerSpawner] Is2v2Mode: {Is2v2Mode()}"); 
+        // In 2v2 mode, we need to share gold with teammate
         if (Is2v2Mode())
         {
+            int captureValue = CalculateCenterCardsValue();
+            captureValue += CardInteraction.cardLookup[playedCard].GetCardID()[1];
+            
             // Share gold with teammate (50/50 split)
             int sharedGold = captureValue / 2;
-            AddGold(sharedGold);
             
             // Send gold share to teammate via network
             int teammateNumber = GetTeammateNumber();
             GameManager.LocalInstance.networkRelay.ShareGoldWithTeammateServerRPC(teammateNumber, sharedGold);
+            
+            Debug.Log($"[SuperPowerSpawner] Local capture in 2v2! Total value: {captureValue}, Shared with teammate: {sharedGold}");
         }
         else
         {
-            // 1v1 mode - player gets full amount
-            AddGold(captureValue);
+            Debug.Log($"[SuperPowerSpawner] Local capture in 1v1! Gold will be added individually per card.");
         }
-        
-        Debug.Log($"[SuperPowerSpawner] Local capture! Value: {captureValue}, Gold added: {captureValue}");
     }
     
     /// <summary>
@@ -1253,7 +1350,7 @@ public class SuperPowerSpawner : MonoBehaviour
     /// <summary>
     /// Checks if current game mode is 2v2
     /// </summary>
-    private bool Is2v2Mode()
+    public bool Is2v2Mode()
     {
         // You may need to adjust this based on how you determine game mode
         // For now, assuming 2v2 if there are 4 players
@@ -1458,5 +1555,236 @@ public class SuperPowerSpawner : MonoBehaviour
         
         buttonCanvasGroup.alpha = 1f;
         Debug.Log("[SuperPowerSpawner] Open button faded in and activated");
+    }
+    
+    /// <summary>
+    /// Creates and animates a gold popup text at the specified location
+    /// </summary>
+    public void ShowGoldPopup(int goldAmount)
+    {
+        if (goldPopupLocation == null && goldDisplayText == null)
+        {
+            Debug.LogWarning("[SuperPowerSpawner] No goldPopupLocation or goldDisplayText assigned. Cannot show gold popup.");
+            return;
+        }
+        
+        StartCoroutine(ShowGoldPopupCoroutine(goldAmount));
+    }
+    
+    /// <summary>
+    /// Coroutine that handles the gold popup animation
+    /// </summary>
+    /// <summary>
+    /// Coroutine that handles the gold popup animation: fades in, scales from start to end, then fades out (no scale shrink)
+    /// </summary>
+    private IEnumerator ShowGoldPopupCoroutine(int goldAmount)
+    {
+        // Create popup text object
+        GameObject popupObject = CreateGoldPopupObject(goldAmount);
+        if (popupObject == null) yield break;
+
+        TextMeshProUGUI popupText = popupObject.GetComponent<TextMeshProUGUI>();
+        CanvasGroup popupCanvasGroup = GetOrAddCanvasGroup(popupObject);
+
+        // Set initial state
+        popupCanvasGroup.alpha = 0f;
+        popupObject.transform.localScale = Vector3.one * popupStartScale;
+
+        Vector3 startPosition = popupObject.transform.position;
+        Vector3 endPosition = startPosition + new Vector3(0, popupMoveDistance, 0);
+
+        // Phase 1: Fade in and scale up (from start to end scale)
+        float elapsed = 0f;
+        while (elapsed < popupFadeDuration)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / popupFadeDuration);
+
+            popupCanvasGroup.alpha = Mathf.Lerp(0f, 1f, progress);
+            popupObject.transform.localScale = Vector3.one * Mathf.Lerp(popupStartScale, popupEndScale, progress);
+
+            yield return null;
+        }
+        popupCanvasGroup.alpha = 1f;
+        popupObject.transform.localScale = Vector3.one * popupEndScale;
+
+        // Phase 2: Move upward while visible (no scale shrink)
+        elapsed = 0f;
+        while (elapsed < popupMoveDuration)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / popupMoveDuration);
+
+            popupObject.transform.position = Vector3.Lerp(startPosition, endPosition, progress);
+
+            yield return null;
+        }
+        popupObject.transform.position = endPosition;
+
+        // Phase 3: Fade out (keep at end scale)
+        elapsed = 0f;
+        while (elapsed < popupFadeDuration)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / popupFadeDuration);
+
+            popupCanvasGroup.alpha = Mathf.Lerp(1f, 0f, progress);
+
+            yield return null;
+        }
+        popupCanvasGroup.alpha = 0f;
+
+        Destroy(popupObject);
+    }
+
+    /// <summary>
+    /// Creates a gold popup text object
+    /// </summary>
+    private GameObject CreateGoldPopupObject(int goldAmount)
+    {
+        GameObject popupObject;
+        
+        // Use prefab if available, otherwise create from scratch
+        if (goldPopupPrefab != null)
+        {
+            // Use goldPopupLocation as parent if available, otherwise use goldDisplayText parent
+            Transform parentTransform = goldPopupLocation != null ? goldPopupLocation : 
+                                      (goldDisplayText != null ? goldDisplayText.transform.parent : null);
+            
+            if (parentTransform == null)
+            {
+                Debug.LogError("[SuperPowerSpawner] No valid parent transform found for gold popup!");
+                return null;
+            }
+            
+            popupObject = Instantiate(goldPopupPrefab, parentTransform);
+        }
+        else
+        {
+            // Create popup object from scratch
+            popupObject = new GameObject("GoldPopup");
+            
+            // Use goldPopupLocation as parent if available, otherwise use goldDisplayText parent
+            Transform parentTransform = goldPopupLocation != null ? goldPopupLocation : 
+                                      (goldDisplayText != null ? goldDisplayText.transform.parent : null);
+            
+            if (parentTransform == null)
+            {
+                Debug.LogError("[SuperPowerSpawner] No valid parent transform found for gold popup!");
+                return null;
+            }
+            
+            popupObject.transform.SetParent(parentTransform, false);
+            
+            // Add TextMeshProUGUI component
+            TextMeshProUGUI popupText = popupObject.AddComponent<TextMeshProUGUI>();
+            popupText.text = $"+{goldAmount}";
+            popupText.fontSize = popupFontSize;
+            popupText.color = popupTextColor;
+            popupText.alignment = TextAlignmentOptions.Center;
+            popupText.fontStyle = FontStyles.Bold;
+            
+            // Add RectTransform setup
+            RectTransform rectTransform = popupObject.GetComponent<RectTransform>();
+            rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+            rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+            rectTransform.sizeDelta = new Vector2(100, 50);
+        }
+        
+        // Position at the goldPopupLocation if available, otherwise fallback to gold display position
+        if (goldPopupLocation != null)
+        {
+            popupObject.transform.position = goldPopupLocation.position;
+        }
+        else if (goldDisplayText != null)
+        {
+            // Fallback to original behavior
+            Vector3 goldDisplayPosition = goldDisplayText.transform.position;
+            popupObject.transform.position = goldDisplayPosition + Vector3.up * 50f;
+        }
+        else
+        {
+            Debug.LogWarning("[SuperPowerSpawner] No goldPopupLocation or goldDisplayText found. Popup will appear at origin.");
+            popupObject.transform.position = Vector3.zero;
+        }
+        
+        return popupObject;
+    }
+    
+    /// <summary>
+    /// Adds gold for a single card and queues popup animation (new queue-based system)
+    /// </summary>
+    public void AddGoldWithPopupQueued(int cardValue)
+    {
+        // Add gold immediately
+        AddGold(cardValue);
+        
+        // Queue the popup for display
+        QueueGoldPopup(cardValue);
+    }
+    
+    /// <summary>
+    /// Adds a gold value to the popup queue and starts processing if not already running
+    /// </summary>
+    public void QueueGoldPopup(int goldAmount)
+    {
+        goldPopupQueue.Enqueue(goldAmount);
+        Debug.Log($"[SuperPowerSpawner] Queued gold popup: +{goldAmount} (Queue size: {goldPopupQueue.Count})");
+        
+        // Start processing the queue if not already running
+        if (!isProcessingPopupQueue)
+        {
+            StartCoroutine(ProcessGoldPopupQueue());
+        }
+    }
+    
+    /// <summary>
+    /// Processes the gold popup queue, showing each popup with a delay
+    /// </summary>
+    private IEnumerator ProcessGoldPopupQueue()
+    {
+        isProcessingPopupQueue = true;
+        
+        while (goldPopupQueue.Count > 0)
+        {
+            int goldAmount = goldPopupQueue.Dequeue();
+            
+            // Show the popup for this gold amount
+            ShowGoldPopup(goldAmount);
+            
+            // Wait before showing the next popup
+            yield return new WaitForSeconds(popupDisplayDelay);
+        }
+        
+        isProcessingPopupQueue = false;
+    }
+    
+    /// <summary>
+    /// Legacy method for backward compatibility (old system)
+    /// </summary>
+    public IEnumerator AddGoldWithPopup(int cardValue)
+    {
+        // Show popup animation
+        ShowGoldPopup(cardValue);
+        
+        // Wait for a short delay to let popup start
+        yield return new WaitForSeconds(popupFadeDuration + popupScaleDuration);
+        
+        // Add the gold
+        AddGold(cardValue);
+    }
+    
+    /// <summary>
+    /// Public getter for card processing delay
+    /// </summary>
+    public float CardProcessingDelay => cardProcessingDelay;
+    
+    /// <summary>
+    /// Clears the gold popup queue (useful when starting new rounds)
+    /// </summary>
+    public void ClearGoldPopupQueue()
+    {
+        goldPopupQueue.Clear();
+        Debug.Log("[SuperPowerSpawner] Gold popup queue cleared.");
     }
 }

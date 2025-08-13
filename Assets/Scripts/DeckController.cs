@@ -1426,6 +1426,13 @@ public class DeckController : MonoBehaviour
 
         else
         {
+            // If this is the local player, process gold values first
+            if (relativePoolIndex == 0) // Local player
+            {
+                StartCoroutine(MoveCardsToLocalPlayerPoolWithGold(cardObjects, relativePoolIndex));
+            }
+            
+            // Move cards using existing system for ALL players (including local)
             foreach (var card in cardObjects)
             {
                 card.transform.parent = null; // Unparent the card
@@ -1434,6 +1441,43 @@ public class DeckController : MonoBehaviour
             }
             BuildPoolMoveListsAndMoveCards(playerPoolTransforms[GetPoolIndex(relativePoolIndex)].position, cardObjects, 10, GetPoolIndex(relativePoolIndex));
         }
+    }
+
+    /// <summary>
+    /// Processes gold values for local player (NO card movement - only gold calculation and queuing)
+    /// </summary>
+    private IEnumerator MoveCardsToLocalPlayerPoolWithGold(List<GameObject> cardObjects, int relativePoolIndex)
+    {
+        // Only process gold - NO card movement here
+        foreach (var card in cardObjects)
+        {
+            // Get card value for gold calculation
+            CardInteraction cardInteraction = card.GetComponent<CardInteraction>();
+            if (cardInteraction != null)
+            {
+                int[] cardID = cardInteraction.GetCardID();
+                if (cardID != null && cardID.Length >= 2)
+                {
+                    int cardValue = cardID[1]; // Card rank value (2-10)
+                    
+                    if (cardValue > 0 && SuperPowerSpawner.LocalInstance != null)
+                    {
+                        // Calculate actual gold to add (considering 2v2 mode sharing)
+                        int goldToAdd = cardValue;
+                        if (SuperPowerSpawner.LocalInstance.Is2v2Mode())
+                        {
+                            goldToAdd = cardValue / 2; // Half for 2v2 mode
+                        }
+                        
+                        // Add gold and queue popup immediately (no waiting)
+                        SuperPowerSpawner.LocalInstance.AddGoldWithPopupQueued(goldToAdd);
+                    }
+                }
+            }
+        }
+        
+        // No card movement here - BuildPoolMoveListsAndMoveCards handles that
+        yield return null;
     }
 
     private int GetPoolIndex(int relativePoolIndex)
