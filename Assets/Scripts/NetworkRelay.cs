@@ -456,5 +456,17 @@ public class NetworkRelay : NetworkBehaviour
         }
     }
 
+    // ===== GAME STATE SYNC =====
+
+    /// <summary>
+    /// Client RPC to apply a complete game state snapshot to all clients
+    /// </summary>
+    [ClientRpc(RequireOwnership = false)]
+    public void ApplyGameStateClientRPC(SerializableGameState snapshot)
+    {
+        Debug.Log($"[NetworkRelay] Received game state snapshot version {snapshot.snapshotVersion}");
+        GameManager.LocalInstance?.ApplyGameState(snapshot);
+    }
+
 
 }

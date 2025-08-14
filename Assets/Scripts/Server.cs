@@ -37,6 +37,11 @@ public class Server : NetworkBehaviour
     private bool oynayamazsinPending = false;
     private HashSet<ulong> dealCenterFinishedClients = new HashSet<ulong>();
 
+    // Game state management
+    private SerializableGameState manualSavedState;
+    private bool hasManualSavedState = false;
+    private int snapshotVersionCounter = 0;
+
     public void ResetAllServerVariables()
     {
         deckCardsDict = null;
@@ -436,6 +441,9 @@ public class Server : NetworkBehaviour
             kutsalDestePending = false;
             networkRelay.SetKutsalDesteActiveClientRPC(true); // Notify clients to start effect
         }
+        
+        // Send game state snapshot after turn changes
+        // Disabled: only manual load should broadcast snapshots
     }
 
     private void NextTurn()
@@ -1199,6 +1207,210 @@ public class Server : NetworkBehaviour
             // Now Delayed_DealCardPrefabsToPlayers will be called inside DealCardsToPlayerHands
         }
     }
+
+    // ===== GAME STATE MANAGEMENT =====
+
+    /// <summary>
+    /// Builds a complete game state snapshot from current server state
+    /// </summary>
+    public SerializableGameState BuildGameStateSnapshot()
+    {
+        snapshotVersionCounter++;
+        
+        var snapshot = new SerializableGameState();
+        
+        // Core game info
+        snapshot.snapshotVersion = snapshotVersionCounter;
+        snapshot.timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        snapshot.playerCount = this.playerCount;
+        snapshot.currentPlayer = this.currentPlayer;
+        snapshot.turnCounter = this.turnCounter;
+        snapshot.roundCount = this.roundCount;
+        snapshot.startingPlayerNo = this.startingPlayerNo;
+        snapshot.seed = this.seed;
+        snapshot.lastPlayerToCapture = this.lastPlayerToCapture;
+
+        // Convert deck from dictionary to ordered list (if you maintain deck order)
+        var deckList = new List<string>();
+        if (deckCardsDict != null)
+        {
+            foreach (var kvp in deckCardsDict)
+            {
+                deckList.Add(kvp.Key);
+            }
+        }
+        snapshot.deck = new SerializableStringList(deckList);
+
+        // Center cards (maintain order)
+        var centerList = new List<string>();
+        if (centerCardsDict != null)
+        {
+            foreach (var kvp in centerCardsDict)
+            {
+                centerList.Add(kvp.Key);
+            }
+        }
+        snapshot.center = new SerializableStringList(centerList);
+
+        // Player hands
+        snapshot.hands = new SerializableDictionary();
+        if (playersHandCardsIDs != null)
+        {
+            var handsDict = new Dictionary<int, List<string>>();
+            foreach (var kvp in playersHandCardsIDs)
+            {
+                handsDict[kvp.Key] = new List<string>(kvp.Value);
+            }
+            snapshot.hands = new SerializableDictionary(handsDict);
+        }
+
+        // Player pools
+        snapshot.pools = new SerializableDictionary();
+        if (playersPooledCardsIDs != null)
+        {
+            var poolsDict = new Dictionary<int, List<string>>();
+            foreach (var kvp in playersPooledCardsIDs)
+            {
+                poolsDict[kvp.Key] = new List<string>(kvp.Value);
+            }
+            snapshot.pools = new SerializableDictionary(poolsDict);
+        }
+
+        // Pişti pools (you may need to add this tracking to server)
+        snapshot.pistiPools = new SerializableDictionary();
+        // TODO: If you track pişti pools separately on server, add here
+        // For now, empty dictionary
+        snapshot.pistiPools = new SerializableDictionary(new Dictionary<int, List<string>>());
+
+        // Bomb stack (if you use this)
+        snapshot.bombStack = new SerializableStringList(new List<string>());
+
+        // Scores and counts
+        snapshot.points = new SerializableIntArray(points ?? new int[playerCount]);
+        snapshot.pistiCounts = new SerializableIntArray(piştiCounts ?? new int[playerCount]);
+
+        // Active effects and flags
+        snapshot.copiedCardMap = new SerializableStringDictionary(copiedCardMap ?? new Dictionary<string, string>());
+        snapshot.oynayamazsinActive = oynayamazsinPending; // Use your actual flag
+        snapshot.isYapamazsınActive = isYapamazsınActive;
+        snapshot.verZehriActive = verZehriActive;
+        snapshot.kutsalDesteActive = kutsalDesteActive;
+        snapshot.verZehriPending = verZehriPending;
+        snapshot.kutsalDestePending = kutsalDestePending;
+        snapshot.oynayamazsinPending = oynayamazsinPending;
+        snapshot.blockCount = blockCount;
+
+        // Optional: Player gold (leave empty for now since it's client-managed)
+        snapshot.playerGold = new SerializableDictionary(new Dictionary<int, List<string>>());
+
+        Debug.Log($"[Server] Built game state snapshot version {snapshot.snapshotVersion} with {centerList.Count} center cards, {playersHandCardsIDs?.Count ?? 0} player hands");
+        
+        return snapshot;
+    }
+
+    /// <summary>
+    /// Context menu to manually save current game state for testing
+    /// </summary>
+    [ContextMenu("Save Current Game State")]
+    public void SaveCurrentGameState()
+    {
+        manualSavedState = BuildGameStateSnapshot();
+        hasManualSavedState = true;
+        Debug.Log($"[Server] Manually saved game state version {manualSavedState.snapshotVersion}");
+    }
+
+    /// <summary>
+    /// Context menu to load and apply the manually saved game state to all clients
+    /// </summary>
+    [ContextMenu("Load Saved Game State")]
+    public void LoadSavedGameState()
+    {
+        if (!hasManualSavedState)
+        {
+            Debug.LogWarning("[Server] No manually saved game state available!");
+            return;
+        }
+
+        Debug.Log($"[Server] Loading manually saved game state version {manualSavedState.snapshotVersion}");
+        ApplyGameStateToServer(manualSavedState);
+        networkRelay.ApplyGameStateClientRPC(manualSavedState);
+    }
+
+    /// <summary>
+    /// Context menu to dump current game state for debugging
+    /// </summary>
+    [ContextMenu("Dump Current Game State")]
+    public void DumpCurrentGameState()
+    {
+        var snapshot = BuildGameStateSnapshot();
+        Debug.Log($"[Server] Current Game State Dump:\n" +
+                  $"Version: {snapshot.snapshotVersion}\n" +
+                  $"Player Count: {snapshot.playerCount}\n" +
+                  $"Current Player: {snapshot.currentPlayer}\n" +
+                  $"Turn Counter: {snapshot.turnCounter}\n" +
+                  $"Round Count: {snapshot.roundCount}\n" +
+                  $"Center Cards: {snapshot.center.ToList().Count}\n" +
+                  $"Player Hands: {(snapshot.hands.ToDictionary()?.Count ?? 0)}\n" +
+                  $"Player Pools: {(snapshot.pools.ToDictionary()?.Count ?? 0)}");
+    }
+
+    /// <summary>
+    /// Applies a game state snapshot to the server's internal state
+    /// </summary>
+    private void ApplyGameStateToServer(SerializableGameState snapshot)
+    {
+        // Core game info
+        this.currentPlayer = snapshot.currentPlayer;
+        this.turnCounter = snapshot.turnCounter;
+        this.roundCount = snapshot.roundCount;
+        this.startingPlayerNo = snapshot.startingPlayerNo;
+        this.lastPlayerToCapture = snapshot.lastPlayerToCapture;
+
+        // Rebuild dictionaries from snapshot
+        if (centerCardsDict == null) centerCardsDict = new Dictionary<string, int[]>();
+        centerCardsDict.Clear();
+        foreach (string cardId in snapshot.center.ToList())
+        {
+            if (allCardLookup.ContainsKey(cardId))
+            {
+                centerCardsDict[cardId] = allCardLookup[cardId];
+            }
+        }
+
+        if (playersHandCardsIDs == null) playersHandCardsIDs = new Dictionary<int, List<string>>();
+        playersHandCardsIDs.Clear();
+        var handsDict = snapshot.hands.ToDictionary();
+        foreach (var kvp in handsDict)
+        {
+            playersHandCardsIDs[kvp.Key] = kvp.Value;
+        }
+
+        if (playersPooledCardsIDs == null) playersPooledCardsIDs = new Dictionary<int, List<string>>();
+        playersPooledCardsIDs.Clear();
+        var poolsDict = snapshot.pools.ToDictionary();
+        foreach (var kvp in poolsDict)
+        {
+            playersPooledCardsIDs[kvp.Key] = kvp.Value;
+        }
+
+        // Apply effects and flags
+        copiedCardMap = snapshot.copiedCardMap.ToDictionary();
+        isYapamazsınActive = snapshot.isYapamazsınActive;
+        verZehriActive = snapshot.verZehriActive;
+        kutsalDesteActive = snapshot.kutsalDesteActive;
+        verZehriPending = snapshot.verZehriPending;
+        kutsalDestePending = snapshot.kutsalDestePending;
+        oynayamazsinPending = snapshot.oynayamazsinPending;
+        blockCount = snapshot.blockCount;
+
+        // Apply scores
+        points = snapshot.points.ToArray();
+        piştiCounts = snapshot.pistiCounts.ToArray();
+
+        Debug.Log($"[Server] Applied game state snapshot version {snapshot.snapshotVersion} to server");
+    }
+
+    // Note: Automatic or request-based broadcasting removed per user request. Only manual Save/Load remains.
 
 
 }

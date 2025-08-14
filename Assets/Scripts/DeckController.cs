@@ -23,7 +23,7 @@ public class DeckController : MonoBehaviour
     private List<GameObject> activeCards = new List<GameObject>();
     private List<CardInteraction> cardInteractionList; // List to store CardInteraction references
     public List<Transform> playerHandTransforms = new List<Transform>();
-    private List<Transform> playerPoolTransforms = new List<Transform>();
+    public List<Transform> playerPoolTransforms = new List<Transform>();
     public Transform centerTransform;
     private List<Transform> playerPiştiPoolTransforms = new List<Transform>();
     private int relativeIndex = 0;
