@@ -328,6 +328,9 @@ public class GameManager : MonoBehaviour
 
     public List<GameObject> kapkacCardsToBeReset = new List<GameObject>();
 
+    // Track cards that have been changed by powers (for save/load persistence)
+    private Dictionary<string, string> cardPowerEffects = new Dictionary<string, string>();
+
     [SerializeField] private GameObject kapkacEffectPrefab; // Prefab with your PNG as a SpriteRenderers
 
     [SerializeField] private GameObject kapkacAnimEffectPrefab; // The animation prefab for Kapkaç
@@ -3867,6 +3870,8 @@ public class GameManager : MonoBehaviour
             cardInteraction.SetCardID(cardID);
 
             cardInteraction.activePowerEffect = "Kapkaç";
+            // Track this card change for save/load persistence
+            cardPowerEffects[cardUniqueID] = "Kapkaç";
 
 
 
@@ -4187,6 +4192,8 @@ public class GameManager : MonoBehaviour
         // 4. Update the activePowerEffect
 
         cardScript.activePowerEffect = "YandımAnam";
+        // Track this card change for save/load persistence
+        cardPowerEffects[cardUniqueID] = "YandımAnam";
 
 
 
@@ -4241,6 +4248,8 @@ public class GameManager : MonoBehaviour
     {
         // Add header entry to sync log without clearing it
         SyncLog($"=== APPLYING GAME STATE (snapshot v{snapshot.snapshotVersion}) ===");
+        // Log current client-local state BEFORE applying snapshot for A/B comparison
+        LogDetailedLocalState("CLIENT BEFORE APPLY");
         
         // Ensure a clean slate immediately before we start rebuild
         if (deckController != null)
@@ -4314,6 +4323,8 @@ public class GameManager : MonoBehaviour
         UnfreezeClientAfterResync();
 
         SyncLog($"ApplyGameStateCoroutine completed successfully for snapshot v{snapshot.snapshotVersion}");
+        // Final detailed dump AFTER apply for comparison
+        LogDetailedLocalState("CLIENT AFTER APPLY");
     }
 
     /// <summary>
@@ -4371,6 +4382,7 @@ public class GameManager : MonoBehaviour
         // Clear any pending lists
         cardObjectsToBeDiscarted.Clear();
         kapkacCardsToBeReset.Clear();
+        cardPowerEffects.Clear();
     }
 
     /// <summary>
@@ -4419,8 +4431,13 @@ public class GameManager : MonoBehaviour
         // 1) Rebuild center cards (order preserved from snapshot)
         var centerList = snapshot.center.ToList();
         SyncLog($"Rebuilding center: {centerList.Count} cards");
-        foreach (string cardId in centerList)
+        
+        // Ensure centerTransform is in correct position
+        centerTransform.position = new Vector3(0, 50, 0);
+        
+        for (int i = 0; i < centerList.Count; i++)
         {
+            string cardId = centerList[i];
             if (CardInteraction.cardLookup.ContainsKey(cardId))
             {
                 var cardInteraction = CardInteraction.cardLookup[cardId];
@@ -4428,7 +4445,25 @@ public class GameManager : MonoBehaviour
                 cardObject.transform.SetParent(centerTransform, false);
                 centerCardsObjects.Add(cardObject);
                 centerCards[cardId] = cardInteraction.GetCardID();
-                SyncLog($"Center card rebuilt: {cardId} -> [{cardInteraction.GetCardID()[0]},{cardInteraction.GetCardID()[1]}]");
+                
+                // Apply proper positioning and rotation like DealCenter does
+                Vector3 centerPosition = centerTransform.position;
+                Vector3 centerRotation = centerTransform.rotation.eulerAngles;
+                
+                if (i == centerList.Count - 1) // Last card (top card) should be face up
+                {
+                    cardObject.transform.rotation = Quaternion.Euler(centerRotation.x + 180, centerRotation.y, UnityEngine.Random.Range(-12, 12));
+                    cardObject.transform.position = new Vector3(centerPosition.x, centerPosition.y + 10, centerPosition.z);
+                }
+                else
+                {
+                    cardObject.transform.rotation = Quaternion.Euler(centerRotation.x, centerRotation.y, UnityEngine.Random.Range(-12, 12));
+                    cardObject.transform.position = new Vector3(centerPosition.x, centerPosition.y, centerPosition.z);
+                }
+                
+                cardObject.transform.localScale = new Vector3(deckCtrl.centerScale, deckCtrl.centerScale, deckCtrl.centerScale);
+                
+                SyncLog($"Center card rebuilt: {cardId} -> [{cardInteraction.GetCardID()[0]},{cardInteraction.GetCardID()[1]}] (face up: {i == centerList.Count - 1})");
             }
             else
             {
@@ -4488,7 +4523,38 @@ public class GameManager : MonoBehaviour
         deckCtrl.AssignCardsToPlayerPools(new SerializableDictionary(relPools));
         SyncLog("AssignCardsToPlayerPools completed");
 
-        // 5) Layout update after parenting
+        // 5) Handle bombed cards (cards outside normal game flow)
+        var bombedList = snapshot.bombStack.ToList();
+        SyncLog($"Rebuilding bombed cards: {bombedList.Count} cards");
+        foreach (string cardId in bombedList)
+        {
+            if (CardInteraction.cardLookup.ContainsKey(cardId))
+            {
+                var cardInteraction = CardInteraction.cardLookup[cardId];
+                var cardObject = cardInteraction.gameObject;
+                
+                // Move to BombedStack GameObject (outside normal game flow)
+                GameObject bombedStack = GameObject.Find("BombedStack");
+                if (bombedStack != null)
+                {
+                    cardObject.transform.SetParent(bombedStack.transform, false);
+                    cardObject.transform.localPosition = Vector3.zero;
+                    cardObject.transform.localScale = new Vector3(deckCtrl.centerScale, deckCtrl.centerScale, deckCtrl.centerScale);
+                    SyncLog($"Bombed card rebuilt: {cardId} -> BombedStack");
+                }
+                else
+                {
+                    SyncLogWarning($"BombedStack GameObject not found, card {cardId} left unparented");
+                }
+            }
+            else
+            {
+                SyncLogWarning($"Bombed card rebuild: card not found {cardId}");
+            }
+        }
+        SyncLog($"Bombed cards rebuild complete: {bombedList.Count} cards placed");
+
+        // 6) Layout update after parenting
         SyncLog("Calling UpdateCurrentPlayerHandLayout");
         deckCtrl.UpdateCurrentPlayerHandLayout();
         SyncLog("UpdateCurrentPlayerHandLayout completed");
@@ -4512,10 +4578,65 @@ public class GameManager : MonoBehaviour
         SetOynayamazsinActive(snapshot.oynayamazsinActive);
         SetVerZehriActive(snapshot.verZehriActive);
         SetKutsalDesteActive(snapshot.kutsalDesteActive);
+        
+        // Apply client-side superpower states
+        isKapkacPending = snapshot.isKapkacPending;
+        isYandimAnamPending = snapshot.isYandimAnamPending;
+        isKopyalaActive = snapshot.isKopyalaActive;
+        isSunuDegisTokusActive = snapshot.isSunuDegisTokusActive;
+        isSunuDegisBunuTokusActive = snapshot.isSunuDegisBunuTokusActive;
+
+        // Apply card power effects (Kapkaç, Yandım Anam, etc.)
+        cardPowerEffects = snapshot.cardPowerEffects.ToDictionary();
+        ApplyCardPowerEffects();
 
         // TODO: Apply copied card map if needed
         // var copiedCards = snapshot.copiedCardMap.ToDictionary();
         // Handle card copying state restoration here
+    }
+
+    /// <summary>
+    /// Applies card power effects (Kapkaç, Yandım Anam) to cards after loading game state
+    /// </summary>
+    private void ApplyCardPowerEffects()
+    {
+        if (cardPowerEffects == null) return;
+
+        foreach (var kvp in cardPowerEffects)
+        {
+            string cardUniqueID = kvp.Key;
+            string powerEffect = kvp.Value;
+
+            if (CardInteraction.cardLookup.TryGetValue(cardUniqueID, out var cardInteraction))
+            {
+                cardInteraction.activePowerEffect = powerEffect;
+
+                switch (powerEffect)
+                {
+                    case "Kapkaç":
+                        // Set card value to 11 (Jack)
+                        int[] cardID = cardInteraction.GetCardID();
+                        cardID[1] = 11;
+                        cardInteraction.SetCardID(cardID);
+                        // Note: Visual effects will be handled by the card's existing logic
+                        break;
+
+                    case "YandımAnam":
+                        // Set card value to 0
+                        cardInteraction.SetCardValue(0);
+                        // Note: Visual effects will be handled by the card's existing logic
+                        break;
+
+                    default:
+                        Debug.LogWarning($"Unknown power effect: {powerEffect} for card {cardUniqueID}");
+                        break;
+                }
+            }
+            else
+            {
+                Debug.LogWarning($"Card {cardUniqueID} not found in cardLookup when applying power effect {powerEffect}");
+            }
+        }
     }
 
     /// <summary>
@@ -4578,6 +4699,20 @@ public class GameManager : MonoBehaviour
         {
             SyncLog($"Snapshot pools abs P{kvp.Key} ({kvp.Value.Count}): [{string.Join(", ", kvp.Value)}]");
         }
+        
+        var bombedList = snapshot.bombStack.ToList();
+        SyncLog($"Snapshot bombed ({bombedList.Count}): [{string.Join(", ", bombedList)}]");
+        
+        // Superpower states
+        SyncLog($"Snapshot superpowers: verZehri={snapshot.verZehriActive}, kutsalDeste={snapshot.kutsalDesteActive}, oynayamazsin={snapshot.oynayamazsinPending}, blockCount={snapshot.blockCount}");
+        SyncLog($"Snapshot client powers: kapkac={snapshot.isKapkacPending}, yandimAnam={snapshot.isYandimAnamPending}, kopyala={snapshot.isKopyalaActive}, sunuDegis={snapshot.isSunuDegisTokusActive}, sunuDegisBunu={snapshot.isSunuDegisBunuTokusActive}");
+        
+        // Card power effects
+        var cardEffects = snapshot.cardPowerEffects.ToDictionary();
+        if (cardEffects.Count > 0)
+        {
+            SyncLog($"Snapshot card power effects ({cardEffects.Count}): [{string.Join(", ", cardEffects.Select(kvp => $"{kvp.Key}:{kvp.Value}"))}]");
+        }
     }
 
     private void LogLocalStateSummary(string label)
@@ -4601,6 +4736,182 @@ public class GameManager : MonoBehaviour
             var pool = CollectPoolUniqueIdsByRel(rel);
             SyncLog($"Local pool rel{rel} ({pool.Count}): [{string.Join(", ", pool)}]");
         }
+    }
+
+    // ===== EXTRA DETAILED LOGGING FOR SYNC DIAGNOSTICS =====
+
+    public void LogSnapshotForSyncLogs(SerializableGameState snapshot, string label)
+    {
+        SyncLog($"=== {label} ===");
+        LogSnapshotSummary(snapshot);
+    }
+
+    /// <summary>
+    /// Captures current client-side superpower states and sends them to server for saving
+    /// </summary>
+    public void CaptureClientSuperpowerStatesForSave()
+    {
+        // This method can be called before saving to ensure client states are captured
+        // For now, the states are captured during ApplyGameState, but this could be enhanced
+        // to send current states to server before save if needed
+        Debug.Log($"[GameManager] Current client superpower states: kapkac={isKapkacPending}, yandimAnam={isYandimAnamPending}, kopyala={isKopyalaActive}, sunuDegis={isSunuDegisTokusActive}, sunuDegisBunu={isSunuDegisBunuTokusActive}");
+    }
+
+    private void LogDetailedLocalState(string label)
+    {
+        var deckCtrl = deckController;
+        SyncLog($"--- DETAILED LOCAL STATE: {label} ---");
+
+        // Basic info
+        SyncLog($"currentPlayerNo={currentPlayerNo}, turnCounter={turnCounter}");
+
+        // Center (dictionary + objects order)
+        try
+        {
+            SyncLog($"centerCards dict ({centerCards.Count}): [{string.Join(", ", centerCards.Select(kvp => kvp.Key + ":" + kvp.Value[0] + "_" + kvp.Value[1]))}]");
+        }
+        catch (Exception ex)
+        {
+            SyncLogWarning($"centerCards dict log failed: {ex.Message}");
+        }
+        try
+        {
+            var centerOrder = CollectCenterUniqueIds();
+            SyncLog($"centerCardsObjects order ({centerOrder.Count}): [{string.Join(", ", centerOrder)}]");
+        }
+        catch (Exception ex)
+        {
+            SyncLogWarning($"centerCardsObjects log failed: {ex.Message}");
+        }
+
+        // My cards (client's known hand list)
+        try
+        {
+            if (myCards != null)
+            {
+                var myCardsWithVals = myCards.Select(id =>
+                {
+                    if (CardInteraction.cardLookup.TryGetValue(id, out var ci))
+                    {
+                        var cid = ci.GetCardID();
+                        return id + "(" + cid[0] + "_" + cid[1] + ")";
+                    }
+                    return id + "(n/a)";
+                }).ToList();
+                SyncLog($"myCards ({myCards.Count}): [{string.Join(", ", myCardsWithVals)}]");
+            }
+            else
+            {
+                SyncLog("myCards is null");
+            }
+        }
+        catch (Exception ex)
+        {
+            SyncLogWarning($"myCards log failed: {ex.Message}");
+        }
+
+        // Player hand transforms (children that actually hold cards)
+        try
+        {
+            if (deckCtrl != null && deckCtrl.playerHandTransforms != null)
+            {
+                for (int i = 0; i < deckCtrl.playerHandTransforms.Count; i++)
+                {
+                    var t = deckCtrl.playerHandTransforms[i];
+                    var children = CollectCardsUnderTransform(t);
+                    SyncLog($"handTransform[{i}] '{t?.name}' cards ({children.Count}): [{string.Join(", ", children)}]");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            SyncLogWarning($"playerHandTransforms log failed: {ex.Message}");
+        }
+
+        // Player pool transforms
+        try
+        {
+            if (deckCtrl != null && deckCtrl.playerPoolTransforms != null)
+            {
+                for (int i = 0; i < deckCtrl.playerPoolTransforms.Count; i++)
+                {
+                    var t = deckCtrl.playerPoolTransforms[i];
+                    var children = CollectCardsUnderTransform(t);
+                    SyncLog($"poolTransform[{i}] '{t?.name}' cards ({children.Count}): [{string.Join(", ", children)}]");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            SyncLogWarning($"playerPoolTransforms log failed: {ex.Message}");
+        }
+
+        // Pişti pool transforms (if used)
+        try
+        {
+            if (playerPiştiPoolTransforms != null)
+            {
+                for (int i = 0; i < playerPiştiPoolTransforms.Count; i++)
+                {
+                    var t = playerPiştiPoolTransforms[i];
+                    var children = CollectCardsUnderTransform(t);
+                    SyncLog($"pistiPoolTransform[{i}] '{t?.name}' cards ({children.Count}): [{string.Join(", ", children)}]");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            SyncLogWarning($"playerPiştiPoolTransforms log failed: {ex.Message}");
+        }
+
+        // Sanity: card lookup count
+        SyncLog($"CardInteraction.cardLookup count={CardInteraction.cardLookup?.Count ?? 0}");
+
+        // Client-side superpower states
+        SyncLog($"Client superpowers: kapkac={isKapkacPending}, yandimAnam={isYandimAnamPending}, kopyala={isKopyalaActive}, sunuDegis={isSunuDegisTokusActive}, sunuDegisBunu={isSunuDegisBunuTokusActive}");
+
+        // Card power effects
+        if (cardPowerEffects != null && cardPowerEffects.Count > 0)
+        {
+            SyncLog($"Client card power effects ({cardPowerEffects.Count}): [{string.Join(", ", cardPowerEffects.Select(kvp => $"{kvp.Key}:{kvp.Value}"))}]");
+        }
+
+        // Bombed cards (outside normal game flow)
+        try
+        {
+            GameObject bombedStack = GameObject.Find("BombedStack");
+            if (bombedStack != null)
+            {
+                var bombedChildren = CollectCardsUnderTransform(bombedStack.transform);
+                SyncLog($"bombedStack '{bombedStack.name}' cards ({bombedChildren.Count}): [{string.Join(", ", bombedChildren)}]");
+            }
+            else
+            {
+                SyncLog("bombedStack GameObject not found");
+            }
+        }
+        catch (Exception ex)
+        {
+            SyncLogWarning($"bombedStack log failed: {ex.Message}");
+        }
+    }
+
+    private List<string> CollectCardsUnderTransform(Transform parent)
+    {
+        var ids = new List<string>();
+        if (parent == null) return ids;
+        int idx = 0;
+        foreach (Transform child in parent)
+        {
+            var ci = child.GetComponent<CardInteraction>();
+            if (ci != null)
+            {
+                var cardID = ci.GetCardID();
+                ids.Add($"{idx}:{ci.uniqueCardInstanceID}({cardID[0]}_{cardID[1]})");
+            }
+            idx++;
+        }
+        return ids;
     }
 
     private List<string> CollectCenterUniqueIds()

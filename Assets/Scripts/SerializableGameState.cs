@@ -42,6 +42,16 @@ public struct SerializableGameState : INetworkSerializable
     public bool oynayamazsinPending;
     public int blockCount;
 
+    // Client-side superpower states that need to persist
+    public bool isKapkacPending;
+    public bool isYandimAnamPending;
+    public bool isKopyalaActive;
+    public bool isSunuDegisTokusActive;
+    public bool isSunuDegisBunuTokusActive;
+
+    // Card power effect tracking (for Kapkaç, Yandım Anam, etc.)
+    public SerializableStringDictionary cardPowerEffects; // Dictionary<string, string> - cardID -> powerEffect
+
     // Optional: Player gold (if you want gold to be sync-safe)
     public SerializableDictionary playerGold; // Dictionary<int, int>
 
@@ -76,6 +86,16 @@ public struct SerializableGameState : INetworkSerializable
         serializer.SerializeValue(ref kutsalDestePending);
         serializer.SerializeValue(ref oynayamazsinPending);
         serializer.SerializeValue(ref blockCount);
+        
+        // Client-side superpower states
+        serializer.SerializeValue(ref isKapkacPending);
+        serializer.SerializeValue(ref isYandimAnamPending);
+        serializer.SerializeValue(ref isKopyalaActive);
+        serializer.SerializeValue(ref isSunuDegisTokusActive);
+        serializer.SerializeValue(ref isSunuDegisBunuTokusActive);
+
+        // Card power effects
+        serializer.SerializeValue(ref cardPowerEffects);
 
         serializer.SerializeValue(ref playerGold);
     }

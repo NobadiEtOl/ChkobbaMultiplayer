@@ -469,4 +469,12 @@ public class NetworkRelay : NetworkBehaviour
     }
 
 
+    // Debug-only: broadcast a snapshot to be logged into clients' sync logs
+    [ClientRpc(RequireOwnership = false)]
+    public void LogSnapshotClientRPC(SerializableGameState snapshot, string label)
+    {
+        GameManager.LocalInstance?.LogSnapshotForSyncLogs(snapshot, label);
+    }
+
+
 }

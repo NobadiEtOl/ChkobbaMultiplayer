@@ -36,6 +36,9 @@ public class Server : NetworkBehaviour
     private Dictionary<string, string> copiedCardMap = new Dictionary<string, string>();
     private bool oynayamazsinPending = false;
     private HashSet<ulong> dealCenterFinishedClients = new HashSet<ulong>();
+    
+    // Track cards outside normal game flow (e.g., bombed cards)
+    private List<string> bombedCards = new List<string>();
 
     // Game state management
     private SerializableGameState manualSavedState;
@@ -66,6 +69,7 @@ public class Server : NetworkBehaviour
         winnerPrintFlag = false;
         copiedCardMap.Clear();
         zaferPuaniPoints.Clear();
+        bombedCards.Clear();
     }
 
     public void ResetForNewRound()
@@ -86,6 +90,7 @@ public class Server : NetworkBehaviour
         winnerPrintFlag = false;
         copiedCardMap.Clear();
         zaferPuaniPoints.Clear();
+        bombedCards.Clear(); // Clear bombed cards for new round
         // DO NOT reset: points, piştiCounts, roundCount, startingPlayerNo
     }
 
@@ -837,6 +842,13 @@ public class Server : NetworkBehaviour
             networkRelay.SendMoveToClientRPC(selectedHandCardUniqueID, new SerializableCard(updatedDict), playerNumber);
             lastPlayerToCapture = playerNumber;
 
+            // CRITICAL FIX: Remove the played card from the server's hand tracking
+            if (playersHandCardsIDs != null && playersHandCardsIDs.ContainsKey(playerNumber))
+            {
+                bool removed = playersHandCardsIDs[playerNumber].Remove(selectedHandCardUniqueID);
+                Debug.Log($"[Server] CAPTURE: Removed card {selectedHandCardUniqueID} from player {playerNumber} hand: {removed}");
+            }
+
             if (verZehriActive)
             {
                 int team = (playerNumber % 2);
@@ -859,6 +871,13 @@ public class Server : NetworkBehaviour
         else
         {
             AddCardIDToCenter(selectedHandCardUniqueID, selectedHandCard);
+            
+            // CRITICAL FIX: Remove the played card from the server's hand tracking
+            if (playersHandCardsIDs != null && playersHandCardsIDs.ContainsKey(playerNumber))
+            {
+                bool removed = playersHandCardsIDs[playerNumber].Remove(selectedHandCardUniqueID);
+                Debug.Log($"[Server] ADD TO CENTER: Removed card {selectedHandCardUniqueID} from player {playerNumber} hand: {removed}");
+            }
         }
         //if(singleDebuggingMode)EndTurn();
     }
@@ -962,9 +981,16 @@ public class Server : NetworkBehaviour
 
     public void BombaCenter()
     {
-        // Remove all cards from the center (do NOT add to any player's pool)
-        if (centerCardsDict != null)
+        // Move all center cards to bombed stack (outside normal game flow)
+        if (centerCardsDict != null && centerCardsDict.Count > 0)
+        {
+            foreach (var cardId in centerCardsDict.Keys.ToList())
+            {
+                bombedCards.Add(cardId);
+                Debug.Log($"[Server] Bomba: Moved card {cardId} to bombed stack");
+            }
             centerCardsDict.Clear();
+        }
 
         // Notify all clients to update their view
         networkRelay.BombaClientRPC();
@@ -1103,11 +1129,12 @@ public class Server : NetworkBehaviour
             return;
         }
 
+        Debug.Log("=== CURRENT SERVER HAND TRACKING ===");
         foreach (var kvp in playersHandCardsIDs)
         {
             int playerNo = kvp.Key;
             List<string> hand = kvp.Value;
-            Debug.Log($"Player {playerNo} hand:");
+            Debug.Log($"Player {playerNo} hand ({hand.Count} cards):");
             foreach (var cardID in hand)
             {
                 if (allCardLookup.TryGetValue(cardID, out int[] cardArr))
@@ -1120,6 +1147,45 @@ public class Server : NetworkBehaviour
                 }
             }
         }
+        Debug.Log("=== END SERVER HAND TRACKING ===");
+    }
+
+    [ContextMenu("Debug Current Game State for Save")]
+    public void DebugCurrentGameStateForSave()
+    {
+        Debug.Log("=== DEBUG: CURRENT GAME STATE FOR SAVE ===");
+        
+        // Show what would be saved
+        if (playersHandCardsIDs != null)
+        {
+            Debug.Log("Server playersHandCardsIDs (what gets saved):");
+            foreach (var kvp in playersHandCardsIDs)
+            {
+                Debug.Log($"  P{kvp.Key}: [{string.Join(", ", kvp.Value)}] ({kvp.Value.Count} cards)");
+            }
+        }
+        
+        if (centerCardsDict != null)
+        {
+            var centerList = centerCardsDict.Keys.ToList();
+            Debug.Log($"Server centerCardsDict: [{string.Join(", ", centerList)}] ({centerList.Count} cards)");
+        }
+        
+        if (playersPooledCardsIDs != null)
+        {
+            Debug.Log("Server playersPooledCardsIDs:");
+            foreach (var kvp in playersPooledCardsIDs)
+            {
+                Debug.Log($"  P{kvp.Key}: [{string.Join(", ", kvp.Value)}] ({kvp.Value.Count} cards)");
+            }
+        }
+        
+        if (bombedCards != null)
+        {
+            Debug.Log($"Server bombedCards: [{string.Join(", ", bombedCards)}] ({bombedCards.Count} cards)");
+        }
+        
+        Debug.Log("=== END DEBUG GAME STATE ===");
     }
 
     private Dictionary<int, int> zaferPuaniPoints = new Dictionary<int, int>();
@@ -1282,8 +1348,8 @@ public class Server : NetworkBehaviour
         // For now, empty dictionary
         snapshot.pistiPools = new SerializableDictionary(new Dictionary<int, List<string>>());
 
-        // Bomb stack (if you use this)
-        snapshot.bombStack = new SerializableStringList(new List<string>());
+        // Bomb stack (cards outside normal game flow)
+        snapshot.bombStack = new SerializableStringList(bombedCards ?? new List<string>());
 
         // Scores and counts
         snapshot.points = new SerializableIntArray(points ?? new int[playerCount]);
@@ -1300,6 +1366,19 @@ public class Server : NetworkBehaviour
         snapshot.oynayamazsinPending = oynayamazsinPending;
         snapshot.blockCount = blockCount;
 
+        // Client-side superpower states (get from GameManager if available)
+        snapshot.isKapkacPending = false;
+        snapshot.isYandimAnamPending = false;
+        snapshot.isKopyalaActive = false;
+        snapshot.isSunuDegisTokusActive = false;
+        snapshot.isSunuDegisBunuTokusActive = false;
+        
+        // Card power effects (get from GameManager if available)
+        snapshot.cardPowerEffects = new SerializableStringDictionary(new Dictionary<string, string>());
+        
+        // Note: These client-side states will be set by the client during ApplyGameState
+        // since the server doesn't have direct access to GameManager.LocalInstance
+
         // Optional: Player gold (leave empty for now since it's client-managed)
         snapshot.playerGold = new SerializableDictionary(new Dictionary<int, List<string>>());
 
@@ -1314,9 +1393,14 @@ public class Server : NetworkBehaviour
     [ContextMenu("Save Current Game State")]
     public void SaveCurrentGameState()
     {
+        // Debug what's being saved BEFORE creating snapshot
+        DebugCurrentGameStateForSave();
+        
         manualSavedState = BuildGameStateSnapshot();
         hasManualSavedState = true;
         Debug.Log($"[Server] Manually saved game state version {manualSavedState.snapshotVersion}");
+        // Ask clients to log the saved snapshot for BEFORE/AFTER comparison
+        networkRelay.LogSnapshotClientRPC(manualSavedState, $"SERVER SAVED SNAPSHOT v{manualSavedState.snapshotVersion}");
     }
 
     /// <summary>
@@ -1332,6 +1416,8 @@ public class Server : NetworkBehaviour
         }
 
         Debug.Log($"[Server] Loading manually saved game state version {manualSavedState.snapshotVersion}");
+        // Tell clients to log their current local BEFORE state via ApplyGameState path
+        networkRelay.LogSnapshotClientRPC(manualSavedState, $"SERVER LOADING SNAPSHOT v{manualSavedState.snapshotVersion}");
         ApplyGameStateToServer(manualSavedState);
         networkRelay.ApplyGameStateClientRPC(manualSavedState);
     }
@@ -1391,6 +1477,15 @@ public class Server : NetworkBehaviour
         foreach (var kvp in poolsDict)
         {
             playersPooledCardsIDs[kvp.Key] = kvp.Value;
+        }
+
+        // Apply bombed cards (cards outside normal game flow)
+        bombedCards.Clear();
+        var bombedList = snapshot.bombStack.ToList();
+        foreach (string cardId in bombedList)
+        {
+            bombedCards.Add(cardId);
+            Debug.Log($"[Server] Load: Restored bombed card {cardId} to bomb stack");
         }
 
         // Apply effects and flags
