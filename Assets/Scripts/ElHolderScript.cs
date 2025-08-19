@@ -39,16 +39,25 @@ public class ElHolderScript : MonoBehaviour
 
         foreach (Transform child in gameObject.transform)
         {
-            handObjects.Add(child.gameObject);
-            frameObjects.Add(child.gameObject);
+            // Check if this is a frame object (has a Renderer but no Animator)
             Animator animator = child.GetComponent<Animator>();
+            Renderer renderer = child.GetComponent<Renderer>();
+            
             if (animator != null)
             {
+                // This is a hand object (has animator)
+                handObjects.Add(child.gameObject);
                 animatorHands.Add(animator);
+            }
+            else if (renderer != null)
+            {
+                // This is a frame object (has renderer but no animator)
+                frameObjects.Add(child.gameObject);
             }
         }
 
-        // Apply the assigned material to all frames
+        // Apply the assigned material to frame objects only
+        Debug.Log($"ElHolderScript: Found {handObjects.Count} hand objects and {frameObjects.Count} frame objects");
         ApplyFrameMaterial();
     }
 
@@ -723,7 +732,8 @@ public class ElHolderScript : MonoBehaviour
             return;
         }
 
-        // Apply the material to all frame objects
+        // Apply the material to all frame objects only
+        Debug.Log($"Applying frame material to {frameObjects.Count} frame objects");
         foreach (GameObject frameObject in frameObjects)
         {
             if (frameObject != null)
@@ -732,7 +742,7 @@ public class ElHolderScript : MonoBehaviour
                 if (renderer != null)
                 {
                     renderer.material = frameMaterial;
-                    Debug.Log($"Applied frame material to {frameObject.name}");
+                    Debug.Log($"Applied frame material to frame: {frameObject.name}");
                 }
                 else
                 {

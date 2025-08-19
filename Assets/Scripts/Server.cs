@@ -91,6 +91,10 @@ public class Server : NetworkBehaviour
         copiedCardMap.Clear();
         zaferPuaniPoints.Clear();
         bombedCards.Clear(); // Clear bombed cards for new round
+        
+        // Reset move chains for new round
+        MoveChainIntegrator.ResetChains();
+        
         // DO NOT reset: points, piştiCounts, roundCount, startingPlayerNo
     }
 
@@ -830,8 +834,19 @@ public class Server : NetworkBehaviour
         Debug.LogWarning("Selected hand card: " + selectedHandCard[0] + "_" + selectedHandCard[1]);
         Debug.LogWarning("Sum value: " + sumValue);
 
+        // === MOVE CHAIN TRACKING ===
+        string[] capturedCardIds = new string[0];
+        var dict = serializableCard.ToDictionary();
+        if (dict != null && dict.Count > 0)
+        {
+            capturedCardIds = dict.Keys.ToArray();
+        }
+        
         if (selectedHandCard[1] == sumValue || (selectedHandCard[1] == 11 && sumValue != 0))
         {
+            // This is a capture move
+            MoveChainIntegrator.TrackServerCardPlay(playerNumber, selectedHandCardUniqueID, selectedHandCard, capturedCardIds, sumValue);
+            
             int centerCardCount = centerCardsDict.Count + 1;
             RemoveCardsFromCenter(serializableCard);
             // Add the played card to the serializableCard for pool addition
@@ -870,6 +885,9 @@ public class Server : NetworkBehaviour
         }
         else
         {
+            // This is a play to center move
+            MoveChainIntegrator.TrackServerCardPlay(playerNumber, selectedHandCardUniqueID, selectedHandCard, new string[0], sumValue);
+            
             AddCardIDToCenter(selectedHandCardUniqueID, selectedHandCard);
             
             // CRITICAL FIX: Remove the played card from the server's hand tracking

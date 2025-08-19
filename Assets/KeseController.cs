@@ -42,6 +42,11 @@ public class KeseController : MonoBehaviour
     [SerializeField] private float coinFlipFrameRate = 20f;
     [SerializeField] private float acceptRadius = 100f;
     [SerializeField] private Ease moveEase = Ease.OutQuad;
+    
+    [Header("Kese Movement")]
+    [SerializeField] private Transform keseReachPoint; // The position where kese appears when active
+    [SerializeField] private float keseMoveSpeed = 2f;
+    [SerializeField] private Ease keseMoveEase = Ease.OutQuad;
 
     [SerializeField] private GameObject currentCoin;
     private bool isDraggingCoin = false;
@@ -64,6 +69,12 @@ public class KeseController : MonoBehaviour
     private float pouchTimer = 0f;
     private bool isPouchAccepting = false;
     private Coroutine pouchAnimCoroutine;
+    
+    // Kese movement tracking (like infobox and hesap makinesi)
+    private Vector3 keseStartingPosition;
+    private bool isKeseMoving = false;
+    private bool isKeseAtReachPoint = false;
+    private Sequence keseMoveSequence;
 
     // For idle/page change
     private Image img;
@@ -118,6 +129,13 @@ public class KeseController : MonoBehaviour
             handOriginalRotation = rightHandObject.transform.localRotation;
         }
 
+        // Store kese starting position (like infobox and hesap makinesi)
+        keseStartingPosition = transform.position;
+        
+        // Ensure kese starts at starting position
+        transform.position = keseStartingPosition;
+        isKeseAtReachPoint = false;
+
         // Spawn the first coin (only once)
         SpawnCoin();
     }
@@ -135,8 +153,8 @@ public class KeseController : MonoBehaviour
         HandleTouchInput();
 #endif
 
-        // Check for hesap makinesi timer logic
-        CheckHesapMakinesiTimer();
+        // Check for hesap makinesi and kese timer logic
+        CheckHesapMakinesiAndKeseTimer();
 
         // --- DRAG FOLLOW LOGIC & HAND APPROACH ---
         if (handApproachingReachPoint && rightHandObject != null && coinReachPoint != null)
@@ -307,12 +325,21 @@ public class KeseController : MonoBehaviour
     }
     
     /// <summary>
-    /// Checks for hesap makinesi timer logic
+    /// Checks for hesap makinesi and kese timer logic
     /// </summary>
-    private void CheckHesapMakinesiTimer()
+    private void CheckHesapMakinesiAndKeseTimer()
     {
-        // Removed automatic closing when coin returns to start
-        // Hesap makinesi will only close when something else is clicked
+        if (coinIsBeingHeld)
+        {
+            float holdTime = Time.time - coinTouchStartTime;
+            
+            // Show kese when coin is held for more than threshold
+            if (holdTime > quickDropTimeThreshold && !isKeseAtReachPoint && !isKeseMoving)
+            {
+                Debug.Log($"[KeseController] Coin held for {holdTime:F2} seconds, showing kese");
+                MoveKeseToReachPoint();
+            }
+        }
     }
     
     /// <summary>
@@ -324,6 +351,13 @@ public class KeseController : MonoBehaviour
         {
             Debug.Log("[KeseController] Something else was clicked, force closing hesap makinesi");
             hesapMakinesiController.ForceClose();
+        }
+        
+        // Also close kese when something else is clicked
+        if (isKeseAtReachPoint)
+        {
+            Debug.Log("[KeseController] Something else was clicked, closing kese");
+            MoveKeseToStartingPosition();
         }
     }
     
@@ -409,10 +443,10 @@ public class KeseController : MonoBehaviour
         handApproachingReachPoint = true; // Start approach
         dragTargetPosition = ScreenToWorld(screenPos);
         
-        // Start timer for hesap makinesi
+        // Start timer for hesap makinesi and kese
         coinTouchStartTime = Time.time;
         coinIsBeingHeld = true;
-        Debug.Log("[KeseController] Coin touch started, timer begins for hesap makinesi");
+        Debug.Log("[KeseController] Coin touch started, timer begins for hesap makinesi and kese");
     }
 
     /// <summary>
@@ -448,7 +482,11 @@ public class KeseController : MonoBehaviour
             }
         }
 
-        float distToDest = Vector3.Distance(currentCoin.transform.position, coinDestinationPoint.position);
+        // Calculate distance to the kese's current position (not the fixed destination point)
+        Vector3 keseCurrentPosition = isKeseAtReachPoint ? keseReachPoint.position : coinDestinationPoint.position;
+        float distToDest = Vector3.Distance(currentCoin.transform.position, keseCurrentPosition);
+        
+        Debug.Log($"[KeseController] Coin drop check - Distance: {distToDest:F2}, AcceptRadius: {acceptRadius}, KeseAtReach: {isKeseAtReachPoint}, TokenCount: {coinTokenData.Count}");
 
         if (distToDest <= acceptRadius && coinTokenData.Count > 0)
         {
@@ -461,6 +499,13 @@ public class KeseController : MonoBehaviour
             // Not close enough: animate coin and hand back to start, then stop following
             shouldHandFollowCoin = false;
             ReturnCoin();
+            
+            // Close kese when coin is dropped outside accept radius
+            if (isKeseAtReachPoint)
+            {
+                Debug.Log("[KeseController] Coin dropped outside accept radius, closing kese");
+                MoveKeseToStartingPosition();
+            }
         }
     }
 
@@ -475,7 +520,7 @@ public class KeseController : MonoBehaviour
         // --- Pass spawn origin and scale to SuperPowerSpawner ---
         if (SuperPowerSpawner.LocalInstance != null)
         {
-            Vector3 spawnOrigin = coinDestinationPoint.position;
+            Vector3 spawnOrigin = isKeseAtReachPoint ? keseReachPoint.position : coinDestinationPoint.position;
             float spawnScale = 1.5f; // Or any "big" scale you want
             
             // Use token data if available, otherwise use default coinAmount
@@ -496,7 +541,8 @@ public class KeseController : MonoBehaviour
         
         // Move coin and hand to destination together
         coinMoveSequence = DOTween.Sequence();
-        coinMoveSequence.Join(currentCoin.transform.DOMove(coinDestinationPoint.position, coinMoveSpeed).SetEase(moveEase));
+        Vector3 targetPosition = isKeseAtReachPoint ? keseReachPoint.position : coinDestinationPoint.position;
+        coinMoveSequence.Join(currentCoin.transform.DOMove(targetPosition, coinMoveSpeed).SetEase(moveEase));
         coinMoveSequence.OnComplete(() =>
         {
             // Make coin invisible
@@ -515,6 +561,9 @@ public class KeseController : MonoBehaviour
 
             // Reset coin position and fade in
             StartCoroutine(ResetAndFadeInCoin());
+            
+            // Close kese after acceptance animation finishes
+            StartCoroutine(CloseKeseAfterAcceptance());
         });
     }
 
@@ -579,6 +628,23 @@ public class KeseController : MonoBehaviour
             coinImg.color = new Color(1, 1, 1, 0);
             Sequence coinFadeSequence = DOTween.Sequence();
             coinFadeSequence.Append(coinImg.DOFade(1f, coinFadeInDuration));
+        }
+    }
+    
+    /// <summary>
+    /// Closes the kese after the acceptance animation finishes
+    /// </summary>
+    private IEnumerator CloseKeseAfterAcceptance()
+    {
+        // Wait for the pouch accept animation to finish
+        float pouchAcceptDuration = pouchAcceptFrames.Length / pouchAcceptFrameRate;
+        yield return new WaitForSeconds(pouchAcceptDuration + 0.5f); // Add extra delay for safety
+        
+        // Close the kese
+        if (isKeseAtReachPoint)
+        {
+            Debug.Log("[KeseController] Acceptance animation finished, closing kese");
+            MoveKeseToStartingPosition();
         }
     }
 
@@ -773,12 +839,132 @@ public class KeseController : MonoBehaviour
         Debug.Log("[KeseController] Cleared coin token data");
     }
     
+    // ===== KESE MOVEMENT METHODS (like infobox and hesap makinesi) =====
+    
+    /// <summary>
+    /// Moves the kese from starting position to reach point
+    /// </summary>
+    public void MoveKeseToReachPoint()
+    {
+        if (isKeseMoving || keseReachPoint == null) return;
+        
+        Debug.Log("[KeseController] Moving kese to reach point");
+        
+        // Kill any existing movement sequence
+        if (keseMoveSequence != null)
+            keseMoveSequence.Kill();
+        
+        isKeseMoving = true;
+        isKeseAtReachPoint = true;
+        
+        // Create movement sequence
+        keseMoveSequence = DOTween.Sequence();
+        keseMoveSequence.Append(transform.DOMove(keseReachPoint.position, keseMoveSpeed).SetEase(keseMoveEase));
+        keseMoveSequence.OnComplete(() => {
+            isKeseMoving = false;
+            Debug.Log("[KeseController] Kese reached target position");
+            
+            // Start pouch idle animation when kese appears
+            if (pouchImage != null && pouchIdleFrames.Length > 0)
+            {
+                if (pouchAnimCoroutine != null) StopCoroutine(pouchAnimCoroutine);
+                pouchAnimCoroutine = StartCoroutine(PlayPouchIdleAnimation());
+            }
+        });
+    }
+    
+    /// <summary>
+    /// Moves the kese from reach point back to starting position
+    /// </summary>
+    public void MoveKeseToStartingPosition()
+    {
+        if (isKeseMoving) return;
+        
+        Debug.Log("[KeseController] Moving kese to starting position");
+        
+        // Kill any existing movement sequence
+        if (keseMoveSequence != null)
+            keseMoveSequence.Kill();
+        
+        // Stop pouch animation when kese closes
+        if (pouchAnimCoroutine != null)
+        {
+            StopCoroutine(pouchAnimCoroutine);
+            pouchAnimCoroutine = null;
+        }
+        
+        isKeseMoving = true;
+        isKeseAtReachPoint = false;
+        
+        // Create movement sequence
+        keseMoveSequence = DOTween.Sequence();
+        keseMoveSequence.Append(transform.DOMove(keseStartingPosition, keseMoveSpeed).SetEase(keseMoveEase));
+        keseMoveSequence.OnComplete(() => {
+            isKeseMoving = false;
+            Debug.Log("[KeseController] Kese returned to starting position");
+        });
+    }
+    
+    /// <summary>
+    /// Public method to check if kese is at reach point
+    /// </summary>
+    public bool IsKeseAtReachPoint()
+    {
+        return isKeseAtReachPoint;
+    }
+    
+    /// <summary>
+    /// Public method to check if kese is moving
+    /// </summary>
+    public bool IsKeseMoving()
+    {
+        return isKeseMoving;
+    }
+    
+    /// <summary>
+    /// Public method to manually trigger movement to reach point (for testing)
+    /// </summary>
+    [ContextMenu("Move Kese to Reach Point")]
+    public void TriggerMoveKeseToReachPoint()
+    {
+        MoveKeseToReachPoint();
+    }
+    
+    /// <summary>
+    /// Public method to manually trigger movement to starting position (for testing)
+    /// </summary>
+    [ContextMenu("Move Kese to Starting Position")]
+    public void TriggerMoveKeseToStartingPosition()
+    {
+        MoveKeseToStartingPosition();
+    }
+    
+    void OnDestroy()
+    {
+        // Clean up DOTween sequences
+        if (keseMoveSequence != null)
+            keseMoveSequence.Kill();
+    }
+    
     private void OnDrawGizmosSelected()
     {
+        // Draw acceptance radius at the current kese position
+        Vector3 currentAcceptancePosition = isKeseAtReachPoint ? keseReachPoint.position : coinDestinationPoint.position;
         if (coinDestinationPoint != null)
         {
             Gizmos.color = Color.green;
-            Gizmos.DrawWireSphere(coinDestinationPoint.position, acceptRadius);
+            Gizmos.DrawWireSphere(currentAcceptancePosition, acceptRadius);
+        }
+        
+        // Draw the kese reach point in the scene view
+        if (keseReachPoint != null)
+        {
+            Gizmos.color = Color.blue;
+            Gizmos.DrawWireSphere(keseReachPoint.position, 0.5f);
+            
+            // Draw line from current position to reach point
+            Gizmos.color = Color.cyan;
+            Gizmos.DrawLine(transform.position, keseReachPoint.position);
         }
     }
 }

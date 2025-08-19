@@ -476,5 +476,31 @@ public class NetworkRelay : NetworkBehaviour
         GameManager.LocalInstance?.LogSnapshotForSyncLogs(snapshot, label);
     }
 
+    // === MOVE CHAIN VALIDATION RPCs ===
+    
+    [ClientRpc(RequireOwnership = false)]
+    public void BroadcastMoveForValidationClientRPC(GameMove move)
+    {
+        // Clients receive moves from server for validation
+        if (MoveChainTracker.ClientInstance != null)
+        {
+            // TODO: Implement move validation logic
+            Debug.Log($"[NetworkRelay] Client received move for validation: {move.moveType} by P{move.playerNumber}");
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void RequestFullStateSyncServerRPC()
+    {
+        // Client requests full state sync due to desync
+        Debug.Log("[NetworkRelay] Client requested full state sync due to desync");
+        
+        if (Server.Singleton != null)
+        {
+            var gameState = Server.Singleton.BuildGameStateSnapshot();
+            ApplyGameStateClientRPC(gameState);
+        }
+    }
+
 
 }

@@ -2789,6 +2789,17 @@ public class GameManager : MonoBehaviour
 
         {
 
+            // Track the superpower effect BEFORE applying it
+            var effectData = new Dictionary<string, string>
+            {
+                ["sourceCard"] = sourceUniqueID,
+                ["targetCard"] = targetUniqueID,
+                ["oldValue"] = targetCard.GetCardID()[1].ToString(),
+                ["newValue"] = sourceCard.GetCardID()[1].ToString(),
+                ["effectType"] = "cardCopy"
+            };
+            MoveChainIntegrator.TrackSuperpowerEffect(currentPlayerNo, "Kopyala Yapıştır", new[] { targetUniqueID, sourceUniqueID }, effectData);
+
             // Copy cardID and sprite
 
             int[] newCardID = sourceCard.GetCardID();
@@ -3048,6 +3059,19 @@ public class GameManager : MonoBehaviour
     public void OnBombaCenter()
 
     {
+
+        // Track bomba effect BEFORE applying it
+        var bombedCardIds = centerCardsObjects.Where(c => c != null)
+            .Select(c => c.GetComponent<CardInteraction>()?.uniqueCardInstanceID)
+            .Where(id => !string.IsNullOrEmpty(id))
+            .ToArray();
+        
+        var effectData = new Dictionary<string, string>
+        {
+            ["bombedCardCount"] = bombedCardIds.Length.ToString(),
+            ["effectType"] = "centerClear"
+        };
+        MoveChainIntegrator.TrackSuperpowerEffect(currentPlayerNo, "Bomba", bombedCardIds, effectData);
 
         StartCoroutine(BombThenExplosionSequence());
 
@@ -3863,6 +3887,15 @@ public class GameManager : MonoBehaviour
 
         {
 
+            // Track the superpower effect BEFORE applying it
+            var effectData = new Dictionary<string, string>
+            {
+                ["oldValue"] = cardInteraction.GetCardID()[1].ToString(),
+                ["newValue"] = "11",
+                ["effectType"] = "cardValueChange"
+            };
+            MoveChainIntegrator.TrackSuperpowerEffect(currentPlayerNo, "Kapkaç", new[] { cardUniqueID }, effectData);
+
             int[] cardID = cardInteraction.GetCardID();
 
             cardID[1] = 11;
@@ -4088,6 +4121,15 @@ public class GameManager : MonoBehaviour
         if (CardInteraction.cardLookup.TryGetValue(cardUniqueID, out var cardInteraction))
 
         {
+
+            // Track the superpower effect BEFORE applying it
+            var effectData = new Dictionary<string, string>
+            {
+                ["oldValue"] = cardInteraction.GetCardID()[1].ToString(),
+                ["newValue"] = "0",
+                ["effectType"] = "cardValueChange"
+            };
+            MoveChainIntegrator.TrackSuperpowerEffect(currentPlayerNo, "Yandım Anam", new[] { cardUniqueID }, effectData);
 
             StartCoroutine(YandimAnamCoroutine(cardUniqueID));
 
@@ -4383,6 +4425,11 @@ public class GameManager : MonoBehaviour
         cardObjectsToBeDiscarted.Clear();
         kapkacCardsToBeReset.Clear();
         cardPowerEffects.Clear();
+        
+        // CRITICAL: Reset move chains to prevent infinite desync loops
+        // When we apply a full game state, the chains should be reset to match the new state
+        MoveChainIntegrator.ResetChains();
+        Debug.Log("[GameManager] Reset all move chains to prevent desync loops after full state sync");
     }
 
     /// <summary>
@@ -4966,6 +5013,153 @@ public class GameManager : MonoBehaviour
             if (ci != null) result.Add(ci.uniqueCardInstanceID);
         }
         return result;
+    }
+
+    // === DESYNC TESTING FUNCTIONS ===
+    
+    /// <summary>
+    /// Test function: Plays first card locally without sending to server (creates desync)
+    /// </summary>
+    [ContextMenu("Test Desync - Play Card Locally Only")]
+    public void TestDesyncLocalCardPlay()
+    {
+        if (myCards == null || myCards.Count == 0)
+        {
+            Debug.LogWarning("[GameManager] No cards in hand to test with!");
+            return;
+        }
+
+        string testCardId = myCards[0];
+        Debug.Log($"[GameManager] Testing desync: Playing card {testCardId} locally only");
+        
+        // Record the move locally (this will create a desync)
+        if (MoveChainTracker.ClientInstance != null)
+        {
+            var cardData = CardInteraction.cardLookup[testCardId].GetCardID();
+            MoveChainTracker.ClientInstance.RecordCardPlay(deckController.thisPlayerNumber, testCardId, cardData, new string[0], 0);
+            
+            // Actually play the card visually in the scene (add to center)
+            if (CardInteraction.cardLookup.ContainsKey(testCardId))
+            {
+                var cardInteraction = CardInteraction.cardLookup[testCardId];
+                var cardObject = cardInteraction.gameObject;
+                
+                // Move card to center visually
+                cardObject.transform.SetParent(centerTransform, false);
+                centerCardsObjects.Add(cardObject);
+                centerCards[testCardId] = cardData;
+                
+                // Position the card in center
+                Vector3 centerPosition = centerTransform.position;
+                Vector3 centerRotation = centerTransform.rotation.eulerAngles;
+                cardObject.transform.rotation = Quaternion.Euler(centerRotation.x + 180, centerRotation.y, UnityEngine.Random.Range(-12, 12));
+                cardObject.transform.position = new Vector3(centerPosition.x, centerPosition.y + 10, centerPosition.z);
+                cardObject.transform.localScale = new Vector3(deckController.centerScale, deckController.centerScale, deckController.centerScale);
+            }
+            
+            // Remove card from hand locally
+            myCards.RemoveAt(0);
+            
+            // Update hand layout to reflect the removed card
+            if (deckController != null)
+            {
+                deckController.UpdateCurrentPlayerHandLayout();
+            }
+            
+            Debug.LogWarning($"[GameManager] DESYNC TEST: Card {testCardId} played locally but NOT sent to server!");
+            Debug.LogWarning("[GameManager] This will create a desync when server and client chains are compared.");
+            Debug.LogWarning("[GameManager] The card should now be visible in the center of the screen.");
+        }
+        else
+        {
+            Debug.LogError("[GameManager] MoveChainTracker not found! Cannot test desync.");
+        }
+    }
+    
+    /// <summary>
+    /// Test function: Simulates a superpower effect locally without server sync
+    /// </summary>
+    [ContextMenu("Test Desync - Superpower Effect Locally Only")]
+    public void TestDesyncLocalSuperpowerEffect()
+    {
+        if (myCards == null || myCards.Count == 0)
+        {
+            Debug.LogWarning("[GameManager] No cards in hand to test with!");
+            return;
+        }
+
+        string testCardId = myCards[0];
+        Debug.Log($"[GameManager] Testing desync: Applying Kapkaç effect to {testCardId} locally only");
+        
+        // Record the superpower effect locally (this will create a desync)
+        if (MoveChainTracker.ClientInstance != null)
+        {
+            var effectData = new Dictionary<string, string>
+            {
+                ["oldValue"] = "5", // Fake old value
+                ["newValue"] = "11",
+                ["effectType"] = "cardValueChange"
+            };
+            MoveChainTracker.ClientInstance.RecordSuperpowerEffect(deckController.thisPlayerNumber, "Kapkaç", new[] { testCardId }, effectData);
+            
+            Debug.LogWarning($"[GameManager] DESYNC TEST: Kapkaç effect applied to {testCardId} locally but NOT synced with server!");
+            Debug.LogWarning("[GameManager] This will create a desync when server and client chains are compared.");
+        }
+        else
+        {
+            Debug.LogError("[GameManager] MoveChainTracker not found! Cannot test desync.");
+        }
+    }
+    
+    /// <summary>
+    /// Test function: Validates current client chain against server chain
+    /// </summary>
+    [ContextMenu("Test Chain Validation")]
+    public void TestChainValidation()
+    {
+        if (MoveChainTracker.ClientInstance == null)
+        {
+            Debug.LogError("[GameManager] Client MoveChainTracker not found!");
+            return;
+        }
+
+        if (MoveChainTracker.ServerInstance == null)
+        {
+            Debug.LogError("[GameManager] Server MoveChainTracker not found!");
+            return;
+        }
+
+        var clientChain = MoveChainTracker.ClientInstance.GetCurrentChain();
+        var serverChain = MoveChainTracker.ServerInstance.GetCurrentChain();
+        
+        Debug.Log($"[GameManager] === CHAIN VALIDATION TEST ===");
+        Debug.Log($"[GameManager] Client chain: {clientChain.chainVersion} moves");
+        Debug.Log($"[GameManager] Server chain: {serverChain.chainVersion} moves");
+        
+        var validationResult = clientChain.ValidateAgainst(serverChain, out int mismatchIndex);
+        bool isValid = validationResult == MoveChain.ValidationResult.Valid;
+        
+        if (isValid)
+        {
+            Debug.Log("[GameManager] ✅ Chains are in sync!");
+        }
+        else
+        {
+            Debug.LogError($"[GameManager] ❌ DESYNC DETECTED at move index {mismatchIndex}!");
+            Debug.LogError($"[GameManager] Client chain version: {clientChain.chainVersion}");
+            Debug.LogError($"[GameManager] Server chain version: {serverChain.chainVersion}");
+            Debug.LogError($"[GameManager] Validation result: {validationResult}");
+        }
+    }
+    
+    /// <summary>
+    /// Test function: Manually reset move chains (useful for testing)
+    /// </summary>
+    [ContextMenu("Reset Move Chains")]
+    public void ResetMoveChains()
+    {
+        MoveChainIntegrator.ResetChains();
+        Debug.Log("[GameManager] Manually reset all move chains");
     }
 
 }

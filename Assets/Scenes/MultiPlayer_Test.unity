@@ -566,6 +566,10 @@ PrefabInstance:
       value: GameManager
       objectReference: {fileID: 0}
     - target: {fileID: 8858676597646837954, guid: 0547bdc6482fdb0479bfbf10d66e62ec, type: 3}
+      propertyPath: editorMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8858676597646837954, guid: 0547bdc6482fdb0479bfbf10d66e62ec, type: 3}
       propertyPath: networkRelay
       value: 
       objectReference: {fileID: 2001506852}
@@ -7044,6 +7048,7 @@ Transform:
   m_Children:
   - {fileID: 1154931855}
   - {fileID: 1357773700}
+  - {fileID: 1670917254}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &566743148
@@ -14282,6 +14287,37 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 6804347803015317241, guid: cf3cc37ee94f4e744b43568625920ac9, type: 3}
   m_PrefabInstance: {fileID: 1623919618}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1164757941
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1164757942}
+  m_Layer: 0
+  m_Name: KeseReachPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1164757942
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1164757941}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 7990, y: 375, z: 389}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1181751475
 GameObject:
   m_ObjectHideFlags: 0
@@ -19460,6 +19496,52 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1649115322}
   m_CullTransparentMesh: 1
+--- !u!1 &1670917253
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1670917254}
+  - component: {fileID: 1670917255}
+  m_Layer: 0
+  m_Name: MoveChainSystem
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1670917254
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1670917253}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 561795238}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1670917255
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1670917253}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5fa192860b3839e4f8bfd1daedb66a78, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  autoInitialize: 1
+  enableLogging: 1
 --- !u!1 &1675861883
 GameObject:
   m_ObjectHideFlags: 0
@@ -23624,6 +23706,9 @@ MonoBehaviour:
   coinFlipFrameRate: 20
   acceptRadius: 1000
   moveEase: 6
+  keseReachPoint: {fileID: 1164757942}
+  keseMoveSpeed: 0.25
+  keseMoveEase: 6
   currentCoin: {fileID: 1701901360}
   handApproachSpeed: 20000
   smokeAnimator: {fileID: 700604825}
@@ -23690,7 +23775,7 @@ Transform:
   m_GameObject: {fileID: 2006903249}
   serializedVersion: 2
   m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 7768, y: 375, z: 925}
+  m_LocalPosition: {x: 12382, y: 375, z: 389}
   m_LocalScale: {x: 1000, y: 1000, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -25475,6 +25560,7 @@ SceneRoots:
   - {fileID: 24649712}
   - {fileID: 595675586}
   - {fileID: 2006903252}
+  - {fileID: 1164757942}
   - {fileID: 132789057}
   - {fileID: 1816107162}
   - {fileID: 2483312691493637850}

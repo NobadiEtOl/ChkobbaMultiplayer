@@ -24,11 +24,14 @@ Shader "Custom/SimpleTwoColorLines"
     }
     SubShader
     {
-        Tags {"RenderType"="Opaque" "Queue"="Geometry"}
+        Tags {"RenderType"="Transparent" "Queue"="AlphaTest"}
         LOD 100
 
         Pass
         {
+            ZWrite On
+            ZTest LEqual
+            
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag

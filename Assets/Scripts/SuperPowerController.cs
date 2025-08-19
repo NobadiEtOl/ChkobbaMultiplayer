@@ -11,6 +11,12 @@ public abstract class SuperPower : ScriptableObject
     public abstract void ActivatePower();
     public void PowerActivated()
     {
+        // Track superpower activation
+        if (DeckController.LocalInstance != null)
+        {
+            MoveChainIntegrator.TrackSuperpowerActivation(DeckController.LocalInstance.thisPlayerNumber, name);
+        }
+        
         GameManager.LocalInstance.networkRelay.ShowcaseSuperPowerServerRPC(name);
     }
 
