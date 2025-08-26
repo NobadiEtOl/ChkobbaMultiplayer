@@ -187,14 +187,62 @@ public class CardInteraction : MonoBehaviour
             }
         }
 
+        // DEBUG: Log all card touches to see what's happening
+        Debug.Log($"[CardInteraction] OnCardTouched called for card: {gameObject.name}, parent: {gameObject.transform.parent?.name}");
 
-        if (gameObject.transform.parent.name == "PlayerPool1" || gameObject.transform.parent.name == "PlayerPiştiPool1")
+        // Check if this is a center card
+        if (gameObject.transform.parent != null && gameObject.transform.parent.name == "Center")
         {
-            DeckController.LocalInstance.ShowcasePlayerPoolCards();
+            Debug.Log($"[CardInteraction] CENTER CARD DETECTED: {gameObject.name}");
+            
+            // Kill any existing animations on this card
+            KillAllTweens();
+            
+            // Handle center card showcase
+            if (DeckController.LocalInstance != null)
+            {
+                if (DeckController.LocalInstance.IsCenterShowcasing())
+                {
+                    Debug.Log("[CardInteraction] Stopping center showcase");
+                    DeckController.LocalInstance.StopShowcaseCenterCards();
+                }
+                else
+                {
+                    Debug.Log("[CardInteraction] Starting center showcase");
+                    DeckController.LocalInstance.StopShowcasePlayerPoolCards();
+                    DeckController.LocalInstance.ExitShowcaseAllOtherHands();
+                    DeckController.LocalInstance.ShowcaseCenterCards();
+                }
+            }
+            else
+            {
+                Debug.LogError("[CardInteraction] DeckController.LocalInstance is null!");
+            }
+            
+            // Return early to prevent normal card selection animations for center cards
+            return;
         }
 
-        else
+
+        // Check if this is a player pool card
+        if (gameObject.transform.parent.name == "PlayerPool1" || gameObject.transform.parent.name == "PlayerPiştiPool1")
         {
+            Debug.Log($"[CardInteraction] Player pool card touched: {gameObject.name}");
+            // Stop center showcase if active
+            DeckController.LocalInstance.StopShowcaseCenterCards();
+            DeckController.LocalInstance.ShowcasePlayerPoolCards();
+        }
+        // Handle center cards and hand cards for selection
+        else if (gameObject.transform.parent.name == "Center" || gameObject.transform.parent.name.StartsWith("PlayerHand"))
+        {
+            Debug.Log($"[CardInteraction] Card selected for interaction: {gameObject.name} (parent: {gameObject.transform.parent.name})");
+            
+            // Stop center showcase when touching hand cards (but not center cards themselves)
+            if (gameObject.transform.parent.name != "Center")
+            {
+                DeckController.LocalInstance.StopShowcaseCenterCards();
+            }
+            
             // Store the original screen position for snap back
             originalScreenPosition = Camera.main.WorldToScreenPoint(transform.position);
 
@@ -272,8 +320,12 @@ public class CardInteraction : MonoBehaviour
         if (stopPower)
             yield return null;
 
-        Debug.Log("OnTouchUp called for card: " + gameObject.name);
-        if (!isDragging) yield return null;
+        Debug.Log($"[CardInteraction] OnTouchUp called for card: {gameObject.name}, parent: {gameObject.transform.parent?.name}, isDragging: {isDragging}");
+        if (!isDragging) 
+        {
+            Debug.Log("[CardInteraction] Not dragging, returning early");
+            yield return null;
+        }
 
         isDragging = false;
 
@@ -284,11 +336,12 @@ public class CardInteraction : MonoBehaviour
         // Try to add the card to the center if moved enough distance
         if (distanceMoved > snapBackThreshold)
         {
+            Debug.Log($"[CardInteraction] Card moved enough distance. Parent: {transform.parent.name}, isOneCardSelected: {isOneCardSelected}");
 
             if (transform.parent.name.Contains("PlayerHand") && isOneCardSelected)
             {
                 // Invoke OnCardsPlayed
-                //Debug.Log("OnCardsPlayed invoked!");
+                Debug.Log("[CardInteraction] Invoking OnCardsPlayed for hand card");
                 StopAutoRotate(); // Stop auto-rotation when the card is played
 
                 //yield return new WaitForSeconds(1f);
@@ -300,9 +353,19 @@ public class CardInteraction : MonoBehaviour
                     activeCardIndicator.SetActive(false); // Deactivate the previous card indicator
                 }
             }
+            else if (transform.parent.name == "Center" && isOneCardSelected)
+            {
+                Debug.Log("[CardInteraction] Center card was selected but cannot be played - showcasing only");
+                // Center cards cannot be played, just reset selection
+                isOneCardSelected = false;
+                if (activeCardIndicator != null)
+                {
+                    activeCardIndicator.SetActive(false);
+                }
+            }
             else
             {
-                //Debug.Log("else");
+                Debug.Log("[CardInteraction] Card not from hand or not selected, resetting selection");
                 isOneCardSelected = false;
             }
         }
@@ -320,6 +383,8 @@ public class CardInteraction : MonoBehaviour
     Sequence jiggleSequence;
     public void SelectCard()
     {
+        Debug.Log($"[CardInteraction] SelectCard called for: {gameObject.name}, parent: {gameObject.transform.parent?.name}");
+        
         if (activeCardIndicator != null)
         {
             activeCardIndicator.SetActive(false); // Deactivate the previous card indicator

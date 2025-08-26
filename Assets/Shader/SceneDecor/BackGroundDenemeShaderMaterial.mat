@@ -44,7 +44,7 @@ Material:
     - _ScaleX: 10.54
     - _ScaleY: 10.2
     - _Smoothness: 0.3
-    - _Speed: 0.5
+    - _Speed: 0.1
     - _TimeSpeed: 1
     m_Colors:
     - _AccentColor: {r: 0.307, g: 0.234949, b: 0.1769949, a: 1}

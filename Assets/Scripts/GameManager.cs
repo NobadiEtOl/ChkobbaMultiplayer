@@ -632,12 +632,13 @@ public class GameManager : MonoBehaviour
             {
 
                 CardInteraction card = hit.collider.GetComponent<CardInteraction>();
+                AddToDebugLog($"[GameManager] Found CardInteraction: {card?.gameObject?.name}, parent: {card?.gameObject?.transform?.parent?.name}");
 
                 if (touch.phase == TouchPhase.Began && card != null)
 
                 {
 
-                    AddToDebugLog($"[GameManager] Touch OnCardTouched called for card: {card.gameObject.name}");
+                    AddToDebugLog($"[GameManager] Touch OnCardTouched called for card: {card.gameObject.name}, parent: {card.gameObject.transform.parent?.name}");
 
                     card.OnCardTouched(touchPosition);
 
@@ -649,9 +650,9 @@ public class GameManager : MonoBehaviour
 
                 {
 
-                    AddToDebugLog($"[GameManager] Touch - No card found, calling TryStopShowcasePlayerPoolCards");
+                    AddToDebugLog($"[GameManager] Touch - No card found, calling TryStopAllShowcases");
 
-                    deckController.TryStopShowcasePlayerPoolCards();
+                    deckController.TryStopAllShowcases();
 
                 }
 
@@ -2213,6 +2214,13 @@ public class GameManager : MonoBehaviour
 
 
 
+        // Check if this is a center card (should not be playable)
+        if (cardObj != null && cardObj.transform.parent != null && cardObj.transform.parent.name == "Center")
+        {
+            AddToDebugLog($"[GameManager] Center card cannot be played - showcasing only");
+            return false;
+        }
+
         // Player can play only if it's their turn AND the card is in PlayerHand1
 
         if (isMyTurn && isInPlayerHand1)
@@ -3730,6 +3738,7 @@ public class GameManager : MonoBehaviour
         yield return StartCoroutine(deckController.SwapCardsBetweenPlayersByID(myPlayerNo, myHandCardID, otherPlayerNo, otherHandCardID, true));
 
         DeckController.LocalInstance.ExitShowcaseAllOtherHands();
+        DeckController.LocalInstance.TryStopShowcaseCenterCards();
 
     }
 
@@ -3819,7 +3828,11 @@ public class GameManager : MonoBehaviour
 
         yield return StartCoroutine(deckController.SwapCardsBetweenPlayersByID(myPlayerNo, myHandCardID, otherPlayerNo, otherHandCardID, true));
 
-        if(readyToExit) deckController.ExitShowcaseAllOtherHands();
+        if(readyToExit) 
+        {
+            deckController.ExitShowcaseAllOtherHands();
+            deckController.TryStopShowcaseCenterCards();
+        }
 
     }
 

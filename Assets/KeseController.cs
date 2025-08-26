@@ -337,7 +337,21 @@ public class KeseController : MonoBehaviour
             if (holdTime > quickDropTimeThreshold && !isKeseAtReachPoint && !isKeseMoving)
             {
                 Debug.Log($"[KeseController] Coin held for {holdTime:F2} seconds, showing kese");
-                MoveKeseToReachPoint();
+                
+                // Close hesap makinesi first if it's open
+                if (hesapMakinesiController != null && hesapMakinesiController.IsAtReachPoint())
+                {
+                    Debug.Log("[KeseController] Hesap makinesi is open, closing it before showing kese");
+                    hesapMakinesiController.ForceClose();
+                    
+                    // Wait a short moment for hesap makinesi to start closing, then show kese
+                    StartCoroutine(ShowKeseAfterHesapMakinesiCloses());
+                }
+                else
+                {
+                    // Hesap makinesi is not open, show kese immediately
+                    MoveKeseToReachPoint();
+                }
             }
         }
     }
@@ -647,6 +661,18 @@ public class KeseController : MonoBehaviour
             MoveKeseToStartingPosition();
         }
     }
+    
+    /// <summary>
+    /// Shows the kese after hesap makinesi has started closing
+    /// </summary>
+    private IEnumerator ShowKeseAfterHesapMakinesiCloses()
+    {
+        // Wait a short moment for hesap makinesi to start its closing animation
+        yield return new WaitForSeconds(0.1f);
+        
+        // Now show the kese
+        MoveKeseToReachPoint();
+    }
 
     // --- POUCH ANIMATION ---
 
@@ -854,6 +880,13 @@ public class KeseController : MonoBehaviour
         if (keseMoveSequence != null)
             keseMoveSequence.Kill();
         
+        // Start pouch idle animation BEFORE moving
+        if (pouchImage != null && pouchIdleFrames.Length > 0)
+        {
+            if (pouchAnimCoroutine != null) StopCoroutine(pouchAnimCoroutine);
+            pouchAnimCoroutine = StartCoroutine(PlayPouchIdleAnimation());
+        }
+        
         isKeseMoving = true;
         isKeseAtReachPoint = true;
         
@@ -863,13 +896,6 @@ public class KeseController : MonoBehaviour
         keseMoveSequence.OnComplete(() => {
             isKeseMoving = false;
             Debug.Log("[KeseController] Kese reached target position");
-            
-            // Start pouch idle animation when kese appears
-            if (pouchImage != null && pouchIdleFrames.Length > 0)
-            {
-                if (pouchAnimCoroutine != null) StopCoroutine(pouchAnimCoroutine);
-                pouchAnimCoroutine = StartCoroutine(PlayPouchIdleAnimation());
-            }
         });
     }
     
@@ -886,13 +912,6 @@ public class KeseController : MonoBehaviour
         if (keseMoveSequence != null)
             keseMoveSequence.Kill();
         
-        // Stop pouch animation when kese closes
-        if (pouchAnimCoroutine != null)
-        {
-            StopCoroutine(pouchAnimCoroutine);
-            pouchAnimCoroutine = null;
-        }
-        
         isKeseMoving = true;
         isKeseAtReachPoint = false;
         
@@ -902,6 +921,13 @@ public class KeseController : MonoBehaviour
         keseMoveSequence.OnComplete(() => {
             isKeseMoving = false;
             Debug.Log("[KeseController] Kese returned to starting position");
+            
+            // Stop pouch animation when kese reaches starting position
+            if (pouchAnimCoroutine != null)
+            {
+                StopCoroutine(pouchAnimCoroutine);
+                pouchAnimCoroutine = null;
+            }
         });
     }
     

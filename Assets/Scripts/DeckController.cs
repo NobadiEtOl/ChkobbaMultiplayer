@@ -39,6 +39,17 @@ public class DeckController : MonoBehaviour
     public int centerScale = 900; // Scale for the center cards
     private int myCardsScale = 1200; // Scale for the player's cards
     
+    [Header("Deck Movement")]
+    [SerializeField] private Transform deckReachPoint; // The position where deck appears when dealing
+    [SerializeField] private float deckMoveSpeed = 2f;
+    [SerializeField] private Ease deckMoveEase = Ease.OutQuad;
+    
+    // Deck movement tracking
+    private Vector3 deckStartingPosition;
+    private bool isDeckMoving = false;
+    private bool isDeckAtReachPoint = false;
+    private Sequence deckMoveSequence;
+    
     //private GameObject cardPool;
 
     void Awake()
@@ -55,6 +66,28 @@ public class DeckController : MonoBehaviour
     void Start()
     {
         InitialDeckSetUp();
+        
+        // Store deck starting position
+        Transform deckTransform = GameObject.Find("DeckTransform").transform;
+        if (deckTransform != null)
+        {
+            deckStartingPosition = deckTransform.position;
+            Debug.Log($"[DeckController] Deck starting position stored: {deckStartingPosition}");
+        }
+        else
+        {
+            Debug.LogWarning("[DeckController] DeckTransform not found!");
+        }
+        
+        // Validate deck movement settings
+        if (deckReachPoint == null)
+        {
+            Debug.LogError("[DeckController] deckReachPoint is not set in the inspector! Deck movement will not work.");
+        }
+        else
+        {
+            Debug.Log($"[DeckController] Deck reach point set to: {deckReachPoint.position}");
+        }
     }
 
     //Called when the deck is ready to start
@@ -62,6 +95,17 @@ public class DeckController : MonoBehaviour
     {
         yield return StartCoroutine(DefineCardPrefabs());
         yield return StartCoroutine(InitializeCardPool());
+        
+        // Move deck to reach point for initial dealing
+        MoveDeckToReachPoint();
+        
+        // Wait for deck to reach position before notifying that deck is ready
+        while (isDeckMoving || !isDeckAtReachPoint)
+        {
+            yield return null;
+        }
+        
+        Debug.Log("[DeckController] Deck is ready and in position for dealing");
         gameManager.DeckReady();
     }
 
@@ -170,7 +214,7 @@ public class DeckController : MonoBehaviour
             {
                 SetAutoRotateFlagFalse(card);
                 card.transform.parent = null; // Unparent the card
-                card.transform.parent = deckTransform;
+                card.transform.parent = deckTransform.transform;
                 // Optionally reset rotation here if needed
             }
         }
@@ -206,18 +250,43 @@ public class DeckController : MonoBehaviour
             return;
         }
 
+        // Check if deck is already at reach point (initial dealing) or needs to be moved (subsequent dealing)
+        if (isDeckAtReachPoint && !isDeckMoving)
+        {
+            Debug.Log("[DeckController] Deck already at reach point (initial dealing), starting immediately");
+            StartCoroutine(DelayedDealPlayersCoroutine(playerHands));
+        }
+        else
+        {
+            Debug.Log("[DeckController] Deck not at reach point (subsequent dealing), moving deck first");
+            MoveDeckToReachPoint();
+            StartCoroutine(DelayedDealPlayersCoroutine(playerHands));
+        }
+    }
+    
+    private IEnumerator DelayedDealPlayersCoroutine(Dictionary<int, List<string>> playerHands)
+    {
+        // Deck should already be at reach point from DeckStart()
+        // Wait for deck to be ready before starting to deal (safety check)
+        while (isDeckMoving || !isDeckAtReachPoint)
+        {
+            yield return null;
+        }
+        
         if (playerCount == 2)
         {
-            StartCoroutine(DealTwoPlayers(playerHands));
+            yield return StartCoroutine(DealTwoPlayers(playerHands));
         }
         else if (playerCount == 4)
         {
-            StartCoroutine(DealFourPlayers(playerHands));
+            yield return StartCoroutine(DealFourPlayers(playerHands));
         }
     }
 
     private IEnumerator DealTwoPlayers(Dictionary<int, List<string>> playerHands)
     {
+        Debug.Log("[DeckController] Starting to deal cards to 2 players");
+        
         var cardObjects = new List<GameObject>();
         var positions = new List<Vector3>();
         var rotations = new List<Quaternion>();
@@ -285,11 +354,17 @@ public class DeckController : MonoBehaviour
         yield return StartCoroutine(ChainMoveCards(positions, cardObjects, 10, rotations, scales));
         UpdateCurrentPlayerHandLayout();
         StartCoroutine(SetAutoRotateFlagTrue(myCardObjects));
+        
+        // After dealing to players is complete, close the deck
+        Debug.Log("[DeckController] Finished dealing to 2 players, closing deck");
+        MoveDeckToStartingPosition();
 
     }
 
     private IEnumerator DealFourPlayers(Dictionary<int, List<string>> playerHands)
     {
+        Debug.Log("[DeckController] Starting to deal cards to 4 players");
+        
         var cardObjects = new List<GameObject>();
         var positions = new List<Vector3>();
         var rotations = new List<Quaternion>();
@@ -361,6 +436,10 @@ public class DeckController : MonoBehaviour
         yield return StartCoroutine(ChainMoveCards(positions, cardObjects, 10, rotations, scales));
         UpdateCurrentPlayerHandLayout();
         StartCoroutine(SetAutoRotateFlagTrue(myCardObjects));
+        
+        // After dealing to players is complete, close the deck
+        Debug.Log("[DeckController] Finished dealing to 4 players, closing deck");
+        MoveDeckToStartingPosition();
     }
 
 
@@ -368,6 +447,14 @@ public class DeckController : MonoBehaviour
     //Deals to center according to the playerCount
     public IEnumerator DealCenter(List<string> centerCardIDs)
     {
+        // Wait for deck to be at reach point before dealing
+        while (isDeckMoving || !isDeckAtReachPoint)
+        {
+            yield return null;
+        }
+        
+        Debug.Log("[DeckController] Starting to deal cards to center");
+        
         //To make sure the center position is correct each round
         centerTransform.position = new Vector3(0, 50, 0);
         Debug.LogWarning("DealCenter called with centerCardIDs: " + string.Join(", ", centerCardIDs));
@@ -415,6 +502,10 @@ public class DeckController : MonoBehaviour
         Vector3 targetPos = originalPos + new Vector3(0, 0, 500); // Move up by 100 units (adjust as needed)
         float duration = 0.3f;
         yield return StartCoroutine(TweenMoveTransform(centerTransform, targetPos, centerTransform.rotation, centerTransform.localScale, duration));
+        
+        // NOTE: Don't close the deck here - it needs to stay open for player dealing
+        Debug.Log("[DeckController] Finished dealing to center, deck remains open for player dealing");
+        
         // After DealCenter animation/logic is done:
         NetworkRelay.Instance.NotifyDealCenterFinishedServerRPC(NetworkManager.Singleton.LocalClientId);
 
@@ -922,6 +1013,18 @@ public class DeckController : MonoBehaviour
 
     private Dictionary<GameObject, (Vector3 pos, Quaternion rot, Vector3 scale)> poolCardOriginalTransforms = new Dictionary<GameObject, (Vector3, Quaternion, Vector3)>();
     private bool isShowcasing = false;
+    
+    [Header("Center Card Showcase Settings")]
+    [SerializeField] private float centerShowcaseSpacing = 800f; // Spacing between showcased center cards
+    [SerializeField] private float centerShowcaseXOffset = 0f; // X offset for showcased center cards
+    [SerializeField] private float centerShowcaseYOffset = 1500f; // Y offset for showcased center cards
+    [SerializeField] private float centerShowcaseZOffset = -500f; // Z offset for showcased center cards
+    [SerializeField] private float centerShowcaseScale = 1200f; // Scale for showcased center cards
+    [SerializeField] private float centerShowcaseMoveDuration = 0.4f; // Movement duration for showcase animation
+    
+    private bool isCenterShowcasing = false;
+    private Dictionary<GameObject, (Vector3 pos, Quaternion rot, Vector3 scale)> centerShowcaseOriginalTransforms = new Dictionary<GameObject, (Vector3, Quaternion, Vector3)>();
+    
     [ContextMenu("Showcase Player Pool Cards")]
     public void ShowcasePlayerPoolCards()
     {
@@ -1034,6 +1137,123 @@ public class DeckController : MonoBehaviour
             }
         }
         poolCardOriginalTransforms.Clear();
+    }
+
+    [ContextMenu("Showcase Center Cards")]
+    public void ShowcaseCenterCards()
+    {
+        if (isCenterShowcasing) return; // Already showcasing
+        
+        isCenterShowcasing = true;
+        centerShowcaseOriginalTransforms.Clear();
+        
+        // Get all center cards
+        List<GameObject> centerCards = new List<GameObject>();
+        foreach (Transform child in centerTransform)
+        {
+            centerCards.Add(child.gameObject);
+        }
+        
+        if (centerCards.Count == 0) 
+        {
+            isCenterShowcasing = false;
+            return;
+        }
+        
+        // Store original transforms
+        foreach (var card in centerCards)
+        {
+            centerShowcaseOriginalTransforms[card] = (card.transform.position, card.transform.rotation, card.transform.localScale);
+        }
+        
+        // Calculate positions based on distance from middle
+        float spacing = centerShowcaseSpacing;
+        float middle = centerCards.Count / 2f;
+        Vector3 centerPosition = centerTransform.position;
+        float baseZ = centerPosition.z + centerShowcaseZOffset;
+        
+        // Move cards to showcase positions using distance from middle logic
+        for (int i = 0; i < centerCards.Count; i++)
+        {
+            GameObject card = centerCards[i];
+            
+            // Kill any existing animations on the card before moving
+            var cardInteraction = card.GetComponent<CardInteraction>();
+            if (cardInteraction != null)
+            {
+                cardInteraction.KillAllTweens();
+            }
+            
+            // Calculate offset from middle: negative = left, positive = right
+            float offsetFromMiddle = i - middle;
+            
+            Vector3 showcasePosition = new Vector3(
+                centerPosition.x + centerShowcaseXOffset + (offsetFromMiddle * spacing),
+                centerPosition.y + centerShowcaseYOffset + (i * 10),
+                baseZ
+            );
+            
+            // Keep original rotation, only change position and scale
+            Vector3 showcaseScale = new Vector3(centerShowcaseScale, centerShowcaseScale, centerShowcaseScale);
+            
+            // Use the existing MoveCard method but preserve rotation
+            StartCoroutine(MoveCardCoroutineShowcase(showcasePosition, card, 1f/centerShowcaseMoveDuration, card.transform.rotation, showcaseScale));
+        }
+    }
+    
+    [ContextMenu("Stop Showcase Center Cards")]
+    public void StopShowcaseCenterCards()
+    {
+        if (!isCenterShowcasing) return;
+        
+        isCenterShowcasing = false;
+        
+        // Restore all center cards to their original positions
+        foreach (var kvp in centerShowcaseOriginalTransforms)
+        {
+            GameObject card = kvp.Key;
+            var (pos, rot, scale) = kvp.Value;
+            
+            if (card != null)
+            {
+                // Kill any existing animations on the card before restoring
+                var cardInteraction = card.GetComponent<CardInteraction>();
+                if (cardInteraction != null)
+                {
+                    cardInteraction.KillAllTweens();
+                }
+                
+                StartCoroutine(MoveCardCoroutineShowcase(pos, card, 1f/centerShowcaseMoveDuration, rot, scale));
+            }
+        }
+        
+        centerShowcaseOriginalTransforms.Clear();
+    }
+    
+    /// <summary>
+    /// Separate coroutine for showcase movement to avoid conflicts with regular MoveCard
+    /// </summary>
+    private IEnumerator MoveCardCoroutineShowcase(Vector3 endPos, GameObject cardObject, float speedMultiplier, Quaternion rotation, Vector3 scale)
+    {
+        float duration = 1f/speedMultiplier;
+
+        // Create a DOTween sequence for position, rotation, and scale
+        DG.Tweening.Sequence moveSeq = DOTween.Sequence();
+        moveSeq.Join(cardObject.transform.DOMove(endPos, duration));
+        moveSeq.Join(cardObject.transform.DORotateQuaternion(rotation, duration));
+        moveSeq.Join(cardObject.transform.DOScale(scale, duration));
+
+        yield return moveSeq.WaitForCompletion();
+    }
+    
+
+    
+    /// <summary>
+    /// Public method to check if center cards are being showcased
+    /// </summary>
+    public bool IsCenterShowcasing()
+    {
+        return isCenterShowcasing;
     }
 
     [ContextMenu("Showcase All Piştis and Point Cards")]
@@ -1254,6 +1474,27 @@ public class DeckController : MonoBehaviour
         if (isShowcasing)
         {
             StopShowcasePlayerPoolCards();
+        }
+    }
+    
+    public void TryStopShowcaseCenterCards()
+    {
+        if (isCenterShowcasing)
+        {
+            StopShowcaseCenterCards();
+        }
+    }
+    
+    /// <summary>
+    /// Stops all active showcases (center, player pools, other hands)
+    /// </summary>
+    public void TryStopAllShowcases()
+    {
+        TryStopShowcaseCenterCards();
+        TryStopShowcasePlayerPoolCards();
+        if (isShowcaseAllActive)
+        {
+            ExitShowcaseAllOtherHands();
         }
     }
 
@@ -2143,6 +2384,131 @@ public class DeckController : MonoBehaviour
         yield return seq.WaitForCompletion();
     }
 
-
+    // ===== DECK MOVEMENT METHODS =====
+    
+    /// <summary>
+    /// Moves the deck from starting position to reach point
+    /// </summary>
+    public void MoveDeckToReachPoint()
+    {
+        if (isDeckMoving || deckReachPoint == null) return;
+        
+        // Get the DeckTransform GameObject that actually needs to move
+        Transform deckTransform = GameObject.Find("DeckTransform").transform;
+        if (deckTransform == null)
+        {
+            Debug.LogError("[DeckController] DeckTransform not found! Cannot move deck.");
+            return;
+        }
+        
+        Debug.Log($"[DeckController] Moving deck from {deckTransform.position} to reach point {deckReachPoint.position}");
+        
+        // Kill any existing movement sequence
+        if (deckMoveSequence != null)
+            deckMoveSequence.Kill();
+        
+        isDeckMoving = true;
+        isDeckAtReachPoint = true;
+        
+        // Create movement sequence - move the DeckTransform, not this GameObject
+        deckMoveSequence = DOTween.Sequence();
+        deckMoveSequence.Append(deckTransform.DOMove(deckReachPoint.position, deckMoveSpeed).SetEase(deckMoveEase));
+        deckMoveSequence.OnComplete(() => {
+            isDeckMoving = false;
+            Debug.Log("[DeckController] Deck reached target position");
+        });
+    }
+    
+    /// <summary>
+    /// Moves the deck from reach point back to starting position
+    /// </summary>
+    public void MoveDeckToStartingPosition()
+    {
+        if (isDeckMoving) return;
+        
+        // Get the DeckTransform GameObject that actually needs to move
+        Transform deckTransform = GameObject.Find("DeckTransform").transform;
+        if (deckTransform == null)
+        {
+            Debug.LogError("[DeckController] DeckTransform not found! Cannot move deck.");
+            return;
+        }
+        
+        Debug.Log($"[DeckController] Moving deck from {deckTransform.position} to starting position {deckStartingPosition}");
+        
+        // Kill any existing movement sequence
+        if (deckMoveSequence != null)
+            deckMoveSequence.Kill();
+        
+        isDeckMoving = true;
+        isDeckAtReachPoint = false;
+        
+        // Create movement sequence - move the DeckTransform, not this GameObject
+        deckMoveSequence = DOTween.Sequence();
+        deckMoveSequence.Append(deckTransform.DOMove(deckStartingPosition, deckMoveSpeed).SetEase(deckMoveEase));
+        deckMoveSequence.OnComplete(() => {
+            isDeckMoving = false;
+            Debug.Log("[DeckController] Deck returned to starting position");
+        });
+    }
+    
+    /// <summary>
+    /// Public method to check if deck is at reach point
+    /// </summary>
+    public bool IsDeckAtReachPoint()
+    {
+        return isDeckAtReachPoint;
+    }
+    
+    /// <summary>
+    /// Public method to check if deck is moving
+    /// </summary>
+    public bool IsDeckMoving()
+    {
+        return isDeckMoving;
+    }
+    
+    /// <summary>
+    /// Public method to manually trigger movement to reach point (for testing)
+    /// </summary>
+    [ContextMenu("Move Deck to Reach Point")]
+    public void TriggerMoveDeckToReachPoint()
+    {
+        MoveDeckToReachPoint();
+    }
+    
+    /// <summary>
+    /// Public method to manually trigger movement to starting position (for testing)
+    /// </summary>
+    [ContextMenu("Move Deck to Starting Position")]
+    public void TriggerMoveDeckToStartingPosition()
+    {
+        MoveDeckToStartingPosition();
+    }
+    
+    void OnDestroy()
+    {
+        // Clean up DOTween sequences
+        if (deckMoveSequence != null)
+            deckMoveSequence.Kill();
+    }
+    
+    private void OnDrawGizmosSelected()
+    {
+        // Draw the deck reach point in the scene view
+        if (deckReachPoint != null)
+        {
+            Gizmos.color = Color.red;
+            Gizmos.DrawWireSphere(deckReachPoint.position, 0.5f);
+            
+            // Draw line from current deck position to reach point
+            Transform deckTransform = GameObject.Find("DeckTransform").transform;
+            if (deckTransform != null)
+            {
+                Gizmos.color = Color.magenta;
+                Gizmos.DrawLine(deckTransform.position, deckReachPoint.position);
+            }
+        }
+    }
 }
 
