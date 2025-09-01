@@ -102,7 +102,7 @@ public class NetworkManagerUI : MonoBehaviour
 
         CreateLobbyOptions options = new CreateLobbyOptions
         {
-            IsPrivate = privateFlag, // <--- This makes the lobby joinable only by code
+            IsPrivate = privateFlag, // Keep private lobbies for friend groups
             Data = new Dictionary<string, DataObject>
             {
                 { "JoinCode", new DataObject(DataObject.VisibilityOptions.Public, joinCodeVar) },
@@ -111,7 +111,21 @@ public class NetworkManagerUI : MonoBehaviour
         };
 
         currentLobby = await Lobbies.Instance.CreateLobbyAsync("MyLobby", playerCount, options);
-        Debug.Log($"Host started with join code: {joinCodeVar}");
+        
+        // For private lobbies, display the lobby code (which clients will use to join)
+        // For public lobbies, display the relay join code
+        if (privateFlag)
+        {
+            Debug.Log($"Host started with Relay join code: {joinCodeVar}");
+            Debug.Log($"Private lobby code for clients: {currentLobby.LobbyCode}");
+            joinCodeText.text = currentLobby.LobbyCode; // Clients use this to join private lobby
+        }
+        else
+        {
+            Debug.Log($"Host started with join code: {joinCodeVar}");
+            joinCodeText.text = joinCodeVar; // Clients use this for public lobby
+        }
+        
         Server.Singleton.SetPlayerCount(playerCount);
         return NetworkManager.Singleton.StartHost() ? joinCodeVar : null;
     }
@@ -140,39 +154,98 @@ public class NetworkManagerUI : MonoBehaviour
         joinCodeText.text = inputJoinCode;
 
         // --- Join the Lobby using the join code ---
-        // Find the lobby that matches the join code
-        var queryOptions = new QueryLobbiesOptions
+        // First try to join as a private lobby using lobby code
+        try
         {
-            Filters = new List<QueryFilter>
+            Debug.Log($"Attempting to join private lobby with lobby code: {inputJoinCode}");
+            currentLobby = await Lobbies.Instance.JoinLobbyByCodeAsync(inputJoinCode);
+            Debug.Log($"Successfully joined private lobby: {currentLobby.Name}");
+            
+            // Get the relay join code from the lobby data
+            if (currentLobby.Data != null && currentLobby.Data.ContainsKey("JoinCode"))
             {
-                new QueryFilter(QueryFilter.FieldOptions.S1, inputJoinCode, QueryFilter.OpOptions.EQ)
+                string relayJoinCode = currentLobby.Data["JoinCode"].Value;
+                Debug.Log($"Retrieved relay join code from private lobby: {relayJoinCode}");
+                
+                // Use the relay join code for the actual connection
+                var privateJoinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode: relayJoinCode);
+                NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(privateJoinAllocation, "wss"));
+                
+                return !string.IsNullOrEmpty(relayJoinCode) && NetworkManager.Singleton.StartClient();
             }
-        };
-        var lobbies = await Lobbies.Instance.QueryLobbiesAsync(queryOptions);
-        Lobby foundLobby = null;
-        foreach (var lobby in lobbies.Results)
-        {
-            if (lobby.Data != null && lobby.Data.ContainsKey("JoinCode") && lobby.Data["JoinCode"].Value == inputJoinCode)
+            else
             {
-                foundLobby = lobby;
-                break;
+                Debug.LogError("Private lobby doesn't contain relay join code!");
+                return false;
             }
         }
-        if (foundLobby != null)
+        catch (Exception e)
         {
-            currentLobby = await Lobbies.Instance.JoinLobbyByIdAsync(foundLobby.Id);
+            Debug.Log($"Failed to join as private lobby: {e.Message}");
+            Debug.Log("Trying as public lobby with relay join code...");
+            
+            // If private lobby join fails, try as public lobby with relay join code
+            var queryOptions = new QueryLobbiesOptions();
+            var lobbies = await Lobbies.Instance.QueryLobbiesAsync(queryOptions);
+            Lobby foundLobby = null;
+            
+            Debug.Log($"Searching through {lobbies.Results.Count} public lobbies for relay join code: {inputJoinCode}");
+            
+            foreach (var lobby in lobbies.Results)
+            {
+                if (lobby.Data != null && lobby.Data.ContainsKey("JoinCode"))
+                {
+                    string lobbyJoinCode = lobby.Data["JoinCode"].Value;
+                    Debug.Log($"Checking public lobby {lobby.Name} with relay code: {lobbyJoinCode}");
+                    
+                    if (lobbyJoinCode == inputJoinCode)
+                    {
+                        foundLobby = lobby;
+                        Debug.Log($"Found matching public lobby: {lobby.Name}");
+                        break;
+                    }
+                }
+            }
+            
+            if (foundLobby != null)
+            {
+                currentLobby = await Lobbies.Instance.JoinLobbyByIdAsync(foundLobby.Id);
+                Debug.Log($"Successfully joined public lobby: {foundLobby.Name}");
+                
+                // For public lobbies, use the input code directly as relay join code
+                var joinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode: inputJoinCode);
+                NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(joinAllocation, "wss"));
+                
+                return !string.IsNullOrEmpty(inputJoinCode) && NetworkManager.Singleton.StartClient();
+            }
+            else
+            {
+                Debug.LogError($"No lobby found with the provided join code: {inputJoinCode}");
+                Debug.LogError($"Available public lobbies: {lobbies.Results.Count}");
+                foreach (var lobby in lobbies.Results)
+                {
+                    if (lobby.Data != null && lobby.Data.ContainsKey("JoinCode"))
+                    {
+                        Debug.LogError($"Public Lobby {lobby.Name}: {lobby.Data["JoinCode"].Value}");
+                    }
+                }
+                
+                // If no lobby found, try to connect directly using the code as a relay join code
+                Debug.Log($"Attempting to connect directly using code as relay join code: {inputJoinCode}");
+                try
+                {
+                    var directJoinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode: inputJoinCode);
+                    NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(directJoinAllocation, "wss"));
+                    Debug.Log($"Successfully connected directly via relay join code: {inputJoinCode}");
+                    return !string.IsNullOrEmpty(inputJoinCode) && NetworkManager.Singleton.StartClient();
+                }
+                catch (Exception relayException)
+                {
+                    Debug.LogError($"Failed to connect directly via relay: {relayException.Message}");
+                    return false;
+                }
+            }
         }
-        else
-        {
-            Debug.LogError("No lobby found with the provided join code.");
-            return false;
-        }
-        // --- End join lobby section ---
-
-        var joinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode: inputJoinCode);
-        NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(joinAllocation, "wss"));
-
-        return !string.IsNullOrEmpty(inputJoinCode) && NetworkManager.Singleton.StartClient();
     }
 
     public async Task FindLobbiesAndStartHostIfNoneExist(int playerCount)

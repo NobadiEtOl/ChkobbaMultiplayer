@@ -86,6 +86,39 @@ public class MoveChainTracker : MonoBehaviour
     }
     
     /// <summary>
+    /// Records card movement between locations
+    /// </summary>
+    public void RecordCardMovement(int playerNumber, string cardId, string fromLocation, string toLocation, string reason)
+    {
+        var move = GameMove.CreateCardMovementMove(nextMoveId++, playerNumber, cardId, fromLocation, toLocation, reason);
+        RecordMove(move);
+        
+        Debug.Log($"[MoveChainTracker] {(isServer ? "Server" : "Client")} recorded card movement: {cardId} from {fromLocation} to {toLocation} by P{playerNumber} - {reason}");
+    }
+    
+    /// <summary>
+    /// Records card swap between players
+    /// </summary>
+    public void RecordCardSwap(int playerANumber, int playerBNumber, string cardAId, string cardBId, string reason)
+    {
+        var move = GameMove.CreateCardSwapMove(nextMoveId++, playerANumber, playerBNumber, cardAId, cardBId, reason);
+        RecordMove(move);
+        
+        Debug.Log($"[MoveChainTracker] {(isServer ? "Server" : "Client")} recorded card swap: P{playerANumber} {cardAId} ↔ P{playerBNumber} {cardBId} - {reason}");
+    }
+    
+    /// <summary>
+    /// Records card parenting change (Unity hierarchy change)
+    /// </summary>
+    public void RecordCardParentingChange(int playerNumber, string cardId, string oldParent, string newParent, string reason)
+    {
+        var move = GameMove.CreateCardParentingChangeMove(nextMoveId++, playerNumber, cardId, oldParent, newParent, reason);
+        RecordMove(move);
+        
+        Debug.Log($"[MoveChainTracker] {(isServer ? "Server" : "Client")} recorded card parenting change: {cardId} from {oldParent} to {newParent} by P{playerNumber} - {reason}");
+    }
+    
+    /// <summary>
     /// Records a move and triggers events
     /// </summary>
     public void RecordMove(GameMove move)

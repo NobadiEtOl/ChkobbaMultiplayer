@@ -1787,4 +1787,280 @@ public class SuperPowerSpawner : MonoBehaviour
         goldPopupQueue.Clear();
         Debug.Log("[SuperPowerSpawner] Gold popup queue cleared.");
     }
+
+    // ========================================
+    // CONTEXT MENU FUNCTIONS FOR TESTING
+    // ========================================
+    
+    /// <summary>
+    /// Spawn a specific superpower for testing purposes
+    /// </summary>
+    [ContextMenu("Spawn Ucundan Göz At")]
+    public void SpawnUcundanGozAt()
+    {
+        SpawnSpecificPower("Ucundan Göz At");
+    }
+    
+    [ContextMenu("Spawn Oynayamazsın")]
+    public void SpawnOynayamazsin()
+    {
+        SpawnSpecificPower("Oynayamazsın");
+    }
+    
+    [ContextMenu("Spawn Değiş Tokuş")]
+    public void SpawnDegisTokus()
+    {
+        SpawnSpecificPower("Değiş Tokuş");
+    }
+    
+    [ContextMenu("Spawn Kapkaç")]
+    public void SpawnKapkac()
+    {
+        SpawnSpecificPower("Kapkaç");
+    }
+    
+    [ContextMenu("Spawn Yandım Anam")]
+    public void SpawnYandimAnam()
+    {
+        SpawnSpecificPower("Yandım Anam");
+    }
+    
+    [ContextMenu("Spawn Baya Baya Bak")]
+    public void SpawnBayaBayaBak()
+    {
+        SpawnSpecificPower("Baya Baya Bak");
+    }
+    
+    [ContextMenu("Spawn Bomba")]
+    public void SpawnBomba()
+    {
+        SpawnSpecificPower("Bomba");
+    }
+    
+    [ContextMenu("Spawn Yapamazsın")]
+    public void SpawnYapamazsin()
+    {
+        SpawnSpecificPower("Yapamazsın");
+    }
+    
+    [ContextMenu("Spawn Bu Daha İyi")]
+    public void SpawnBuDahaIyi()
+    {
+        SpawnSpecificPower("Bu Daha İyi");
+    }
+    
+    [ContextMenu("Spawn Vale Arar")]
+    public void SpawnValeArar()
+    {
+        SpawnSpecificPower("Vale Arar");
+    }
+    
+    [ContextMenu("Spawn Kopyala Yapıştır")]
+    public void SpawnKopyalaYapistir()
+    {
+        SpawnSpecificPower("Kopyala Yapıştır");
+    }
+    
+    [ContextMenu("Spawn Şunu Değiş Tokuş")]
+    public void SpawnSunuDegisTokus()
+    {
+        SpawnSpecificPower("Şunu Değiş Tokuş");
+    }
+    
+    [ContextMenu("Spawn Şunu Değiş Bunu Tokuş")]
+    public void SpawnSunuDegisBunuTokus()
+    {
+        SpawnSpecificPower("Şunu Değiş Bunu Tokuş");
+    }
+    
+    [ContextMenu("Spawn Ver Zehri")]
+    public void SpawnVerZehri()
+    {
+        SpawnSpecificPower("Ver Zehri");
+    }
+    
+    [ContextMenu("Spawn Kutsal Deste")]
+    public void SpawnKutsalDeste()
+    {
+        SpawnSpecificPower("Kutsal Deste");
+    }
+    
+    [ContextMenu("Spawn Zafer Puanı")]
+    public void SpawnZaferPuani()
+    {
+        SpawnSpecificPower("Zafer Puanı");
+    }
+    
+    /// <summary>
+    /// Spawn a random superpower for testing
+    /// </summary>
+    [ContextMenu("Spawn Random Power")]
+    public void SpawnRandomPower()
+    {
+        if (superPowerList.Count > 0)
+        {
+            int randomIndex = Random.Range(0, superPowerList.Count);
+            SuperPower randomPower = superPowerList[randomIndex];
+            SpawnSpecificPower(randomPower.name);
+        }
+        else
+        {
+            Debug.LogWarning("[SuperPowerSpawner] No superpowers available to spawn randomly.");
+        }
+    }
+    
+    /// <summary>
+    /// Spawn multiple random powers for testing
+    /// </summary>
+    [ContextMenu("Spawn 3 Random Powers")]
+    public void SpawnThreeRandomPowers()
+    {
+        ReadyToSpawnSuperPowers(3, null, 150f);
+    }
+    
+    /// <summary>
+    /// Spawn a specific superpower by name using the proper spawning system
+    /// </summary>
+    private void SpawnSpecificPower(string powerName)
+    {
+        // Find the power in the list
+        SuperPower targetPower = null;
+        foreach (var power in superPowerList)
+        {
+            if (power.name == powerName)
+            {
+                targetPower = power;
+                break;
+            }
+        }
+        
+        if (targetPower == null)
+        {
+            Debug.LogError($"[SuperPowerSpawner] Power '{powerName}' not found in superPowerList!");
+            return;
+        }
+        
+        // Check if we have a prefab for this power
+        if (!superPowerPrefabs.ContainsKey(targetPower))
+        {
+            Debug.LogError($"[SuperPowerSpawner] No prefab found for power '{powerName}'!");
+            return;
+        }
+        
+        // Use the proper spawning system like the kese does
+        Debug.Log($"[SuperPowerSpawner] Spawning {powerName} using proper spawning system");
+        StartCoroutine(SpawnSuperPower(targetPower, null, 150f));
+    }
+    
+    /// <summary>
+    /// Clear all spawned superpowers for testing
+    /// </summary>
+    [ContextMenu("Clear All Spawned Powers")]
+    public void ClearAllSpawnedPowers()
+    {
+        foreach (var power in spawnedSuperPowers.ToArray())
+        {
+            if (power != null)
+            {
+                DestroyImmediate(power);
+            }
+        }
+        spawnedSuperPowers.Clear();
+        Debug.Log("[SuperPowerSpawner] All spawned superpowers cleared.");
+    }
+    
+    /// <summary>
+    /// Spawn all powers for comprehensive testing
+    /// </summary>
+    [ContextMenu("Spawn All Powers")]
+    public void SpawnAllPowers()
+    {
+        foreach (var power in superPowerList)
+        {
+            SpawnSpecificPower(power.name);
+        }
+        Debug.Log($"[SuperPowerSpawner] Attempted to spawn all {superPowerList.Count} powers.");
+    }
+    
+    /// <summary>
+    /// Print current power list for debugging
+    /// </summary>
+    [ContextMenu("Print Available Powers")]
+    public void PrintAvailablePowers()
+    {
+        Debug.Log($"[SuperPowerSpawner] Available powers ({superPowerList.Count}):");
+        for (int i = 0; i < superPowerList.Count; i++)
+        {
+            var power = superPowerList[i];
+            Debug.Log($"  {i}: {power.name} - {power.description}");
+        }
+        
+        Debug.Log($"[SuperPowerSpawner] Available prefabs ({superPowerPrefabs.Count}):");
+        foreach (var kvp in superPowerPrefabs)
+        {
+            Debug.Log($"  {kvp.Key.name}: {kvp.Value.name}");
+        }
+    }
+    
+    /// <summary>
+    /// Add testing gold
+    /// </summary>
+    [ContextMenu("Add 50 Gold")]
+    public void AddTestingGold()
+    {
+        AddGold(50);
+        Debug.Log($"[SuperPowerSpawner] Added 50 gold. Current total: {currentGold}");
+    }
+    
+    /// <summary>
+    /// Spawn a specific power at a specific position (like kese does)
+    /// </summary>
+    [ContextMenu("Spawn Kapkaç at Center")]
+    public void SpawnKapkacAtCenter()
+    {
+        SuperPower kapkacPower = null;
+        foreach (var power in superPowerList)
+        {
+            if (power.name == "Kapkaç")
+            {
+                kapkacPower = power;
+                break;
+            }
+        }
+        
+        if (kapkacPower != null)
+        {
+            Vector3 centerPos = centerPosition;
+            Debug.Log($"[SuperPowerSpawner] Spawning Kapkaç at center position {centerPos}");
+            StartCoroutine(SpawnSuperPower(kapkacPower, centerPos, 150f));
+        }
+        else
+        {
+            Debug.LogError("[SuperPowerSpawner] Kapkaç power not found!");
+        }
+    }
+    
+    /// <summary>
+    /// Spawn a specific power at mouse position for testing
+    /// </summary>
+    [ContextMenu("Spawn Random Power at Mouse")]
+    public void SpawnRandomPowerAtMouse()
+    {
+        if (superPowerList.Count > 0)
+        {
+            int randomIndex = Random.Range(0, superPowerList.Count);
+            SuperPower randomPower = superPowerList[randomIndex];
+            
+            Vector3 mousePos = Input.mousePosition;
+            mousePos.z = 10f; // Distance from camera
+            Vector3 worldPos = Camera.main.ScreenToWorldPoint(mousePos);
+            
+            Debug.Log($"[SuperPowerSpawner] Spawning {randomPower.name} at mouse position {worldPos}");
+            StartCoroutine(SpawnSuperPower(randomPower, worldPos, 150f));
+        }
+        else
+        {
+            Debug.LogWarning("[SuperPowerSpawner] No superpowers available to spawn randomly.");
+        }
+    }
 }

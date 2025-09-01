@@ -1999,6 +1999,10 @@ public class DeckController : MonoBehaviour
 
     public void SwapHandCardWithCenterCard(string handCardID, string centerCardID, int playerNo)
     {
+        // Track card movement in move chain
+        MoveChainIntegrator.TrackCardMovement(playerNo, handCardID, "Hand", "Center", "Bu Daha İyi power");
+        MoveChainIntegrator.TrackCardMovement(playerNo, centerCardID, "Center", "Hand", "Bu Daha İyi power");
+        
         GameObject handCardObj = CardInteraction.cardLookup[handCardID].gameObject;
         GameObject centerCardObj = CardInteraction.cardLookup[centerCardID].gameObject;
 
@@ -2132,9 +2136,18 @@ public class DeckController : MonoBehaviour
             showcaseOriginalTransforms.Remove(cardBObj);
         }
 
+        // Track parenting changes for move chain synchronization
+        string oldParentA = cardAObj.transform.parent != null ? cardAObj.transform.parent.name : "None";
+        string oldParentB = cardBObj.transform.parent != null ? cardBObj.transform.parent.name : "None";
+        
         // Swap parents but keep world positions for animation
-            cardAObj.transform.SetParent(handB, true);
+        cardAObj.transform.SetParent(handB, true);
         cardBObj.transform.SetParent(handA, true);
+        
+        // Track the parenting changes in move chain
+        MoveChainIntegrator.TrackCardParentingChange(playerANo, cardAID, oldParentA, handB.name, "Card swap - Şunu Değiş Tokuş");
+        MoveChainIntegrator.TrackCardParentingChange(playerBNo, cardBID, oldParentB, handA.name, "Card swap - Şunu Değiş Tokuş");
+        MoveChainIntegrator.TrackCardSwap(playerANo, playerBNo, cardAID, cardBID, "Şunu Değiş Tokuş power");
 
         // --- Insert at correct indexes ---
         // For handA (insert cardBObj at idxA)
@@ -2245,9 +2258,18 @@ public class DeckController : MonoBehaviour
         Quaternion cardBOldRot = cardBObj.transform.rotation;
         Vector3 cardBOldScale = cardBObj.transform.localScale;
 
+        // Track parenting changes for move chain synchronization
+        string oldParentA = cardAObj.transform.parent != null ? cardAObj.transform.parent.name : "None";
+        string oldParentB = cardBObj.transform.parent != null ? cardBObj.transform.parent.name : "None";
+        
         // Set parents
         cardAObj.transform.SetParent(handB, true);
         cardBObj.transform.SetParent(handA, true);
+        
+        // Track the parenting changes in move chain
+        MoveChainIntegrator.TrackCardParentingChange(thisPlayerNumber, cardAID, oldParentA, handB.name, "Card swap - Index-based swap");
+        MoveChainIntegrator.TrackCardParentingChange(thisPlayerNumber, cardBID, oldParentB, handA.name, "Card swap - Index-based swap");
+        MoveChainIntegrator.TrackCardSwap(thisPlayerNumber, (thisPlayerNumber + 1) % playerCount, cardAID, cardBID, "Index-based card swap");
 
         // Animate cards to each other's old positions and wait for both to finish
         var moveA = MoveCardCoroutine(cardBOldPos, cardAObj, 1, cardBOldRot, new Vector3(normalScale, normalScale, normalScale));

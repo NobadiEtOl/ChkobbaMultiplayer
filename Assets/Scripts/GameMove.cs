@@ -31,6 +31,9 @@ public struct GameMove : INetworkSerializable
         Capture,
         SuperPower_Activation,    // Superpower was activated
         SuperPower_Effect,        // Superpower effect applied to card(s)
+        CardMovement,             // Card moved between locations
+        CardSwap,                 // Cards swapped between players
+        CardParentingChange,      // Card parenting changed in Unity hierarchy
         TurnEnd,
         RoundStart
     }
@@ -105,6 +108,93 @@ public struct GameMove : INetworkSerializable
             superPowerName = superPowerName,
             affectedCardIds = affectedCardIds ?? new string[0],
             superPowerData = new SerializableStringDictionary(effectData ?? new Dictionary<string, string>())
+        };
+        
+        move.moveHash = CalculateMoveHash(move);
+        return move;
+    }
+    
+    /// <summary>
+    /// Creates a card movement move
+    /// </summary>
+    public static GameMove CreateCardMovementMove(int moveId, int playerNumber, string cardId, string fromLocation, string toLocation, string reason)
+    {
+        var move = new GameMove
+        {
+            moveId = moveId,
+            playerNumber = playerNumber,
+            timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            moveType = MoveType.CardMovement,
+            cardId = cardId,
+            cardData = new int[0],
+            capturedCardIds = new string[0],
+            sumValue = 0,
+            superPowerName = "",
+            affectedCardIds = new string[0],
+            superPowerData = new SerializableStringDictionary(new Dictionary<string, string> 
+            { 
+                { "fromLocation", fromLocation },
+                { "toLocation", toLocation },
+                { "reason", reason }
+            })
+        };
+        
+        move.moveHash = CalculateMoveHash(move);
+        return move;
+    }
+    
+    /// <summary>
+    /// Creates a card swap move
+    /// </summary>
+    public static GameMove CreateCardSwapMove(int moveId, int playerANumber, int playerBNumber, string cardAId, string cardBId, string reason)
+    {
+        var move = new GameMove
+        {
+            moveId = moveId,
+            playerNumber = playerANumber, // Primary player
+            timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            moveType = MoveType.CardSwap,
+            cardId = cardAId,
+            cardData = new int[0],
+            capturedCardIds = new string[0],
+            sumValue = 0,
+            superPowerName = "",
+            affectedCardIds = new string[] { cardAId, cardBId },
+            superPowerData = new SerializableStringDictionary(new Dictionary<string, string> 
+            { 
+                { "playerB", playerBNumber.ToString() },
+                { "cardB", cardBId },
+                { "reason", reason }
+            })
+        };
+        
+        move.moveHash = CalculateMoveHash(move);
+        return move;
+    }
+    
+    /// <summary>
+    /// Creates a card parenting change move
+    /// </summary>
+    public static GameMove CreateCardParentingChangeMove(int moveId, int playerNumber, string cardId, string oldParent, string newParent, string reason)
+    {
+        var move = new GameMove
+        {
+            moveId = moveId,
+            playerNumber = playerNumber,
+            timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            moveType = MoveType.CardParentingChange,
+            cardId = cardId,
+            cardData = new int[0],
+            capturedCardIds = new string[0],
+            sumValue = 0,
+            superPowerName = "",
+            affectedCardIds = new string[0],
+            superPowerData = new SerializableStringDictionary(new Dictionary<string, string> 
+            { 
+                { "oldParent", oldParent },
+                { "newParent", newParent },
+                { "reason", reason }
+            })
         };
         
         move.moveHash = CalculateMoveHash(move);

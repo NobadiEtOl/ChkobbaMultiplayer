@@ -335,9 +335,9 @@ public class GameManager : MonoBehaviour
 
     [SerializeField] private GameObject kapkacAnimEffectPrefab; // The animation prefab for Kapkaç
 
-    [SerializeField] private GameObject oynayamazsinBlockPrefab;
+    [SerializeField] public GameObject oynayamazsinBlockPrefab;
 
-    private GameObject oynayamazsinBlockInstance;
+    public GameObject oynayamazsinBlockInstance;
 
     public bool isKapkacPending = false;
 
@@ -477,6 +477,15 @@ public class GameManager : MonoBehaviour
 
         SuperPowerSpawner.LocalInstance.InitializeSuperPowers(); // Initialize super powers
 
+        
+        // Instantiate DebugChainPrinter if it doesn't exist
+        if (DebugChainPrinter.LocalInstance == null)
+        {
+            GameObject debugPrinterObj = new GameObject("DebugChainPrinter");
+            debugPrinterObj.AddComponent<DebugChainPrinter>();
+            DontDestroyOnLoad(debugPrinterObj);
+            Debug.Log("[GameManager] Created DebugChainPrinter instance");
+        }
     }
 
 
@@ -831,19 +840,19 @@ public class GameManager : MonoBehaviour
 
 
     private IEnumerator DelayedDealPlayers(int playerCount, Dictionary<int, List<string>> playerHands)
-
     {
-
         deckController.DealPlayers(playerCount, playerHands);
-
-
 
         yield return new WaitForSeconds(0f);
 
-
+        // Refresh Vale Arar indicators on new cards if the power is active
+        if (valeArarActive)
+        {
+            RefreshValeArarIndicators();
+            Debug.Log("[GameManager] Vale Arar indicators refreshed on new cards");
+        }
 
         SuperPowerSpawner.LocalInstance.ReadyToSpawnSuperPowers();
-
     }
 
 
@@ -851,25 +860,31 @@ public class GameManager : MonoBehaviour
     //Gets message from the server to start dealing cards to center
 
     public void CardPrefabsToCenter(SerializableCard serializableCard)
-
     {
-
         Debug.Log("CardPrefabsToCenter called with serializableCard: " + serializableCard.ToString());
-
         //Converts serializablelist to a normal list
-
         List<string> centerCardIDs = serializableCard.ToDictionary().Keys.ToList();
 
-
-
         //Informs the deckController to deal the center cards
-
         if (deckController) StartCoroutine(deckController.DealCenter(centerCardIDs));
-
         else Debug.LogError("DeckController is not assigned in GameManager.");  
 
+        // Refresh Vale Arar indicators on new center cards if the power is active
+        if (valeArarActive)
+        {
+            // Use a coroutine to wait for cards to be spawned before refreshing
+            StartCoroutine(RefreshValeArarAfterCenterDeal());
+        }
+        
         //turnTimerText.text = "";
-
+    }
+    
+    private IEnumerator RefreshValeArarAfterCenterDeal()
+    {
+        // Wait a bit for center cards to be spawned
+        yield return new WaitForSeconds(0.5f);
+        RefreshValeArarIndicators();
+        Debug.Log("[GameManager] Vale Arar indicators refreshed on new center cards");
     }
 
 
@@ -895,33 +910,32 @@ public class GameManager : MonoBehaviour
 
 
         if (isSunuDegisTokusActive)
-
         {
-
             AddToDebugLog($"[GameManager] ŞunuDeğişTokuş is active, checking if card is from own hand");
 
             // Only allow selecting a card outside your own hand for the second selection
-
             if (myCards.Contains(cardID))
-
             {
-
                 AddToDebugLogWarning("You must select a card from another player's hand for ŞunuDeğişTokuş.");
-
                 return;
+            }
 
+            // NOW call PowerActivated() since both cards are selected and we're executing the power
+            if (DeckController.LocalInstance != null)
+            {
+                Debug.Log("[GameManager] Calling PowerActivated() for Şunu Değiş Tokuş since both cards are now selected");
+                // Create a temporary power instance to call PowerActivated
+                var tempPower = ScriptableObject.CreateInstance<SunuDegisTokus>();
+                tempPower.PowerActivated();
+                DestroyImmediate(tempPower);
             }
 
             // Send swap request to server
-
             networkRelay.UseSunuDegisTokusServerRPC(deckController.thisPlayerNumber, sunuDegisTokusFirstCard, cardID);
 
             isSunuDegisTokusActive = false;
-
             sunuDegisTokusFirstCard = null;
-
             return;
-
         }
 
 
@@ -979,17 +993,21 @@ public class GameManager : MonoBehaviour
             sunuDegisBunuTokusSwapIndex++;
 
             if (sunuDegisBunuTokusSwapIndex >= sunuDegisBunuTokusMyHandSnapshot.Count)
-
             {
+                // NOW call PowerActivated() since all swaps are complete
+                if (DeckController.LocalInstance != null)
+                {
+                    Debug.Log("[GameManager] Calling PowerActivated() for Şunu Değiş Bunu Tokuş since all swaps are complete");
+                    // Create a temporary power instance to call PowerActivated
+                    var tempPower = ScriptableObject.CreateInstance<SunuDegisBunuTokus>();
+                    tempPower.PowerActivated();
+                    DestroyImmediate(tempPower);
+                }
 
                 isSunuDegisBunuTokusActive = false;
-
                 sunuDegisBunuTokusMyHandSnapshot = null;
-
                 sunuDegisBunuTokusSwapIndex = 0;
-
                 AddToDebugLog("ŞunuDeğişBunuTokuş: All swaps done.");
-
             }
 
             else
@@ -1397,6 +1415,18 @@ public class GameManager : MonoBehaviour
         // 5. Update the activePowerEffect
 
         cardInteraction.activePowerEffect = "Kapkaç";
+        
+        // 6. IMPORTANT: Clear any selection state to prevent automatic playing
+        // This prevents the card from being automatically played after Kapkaç
+        if (CardInteraction.currentlySelectedCard == cardInteraction)
+        {
+            CardInteraction.currentlySelectedCard = null;
+            CardInteraction.isOneCardSelected = false;
+            if (GameManager.LocalInstance != null)
+            {
+                GameManager.LocalInstance.SetCurrentSelectedHandCardNull();
+            }
+        }
 
     }
 
@@ -1698,7 +1728,7 @@ public class GameManager : MonoBehaviour
 
 
 
-    private int turnCounter;
+    public int turnCounter;
 
     public void UpdateCurrentPlayer(int playerNumber, int turnC)
 
@@ -2489,11 +2519,20 @@ public class GameManager : MonoBehaviour
 
     {
 
-        Debug.Log("Using BayaBayaBak Power");
+        Debug.Log($"[GameManager] UseBayaBayaBakPower() called - Player: {deckController.thisPlayerNumber}, Time: {Time.time}");
 
         int opponentPlayerNo = GetRandomOpponentPlayerNo(); // You can reuse your existing logic
 
+        Debug.Log($"[GameManager] Selected opponent: {opponentPlayerNo}, calling UseBayaBayaBakServerRPC()");
+
+        
+        // Track the power usage
+        DebugChainPrinter.LocalInstance?.TrackPowerUsage("BayaBayaBak", deckController.thisPlayerNumber, $"Target opponent: {opponentPlayerNo}");
+        DebugChainPrinter.LocalInstance?.TrackLocalAction($"UseBayaBayaBakPower called for opponent {opponentPlayerNo}");
+
         networkRelay.UseBayaBayaBakServerRPC(opponentPlayerNo);
+
+        Debug.Log($"[GameManager] UseBayaBayaBakPower() complete - Server will process the power");
 
     }
 
@@ -2503,7 +2542,19 @@ public class GameManager : MonoBehaviour
 
     {
 
+        Debug.Log($"[GameManager] OnBayaBayaBakSynced() called - Opponent: {opponentPlayerNo}, Time: {Time.time}");
+
+        
+        // Track the power effect
+        DebugChainPrinter.LocalInstance?.TrackLocalAction($"OnBayaBayaBakSynced received for opponent {opponentPlayerNo}");
+        DebugChainPrinter.LocalInstance?.TrackPowerUsage("BayaBayaBak", deckController.thisPlayerNumber, $"Effect applied - revealed opponent {opponentPlayerNo} cards");
+        
+        // Track power completion
+        MoveChainIntegrator.ReportPowerCompletion("BayaBayaBak", deckController.thisPlayerNumber, $"Revealed opponent {opponentPlayerNo} cards");
+
         deckController.PeekOpponentCardAll(opponentPlayerNo);
+
+        Debug.Log($"[GameManager] OnBayaBayaBakSynced() complete - Opponent cards revealed");
 
     }
 
@@ -2626,123 +2677,111 @@ public class GameManager : MonoBehaviour
 
 
     public void ActivateValeArarPower()
-
     {
-
-        Debug.Log("ValeArar power activated! Showing indicators for all Jacks.");
-
+        Debug.Log("ValeArar power activated! Showing indicators for all Jacks for the entire round.");
+        
+        valeArarActive = true;
+        
         foreach (var cardScript in cardInteractionsScripts)
-
         {
-
             // Assuming cardID[1] is the value, and 11 is Jack
-
             if (cardScript != null && cardScript.gameObject != null)
-
             {
-
                 string[] tagParts = cardScript.gameObject.tag.Split('_');
-
                 if (tagParts.Length == 2 && int.TryParse(tagParts[1], out int value) && value == 11)
-
                 {
-
                     // Activate the indicator for this card
-
                     var indicator = cardScript.transform.Find("SelectedCardIndicator(Clone)");
-
                     if (indicator != null)
-
                     {
-
                         indicator.gameObject.SetActive(true);
-
                         indicator.GetComponent<SpriteRenderer>().color = Color.red; // Set the sprite to card back
-
                     }
-
                 }
-
             }
-
         }
-
     }
 
 
 
     public void DeactivateValeArarPower()
-
     {
-
         Debug.Log("Deactivating ValeArar power: hiding indicators for all Jacks.");
-
+        
+        valeArarActive = false;
+        
         foreach (var cardScript in cardInteractionsScripts)
-
         {
-
             if (cardScript != null && cardScript.gameObject != null)
-
             {
-
                 string[] tagParts = cardScript.gameObject.tag.Split('_');
-
                 if (tagParts.Length == 2 && int.TryParse(tagParts[1], out int value) && value == 11)
-
                 {
-
                     var indicator = cardScript.transform.Find("SelectedCardIndicator(Clone)");
-
                     if (indicator != null)
-
                         indicator.gameObject.SetActive(false);
-
                 }
-
             }
-
         }
-
+    }
+    
+    public void RefreshValeArarIndicators()
+    {
+        if (!valeArarActive) return;
+        
+        Debug.Log("Refreshing Vale Arar indicators for all Jacks.");
+        
+        foreach (var cardScript in cardInteractionsScripts)
+        {
+            if (cardScript != null && cardScript.gameObject != null)
+            {
+                string[] tagParts = cardScript.gameObject.tag.Split('_');
+                if (tagParts.Length == 2 && int.TryParse(tagParts[1], out int value) && value == 11)
+                {
+                    // Activate the indicator for this card
+                    var indicator = cardScript.transform.Find("SelectedCardIndicator(Clone)");
+                    if (indicator != null)
+                    {
+                        indicator.gameObject.SetActive(true);
+                        indicator.GetComponent<SpriteRenderer>().color = Color.red; // Set the sprite to card back
+                    }
+                }
+            }
+        }
     }
 
 
 
 
 
-    private CardInteraction kopyalaSourceCard = null;
+    public CardInteraction kopyalaSourceCard = null;
 
     public bool isKopyalaActive = false;
 
     // Call this when the power is activated
 
-    public void ActivateKopyalaYapistirPower()
-
+    // New dual selection method for Kopyala Yapıştır
+    public void StartKopyalaYapistirDualSelection(CardInteraction sourceCard)
     {
-
-        Debug.Log("KopyalaYapıstır activated! Select a card to copy to.");
-
+        Debug.Log($"[GameManager] StartKopyalaYapistirDualSelection - Source: {sourceCard.uniqueCardInstanceID}");
+        
         isKopyalaActive = true;
-
-        kopyalaSourceCard = CardInteraction.currentlySelectedCard;
-
-        if (kopyalaSourceCard == null)
-
-            Debug.LogWarning("KopyalaYapıstır: No source card selected when activating power!");
-
-
-
-        // Allow selection from all hands (including own), for just one card
-
+        kopyalaSourceCard = sourceCard;
+        
+        // Allow selection from all hands for target card
         CardInteraction.AllowSelectionForParents(
-
-            new[] { "PlayerHand1", "PlayerHand2", "PlayerHand3", "PlayerHand4" }, // Add/remove as needed for your player count
-
+            new[] { "PlayerHand1", "PlayerHand2", "PlayerHand3", "PlayerHand4" },
             allowOwnHandCards: true,
-
             maxSelections: 1
-
         );
-
+        
+        Debug.Log("[GameManager] Dual selection mode active - select target card to complete power");
+    }
+    
+    public void ActivateKopyalaYapistirPower()
+    {
+        // This method is now obsolete - Kopyala Yapıştır uses dual selection
+        Debug.LogWarning("[GameManager] ActivateKopyalaYapistirPower() called but this method is obsolete. Kopyala Yapıştır now uses dual selection.");
     }
 
 
@@ -2752,37 +2791,35 @@ public class GameManager : MonoBehaviour
     // Call this from CardInteraction when a card is clicked and isKopyalaActive is true
 
     public void TryKopyalaYapistir(CardInteraction targetCard)
-
     {
-
-        Debug.Log("Trying KopyalaYapıstır on: " + targetCard.gameObject.name);
+        Debug.Log($"[GameManager] TryKopyalaYapistir called - Target: {targetCard.gameObject.name}");
 
         if (!isKopyalaActive || kopyalaSourceCard == null || targetCard == null || targetCard == kopyalaSourceCard)
-
+        {
+            Debug.LogWarning("[GameManager] TryKopyalaYapistir - Invalid state or same card selected");
             return;
+        }
 
+        Debug.Log($"[GameManager] KopyalaYapıştır: {kopyalaSourceCard.gameObject.name} -> {targetCard.gameObject.name}");
 
-
-        Debug.Log($"KopyalaYapıstır: {kopyalaSourceCard.gameObject.name} -> {targetCard.gameObject.name}");
-
-
+        // NOW call PowerActivated() since both cards are selected and we're executing the power
+        if (DeckController.LocalInstance != null)
+        {
+            Debug.Log("[GameManager] Calling PowerActivated() for Kopyala Yapıştır since both cards are now selected");
+            // Create a temporary power instance to call PowerActivated
+            var tempPower = ScriptableObject.CreateInstance<KopyalaYapistir>();
+            tempPower.PowerActivated();
+            DestroyImmediate(tempPower);
+        }
 
         // Network the change to server and all clients
-
         networkRelay.KopyalaYapistirServerRPC(targetCard.uniqueCardInstanceID, kopyalaSourceCard.uniqueCardInstanceID);
 
-
-
         // Reset state
-
         isKopyalaActive = false;
-
         kopyalaSourceCard = null;
-
         CardInteraction.currentlySelectedCard = null;
-
         SetCurrentSelectedHandCardNull();
-
     }
 
 
@@ -2807,6 +2844,9 @@ public class GameManager : MonoBehaviour
                 ["effectType"] = "cardCopy"
             };
             MoveChainIntegrator.TrackSuperpowerEffect(currentPlayerNo, "Kopyala Yapıştır", new[] { targetUniqueID, sourceUniqueID }, effectData);
+            
+            // Track power completion
+            MoveChainIntegrator.ReportPowerCompletion("Kopyala Yapıştır", currentPlayerNo, $"Copied {sourceUniqueID} to {targetUniqueID}");
 
             // Copy cardID and sprite
 
@@ -3317,7 +3357,7 @@ public class GameManager : MonoBehaviour
 
 
 
-    private bool oynayamazsinActive = false;
+    public bool oynayamazsinActive = false;
 
     public void SetOynayamazsinActive(bool isActive)
 
@@ -3374,19 +3414,9 @@ public class GameManager : MonoBehaviour
 
 
     public void ActivateKapkacPower()
-
     {
-
-        isKapkacPending = true;
-
-        // Allow selection from all hands, only one card
-
-        CardInteraction.AllowSelectionForParents(
-
-            new[] { "PlayerHand1", "PlayerHand2", "PlayerHand3", "PlayerHand4" }, true, 1);
-
-        DeckController.LocalInstance.ShowcaseAllOtherHands();
-
+        // This method is now obsolete - Kapkaç uses pre-selected cards
+        Debug.LogWarning("[GameManager] ActivateKapkacPower() called but this method is obsolete. Kapkaç now uses pre-selected cards.");
     }
 
 
@@ -3403,9 +3433,11 @@ public class GameManager : MonoBehaviour
 
 
 
-    private bool verZehriActive = false;
+    public bool verZehriActive = false;
 
-    private bool kutsalDesteActive = false;
+    public bool kutsalDesteActive = false;
+
+    public bool valeArarActive = false;
 
 
 
@@ -3457,7 +3489,7 @@ public class GameManager : MonoBehaviour
 
 
 
-    [SerializeField] private GameObject verZehriObject;
+    [SerializeField] public GameObject verZehriObject;
 
     private void StartVerZehriEffect()
 
@@ -3505,7 +3537,7 @@ public class GameManager : MonoBehaviour
 
 
 
-    [SerializeField] private GameObject kutsalDesteObject;
+    [SerializeField] public GameObject kutsalDesteObject;
 
     private void StartKutsalDesteEffect()
 
@@ -3649,6 +3681,9 @@ public class GameManager : MonoBehaviour
 
 
 
+        // Track power completion
+        MoveChainIntegrator.ReportPowerCompletion("Bu Daha İyi", playerNo, $"Swapped hand card {handCardID} with center card {centerCardID}");
+
         // Swap card objects visually
 
         deckController.SwapHandCardWithCenterCard(handCardID, centerCardID, playerNo);
@@ -3667,79 +3702,56 @@ public class GameManager : MonoBehaviour
 
     // Call this to activate the power
 
-    public void ActivateSunuDegisTokusPower()
-
+    // New dual selection method for Şunu Değiş Tokuş
+    public void StartSunuDegisTokusDualSelection(string myHandCard)
     {
-
-        if (currentSelectedHandCard == null)
-
-        {
-
-            Debug.LogWarning("No card selected in your hand for ŞunuDeğişTokuş!");
-
-            return;
-
-        }
-
+        Debug.Log($"[GameManager] StartSunuDegisTokusDualSelection - My card: {myHandCard}");
+        
         isSunuDegisTokusActive = true;
-
-        sunuDegisTokusFirstCard = currentSelectedHandCard;
-
-        Debug.Log("ŞunuDeğişTokuş: Select a card from another player's hand to swap with.");
-
+        sunuDegisTokusFirstCard = myHandCard;
+        
+        Debug.Log("[GameManager] ŞunuDeğişTokuş: Select a card from another player's hand to swap with.");
         DeckController.LocalInstance.ShowcaseAllOtherHands();
-
+    }
+    
+    public void ActivateSunuDegisTokusPower()
+    {
+        // This method is now obsolete - Şunu Değiş Tokuş uses dual selection
+        Debug.LogWarning("[GameManager] ActivateSunuDegisTokusPower() called but this method is obsolete. Şunu Değiş Tokuş now uses dual selection.");
     }
 
 
 
     public IEnumerator OnSunuDegisTokusSynced(int myPlayerNo, int otherPlayerNo, string myHandCardID, string otherHandCardID)
-
     {
-
+        // Track the card swap in move chain
+        MoveChainIntegrator.TrackCardSwap(myPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID, "Şunu Değiş Tokuş power");
+        
+        // Track power completion
+        MoveChainIntegrator.ReportPowerCompletion("Şunu Değiş Tokuş", myPlayerNo, $"Swapped {myHandCardID} with {otherHandCardID} from P{otherPlayerNo}");
+        
         // Swap in myCards if relevant
-
         if (deckController.thisPlayerNumber == myPlayerNo)
-
         {
-
             int idx = myCards.IndexOf(myHandCardID);
-
             if (idx != -1)
-
             {
-
                 myCards[idx] = otherHandCardID;
-
             }
-
         }
-
         else if (deckController.thisPlayerNumber == otherPlayerNo)
-
         {
-
             int idx = myCards.IndexOf(otherHandCardID);
-
             if (idx != -1)
-
             {
-
                 myCards[idx] = myHandCardID;
-
             }
-
         }
-
-
 
         // Visual swap
-
         yield return StartCoroutine(deckController.SwapCardsBetweenPlayersByID(myPlayerNo, myHandCardID, otherPlayerNo, otherHandCardID, true));
-
         DeckController.LocalInstance.ExitShowcaseAllOtherHands();
         DeckController.LocalInstance.TryStopShowcaseCenterCards();
-
     }
 
 
@@ -4110,17 +4122,9 @@ public class GameManager : MonoBehaviour
 
 
     public void ActivateYandimAnamPower()
-
     {
-
-        isYandimAnamPending = true;
-
-        CardInteraction.AllowSelectionForParents(
-
-            new[] { "PlayerHand1", "PlayerHand2", "PlayerHand3", "PlayerHand4" }, true, 1);
-
-        DeckController.LocalInstance.ShowcaseAllOtherHands();
-
+        // This method is now obsolete - Yandım Anam uses pre-selected cards
+        Debug.LogWarning("[GameManager] ActivateYandimAnamPower() called but this method is obsolete. Yandım Anam now uses pre-selected cards.");
     }
 
 
@@ -4289,6 +4293,18 @@ public class GameManager : MonoBehaviour
             }
 
         }
+        
+        // 7. IMPORTANT: Clear any selection state to prevent automatic playing
+        // This prevents the card from being automatically played after Yandım Anam
+        if (CardInteraction.currentlySelectedCard == cardScript)
+        {
+            CardInteraction.currentlySelectedCard = null;
+            CardInteraction.isOneCardSelected = false;
+            if (GameManager.LocalInstance != null)
+            {
+                GameManager.LocalInstance.SetCurrentSelectedHandCardNull();
+            }
+        }
 
     }
 
@@ -4427,6 +4443,13 @@ public class GameManager : MonoBehaviour
         isSunuDegisTokusActive = false;
         sunuDegisTokusFirstCard = null;
         isSunuDegisBunuTokusActive = false;
+        
+        // Deactivate Vale Arar power at the end of round
+        if (valeArarActive)
+        {
+            DeactivateValeArarPower();
+            Debug.Log("[GameManager] Vale Arar deactivated at end of round");
+        }
         
         // Close any open info boxes
         if (SuperPowerSpawner.LocalInstance != null)

@@ -20,7 +20,7 @@ public class Server : NetworkBehaviour
     private int playerCount; // Number of players in the game for the game mode
     private int connectedPlayerCount = 0;
     [SerializeField] private int seed;//Seed for the deck suffle
-    private int turnCounter = 0;
+    public int turnCounter = 0;
     public int currentPlayer;//The player that is currently playing
     int[] points;// To store points for each player
     private int[] piştiCounts;
@@ -35,6 +35,7 @@ public class Server : NetworkBehaviour
     // Server.cs
     private Dictionary<string, string> copiedCardMap = new Dictionary<string, string>();
     private bool oynayamazsinPending = false;
+    private int oynayamazsinActivatedBy = -1;
     private HashSet<ulong> dealCenterFinishedClients = new HashSet<ulong>();
     
     // Track cards outside normal game flow (e.g., bombed cards)
@@ -148,8 +149,8 @@ public class Server : NetworkBehaviour
         // Define current player and update Client
         currentPlayer = startingPlayerNo % playerCount;
         startingPlayerNo++;
-        Debug.LogWarning("Current player: " + currentPlayer);
-        Debug.LogWarning("Starting player: " + startingPlayerNo);
+        // Debug.LogWarning("Current player: " + currentPlayer);
+        // Debug.LogWarning("Starting player: " + startingPlayerNo);
 
         // Initialize the deck and shuffle it
         SaveAllCards();
@@ -407,10 +408,10 @@ public class Server : NetworkBehaviour
         //if(!singleDebuggingMode)
         //{
         readyToEndTurnCounter++;
-        Debug.Log($"[Server] EndTurnCheck called, readyToEndTurnCounter: {readyToEndTurnCounter}, connectedPlayerCount: {connectedPlayerCount}, currentPlayer: {currentPlayer}");
+        // Debug.Log($"[Server] EndTurnCheck called, readyToEndTurnCounter: {readyToEndTurnCounter}, connectedPlayerCount: {connectedPlayerCount}, currentPlayer: {currentPlayer}");
         if (readyToEndTurnCounter == connectedPlayerCount)
         {
-            Debug.Log($"[Server] All players ready, calling EndTurn()");
+            // Debug.Log($"[Server] All players ready, calling EndTurn()");
             EndTurn();
             readyToEndTurnCounter = 0;
         }
@@ -425,12 +426,7 @@ public class Server : NetworkBehaviour
             //Round ends and a winner is decided after each card is played
             //DecideWinner();
         }
-        if (oynayamazsinPending)
-        {
-            blockCount = 1;
-            oynayamazsinPending = false;
-            networkRelay.SetOynayamazsinActiveClientRPC(true); // Show block on all clients
-        }
+        // NOTE: Oynayamazsın pending logic moved to GetMove() to activate when next card is played
         if (turnCounter % (playerCount * 4) == (playerCount * 4) - 1)
         {
             //If each player played their 4 cards new cards are dealt
@@ -438,18 +434,7 @@ public class Server : NetworkBehaviour
         }
         NextTurn();
 
-        if (verZehriPending)
-        {
-            verZehriActive = true;
-            verZehriPending = false;
-            networkRelay.SetVerZehriActiveClientRPC(true); // Notify clients to start effect
-        }
-        if (kutsalDestePending)
-        {
-            kutsalDesteActive = true;
-            kutsalDestePending = false;
-            networkRelay.SetKutsalDesteActiveClientRPC(true); // Notify clients to start effect
-        }
+        // NOTE: Ver Zehri and Kutsal Deste pending logic moved to GetMove() to activate when next card is played
         
         // Send game state snapshot after turn changes
         // Disabled: only manual load should broadcast snapshots
@@ -818,6 +803,46 @@ public class Server : NetworkBehaviour
             return;
         }
         
+        // ACTIVATE PENDING DURATION POWERS WHEN CARD IS PLAYED (New Logic)
+        if (oynayamazsinPending)
+        {
+            blockCount = 1;
+            oynayamazsinPending = false;
+            
+            // Track the pending power now taking effect with the original activator
+            MoveChainIntegrator.TrackPendingPowerActivation(oynayamazsinActivatedBy, "Oynayamazsın", "Block effect activated when card was played");
+            
+            networkRelay.SetOynayamazsinActiveClientRPC(true); // Show block on all clients
+            oynayamazsinActivatedBy = -1; // Reset
+            Debug.Log($"[Server] Oynayamazsın effect activated when Player {playerNumber} played a card");
+        }
+        
+        if (verZehriPending)
+        {
+            verZehriActive = true;
+            verZehriPending = false;
+            
+            // Track the pending power now taking effect with the original activator
+            MoveChainIntegrator.TrackPendingPowerActivation(verZehriActivatedBy, "Ver Zehri", "Poison effect activated when card was played");
+            
+            networkRelay.SetVerZehriActiveClientRPC(true); // Notify clients to start effect
+            verZehriActivatedBy = -1; // Reset
+            Debug.Log($"[Server] Ver Zehri effect activated when Player {playerNumber} played a card");
+        }
+        
+        if (kutsalDestePending)
+        {
+            kutsalDesteActive = true;
+            kutsalDestePending = false;
+            
+            // Track the pending power now taking effect with the original activator
+            MoveChainIntegrator.TrackPendingPowerActivation(kutsalDesteActivatedBy, "Kutsal Deste", "Holy effect activated when card was played");
+            
+            networkRelay.SetKutsalDesteActiveClientRPC(true); // Notify clients to start effect
+            kutsalDesteActivatedBy = -1; // Reset
+            Debug.Log($"[Server] Kutsal Deste effect activated when Player {playerNumber} played a card");
+        }
+        
         int[] selectedHandCard = allCardLookup[selectedHandCardUniqueID];
         Debug.Log($"[Server] selectedHandCard: [{selectedHandCard[0]}, {selectedHandCard[1]}]");
         
@@ -983,6 +1008,9 @@ public class Server : NetworkBehaviour
         handB[cardBIndex] = temp;
 
         Debug.LogWarning($"Server swapped card {cardAIndex} of player {playerANo} with card {cardBIndex} of player {playerBNo}");
+        
+        // Track the card swap in move chain for synchronization
+        MoveChainIntegrator.TrackCardSwap(playerANo, playerBNo, temp, handA[cardAIndex], "Server-side card swap");
     }
 
     public void RegisterCopiedCard(string targetUniqueID, string sourceUniqueID)
@@ -1031,26 +1059,31 @@ public class Server : NetworkBehaviour
         return false; // Not blocked
     }
 
-    private int blockCount = 0;
+    public int blockCount = 0;
 
     public void ActivateOynayamazsin()
     {
         oynayamazsinPending = true;
+        oynayamazsinActivatedBy = currentPlayer; // Track who activated the power
     }
 
     private bool verZehriActive = false;
     private bool kutsalDesteActive = false;
     private bool verZehriPending = false;
     private bool kutsalDestePending = false;
+    private int verZehriActivatedBy = -1;
+    private int kutsalDesteActivatedBy = -1;
 
     public void ActivateVerZehri()
     {
         verZehriPending = true;
+        verZehriActivatedBy = currentPlayer; // Track who activated the power
     }
 
     public void ActivateKutsalDeste()
     {
         kutsalDestePending = true;
+        kutsalDesteActivatedBy = currentPlayer; // Track who activated the power
     }
 
     public void BuDahaIyiSwap(int playerNo, string handCardID, string centerCardID)
@@ -1105,6 +1138,9 @@ public class Server : NetworkBehaviour
 
         handA[idxA] = cardBID;
         handB[idxB] = cardAID;
+        
+        // Track the card swap in move chain for synchronization
+        MoveChainIntegrator.TrackCardSwap(playerANo, playerBNo, cardAID, cardBID, "Şunu Değiş Tokuş power");
     }
 
     /// <summary>
@@ -1135,6 +1171,9 @@ public class Server : NetworkBehaviour
             handB.Insert(idxB, cardAID);
 
             Debug.LogWarning($"Server ŞunuDeğişBunuTokuş swapped card at index {handIndexA} of player {playerANo} with card {idxB} of player {playerBNo}");
+        
+        // Track the card swap in move chain for synchronization
+        MoveChainIntegrator.TrackCardSwap(playerANo, playerBNo, cardAID, cardBID, "Şunu Değiş Bunu Tokuş power");
         }
     }
 

@@ -135,7 +135,14 @@ public class NetworkRelay : NetworkBehaviour
     [ClientRpc]
     public void UseBayaBayaBakClientRPC(int opponentPlayerNo)
     {
+        Debug.Log($"[NetworkRelay] UseBayaBayaBakClientRPC received - Opponent: {opponentPlayerNo}, Time: {Time.time}");
+        
+        // Track the RPC call
+        DebugChainPrinter.LocalInstance?.TrackNetworkRPC("UseBayaBayaBakClientRPC", $"opponentPlayerNo={opponentPlayerNo}");
+        DebugChainPrinter.LocalInstance?.TrackLocalAction($"UseBayaBayaBakClientRPC received for opponent {opponentPlayerNo}");
+        
         GameManager.LocalInstance.OnBayaBayaBakSynced(opponentPlayerNo);
+        Debug.Log($"[NetworkRelay] UseBayaBayaBakClientRPC complete");
     }
 
     [ClientRpc]
@@ -159,19 +166,25 @@ public class NetworkRelay : NetworkBehaviour
     [ClientRpc]
     public void SetOynayamazsinActiveClientRPC(bool isActive)
     {
+        Debug.Log($"[NetworkRelay] SetOynayamazsinActiveClientRPC received - isActive: {isActive}, Time: {Time.time}");
         GameManager.LocalInstance.SetOynayamazsinActive(isActive);
+        Debug.Log($"[NetworkRelay] SetOynayamazsinActiveClientRPC complete");
     }
 
     [ClientRpc]
     public void SetVerZehriActiveClientRPC(bool isActive)
     {
+        Debug.Log($"[NetworkRelay] SetVerZehriActiveClientRPC received - isActive: {isActive}, Time: {Time.time}");
         GameManager.LocalInstance.SetVerZehriActive(isActive);
+        Debug.Log($"[NetworkRelay] SetVerZehriActiveClientRPC complete");
     }
 
     [ClientRpc]
     public void SetKutsalDesteActiveClientRPC(bool isActive)
     {
+        Debug.Log($"[NetworkRelay] SetKutsalDesteActiveClientRPC received - isActive: {isActive}, Time: {Time.time}");
         GameManager.LocalInstance.SetKutsalDesteActive(isActive);
+        Debug.Log($"[NetworkRelay] SetKutsalDesteActiveClientRPC complete");
     }
 
     [ClientRpc]
@@ -189,7 +202,9 @@ public class NetworkRelay : NetworkBehaviour
     [ClientRpc]
     public void UseBuDahaIyiClientRPC(int playerNo, string handCardID, string centerCardID)
     {
+        Debug.Log($"[NetworkRelay] UseBuDahaIyiClientRPC received - Player: {playerNo}, HandCard: {handCardID}, CenterCard: {centerCardID}, Time: {Time.time}");
         GameManager.LocalInstance.OnBuDahaIyiSynced(playerNo, handCardID, centerCardID);
+        Debug.Log($"[NetworkRelay] UseBuDahaIyiClientRPC complete");
     }
 
     [ClientRpc]
@@ -211,7 +226,9 @@ public class NetworkRelay : NetworkBehaviour
     [ClientRpc(RequireOwnership = false)]
     public void KopyalaYapistirClientRPC(string targetUniqueID, string sourceUniqueID)
     {
+        Debug.Log($"[NetworkRelay] KopyalaYapistirClientRPC received - Target: {targetUniqueID}, Source: {sourceUniqueID}, Time: {Time.time}");
         GameManager.LocalInstance.OnKopyalaYapistir(targetUniqueID, sourceUniqueID);
+        Debug.Log($"[NetworkRelay] KopyalaYapistirClientRPC complete");
     }
     [ClientRpc(RequireOwnership = false)]
     public void ShowcaseSuperPowerClientRPC(string powerName, float fadeDuration = 0.5f, float displayDuration = 2f)
@@ -268,15 +285,25 @@ public class NetworkRelay : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void KopyalaYapistirServerRPC(string targetUniqueID, string sourceUniqueID)
     {
+        Debug.Log($"[NetworkRelay] KopyalaYapistirServerRPC called - Target: {targetUniqueID}, Source: {sourceUniqueID}, Time: {Time.time}");
+        
         // Update the server's authoritative card data
         if (Server.Singleton != null && Server.Singleton.allCardLookup.ContainsKey(sourceUniqueID) && Server.Singleton.allCardLookup.ContainsKey(targetUniqueID))
         {
             var sourceID = Server.Singleton.allCardLookup[sourceUniqueID];
+            Debug.Log($"[NetworkRelay] Updating server card data - Target card [{targetUniqueID}] will become [{sourceID[0]}, {sourceID[1]}]");
             Server.Singleton.allCardLookup[targetUniqueID][0] = sourceID[0]; // kind
             Server.Singleton.allCardLookup[targetUniqueID][1] = sourceID[1]; // value
         }
+        else
+        {
+            Debug.LogWarning($"[NetworkRelay] KopyalaYapistirServerRPC - Card lookup failed - Source exists: {Server.Singleton?.allCardLookup.ContainsKey(sourceUniqueID)}, Target exists: {Server.Singleton?.allCardLookup.ContainsKey(targetUniqueID)}");
+        }
+        
         // Notify all clients to update visuals and local cardID
+        Debug.Log($"[NetworkRelay] Broadcasting KopyalaYapistirClientRPC to all clients");
         KopyalaYapistirClientRPC(targetUniqueID, sourceUniqueID);
+        Debug.Log($"[NetworkRelay] KopyalaYapistirServerRPC complete");
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -317,23 +344,38 @@ public class NetworkRelay : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void UseBuDahaIyiServerRPC(int playerNo, string handCardID, string centerCardID)
     {
+        Debug.Log($"[NetworkRelay] UseBuDahaIyiServerRPC called - Player: {playerNo}, HandCard: {handCardID}, CenterCard: {centerCardID}, Time: {Time.time}");
+        
         if (!server.TryBlockPower())
         {
+            Debug.Log($"[NetworkRelay] Power not blocked, calling server.BuDahaIyiSwap()");
             server.BuDahaIyiSwap(playerNo, handCardID, centerCardID);
+            Debug.Log($"[NetworkRelay] Broadcasting UseBuDahaIyiClientRPC to all clients");
             UseBuDahaIyiClientRPC(playerNo, handCardID, centerCardID);
+            Debug.Log($"[NetworkRelay] UseBuDahaIyiServerRPC complete");
+        }
+        else
+        {
+            Debug.Log($"[NetworkRelay] UseBuDahaIyiServerRPC blocked by Yapamazsın power");
         }
     }
 
     [ServerRpc(RequireOwnership = false)]
     public void ActivateVerZehriServerRPC()
     {
+        Debug.Log($"[NetworkRelay] ActivateVerZehriServerRPC called - Time: {Time.time}");
+        Debug.Log($"[NetworkRelay] Calling server.ActivateVerZehri() - This will set verZehriPending=true");
         server.ActivateVerZehri();
+        Debug.Log($"[NetworkRelay] ActivateVerZehriServerRPC complete - Effect will activate at end of turn");
     }
 
     [ServerRpc(RequireOwnership = false)]
     public void ActivateKutsalDesteServerRPC()
     {
+        Debug.Log($"[NetworkRelay] ActivateKutsalDesteServerRPC called - Time: {Time.time}");
+        Debug.Log($"[NetworkRelay] Calling server.ActivateKutsalDeste() - This will set kutsalDestePending=true");
         server.ActivateKutsalDeste();
+        Debug.Log($"[NetworkRelay] ActivateKutsalDesteServerRPC complete - Effect will activate at end of turn");
     }
 
     /*[ServerRpc(RequireOwnership = false)]
@@ -345,7 +387,10 @@ public class NetworkRelay : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void ActivateOynayamazsinServerRPC()
     {
+        Debug.Log($"[NetworkRelay] ActivateOynayamazsinServerRPC called - Time: {Time.time}");
+        Debug.Log($"[NetworkRelay] Calling server.ActivateOynayamazsin() - This will set oynayamazsinPending=true");
         server.ActivateOynayamazsin();
+        Debug.Log($"[NetworkRelay] ActivateOynayamazsinServerRPC complete - Effect will activate at end of turn");
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -363,8 +408,24 @@ public class NetworkRelay : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void UseBayaBayaBakServerRPC(int opponentPlayerNo)
     {
+        Debug.Log($"[NetworkRelay] UseBayaBayaBakServerRPC called - Opponent: {opponentPlayerNo}, Time: {Time.time}");
+        
+        // Track the RPC call
+        DebugChainPrinter.LocalInstance?.TrackNetworkRPC("UseBayaBayaBakServerRPC", $"opponentPlayerNo={opponentPlayerNo}");
+        
         // Get the hand from the server
-        if (!server.TryBlockPower())UseBayaBayaBakClientRPC(opponentPlayerNo);
+        if (!server.TryBlockPower())
+        {
+            Debug.Log($"[NetworkRelay] Power not blocked, calling UseBayaBayaBakClientRPC()");
+            UseBayaBayaBakClientRPC(opponentPlayerNo);
+        }
+        else
+        {
+            Debug.Log($"[NetworkRelay] Power was blocked by Yapamazsın");
+            DebugChainPrinter.LocalInstance?.TrackLocalAction("BayaBayaBak power was blocked by Yapamazsın");
+        }
+        
+        Debug.Log($"[NetworkRelay] UseBayaBayaBakServerRPC complete");
     }
 
     [ServerRpc(RequireOwnership = false)]

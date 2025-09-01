@@ -170,19 +170,41 @@ public class CardInteraction : MonoBehaviour
             // Kapkaç pending
             if (GameManager.LocalInstance.isKapkacPending)
             {
+                Debug.Log($"[CardInteraction] KAPKAÇ POWER ACTIVATED on card: {this.uniqueCardInstanceID}");
                 GameManager.LocalInstance.isKapkacPending = false;
                 CardInteraction.RestrictSelectionToOwnHand();
                 DeckController.LocalInstance.ExitShowcaseAllOtherHands();
+                
+                // IMPORTANT: Clear any existing selection state before applying Kapkaç
+                if (CardInteraction.currentlySelectedCard != null)
+                {
+                    Debug.Log($"[CardInteraction] Clearing currently selected card before Kapkaç: {CardInteraction.currentlySelectedCard.uniqueCardInstanceID}");
+                    CardInteraction.currentlySelectedCard = null;
+                    CardInteraction.isOneCardSelected = false;
+                }
+                
                 GameManager.LocalInstance.networkRelay.ActivateKapkacOnCardServerRPC(this.uniqueCardInstanceID);
+                Debug.Log($"[CardInteraction] KAPKAÇ POWER - Returning early, should NOT continue to normal selection");
                 return;
             }
             // Yandım Anam pending
             if (GameManager.LocalInstance.isYandimAnamPending)
             {
+                Debug.Log($"[CardInteraction] YANDIM ANAM POWER ACTIVATED on card: {this.uniqueCardInstanceID}");
                 GameManager.LocalInstance.isYandimAnamPending = false;
                 CardInteraction.RestrictSelectionToOwnHand();
                 DeckController.LocalInstance.ExitShowcaseAllOtherHands();
+                
+                // IMPORTANT: Clear any existing selection state before applying Yandım Anam
+                if (CardInteraction.currentlySelectedCard != null)
+                {
+                    Debug.Log($"[CardInteraction] Clearing currently selected card before Yandım Anam: {CardInteraction.currentlySelectedCard.uniqueCardInstanceID}");
+                    CardInteraction.currentlySelectedCard = null;
+                    CardInteraction.isOneCardSelected = false;
+                }
+                
                 GameManager.LocalInstance.networkRelay.ActivateYandimAnamOnCardServerRPC(this.uniqueCardInstanceID);
+                Debug.Log($"[CardInteraction] YANDIM ANAM POWER - Returning early, should NOT continue to normal selection");
                 return;
             }
         }
