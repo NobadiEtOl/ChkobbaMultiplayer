@@ -803,14 +803,26 @@ public class Server : NetworkBehaviour
             return;
         }
         
+        // === MOVE CHAIN TRACKING ===
+        // Initialize variables needed for both hybrid power activation and regular card play
+        int[] selectedHandCard = allCardLookup[selectedHandCardUniqueID];
+        Debug.Log($"[Server] selectedHandCard: [{selectedHandCard[0]}, {selectedHandCard[1]}]");
+        
+        string[] capturedCardIds = new string[0];
+        var dict = serializableCard.ToDictionary();
+        if (dict != null && dict.Count > 0)
+        {
+            capturedCardIds = dict.Keys.ToArray();
+        }
+        
         // ACTIVATE PENDING DURATION POWERS WHEN CARD IS PLAYED (New Logic)
         if (oynayamazsinPending)
         {
             blockCount = 1;
             oynayamazsinPending = false;
             
-            // Track the pending power now taking effect with the original activator
-            MoveChainIntegrator.TrackPendingPowerActivation(oynayamazsinActivatedBy, "Oynayamazsın", "Block effect activated when card was played");
+            // CRITICAL: Record BOTH the power activation AND the card play together as ONE move
+            MoveChainIntegrator.TrackHybridPowerTrueActivation(oynayamazsinActivatedBy, "Oynayamazsın", selectedHandCardUniqueID, selectedHandCard, capturedCardIds, sumValue);
             
             networkRelay.SetOynayamazsinActiveClientRPC(true); // Show block on all clients
             oynayamazsinActivatedBy = -1; // Reset
@@ -822,8 +834,8 @@ public class Server : NetworkBehaviour
             verZehriActive = true;
             verZehriPending = false;
             
-            // Track the pending power now taking effect with the original activator
-            MoveChainIntegrator.TrackPendingPowerActivation(verZehriActivatedBy, "Ver Zehri", "Poison effect activated when card was played");
+            // CRITICAL: Record BOTH the power activation AND the card play together as ONE move
+            MoveChainIntegrator.TrackHybridPowerTrueActivation(verZehriActivatedBy, "Ver Zehri", selectedHandCardUniqueID, selectedHandCard, capturedCardIds, sumValue);
             
             networkRelay.SetVerZehriActiveClientRPC(true); // Notify clients to start effect
             verZehriActivatedBy = -1; // Reset
@@ -835,16 +847,13 @@ public class Server : NetworkBehaviour
             kutsalDesteActive = true;
             kutsalDestePending = false;
             
-            // Track the pending power now taking effect with the original activator
-            MoveChainIntegrator.TrackPendingPowerActivation(kutsalDesteActivatedBy, "Kutsal Deste", "Holy effect activated when card was played");
+            // CRITICAL: Record BOTH the power activation AND the card play together as ONE move
+            MoveChainIntegrator.TrackHybridPowerTrueActivation(kutsalDesteActivatedBy, "Kutsal Deste", selectedHandCardUniqueID, selectedHandCard, capturedCardIds, sumValue);
             
             networkRelay.SetKutsalDesteActiveClientRPC(true); // Notify clients to start effect
             kutsalDesteActivatedBy = -1; // Reset
             Debug.Log($"[Server] Kutsal Deste effect activated when Player {playerNumber} played a card");
         }
-        
-        int[] selectedHandCard = allCardLookup[selectedHandCardUniqueID];
-        Debug.Log($"[Server] selectedHandCard: [{selectedHandCard[0]}, {selectedHandCard[1]}]");
         
         // Oynayamazsın: force this card to be blocked (add to center, no capture)
         if (blockCount > 0)
@@ -858,19 +867,16 @@ public class Server : NetworkBehaviour
         // Get the cardID for rules
         Debug.LogWarning("Selected hand card: " + selectedHandCard[0] + "_" + selectedHandCard[1]);
         Debug.LogWarning("Sum value: " + sumValue);
-
-        // === MOVE CHAIN TRACKING ===
-        string[] capturedCardIds = new string[0];
-        var dict = serializableCard.ToDictionary();
-        if (dict != null && dict.Count > 0)
-        {
-            capturedCardIds = dict.Keys.ToArray();
-        }
         
         if (selectedHandCard[1] == sumValue || (selectedHandCard[1] == 11 && sumValue != 0))
         {
             // This is a capture move
-            MoveChainIntegrator.TrackServerCardPlay(playerNumber, selectedHandCardUniqueID, selectedHandCard, capturedCardIds, sumValue);
+            // NOTE: Card play is already recorded by TrackHybridPowerTrueActivation if a hybrid power was pending
+            // Only record here if NO hybrid power was pending
+            if (!oynayamazsinPending && !verZehriPending && !kutsalDestePending)
+            {
+                MoveChainIntegrator.TrackServerCardPlay(playerNumber, selectedHandCardUniqueID, selectedHandCard, capturedCardIds, sumValue);
+            }
             
             int centerCardCount = centerCardsDict.Count + 1;
             RemoveCardsFromCenter(serializableCard);
@@ -911,7 +917,12 @@ public class Server : NetworkBehaviour
         else
         {
             // This is a play to center move
-            MoveChainIntegrator.TrackServerCardPlay(playerNumber, selectedHandCardUniqueID, selectedHandCard, new string[0], sumValue);
+            // NOTE: Card play is already recorded by TrackHybridPowerTrueActivation if a hybrid power was pending
+            // Only record here if NO hybrid power was pending
+            if (!oynayamazsinPending && !verZehriPending && !kutsalDestePending)
+            {
+                MoveChainIntegrator.TrackServerCardPlay(playerNumber, selectedHandCardUniqueID, selectedHandCard, new string[0], sumValue);
+            }
             
             AddCardIDToCenter(selectedHandCardUniqueID, selectedHandCard);
             

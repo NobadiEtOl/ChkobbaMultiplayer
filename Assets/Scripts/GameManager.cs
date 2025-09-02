@@ -3371,7 +3371,8 @@ public class GameManager : MonoBehaviour
 
         {
 
-            Debug.LogWarning("Oynayamazsin power activated! Showing block prefab above center.");
+            // CRITICAL: This is called when the power is TRULY activated (after card play), not when button is pressed
+            Debug.LogWarning("Oynayamazsin power TRULY activated! Showing block prefab above center.");
 
             // Show the block prefab above the center
 
@@ -3451,6 +3452,7 @@ public class GameManager : MonoBehaviour
 
         {
 
+            // CRITICAL: This is called when the power is TRULY activated (after card play), not when button is pressed
             StartVerZehriEffect();
 
         }
@@ -3479,7 +3481,10 @@ public class GameManager : MonoBehaviour
 
         if (isActive)
 
+        {
+            // CRITICAL: This is called when the power is TRULY activated (after card play), not when button is pressed
             StartKutsalDesteEffect();
+        }
 
         else
 
@@ -3495,9 +3500,9 @@ public class GameManager : MonoBehaviour
 
     {
 
-        // Show UI/animation for VerZehri active
+        // CRITICAL: This is called when Ver Zehri is TRULY activated (after card play), not when button is pressed
 
-        Debug.Log("VerZehri effect started!");
+        Debug.Log("VerZehri effect TRULY started (after card play)!");
 
         // TODO: Add your visual effect here
 
@@ -3543,7 +3548,9 @@ public class GameManager : MonoBehaviour
 
     {
 
-        Debug.Log("KutsalDeste effect started!");
+        // CRITICAL: This is called when Kutsal Deste is TRULY activated (after card play), not when button is pressed
+
+        Debug.Log("KutsalDeste effect TRULY started (after card play)!");
 
         // TODO: Add your visual effect here
 

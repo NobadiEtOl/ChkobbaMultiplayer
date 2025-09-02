@@ -97,6 +97,14 @@ public class MoveChainTracker : MonoBehaviour
     }
     
     /// <summary>
+    /// Gets the next available move ID for this tracker
+    /// </summary>
+    public int GetNextMoveId()
+    {
+        return nextMoveId;
+    }
+    
+    /// <summary>
     /// Records card swap between players
     /// </summary>
     public void RecordCardSwap(int playerANumber, int playerBNumber, string cardAId, string cardBId, string reason)

@@ -196,6 +196,8 @@ public class MoveChainIntegrator : MonoBehaviour
         }
     }
     
+
+    
     /// <summary>
     /// Called when client records a move
     /// </summary>
@@ -270,18 +272,30 @@ public class MoveChainIntegrator : MonoBehaviour
     /// </summary>
     public static void TrackServerCardPlay(int playerNumber, string cardId, int[] cardData, string[] capturedCardIds, int sumValue)
     {
-        // STEP 1: Update server chain ONLY (server authoritative)
+        Debug.Log($"[MoveChainIntegrator] TrackServerCardPlay called: P{playerNumber} played {cardId}");
+        
+        // Track in debug chain
+        DebugChainPrinter.LocalInstance?.TrackLocalAction($"Server card play: {cardId} by P{playerNumber}");
+        DebugChainPrinter.LocalInstance?.TrackMoveChain($"Server card play: {cardId} by P{playerNumber}");
+        
+        // STEP 1: Record the move on the server chain
         if (MoveChainTracker.ServerInstance != null)
         {
             MoveChainTracker.ServerInstance.RecordCardPlay(playerNumber, cardId, cardData, capturedCardIds, sumValue);
             Debug.Log($"[MoveChainIntegrator] Server chain updated: Card play {cardId} by P{playerNumber}");
         }
         
-        Debug.Log($"[MoveChainIntegrator] Server card play recorded: {cardId} by P{playerNumber}");
+        // STEP 2: Ensure client chains are synchronized before proceeding
+        ConfirmChainUpdatesComplete(() => {
+            Debug.Log($"[MoveChainIntegrator] Chain updates confirmed complete for card play {cardId} by P{playerNumber}");
+        });
     }
+    
+
     
     /// <summary>
     /// Call this from superpower activation methods to track superpower usage
+    /// For hybrid powers (Kutsal Deste, Ver Zehri, Oynayamazsın), this tracks the INITIAL activation
     /// </summary>
     public static void TrackSuperpowerActivation(int playerNumber, string superPowerName)
     {
@@ -301,14 +315,64 @@ public class MoveChainIntegrator : MonoBehaviour
             Debug.LogWarning($"[MoveChainIntegrator] LocalInstance is null! Cannot halt sync checks for {superPowerName}");
         }
         
-        // STEP 1: Update server chain ONLY (server authoritative)
-        if (MoveChainTracker.ServerInstance != null)
+        // For hybrid powers, DON'T record on server chain yet - wait for true activation (handled by Server.cs)
+        if (IsHybridPower(superPowerName))
         {
-            MoveChainTracker.ServerInstance.RecordSuperpowerActivation(playerNumber, superPowerName);
-            Debug.Log($"[MoveChainIntegrator] Server chain updated: {superPowerName} by P{playerNumber}");
+            Debug.Log($"[MoveChainIntegrator] Hybrid power {superPowerName} activated - waiting for card play to record on chain");
+        }
+        else
+        {
+            // For immediate powers, record on server chain immediately
+            if (MoveChainTracker.ServerInstance != null)
+            {
+                MoveChainTracker.ServerInstance.RecordSuperpowerActivation(playerNumber, superPowerName);
+                Debug.Log($"[MoveChainIntegrator] Server chain updated: {superPowerName} by P{playerNumber}");
+            }
         }
         
-        Debug.Log($"[MoveChainIntegrator] Server power activation recorded: {superPowerName} by P{playerNumber}");
+        Debug.Log($"[MoveChainIntegrator] Power activation recorded: {superPowerName} by P{playerNumber}");
+    }
+    
+    /// <summary>
+    /// Call this when a hybrid power's effect actually takes place (after card play)
+    /// This records BOTH the power activation AND the card play together
+    /// </summary>
+    public static void TrackHybridPowerTrueActivation(int playerNumber, string superPowerName, string cardId, int[] cardData, string[] capturedCardIds, int sumValue)
+    {
+        Debug.Log($"[MoveChainIntegrator] TrackHybridPowerTrueActivation called: {superPowerName} by P{playerNumber} with card {cardId}");
+        
+        // Track in debug chain
+        DebugChainPrinter.LocalInstance?.TrackLocalAction($"Hybrid power true activation: {superPowerName} by P{playerNumber} with card {cardId}");
+        DebugChainPrinter.LocalInstance?.TrackMoveChain($"Hybrid power effect: {superPowerName} by P{playerNumber} with card {cardId}");
+        
+        // STEP 1: Record BOTH power activation AND card play together on server chain
+        if (MoveChainTracker.ServerInstance != null)
+        {
+            // Record the power activation first
+            MoveChainTracker.ServerInstance.RecordSuperpowerActivation(playerNumber, superPowerName);
+            Debug.Log($"[MoveChainIntegrator] Server chain updated: Power activation {superPowerName} by P{playerNumber}");
+            
+            // Then record the card play
+            MoveChainTracker.ServerInstance.RecordCardPlay(playerNumber, cardId, cardData, capturedCardIds, sumValue);
+            Debug.Log($"[MoveChainIntegrator] Server chain updated: Card play {cardId} by P{playerNumber}");
+        }
+        
+        Debug.Log($"[MoveChainIntegrator] Hybrid power true activation recorded: {superPowerName} + {cardId} by P{playerNumber}");
+        
+        // Report power completion immediately since Server.cs handles the synchronization
+        ReportPowerCompletion(superPowerName, playerNumber, $"True activation with card {cardId}");
+    }
+    
+
+    
+    /// <summary>
+    /// Determines if a power is a hybrid power (activates immediately but takes effect after card play)
+    /// </summary>
+    private static bool IsHybridPower(string superPowerName)
+    {
+        return superPowerName == "Kutsal Deste" || 
+               superPowerName == "Ver Zehri" || 
+               superPowerName == "Oynayamazsın";
     }
     
     /// <summary>
@@ -742,7 +806,7 @@ public class MoveChainIntegrator : MonoBehaviour
     {
         Debug.Log("[MoveChainIntegrator] Confirming chain updates are complete before proceeding...");
         
-        // Simple approach: Just wait one frame for all chain updates to propagate
+        // Wait for all chain updates to propagate and ensure synchronization
         if (LocalInstance != null)
         {
             LocalInstance.StartCoroutine(LocalInstance.WaitForChainUpdatesCoroutine(onComplete));
@@ -758,6 +822,23 @@ public class MoveChainIntegrator : MonoBehaviour
     {
         // Wait one frame to ensure all chain updates have been processed
         yield return null;
+        
+        // Verify that both server and client chains are synchronized
+        if (MoveChainTracker.ClientInstance != null && MoveChainTracker.ServerInstance != null)
+        {
+            var clientChain = MoveChainTracker.ClientInstance.GetCurrentChain();
+            var serverChain = MoveChainTracker.ServerInstance.GetCurrentChain();
+            
+            Debug.Log($"[MoveChainIntegrator] Chain sync check - Client v{clientChain.chainVersion} ({clientChain.moves?.Length ?? 0} moves), Server v{serverChain.chainVersion} ({serverChain.moves?.Length ?? 0} moves)");
+            
+            // If chains are not synchronized, wait another frame
+            if (clientChain.chainVersion != serverChain.chainVersion || 
+                (clientChain.moves?.Length ?? 0) != (serverChain.moves?.Length ?? 0))
+            {
+                Debug.LogWarning("[MoveChainIntegrator] Chains not synchronized, waiting another frame...");
+                yield return null;
+            }
+        }
         
         Debug.Log("[MoveChainIntegrator] Chain updates confirmed complete, proceeding with visual changes");
         onComplete?.Invoke();
