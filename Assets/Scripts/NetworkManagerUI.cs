@@ -29,7 +29,811 @@ public class NetworkManagerUI : MonoBehaviour
     [SerializeField] private Text joinCodeText;
     private string joinCodeVar;
 
+    // === DISCONNECT DETECTION & RECONNECTION ===
+    [Header("Disconnect Detection")]
+    [SerializeField] private float heartbeatInterval = 10f; // Send heartbeat every 10 seconds (less aggressive)
+    [SerializeField] private float disconnectTimeout = 30f; // Consider disconnected after 30 seconds without heartbeat (more lenient)
+    [SerializeField] private bool enableAutomaticReconnection = true;
+    
+    private string lastGameJoined = ""; // Current/last game join code
+    private bool isInGame = false; // Whether we're currently in an active game
+    private float lastHeartbeatTime = 0f;
+    private bool isHeartbeatActive = false;
+    private Coroutine heartbeatCoroutine;
+    private Coroutine disconnectCheckCoroutine;
+    public Lobby currentLobby; // Store the current lobby when you join/create it
+    public Lobby CurrentLobby { get { return currentLobby; } } // Public access for Server
+
+    // === PLAYER PREFERENCES KEYS ===
+    private string LAST_JOIN_CODE_KEY;
+    private string LAST_PLAYER_COUNT_KEY;
+    private string LAST_GAME_TIMESTAMP_KEY;
+
     void Awake()
+    {
+        // Initialize ParrelSync-aware PlayerPrefs keys
+        InitializePlayerPrefsKeys();
+        
+        // Load last game info from PlayerPrefs
+        LoadLastGameInfo();
+        
+        // Setup button listeners
+        SetupButtonListeners();
+    }
+
+    /// <summary>
+    /// Initializes PlayerPrefs keys with ParrelSync-aware unique identifiers
+    /// </summary>
+    private void InitializePlayerPrefsKeys()
+    {
+        string uniqueId = GetUniquePlayerId();
+        LAST_JOIN_CODE_KEY = $"LastGameJoinCode_{uniqueId}";
+        LAST_PLAYER_COUNT_KEY = $"LastPlayerCount_{uniqueId}";
+        LAST_GAME_TIMESTAMP_KEY = $"LastGameTimestamp_{uniqueId}";
+        
+        Debug.Log($"[NetworkManagerUI] Initialized PlayerPrefs keys with unique ID: {uniqueId}");
+    }
+
+    void Start()
+    {
+        // Subscribe to network events
+        if (NetworkManager.Singleton != null)
+        {
+            NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
+            NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
+            NetworkManager.Singleton.OnServerStarted += OnServerStarted;
+        }
+        
+        // TEMPORARILY DISABLED: Heartbeat system might be causing disconnections
+        // TODO: Re-enable this once normal game flow is working properly
+        // if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsHost)
+        // {
+        //     StartDisconnectDetection();
+        // }
+        
+        // RE-ENABLED: Auto-initialize Unity Services on startup (as originally requested)
+        // This ensures Unity Services is ready immediately when game opens
+        StartCoroutine(AutoInitializeUnityServicesOnStartup());
+        
+        // RE-ENABLED: Check for saved games and attempt reconnection (after Unity Services is ready)
+        StartCoroutine(CheckForSavedGameAndReconnect());
+    }
+
+    void OnDestroy()
+    {
+        // Unsubscribe from network events
+        if (NetworkManager.Singleton != null)
+        {
+            NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
+            NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
+            NetworkManager.Singleton.OnServerStarted -= OnServerStarted;
+        }
+        
+        // Stop coroutines
+        StopDisconnectDetection();
+    }
+
+    // === DISCONNECT DETECTION & HEARTBEAT ===
+    
+    /// <summary>
+    /// Starts the disconnect detection system
+    /// </summary>
+    private void StartDisconnectDetection()
+    {
+        if (isHeartbeatActive) return;
+        
+        isHeartbeatActive = true;
+        heartbeatCoroutine = StartCoroutine(HeartbeatCoroutine());
+        disconnectCheckCoroutine = StartCoroutine(DisconnectCheckCoroutine());
+        
+        Debug.Log("[NetworkManagerUI] Disconnect detection started");
+    }
+
+    /// <summary>
+    /// Stops the disconnect detection system
+    /// </summary>
+    private void StopDisconnectDetection()
+    {
+        if (!isHeartbeatActive) return;
+        
+        isHeartbeatActive = false;
+        
+        if (heartbeatCoroutine != null)
+        {
+            StopCoroutine(heartbeatCoroutine);
+            heartbeatCoroutine = null;
+        }
+        
+        if (disconnectCheckCoroutine != null)
+        {
+            StopCoroutine(disconnectCheckCoroutine);
+            disconnectCheckCoroutine = null;
+        }
+        
+        Debug.Log("[NetworkManagerUI] Disconnect detection stopped");
+    }
+
+    /// <summary>
+    /// Coroutine that sends periodic heartbeats to the server
+    /// </summary>
+    private IEnumerator HeartbeatCoroutine()
+    {
+        while (isHeartbeatActive)
+        {
+            // CRITICAL FIX: Only clients should send heartbeats, not the host
+            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient && !NetworkManager.Singleton.IsHost)
+            {
+                SendHeartbeat();
+            }
+            yield return new WaitForSeconds(heartbeatInterval);
+        }
+    }
+
+    /// <summary>
+    /// Coroutine that checks for disconnections based on heartbeat timeouts
+    /// </summary>
+    private IEnumerator DisconnectCheckCoroutine()
+    {
+        while (isHeartbeatActive)
+        {
+            // CRITICAL FIX: Only clients should check heartbeat timeouts, not the host
+            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient && !NetworkManager.Singleton.IsHost)
+            {
+                CheckHeartbeatTimeout();
+            }
+            yield return new WaitForSeconds(1f); // Check every second
+        }
+    }
+
+    /// <summary>
+    /// Sends a heartbeat to the server to indicate we're still connected
+    /// </summary>
+    private void SendHeartbeat()
+    {
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient)
+        {
+            // Send heartbeat RPC to server
+            var networkRelay = FindObjectOfType<NetworkRelay>();
+            if (networkRelay != null)
+            {
+                networkRelay.SendHeartbeatServerRPC();
+                lastHeartbeatTime = Time.time;
+                Debug.Log($"[NetworkManagerUI] Heartbeat sent at {Time.time:F2}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Checks if we've missed heartbeats and should consider ourselves disconnected
+    /// </summary>
+    private void CheckHeartbeatTimeout()
+    {
+        if (Time.time - lastHeartbeatTime > disconnectTimeout)
+        {
+            Debug.LogWarning($"[NetworkManagerUI] Heartbeat timeout detected! Last heartbeat: {lastHeartbeatTime:F2}, Current time: {Time.time:F2}");
+            OnDisconnectDetected("Heartbeat timeout");
+        }
+    }
+
+    /// <summary>
+    /// Called when a disconnect is detected (either through events or heartbeat timeout)
+    /// </summary>
+    private void OnDisconnectDetected(string reason)
+    {
+        Debug.LogWarning($"[NetworkManagerUI] Disconnect detected: {reason}");
+        
+        // Stop disconnect detection
+        StopDisconnectDetection();
+        
+        // Mark as disconnected
+        isInGame = false;
+        
+        // CRITICAL FIX: Only clients should attempt automatic reconnection
+        // Hosts should NOT try to reconnect to their own lobby
+        bool isHost = NetworkManager.Singleton != null && NetworkManager.Singleton.IsHost;
+        
+        if (!isHost && enableAutomaticReconnection && !string.IsNullOrEmpty(lastGameJoined))
+        {
+            Debug.Log($"[NetworkManagerUI] Client attempting automatic reconnection to: {lastGameJoined}");
+            StartCoroutine(AttemptReconnection());
+        }
+        else if (isHost)
+        {
+            Debug.Log("[NetworkManagerUI] Host detected disconnect - waiting for client to reconnect");
+            // Host should just return to main page, not try to reconnect
+            if (mainUIScript != null)
+            {
+                mainUIScript.OnDisconnectDetected();
+            }
+        }
+        else
+        {
+            Debug.Log("[NetworkManagerUI] No automatic reconnection - returning to main page");
+            // Notify MainUIScript to return to main page
+            if (mainUIScript != null)
+            {
+                mainUIScript.OnDisconnectDetected();
+            }
+        }
+    }
+
+    // === NETWORK EVENT HANDLERS ===
+    
+    /// <summary>
+    /// Called when a client connects to the network
+    /// </summary>
+    private void OnClientConnected(ulong clientId)
+    {
+        Debug.Log($"[NetworkManagerUI] Client connected: {clientId}");
+        
+        // Mark as in game
+        isInGame = true;
+        
+        // Note: Disconnect detection is already started in Start() for clients
+        // No need to start it again here
+    }
+
+    /// <summary>
+    /// Called when a client disconnects from the network
+    /// </summary>
+    private void OnClientDisconnected(ulong clientId)
+    {
+        Debug.LogWarning($"[NetworkManagerUI] Client disconnected: {clientId}");
+        OnDisconnectDetected("Network disconnect event");
+    }
+
+    /// <summary>
+    /// Called when the server starts
+    /// </summary>
+    private void OnServerStarted()
+    {
+        Debug.Log("[NetworkManagerUI] Server started");
+        
+        // CRITICAL FIX: Host should NOT start disconnect detection
+        // Host doesn't need to send heartbeats or detect disconnections
+        // Only clients need this functionality
+        
+        isInGame = true;
+    }
+
+    // === AUTO-INITIALIZATION & SAVED GAME CHECK ===
+    
+    /// <summary>
+    /// Checks if Unity Services is already initialized
+    /// </summary>
+    private bool IsUnityServicesInitialized()
+    {
+        try
+        {
+            // Try to access AuthenticationService - if it throws an exception, services aren't initialized
+            var playerId = AuthenticationService.Instance.PlayerId;
+            return !string.IsNullOrEmpty(playerId);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+    
+    /// <summary>
+    /// Auto-initializes Unity Services on startup (without trying to reconnect to saved games)
+    /// </summary>
+    private IEnumerator AutoInitializeUnityServicesOnStartup()
+    {
+        Debug.Log("[NetworkManagerUI] Auto-initializing Unity Services on startup...");
+        
+        // Check if Unity Services is already initialized
+        if (IsUnityServicesInitialized())
+        {
+            Debug.Log("[NetworkManagerUI] Unity Services already initialized - skipping");
+            yield break;
+        }
+        
+        // Initialize Unity Services in the background
+        bool initializationComplete = false;
+        bool initializationSuccess = false;
+        
+        StartCoroutine(InitializeUnityServicesCoroutine((success) => {
+            initializationSuccess = success;
+            initializationComplete = true;
+        }));
+        
+        // Wait for initialization to complete
+        while (!initializationComplete)
+        {
+            yield return null;
+        }
+        
+        if (initializationSuccess)
+        {
+            Debug.Log("[NetworkManagerUI] Unity Services auto-initialized successfully");
+        }
+        else
+        {
+            Debug.LogWarning("[NetworkManagerUI] Unity Services auto-initialization failed");
+        }
+    }
+    
+    /// <summary>
+    /// Coroutine wrapper for Unity Services initialization
+    /// </summary>
+    private IEnumerator InitializeUnityServicesCoroutine(System.Action<bool> callback)
+    {
+        // Initialize Unity Services
+        Debug.Log("[NetworkManagerUI] Initializing Unity Services...");
+        var initialOptions = new InitializationOptions();
+        
+        #if UNITY_EDITOR
+        if (ClonesManager.IsClone())
+        {
+            string parrelArgument = ClonesManager.GetArgument();
+            initialOptions.SetProfile(parrelArgument);
+            Debug.Log("ParrelSync argument: " + parrelArgument);
+        }
+        #endif
+        
+        var initTask = UnityServices.InitializeAsync(initialOptions);
+        while (!initTask.IsCompleted)
+        {
+            yield return null;
+        }
+        
+        if (initTask.IsFaulted)
+        {
+            Debug.LogError($"[NetworkManagerUI] Unity Services initialization failed: {initTask.Exception}");
+            callback?.Invoke(false);
+            yield break;
+        }
+        
+        Debug.Log("[NetworkManagerUI] Unity Services initialized successfully");
+        
+        // Sign in anonymously
+        Debug.Log("[NetworkManagerUI] Signing in anonymously...");
+        var signInTask = EnsureFreshAnonymousSignIn();
+        while (!signInTask.IsCompleted)
+        {
+            yield return null;
+        }
+        
+        if (signInTask.IsFaulted)
+        {
+            Debug.LogError($"[NetworkManagerUI] Anonymous sign-in failed: {signInTask.Exception}");
+            callback?.Invoke(false);
+            yield break;
+        }
+        
+        Debug.Log("[NetworkManagerUI] Anonymous sign-in completed");
+        callback?.Invoke(true);
+    }
+    
+    /// <summary>
+    /// Checks for saved games and attempts reconnection (runs after Unity Services is initialized)
+    /// </summary>
+    private IEnumerator CheckForSavedGameAndReconnect()
+    {
+        // Wait for Unity Services to be initialized
+        while (!IsUnityServicesInitialized())
+        {
+            yield return new WaitForSeconds(0.5f);
+        }
+        
+        // Add a small delay to ensure everything is properly initialized
+        yield return new WaitForSeconds(1f);
+        
+        Debug.Log("[NetworkManagerUI] Unity Services ready, checking for saved games...");
+        
+        // Check if we have a saved join code
+        if (string.IsNullOrEmpty(lastGameJoined))
+        {
+            Debug.Log("[NetworkManagerUI] No saved game found - ready for manual connection");
+            yield break;
+        }
+        
+        // CRITICAL: Don't auto-reconnect if we're already connected to a game
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient)
+        {
+            Debug.Log("[NetworkManagerUI] Already connected to a game - skipping auto-reconnection");
+            yield break;
+        }
+        
+        Debug.Log($"[NetworkManagerUI] Found saved game: {lastGameJoined} - attempting reconnection...");
+        
+        // Show connecting UI to user - use the saved player count
+        int lastPlayerCount = PlayerPrefs.GetInt(LAST_PLAYER_COUNT_KEY, 2);
+        if (mainUIScript != null)
+        {
+            mainUIScript.OpenWaitingScreenUI("yellow", lastPlayerCount.ToString(), "Reconnecting...");
+        }
+        
+        // Attempt reconnection
+        bool reconnectionComplete = false;
+        bool reconnectionSuccess = false;
+        
+        StartCoroutine(AttemptReconnectionCoroutine(lastGameJoined, (success) => {
+            reconnectionSuccess = success;
+            reconnectionComplete = true;
+        }));
+        
+        // Wait for reconnection attempt to complete
+        while (!reconnectionComplete)
+        {
+            yield return null;
+        }
+        
+        if (reconnectionSuccess)
+        {
+            Debug.Log("[NetworkManagerUI] Auto-reconnection successful! Connected to lobby only (step-by-step testing)");
+            
+            // STOP HERE - Don't close waiting screen or request game state sync
+            // The UI will show the lobby code instead of "Reconnecting..."
+        }
+        else
+        {
+            Debug.LogWarning("[NetworkManagerUI] Auto-reconnection failed - returning to main menu");
+            ClearSavedGameInfo();
+            
+            // Return to main page
+            if (mainUIScript != null)
+            {
+                mainUIScript.OnDisconnectDetected();
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Automatically initializes Unity Services and checks for saved game on startup
+    /// </summary>
+    private IEnumerator AutoInitializeUnityServicesAndCheckForSavedGame()
+    {
+        Debug.Log("[NetworkManagerUI] Starting auto-initialization of Unity Services...");
+        
+        // Check if we already have a saved join code
+        if (string.IsNullOrEmpty(lastGameJoined))
+        {
+            Debug.Log("[NetworkManagerUI] No saved game found - proceeding to main menu");
+            yield break; // No saved game, just show main menu
+        }
+        
+        // CRITICAL: Don't auto-reconnect if we're already connected to a game
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient)
+        {
+            Debug.Log("[NetworkManagerUI] Already connected to a game - skipping auto-reconnection");
+            yield break;
+        }
+        
+        // Show connecting UI to user
+        if (mainUIScript != null)
+        {
+            mainUIScript.OpenWaitingScreenUI("yellow", "2", "Reconnecting...");
+        }
+        
+        // Use a flag to track completion since we can't use await in coroutine
+        bool initializationComplete = false;
+        bool initializationSuccess = false;
+        
+        // Start the async initialization
+        StartCoroutine(AutoInitializeCoroutine((success) => {
+            initializationSuccess = success;
+            initializationComplete = true;
+        }));
+        
+        // Wait for initialization to complete
+        while (!initializationComplete)
+        {
+            yield return null;
+        }
+        
+        if (initializationSuccess)
+        {
+            Debug.Log("[NetworkManagerUI] Auto-reconnection successful! Going to game...");
+            // The game will continue from where it left off
+        }
+        else
+        {
+            Debug.LogWarning("[NetworkManagerUI] Auto-reconnection failed - returning to main menu");
+            ClearSavedGameInfo();
+            
+            // Return to main page
+            if (mainUIScript != null)
+            {
+                mainUIScript.OnDisconnectDetected();
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Coroutine wrapper for the async auto-initialization
+    /// </summary>
+    private IEnumerator AutoInitializeCoroutine(System.Action<bool> callback)
+    {
+        bool initializationSuccess = false;
+        Exception caughtException = null;
+        
+        // Step 1: Initialize Unity Services
+        Debug.Log("[NetworkManagerUI] Initializing Unity Services...");
+        var initialOptions = new InitializationOptions();
+        
+        #if UNITY_EDITOR
+        if (ClonesManager.IsClone())
+        {
+            string parrelArgument = ClonesManager.GetArgument();
+            initialOptions.SetProfile(parrelArgument);
+            Debug.Log("ParrelSync argument: " + parrelArgument);
+        }
+        #endif
+        
+        var initTask = UnityServices.InitializeAsync(initialOptions);
+        while (!initTask.IsCompleted)
+        {
+            yield return null;
+        }
+        
+        if (initTask.IsFaulted)
+        {
+            Debug.LogError($"[NetworkManagerUI] Unity Services initialization failed: {initTask.Exception}");
+            callback?.Invoke(false);
+            yield break;
+        }
+        
+        Debug.Log("[NetworkManagerUI] Unity Services initialized successfully");
+        
+        // Step 2: Sign in anonymously
+        Debug.Log("[NetworkManagerUI] Signing in anonymously...");
+        var signInTask = EnsureFreshAnonymousSignIn();
+        while (!signInTask.IsCompleted)
+        {
+            yield return null;
+        }
+        
+        if (signInTask.IsFaulted)
+        {
+            Debug.LogError($"[NetworkManagerUI] Anonymous sign-in failed: {signInTask.Exception}");
+            callback?.Invoke(false);
+            yield break;
+        }
+        
+        Debug.Log("[NetworkManagerUI] Anonymous sign-in completed");
+        
+        // Step 3: Check if the saved game is still active and attempt reconnection
+        Debug.Log($"[NetworkManagerUI] Checking if saved game {lastGameJoined} is still active...");
+        var reconnectionTask = AttemptReconnectionToGame(lastGameJoined);
+        while (!reconnectionTask.IsCompleted)
+        {
+            yield return null;
+        }
+        
+        if (reconnectionTask.IsFaulted)
+        {
+            Debug.LogError($"[NetworkManagerUI] Reconnection failed: {reconnectionTask.Exception}");
+            callback?.Invoke(false);
+            yield break;
+        }
+        
+        bool reconnectionSuccess = reconnectionTask.Result;
+        callback?.Invoke(reconnectionSuccess);
+    }
+
+    // === JOIN CODE STORAGE & MANAGEMENT ===
+    
+    /// <summary>
+    /// Saves the current game join code to PlayerPrefs
+    /// </summary>
+    private void SaveGameJoinCode(string joinCode, int playerCount)
+    {
+        lastGameJoined = joinCode;
+        PlayerPrefs.SetString(LAST_JOIN_CODE_KEY, joinCode);
+        PlayerPrefs.SetInt(LAST_PLAYER_COUNT_KEY, playerCount);
+        PlayerPrefs.SetString(LAST_GAME_TIMESTAMP_KEY, DateTime.UtcNow.ToString("O"));
+        PlayerPrefs.Save();
+        
+        Debug.Log($"[NetworkManagerUI] Saved game join code: {joinCode} for {playerCount} players");
+    }
+
+    /// <summary>
+    /// Loads the last game join code from PlayerPrefs
+    /// </summary>
+    private void LoadLastGameInfo()
+    {
+        lastGameJoined = PlayerPrefs.GetString(LAST_JOIN_CODE_KEY, "");
+        int lastPlayerCount = PlayerPrefs.GetInt(LAST_PLAYER_COUNT_KEY, 0);
+        string lastTimestamp = PlayerPrefs.GetString(LAST_GAME_TIMESTAMP_KEY, "");
+        
+        if (!string.IsNullOrEmpty(lastGameJoined))
+        {
+            Debug.Log($"[NetworkManagerUI] Loaded last game: {lastGameJoined} ({lastPlayerCount} players) from {lastTimestamp}");
+        }
+    }
+
+    /// <summary>
+    /// Clears the saved game join code
+    /// </summary>
+    public void ClearSavedGameInfo()
+    {
+        lastGameJoined = "";
+        PlayerPrefs.DeleteKey(LAST_JOIN_CODE_KEY);
+        PlayerPrefs.DeleteKey(LAST_PLAYER_COUNT_KEY);
+        PlayerPrefs.DeleteKey(LAST_GAME_TIMESTAMP_KEY);
+        PlayerPrefs.Save();
+        
+        Debug.Log("[NetworkManagerUI] Cleared saved game info");
+    }
+
+    // === AUTOMATIC RECONNECTION ===
+    
+    /// <summary>
+    /// Attempts to reconnect to the last game
+    /// </summary>
+    private IEnumerator AttemptReconnection()
+    {
+        Debug.Log($"[NetworkManagerUI] Starting reconnection attempt to: {lastGameJoined}");
+        
+        // Wait a moment before attempting reconnection
+        yield return new WaitForSeconds(2f);
+        
+        // Try to reconnect using the saved join code
+        // Use a flag to track the result since we can't use await in coroutine
+        bool reconnectionAttempted = false;
+        bool reconnectionResult = false;
+        
+        // Start the async reconnection
+        StartCoroutine(AttemptReconnectionCoroutine(lastGameJoined, (result) => {
+            reconnectionResult = result;
+            reconnectionAttempted = true;
+        }));
+        
+        // Wait for the reconnection attempt to complete
+        while (!reconnectionAttempted)
+        {
+            yield return null;
+        }
+        
+        if (reconnectionResult)
+        {
+            Debug.Log("[NetworkManagerUI] Reconnection successful!");
+            // The game will continue from where it left off
+        }
+        else
+        {
+            Debug.LogWarning("[NetworkManagerUI] Reconnection failed - returning to main page");
+            ClearSavedGameInfo();
+            
+            // Notify MainUIScript to return to main page
+            if (mainUIScript != null)
+            {
+                mainUIScript.OnDisconnectDetected();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Coroutine wrapper for the async reconnection attempt
+    /// </summary>
+    private IEnumerator AttemptReconnectionCoroutine(string joinCode, System.Action<bool> callback)
+    {
+        bool result = false;
+        
+        // Start the async operation
+        var task = AttemptReconnectionToGame(joinCode);
+        
+        // Wait for the task to complete
+        while (!task.IsCompleted)
+        {
+            yield return null;
+        }
+        
+        // Get the result and call the callback
+        result = task.Result;
+        callback?.Invoke(result);
+    }
+
+    /// <summary>
+    /// Attempts to reconnect to lobby only (step-by-step testing)
+    /// </summary>
+    private async Task<bool> AttemptReconnectionToGame(string lobbyJoinCode)
+    {
+        try
+        {
+            Debug.Log($"[NetworkManagerUI] STEP-BY-STEP RECONNECTION: Attempting to reconnect to lobby only: {lobbyJoinCode}");
+            
+            // Step 1: Join lobby using saved lobby join code
+            Debug.Log($"[NetworkManagerUI] Step 1: Joining lobby with code: {lobbyJoinCode}");
+            currentLobby = await Lobbies.Instance.JoinLobbyByCodeAsync(lobbyJoinCode);
+            Debug.Log($"[NetworkManagerUI] SUCCESS: Successfully rejoined lobby: {currentLobby.Name}");
+            Debug.Log($"[NetworkManagerUI] Lobby ID: {currentLobby.Id}");
+            Debug.Log($"[NetworkManagerUI] Lobby Code: {currentLobby.LobbyCode}");
+            Debug.Log($"[NetworkManagerUI] Players in lobby: {currentLobby.Players.Count}");
+            
+            // Update UI to show lobby code instead of "Reconnecting..."
+            if (mainUIScript != null)
+            {
+                mainUIScript.OpenWaitingScreenUI("yellow", "2", currentLobby.LobbyCode);
+            }
+            
+            // STOP HERE - Don't attempt relay connection or game state sync
+            Debug.Log($"[NetworkManagerUI] LOBBY RECONNECTION SUCCESS: Connected to lobby, stopping here for testing");
+            return true;
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[NetworkManagerUI] LOBBY RECONNECTION FAILED: {e.Message}");
+            return false;
+        }
+    }
+
+
+    /// <summary>
+    /// Handles successful reconnection by closing waiting screen and requesting game state sync
+    /// </summary>
+    private IEnumerator HandleSuccessfulReconnection()
+    {
+        Debug.Log("[NetworkManagerUI] Handling successful reconnection...");
+        
+        // Wait a moment for the network connection to stabilize
+        yield return new WaitForSeconds(1f);
+        
+        // Close the waiting screen
+        if (mainUIScript != null)
+        {
+            Debug.Log("[NetworkManagerUI] Closing reconnection waiting screen");
+            mainUIScript.ReturnToMainPage();
+        }
+        
+        // Wait a bit more for UI to close
+        yield return new WaitForSeconds(0.5f);
+        
+        // Request game state sync from server
+        var networkRelay = FindObjectOfType<NetworkRelay>();
+        if (networkRelay != null)
+        {
+            Debug.Log("[NetworkManagerUI] Requesting game state sync from server");
+            networkRelay.RequestGameStateSyncForReconnectedClientServerRPC();
+        }
+        else
+        {
+            Debug.LogError("[NetworkManagerUI] NetworkRelay not found - cannot request game state sync");
+        }
+        
+        Debug.Log("[NetworkManagerUI] Reconnection handling complete");
+    }
+
+    // === PUBLIC METHODS FOR EXTERNAL USE ===
+    
+    /// <summary>
+    /// Public method to manually attempt reconnection
+    /// </summary>
+    [ContextMenu("Attempt Manual Reconnection")]
+    public void ManualReconnectionAttempt()
+    {
+        if (!string.IsNullOrEmpty(lastGameJoined))
+        {
+            Debug.Log("[NetworkManagerUI] Manual reconnection attempt triggered");
+            StartCoroutine(AttemptReconnection());
+        }
+        else
+        {
+            Debug.LogWarning("[NetworkManagerUI] No saved game to reconnect to");
+        }
+    }
+
+    /// <summary>
+    /// Public method to check if we're currently in a game
+    /// </summary>
+    public bool IsCurrentlyInGame()
+    {
+        return isInGame && NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient;
+    }
+
+    /// <summary>
+    /// Public method to get the last game join code
+    /// </summary>
+    public string GetLastGameJoinCode()
+    {
+        return lastGameJoined;
+    }
+
+    // === ORIGINAL METHODS (UPDATED) ===
+
+    void SetupButtonListeners()
     {
         clientButton.onClick.AddListener(async () => { await StartClientWithRelay(); });
         hostTwoPlayerButton.onClick.AddListener(async () => {await StartHostWithRelay(2,true); });
@@ -76,22 +880,14 @@ public class NetworkManagerUI : MonoBehaviour
 
     public async Task<string> StartHostWithRelay(int playerCount,bool privateFlag)
     {
-        
-
-        var initialOptions = new InitializationOptions();
-
-        #if UNITY_EDITOR
-        if (ClonesManager.IsClone())
+        // Use existing Unity Services connection (initialized at startup)
+        if (!IsUnityServicesInitialized())
         {
-            string parrelArgument = ClonesManager.GetArgument();
-            initialOptions.SetProfile(parrelArgument);
-            Debug.Log("ParrelSync argument: " + parrelArgument);
+            Debug.LogError("[NetworkManagerUI] Unity Services not initialized! This should have been done at startup.");
+            return null;
         }
-        #endif
-
-        await UnityServices.InitializeAsync(initialOptions);
-
-        await EnsureFreshAnonymousSignIn();
+        
+        Debug.Log("[NetworkManagerUI] Using existing Unity Services connection for hosting");
 
         Allocation allocation = await RelayService.Instance.CreateAllocationAsync(playerCount);
         NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(allocation, "wss"));
@@ -105,145 +901,144 @@ public class NetworkManagerUI : MonoBehaviour
             IsPrivate = privateFlag, // Keep private lobbies for friend groups
             Data = new Dictionary<string, DataObject>
             {
-                { "JoinCode", new DataObject(DataObject.VisibilityOptions.Public, joinCodeVar) },
+                { "RelayJoinCode", new DataObject(DataObject.VisibilityOptions.Public, joinCodeVar) }, // CRITICAL: Store relay join code
+                { "HostAllocationId", new DataObject(DataObject.VisibilityOptions.Public, allocation.AllocationId.ToString()) }, // For keep-alive
+                { "GameStatus", new DataObject(DataObject.VisibilityOptions.Public, "Active") }, // Track game status
+                { "PlayerCount", new DataObject(DataObject.VisibilityOptions.Public, playerCount.ToString()) }, // Track player count
+                { "LastHeartbeat", new DataObject(DataObject.VisibilityOptions.Public, DateTime.UtcNow.ToString("O")) }, // Heartbeat timestamp
                 { "HostPlayerId", new DataObject(DataObject.VisibilityOptions.Public, AuthenticationService.Instance.PlayerId) }
             }
         };
 
         currentLobby = await Lobbies.Instance.CreateLobbyAsync("MyLobby", playerCount, options);
         
-        // For private lobbies, display the lobby code (which clients will use to join)
-        // For public lobbies, display the relay join code
+        // CRITICAL: Display lobby codes for client connection, save lobby codes for reconnection
         if (privateFlag)
         {
-            Debug.Log($"Host started with Relay join code: {joinCodeVar}");
+            Debug.Log($"Host created private lobby with Relay join code: {joinCodeVar}");
             Debug.Log($"Private lobby code for clients: {currentLobby.LobbyCode}");
-            joinCodeText.text = currentLobby.LobbyCode; // Clients use this to join private lobby
+            joinCodeText.text = currentLobby.LobbyCode; // Clients use this to join lobby first
+            
+            // CRITICAL: Save LOBBY code for reconnection (lobby-first approach)
+            SaveGameJoinCode(currentLobby.LobbyCode, playerCount);
         }
         else
         {
-            Debug.Log($"Host started with join code: {joinCodeVar}");
-            joinCodeText.text = joinCodeVar; // Clients use this for public lobby
+            Debug.Log($"Host created public lobby with Relay join code: {joinCodeVar}");
+            Debug.Log($"Public lobby code for clients: {currentLobby.LobbyCode}");
+            joinCodeText.text = currentLobby.LobbyCode; // Clients use this to join lobby first
+            
+            // CRITICAL: Save LOBBY code for reconnection (lobby-first approach)
+            SaveGameJoinCode(currentLobby.LobbyCode, playerCount);
         }
         
         Server.Singleton.SetPlayerCount(playerCount);
+        
+        // CRITICAL: Start relay keep-alive system to maintain connections
+        if (Server.Singleton != null)
+        {
+            Server.Singleton.StartRelayKeepAlive(allocation.AllocationId.ToString());
+            Debug.Log($"[NetworkManagerUI] Started relay keep-alive system for allocation: {allocation.AllocationId}");
+        }
+        
         return NetworkManager.Singleton.StartHost() ? joinCodeVar : null;
     }
 
     public async Task<bool> StartClientWithRelay()
     {
         string inputJoinCode = inputField.text;
-        mainUIScript.OpenWaitingScreenUI("yellow", "2",inputJoinCode);
+        mainUIScript.OpenWaitingScreenUI("yellow", "2", inputJoinCode);
 
-        var initialOptions = new InitializationOptions();
-
-        #if UNITY_EDITOR
-        if (ClonesManager.IsClone())
+        // Use existing Unity Services connection (initialized at startup)
+        if (!IsUnityServicesInitialized())
         {
-            string parrelArgument = ClonesManager.GetArgument();
-            initialOptions.SetProfile(parrelArgument);
-            Debug.Log("ParrelSync argument: " + parrelArgument);
+            Debug.LogError("[NetworkManagerUI] Unity Services not initialized! This should have been done at startup.");
+            return false;
         }
-        #endif
-
-        await UnityServices.InitializeAsync(initialOptions);
-
-        await EnsureFreshAnonymousSignIn();
-
-        Debug.Log("Trying to join with joinCode: " + inputJoinCode);
+        
+        Debug.Log("[NetworkManagerUI] Using existing Unity Services connection for client");
+        Debug.Log($"[NetworkManagerUI] LOBBY-FIRST CONNECTION: Trying to join lobby with code: {inputJoinCode}");
         joinCodeText.text = inputJoinCode;
 
-        // --- Join the Lobby using the join code ---
-        // First try to join as a private lobby using lobby code
+        // CRITICAL: LOBBY-FIRST CONNECTION FLOW
+        // Step 1: Join the lobby using the provided lobby join code
         try
         {
-            Debug.Log($"Attempting to join private lobby with lobby code: {inputJoinCode}");
+            Debug.Log($"[NetworkManagerUI] Step 1: Joining lobby with code: {inputJoinCode}");
             currentLobby = await Lobbies.Instance.JoinLobbyByCodeAsync(inputJoinCode);
-            Debug.Log($"Successfully joined private lobby: {currentLobby.Name}");
+            Debug.Log($"[NetworkManagerUI] Successfully joined lobby: {currentLobby.Name}");
             
-            // Get the relay join code from the lobby data
-            if (currentLobby.Data != null && currentLobby.Data.ContainsKey("JoinCode"))
+            // Step 2: Get relay join code from lobby metadata
+            if (currentLobby.Data != null && currentLobby.Data.ContainsKey("RelayJoinCode"))
             {
-                string relayJoinCode = currentLobby.Data["JoinCode"].Value;
-                Debug.Log($"Retrieved relay join code from private lobby: {relayJoinCode}");
+                string relayJoinCode = currentLobby.Data["RelayJoinCode"].Value;
+                Debug.Log($"[NetworkManagerUI] Step 2: Retrieved relay join code from lobby: {relayJoinCode}");
                 
-                // Use the relay join code for the actual connection
-                var privateJoinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode: relayJoinCode);
-                NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(privateJoinAllocation, "wss"));
+                // Step 3: Connect to relay using the stored relay join code
+                Debug.Log($"[NetworkManagerUI] Step 3: Connecting to relay with code: {relayJoinCode}");
+                var joinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode: relayJoinCode);
+                NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(joinAllocation, "wss"));
                 
-                return !string.IsNullOrEmpty(relayJoinCode) && NetworkManager.Singleton.StartClient();
+                // Step 4: Save LOBBY join code for reconnection (not relay code)
+                SaveGameJoinCode(inputJoinCode, currentLobby.MaxPlayers);
+                Debug.Log($"[NetworkManagerUI] Step 4: Saved lobby code for reconnection: {inputJoinCode}");
+                
+                // Step 5: Start client connection
+                bool success = NetworkManager.Singleton.StartClient();
+                if (success)
+                {
+                    Debug.Log($"[NetworkManagerUI] LOBBY-FIRST SUCCESS: Connected to lobby and relay successfully");
+                    return true;
+                }
+                else
+                {
+                    Debug.LogError($"[NetworkManagerUI] Failed to start NetworkManager client");
+                    return false;
+                }
             }
             else
             {
-                Debug.LogError("Private lobby doesn't contain relay join code!");
+                Debug.LogError($"[NetworkManagerUI] Lobby doesn't contain RelayJoinCode in metadata!");
                 return false;
             }
         }
         catch (Exception e)
         {
-            Debug.Log($"Failed to join as private lobby: {e.Message}");
-            Debug.Log("Trying as public lobby with relay join code...");
+            Debug.LogError($"[NetworkManagerUI] LOBBY-FIRST CONNECTION FAILED: {e.Message}");
             
-            // If private lobby join fails, try as public lobby with relay join code
-            var queryOptions = new QueryLobbiesOptions();
-            var lobbies = await Lobbies.Instance.QueryLobbiesAsync(queryOptions);
-            Lobby foundLobby = null;
-            
-            Debug.Log($"Searching through {lobbies.Results.Count} public lobbies for relay join code: {inputJoinCode}");
-            
-            foreach (var lobby in lobbies.Results)
+            // FALLBACK: Try to find lobby by searching (for backward compatibility)
+            Debug.Log("[NetworkManagerUI] FALLBACK: Searching for lobby with matching join code...");
+            try
             {
-                if (lobby.Data != null && lobby.Data.ContainsKey("JoinCode"))
-                {
-                    string lobbyJoinCode = lobby.Data["JoinCode"].Value;
-                    Debug.Log($"Checking public lobby {lobby.Name} with relay code: {lobbyJoinCode}");
-                    
-                    if (lobbyJoinCode == inputJoinCode)
-                    {
-                        foundLobby = lobby;
-                        Debug.Log($"Found matching public lobby: {lobby.Name}");
-                        break;
-                    }
-                }
-            }
-            
-            if (foundLobby != null)
-            {
-                currentLobby = await Lobbies.Instance.JoinLobbyByIdAsync(foundLobby.Id);
-                Debug.Log($"Successfully joined public lobby: {foundLobby.Name}");
+                var queryOptions = new QueryLobbiesOptions();
+                var lobbies = await Lobbies.Instance.QueryLobbiesAsync(queryOptions);
                 
-                // For public lobbies, use the input code directly as relay join code
-                var joinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode: inputJoinCode);
-                NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(joinAllocation, "wss"));
-                
-                return !string.IsNullOrEmpty(inputJoinCode) && NetworkManager.Singleton.StartClient();
-            }
-            else
-            {
-                Debug.LogError($"No lobby found with the provided join code: {inputJoinCode}");
-                Debug.LogError($"Available public lobbies: {lobbies.Results.Count}");
                 foreach (var lobby in lobbies.Results)
                 {
-                    if (lobby.Data != null && lobby.Data.ContainsKey("JoinCode"))
+                    if (lobby.Data != null && lobby.Data.ContainsKey("RelayJoinCode"))
                     {
-                        Debug.LogError($"Public Lobby {lobby.Name}: {lobby.Data["JoinCode"].Value}");
+                        string lobbyRelayCode = lobby.Data["RelayJoinCode"].Value;
+                        if (lobbyRelayCode == inputJoinCode)
+                        {
+                            Debug.Log($"[NetworkManagerUI] FALLBACK: Found lobby with matching relay code: {lobby.Name}");
+                            currentLobby = await Lobbies.Instance.JoinLobbyByIdAsync(lobby.Id);
+                            
+                            var joinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode: inputJoinCode);
+                            NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(joinAllocation, "wss"));
+                            
+                            SaveGameJoinCode(lobby.LobbyCode, lobby.MaxPlayers);
+                            return NetworkManager.Singleton.StartClient();
+                        }
                     }
                 }
                 
-                // If no lobby found, try to connect directly using the code as a relay join code
-                Debug.Log($"Attempting to connect directly using code as relay join code: {inputJoinCode}");
-                try
-                {
-                    var directJoinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode: inputJoinCode);
-                    NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(directJoinAllocation, "wss"));
-                    Debug.Log($"Successfully connected directly via relay join code: {inputJoinCode}");
-                    return !string.IsNullOrEmpty(inputJoinCode) && NetworkManager.Singleton.StartClient();
-                }
-                catch (Exception relayException)
-                {
-                    Debug.LogError($"Failed to connect directly via relay: {relayException.Message}");
-                    return false;
-                }
+                Debug.LogError($"[NetworkManagerUI] FALLBACK FAILED: No lobby found with join code: {inputJoinCode}");
+                return false;
+            }
+            catch (Exception fallbackException)
+            {
+                Debug.LogError($"[NetworkManagerUI] FALLBACK EXCEPTION: {fallbackException.Message}");
+                return false;
             }
         }
     }
@@ -252,20 +1047,14 @@ public class NetworkManagerUI : MonoBehaviour
     {
         mainUIScript.OpenWaitingScreenUI("red", playerCount.ToString(),"abc");
 
-        var initialOptions = new InitializationOptions();
-
-        #if UNITY_EDITOR
-        if (ClonesManager.IsClone())
+        // Use existing Unity Services connection (initialized at startup)
+        if (!IsUnityServicesInitialized())
         {
-            string parrelArgument = ClonesManager.GetArgument();
-            initialOptions.SetProfile(parrelArgument);
-            Debug.Log("ParrelSync argument: " + parrelArgument);
+            Debug.LogError("[NetworkManagerUI] Unity Services not initialized! This should have been done at startup.");
+            return;
         }
-        #endif
-
-        await UnityServices.InitializeAsync(initialOptions);
-
-        await EnsureFreshAnonymousSignIn();
+        
+        Debug.Log("[NetworkManagerUI] Using existing Unity Services connection for quick play");
 
         QueryLobbiesOptions queryOptions = new QueryLobbiesOptions
         {
@@ -286,10 +1075,10 @@ public class NetworkManagerUI : MonoBehaviour
                 Debug.Log($"Lobby Name: {lobby.Name}, Player Count: {playerCount}, Available Slots: {lobby.AvailableSlots}");
             }
 
-            // Join the first lobby found
+            // Join the first lobby found using lobby-first approach
             if (lobbies.Results.Count > 0)
             {
-                JoinLobby(lobbies.Results[0].Id);
+                await JoinLobbyById(lobbies.Results[0].Id);
             }
         }
         else
@@ -303,59 +1092,112 @@ public class NetworkManagerUI : MonoBehaviour
     }
 
 
-    public async void JoinLobby(string lobbyId)
+    public async Task JoinLobbyById(string lobbyId)
     {
         try
         {
+            Debug.Log($"[NetworkManagerUI] QUICKPLAY: Joining lobby by ID: {lobbyId}");
             var lobby = await Lobbies.Instance.JoinLobbyByIdAsync(lobbyId);
-            currentLobby = lobby; // Store the current lobby
+            currentLobby = lobby;
+            
             if (lobby == null)
             {
-                Debug.LogError("Lobby is null!");
+                Debug.LogError("[NetworkManagerUI] Lobby is null!");
                 return;
             }
-            if (lobby.Data == null || !lobby.Data.ContainsKey("HostPlayerId"))
+            
+            if (lobby.Data == null || !lobby.Data.ContainsKey("RelayJoinCode"))
             {
-                Debug.LogError("Lobby data or HostPlayerId is missing!");
+                Debug.LogError("[NetworkManagerUI] Lobby data or RelayJoinCode is missing!");
                 return;
             }
 
-            if (lobby != null)
+            Debug.Log($"[NetworkManagerUI] QUICKPLAY: Successfully joined lobby: {lobby.Name}");
+            
+            // LOBBY-FIRST APPROACH: Get relay join code from lobby metadata
+            string relayJoinCode = lobby.Data["RelayJoinCode"].Value;
+            Debug.Log($"[NetworkManagerUI] QUICKPLAY: Retrieved relay join code: {relayJoinCode}");
+            
+            // Connect to relay using stored relay join code
+            var joinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode: relayJoinCode);
+            NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(joinAllocation, "wss"));
+
+            // CRITICAL: Save LOBBY code for reconnection (not relay code)
+            SaveGameJoinCode(lobby.LobbyCode, lobby.MaxPlayers);
+            Debug.Log($"[NetworkManagerUI] QUICKPLAY: Saved lobby code for reconnection: {lobby.LobbyCode}");
+
+            bool success = NetworkManager.Singleton.StartClient();
+            if (success)
             {
-                UnityTransport transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-                if (transport == null)
-                {
-                    Debug.LogError("UnityTransport component is missing.");
-                    return;
-                }
-
-                var joinCode = lobby.Data["JoinCode"].Value;
-                var joinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode: joinCode);
-                NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(joinAllocation, "wss"));
-
-                NetworkManager.Singleton.StartClient();
-                Debug.Log("Successfully connected to the lobby.");
+                Debug.Log("[NetworkManagerUI] QUICKPLAY SUCCESS: Connected to lobby and relay successfully");
             }
             else
             {
-                Debug.LogError("Failed to retrieve join allocation.");
+                Debug.LogError("[NetworkManagerUI] QUICKPLAY FAILED: Could not start NetworkManager client");
             }
         }
         catch (Exception e)
         {
-            Debug.LogError($"Error joining lobby: {e}");
+            Debug.LogError($"[NetworkManagerUI] Error joining lobby by ID: {e}");
         }
     }
 
-    private Lobby currentLobby; // Store the current lobby when you join/create it
+    // Legacy method for backward compatibility
+    public async void JoinLobby(string lobbyId)
+    {
+        await JoinLobbyById(lobbyId);
+    }
+
+    /// <summary>
+    /// Properly disconnects from lobby services and cleans up network state
+    /// KEEPS Unity Services connected for potential reconnection
+    /// </summary>
+    public async void DisconnectFromLobbyAndNetwork()
+    {
+        Debug.Log("[NetworkManagerUI] Disconnecting from lobby and cleaning up network state...");
+        
+        try
+        {
+            // STEP 1: Keep player in lobby for reconnection (don't remove them)
+            if (currentLobby != null && AuthenticationService.Instance.IsSignedIn)
+            {
+                Debug.Log($"[NetworkManagerUI] Keeping player in lobby for reconnection: {currentLobby.Name}");
+                // CRITICAL: Do NOT remove player from lobby - keep them for reconnection
+                // await Lobbies.Instance.RemovePlayerAsync(currentLobby.Id, AuthenticationService.Instance.PlayerId);
+                // currentLobby = null; // Keep reference for potential reconnection
+                Debug.Log("[NetworkManagerUI] Player kept in lobby for reconnection");
+            }
+            
+            // STEP 2: Shutdown NetworkManager if it's running
+            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+            {
+                Debug.Log("[NetworkManagerUI] Shutting down NetworkManager");
+                NetworkManager.Singleton.Shutdown();
+            }
+            
+            // STEP 3: KEEP Unity Services connected (don't sign out)
+            // This allows for automatic reconnection to saved games
+            Debug.Log("[NetworkManagerUI] Keeping Unity Services connected for potential reconnection");
+            
+            Debug.Log("[NetworkManagerUI] Successfully disconnected from lobby and network (Unity Services still connected)");
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[NetworkManagerUI] Error during disconnection: {e.Message}");
+            // Continue with cleanup even if there's an error
+        }
+    }
 
     private async void OnApplicationQuit()
     {
+        // Only remove player from lobby when application is actually quitting
         if (currentLobby != null && AuthenticationService.Instance.IsSignedIn)
         {
             try
             {
+                Debug.Log($"[NetworkManagerUI] Application quitting - removing player from lobby: {currentLobby.Name}");
                 await Lobbies.Instance.RemovePlayerAsync(currentLobby.Id, AuthenticationService.Instance.PlayerId);
+                Debug.Log("[NetworkManagerUI] Successfully left lobby on application quit");
             }
             catch (Exception e)
             {

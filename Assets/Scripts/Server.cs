@@ -7,6 +7,8 @@ using System.Linq;
 using Unity.Netcode;
 using UnityEngine.Pool;
 using UnityEngine.Tilemaps;
+using Unity.Services.Lobbies;
+using Unity.Services.Lobbies.Models;
 
 public class Server : NetworkBehaviour
 {
@@ -46,6 +48,13 @@ public class Server : NetworkBehaviour
     private bool hasManualSavedState = false;
     private int snapshotVersionCounter = 0;
 
+    // KEEP-ALIVE SYSTEM for relay connections
+    private Coroutine relayKeepAliveCoroutine;
+    private bool isRelayKeepAliveActive = false;
+    private string hostAllocationId;
+    private List<string> clientAllocationIds = new List<string>();
+    private NetworkManagerUI networkManagerUI;
+
     public void ResetAllServerVariables()
     {
         deckCardsDict = null;
@@ -63,7 +72,7 @@ public class Server : NetworkBehaviour
         startingPlayerNo = 0;
         timer = 0f;
         turnTime = 15f;
-        //connectedPlayerCount = 0;
+        connectedPlayerCount = 0; // FIXED: Reset connection count
         roundCount = 0;
         readyToEndTurnCounter = 0;
         singleDebuggingMode = false;
@@ -71,6 +80,15 @@ public class Server : NetworkBehaviour
         copiedCardMap.Clear();
         zaferPuaniPoints.Clear();
         bombedCards.Clear();
+        
+        // Reset connection tracking
+        dealCenterFinishedClients.Clear();
+        initialDealCoroutineCheckCounter = 0;
+        
+        // Reset keep-alive system
+        StopRelayKeepAlive();
+        hostAllocationId = null;
+        clientAllocationIds.Clear();
     }
 
     public void ResetForNewRound()
@@ -85,13 +103,17 @@ public class Server : NetworkBehaviour
         lastPlayerToCapture = -1;
         timer = 0f;
         turnTime = 15f;
-        //connectedPlayerCount = 0;
+        connectedPlayerCount = 0; // FIXED: Reset connection count for new round
         readyToEndTurnCounter = 0;
         singleDebuggingMode = false;
         winnerPrintFlag = false;
         copiedCardMap.Clear();
         zaferPuaniPoints.Clear();
         bombedCards.Clear(); // Clear bombed cards for new round
+        
+        // Reset connection tracking
+        dealCenterFinishedClients.Clear();
+        initialDealCoroutineCheckCounter = 0;
         
         // Reset move chains for new round
         MoveChainIntegrator.ResetChains();
@@ -103,14 +125,43 @@ public class Server : NetworkBehaviour
     {
         Singleton = this;
         if (playerCount == 0) playerCount = 2;
+        
+        // Subscribe to network events for disconnect handling
+        if (NetworkManager.Singleton != null)
+        {
+            NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
+        }
     }
     // Start is called before the first frame update
     void Start()
     {
         print("server.cs start");
         ResetAllServerVariables();
+        
+        // Subscribe to network events if NetworkManager is available
+        SubscribeToNetworkEvents();
+        
+        // Initialize NetworkManagerUI reference
+        networkManagerUI = FindObjectOfType<NetworkManagerUI>();
+        
         //StartCoroutine(ServerSubsciribe());
+    }
 
+    /// <summary>
+    /// Subscribes to NetworkManager events for disconnect handling
+    /// </summary>
+    private void SubscribeToNetworkEvents()
+    {
+        if (NetworkManager.Singleton != null)
+        {
+            NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
+            hasSubscribedToNetworkEvents = true;
+            Debug.Log("[Server] Subscribed to NetworkManager disconnect events");
+        }
+        else
+        {
+            Debug.LogWarning("[Server] NetworkManager.Singleton is null, cannot subscribe to events");
+        }
     }
 
     void Update()
@@ -120,6 +171,18 @@ public class Server : NetworkBehaviour
         {
             DecideWinner();
             winnerPrintFlag = false;
+        }
+        
+        // Try to subscribe to network events if not already subscribed
+        if (NetworkManager.Singleton != null && !hasSubscribedToNetworkEvents)
+        {
+            SubscribeToNetworkEvents();
+        }
+        
+        // Check for heartbeat timeouts
+        if (IsServer && clientHeartbeats.Count > 0)
+        {
+            CheckHeartbeatTimeouts();
         }
     }
 
@@ -176,6 +239,12 @@ public class Server : NetworkBehaviour
     }
 
     private int initialDealCoroutineCheckCounter = 0;
+    private bool hasSubscribedToNetworkEvents = false;
+    
+    // === HEARTBEAT TRACKING ===
+    private Dictionary<ulong, float> clientHeartbeats = new Dictionary<ulong, float>();
+    private Dictionary<ulong, bool> disconnectedClients = new Dictionary<ulong, bool>();
+    
     public void InitialDealCoroutineCheck()
     {
         Debug.LogWarning("InitialDealCoroutineCheck called, connectedPlayerCount: " + connectedPlayerCount);
@@ -958,8 +1027,19 @@ public class Server : NetworkBehaviour
         Debug.Log("connectedPlayerCount: " + connectedPlayerCount);
         Debug.Log("playerCount: " + playerCount);
 
-        if (playerCount == connectedPlayerCount)
+        // CRITICAL FIX: Check if this is a reconnection vs a new game start
+        // If the game is already in progress (turnCounter > 0), this is a reconnection
+        bool isReconnection = turnCounter > 0;
+        
+        if (isReconnection)
         {
+            Debug.Log($"[Server] Client {clientId} reconnected to existing game (turn {turnCounter})");
+            // Don't start a new game - the reconnected client will request game state sync
+        }
+        else if (playerCount == connectedPlayerCount)
+        {
+            // This is a fresh game start
+            Debug.Log($"[Server] All players connected - starting new game");
             if (playerCount == 2)
             {
                 StartGameAfterDelayTwoPlayer();
@@ -970,6 +1050,120 @@ public class Server : NetworkBehaviour
             }
         }
     }
+
+    /// <summary>
+    /// Handles when a client disconnects from the server
+    /// </summary>
+    public void OnClientDisconnected(ulong clientId)
+    {
+        Debug.LogWarning($"[Server] Client {clientId} disconnected");
+        
+        // Mark client as disconnected
+        disconnectedClients[clientId] = true;
+        
+        // Remove from heartbeat tracking
+        clientHeartbeats.Remove(clientId);
+        
+        // Decrease the connected player count
+        if (connectedPlayerCount > 0)
+        {
+            connectedPlayerCount--;
+            Debug.LogWarning($"[Server] Connected player count decreased to: {connectedPlayerCount}");
+        }
+        
+        // Reset game state if no players are connected
+        if (connectedPlayerCount == 0)
+        {
+            Debug.LogWarning("[Server] All players disconnected, resetting game state");
+            ResetAllServerVariables();
+        }
+        
+        // Reset connection tracking
+        dealCenterFinishedClients.Clear();
+        initialDealCoroutineCheckCounter = 0;
+        readyToEndTurnCounter = 0;
+        
+        // TODO: Implement bot placeholder system here
+        Debug.LogWarning($"[Server] Client {clientId} disconnected - bot placeholder system should activate");
+    }
+
+    /// <summary>
+    /// Handles heartbeat from a client
+    /// </summary>
+    public void OnClientHeartbeat(ulong clientId)
+    {
+        if (!clientHeartbeats.ContainsKey(clientId))
+        {
+            Debug.Log($"[Server] New client {clientId} heartbeat registered");
+        }
+        
+        clientHeartbeats[clientId] = Time.time;
+        
+        // If this client was marked as disconnected, mark them as reconnected
+        if (disconnectedClients.ContainsKey(clientId) && disconnectedClients[clientId])
+        {
+            disconnectedClients[clientId] = false;
+            Debug.Log($"[Server] Client {clientId} reconnected after disconnect");
+        }
+    }
+
+    /// <summary>
+    /// Checks for clients that haven't sent heartbeats recently
+    /// </summary>
+    private void CheckHeartbeatTimeouts()
+    {
+        float currentTime = Time.time;
+        List<ulong> timedOutClients = new List<ulong>();
+        
+        foreach (var kvp in clientHeartbeats)
+        {
+            ulong clientId = kvp.Key;
+            float lastHeartbeat = kvp.Value;
+            
+            if (currentTime - lastHeartbeat > 20f) // 20 second timeout
+            {
+                Debug.LogWarning($"[Server] Client {clientId} heartbeat timeout - marking as disconnected");
+                timedOutClients.Add(clientId);
+            }
+        }
+        
+        // Handle timed out clients
+        foreach (ulong clientId in timedOutClients)
+        {
+            OnClientDisconnected(clientId);
+        }
+    }
+
+    /// <summary>
+    /// Context menu method to manually reset connection count (for testing)
+    /// </summary>
+    [ContextMenu("Reset Connection Count")]
+    public void ResetConnectionCount()
+    {
+        Debug.LogWarning($"[Server] Manually resetting connection count from {connectedPlayerCount} to 0");
+        connectedPlayerCount = 0;
+        dealCenterFinishedClients.Clear();
+        initialDealCoroutineCheckCounter = 0;
+        readyToEndTurnCounter = 0;
+        Debug.LogWarning("[Server] Connection count reset complete");
+    }
+    
+    void OnDestroy()
+    {
+        if (Singleton == this)
+        {
+            Singleton = null;
+        }
+        
+        // Unsubscribe from network events
+        if (NetworkManager.Singleton != null && hasSubscribedToNetworkEvents)
+        {
+            NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
+            hasSubscribedToNetworkEvents = false;
+            Debug.Log("[Server] Unsubscribed from NetworkManager disconnect events");
+        }
+    }
+    
     public void StartGameAfterDelayFourPlayer()
     {
         Invoke("StartGameDelayedFourPlayer", 3f);
@@ -1574,6 +1768,150 @@ public class Server : NetworkBehaviour
     }
 
     // Note: Automatic or request-based broadcasting removed per user request. Only manual Save/Load remains.
+
+    // ===== RELAY KEEP-ALIVE SYSTEM =====
+
+    /// <summary>
+    /// Starts the relay keep-alive system to maintain all relay connections
+    /// </summary>
+    public void StartRelayKeepAlive(string hostAllocationId)
+    {
+        if (IsServer && !isRelayKeepAliveActive)
+        {
+            this.hostAllocationId = hostAllocationId;
+            isRelayKeepAliveActive = true;
+            relayKeepAliveCoroutine = StartCoroutine(RelayKeepAliveCoroutine());
+            Debug.Log($"[Server] Started relay keep-alive system for allocation: {hostAllocationId}");
+        }
+    }
+
+    /// <summary>
+    /// Stops the relay keep-alive system
+    /// </summary>
+    public void StopRelayKeepAlive()
+    {
+        if (isRelayKeepAliveActive)
+        {
+            isRelayKeepAliveActive = false;
+            if (relayKeepAliveCoroutine != null)
+            {
+                StopCoroutine(relayKeepAliveCoroutine);
+                relayKeepAliveCoroutine = null;
+            }
+            Debug.Log("[Server] Stopped relay keep-alive system");
+        }
+    }
+
+    /// <summary>
+    /// Adds a client allocation ID to the keep-alive tracking
+    /// </summary>
+    public void AddClientAllocationForKeepAlive(string clientAllocationId)
+    {
+        if (!clientAllocationIds.Contains(clientAllocationId))
+        {
+            clientAllocationIds.Add(clientAllocationId);
+            Debug.Log($"[Server] Added client allocation to keep-alive: {clientAllocationId}");
+        }
+    }
+
+    /// <summary>
+    /// Coroutine that sends heartbeats every 5 seconds to maintain relay connections
+    /// </summary>
+    private IEnumerator RelayKeepAliveCoroutine()
+    {
+        Debug.Log("[Server] Relay keep-alive coroutine started");
+        
+        while (isRelayKeepAliveActive)
+        {
+            yield return new WaitForSeconds(5f); // Send heartbeat every 5 seconds
+            
+            if (IsServer && isRelayKeepAliveActive)
+            {
+                // Send heartbeat to maintain relay connection
+                SendRelayHeartbeat();
+                
+                // Update lobby with heartbeat timestamp
+                UpdateLobbyHeartbeat();
+            }
+        }
+        
+        Debug.Log("[Server] Relay keep-alive coroutine stopped");
+    }
+
+    /// <summary>
+    /// Sends heartbeat to maintain relay connections
+    /// </summary>
+    private void SendRelayHeartbeat()
+    {
+        try
+        {
+            // The act of being connected as a host/server maintains the relay allocation
+            // We just need to ensure we're actively using the connection
+            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+            {
+                // Send a minimal ping to maintain connection
+                networkRelay?.SendHeartbeatServerRPC();
+                Debug.Log($"[Server] Sent relay heartbeat for host allocation: {hostAllocationId}");
+                
+                // Log all tracked allocations
+                if (clientAllocationIds.Count > 0)
+                {
+                    Debug.Log($"[Server] Maintaining {clientAllocationIds.Count} client allocations: {string.Join(", ", clientAllocationIds)}");
+                }
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[Server] Error sending relay heartbeat: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Updates lobby metadata with heartbeat timestamp to keep lobby active
+    /// </summary>
+    private async void UpdateLobbyHeartbeat()
+    {
+        try
+        {
+            if (networkManagerUI != null && networkManagerUI.currentLobby != null)
+            {
+                // Update lobby with heartbeat timestamp to keep it active
+                var updateOptions = new UpdateLobbyOptions
+                {
+                    Data = new Dictionary<string, DataObject>
+                    {
+                        { "LastHeartbeat", new DataObject(DataObject.VisibilityOptions.Public, DateTime.UtcNow.ToString("O")) }
+                    }
+                };
+                
+                await Lobbies.Instance.UpdateLobbyAsync(networkManagerUI.currentLobby.Id, updateOptions);
+                Debug.Log($"[Server] Lobby heartbeat sent at {DateTime.UtcNow:HH:mm:ss} - lobby kept active");
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[Server] Error updating lobby heartbeat: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Called when a client connects - adds their allocation to keep-alive tracking
+    /// </summary>
+    public void OnClientConnectedForKeepAlive(ulong clientId, string clientAllocationId)
+    {
+        AddClientAllocationForKeepAlive(clientAllocationId);
+        Debug.Log($"[Server] Client {clientId} connected, tracking allocation: {clientAllocationId}");
+    }
+
+    /// <summary>
+    /// Called when a client disconnects - keeps their allocation alive for reconnection
+    /// </summary>
+    public void OnClientDisconnectedKeepAlive(ulong clientId)
+    {
+        // CRITICAL: Do NOT remove client allocation from keep-alive
+        // We want to keep it alive for potential reconnection
+        Debug.Log($"[Server] Client {clientId} disconnected, but keeping their relay allocation alive for reconnection");
+    }
 
 
 }

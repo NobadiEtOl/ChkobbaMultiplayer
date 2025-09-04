@@ -529,6 +529,17 @@ public class NetworkRelay : NetworkBehaviour
         GameManager.LocalInstance?.ApplyGameState(snapshot);
     }
 
+    [ClientRpc(RequireOwnership = false)]
+    public void ApplyGameStateToReconnectedClientClientRPC(SerializableGameState snapshot, ulong targetClientId)
+    {
+        // Only apply the game state if this is the target client
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.LocalClientId == targetClientId)
+        {
+            Debug.Log($"[NetworkRelay] Applying game state snapshot v{snapshot.snapshotVersion} to reconnected client {targetClientId}");
+            GameManager.LocalInstance?.ApplyGameState(snapshot);
+        }
+    }
+
 
     // Debug-only: broadcast a snapshot to be logged into clients' sync logs
     [ClientRpc(RequireOwnership = false)]
@@ -560,6 +571,73 @@ public class NetworkRelay : NetworkBehaviour
         {
             var gameState = Server.Singleton.BuildGameStateSnapshot();
             ApplyGameStateClientRPC(gameState);
+        }
+    }
+
+    // === HEARTBEAT & DISCONNECT DETECTION ===
+    
+    [ServerRpc(RequireOwnership = false)]
+    public void SendHeartbeatServerRPC()
+    {
+        // Client sends heartbeat to server
+        ulong clientId = OwnerClientId;
+        Debug.Log($"[NetworkRelay] Heartbeat received from client {clientId}");
+        
+        // Update the server's heartbeat tracking
+        if (Server.Singleton != null)
+        {
+            Server.Singleton.OnClientHeartbeat(clientId);
+        }
+    }
+
+    [ClientRpc(RequireOwnership = false)]
+    public void OnPlayerDisconnectedClientRPC(ulong clientId, string reason)
+    {
+        Debug.LogWarning($"[NetworkRelay] Player {clientId} disconnected: {reason}");
+        
+        // Notify GameManager about the disconnect
+        if (GameManager.LocalInstance != null)
+        {
+            GameManager.LocalInstance.OnPlayerDisconnected(clientId, reason);
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void NotifyDisconnectServerRPC(string reason)
+    {
+        // Client notifies server about impending disconnect
+        ulong clientId = OwnerClientId;
+        Debug.LogWarning($"[NetworkRelay] Client {clientId} notifying disconnect: {reason}");
+        
+        // Notify all clients about the disconnect
+        OnPlayerDisconnectedClientRPC(clientId, reason);
+        
+        // Update server state
+        if (Server.Singleton != null)
+        {
+            Server.Singleton.OnClientDisconnected(clientId);
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void RequestGameStateSyncForReconnectedClientServerRPC()
+    {
+        // Reconnected client requests current game state
+        ulong clientId = OwnerClientId;
+        Debug.Log($"[NetworkRelay] Reconnected client {clientId} requesting game state sync");
+        
+        if (Server.Singleton != null)
+        {
+            // Build current game state snapshot
+            var gameState = Server.Singleton.BuildGameStateSnapshot();
+            Debug.Log($"[NetworkRelay] Sending game state snapshot v{gameState.snapshotVersion} to reconnected client {clientId}");
+            
+            // Send game state to the requesting client
+            ApplyGameStateToReconnectedClientClientRPC(gameState, clientId);
+        }
+        else
+        {
+            Debug.LogError("[NetworkRelay] Server.Singleton is null - cannot provide game state");
         }
     }
 

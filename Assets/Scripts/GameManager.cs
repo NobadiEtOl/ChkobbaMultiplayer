@@ -498,6 +498,29 @@ public class GameManager : MonoBehaviour
 
     }
 
+    /// <summary>
+    /// Called when a reconnected client has successfully applied game state and is ready to play
+    /// </summary>
+    public void OnReconnectionGameStateApplied()
+    {
+        Debug.Log("[GameManager] Reconnected client game state applied successfully");
+        
+        // Close any waiting screens that might still be open
+        if (waitingScreen != null && waitingScreen.activeSelf)
+        {
+            waitingScreen.SetActive(false);
+            Debug.Log("[GameManager] Closed waiting screen after reconnection");
+        }
+        
+        // Ensure main screen is hidden and game is visible
+        if (mainScreen != null && mainScreen.activeSelf)
+        {
+            mainScreen.SetActive(false);
+        }
+        
+        Debug.Log("[GameManager] Reconnected client is now ready to play");
+    }
+
 
 
     void OnDestroy()
@@ -3948,7 +3971,21 @@ public class GameManager : MonoBehaviour
 
     }
 
-
+    /// <summary>
+    /// Called when a player disconnects from the game
+    /// </summary>
+    public void OnPlayerDisconnected(ulong clientId, string reason)
+    {
+        Debug.LogWarning($"[GameManager] Player {clientId} disconnected: {reason}");
+        
+        // TODO: Implement bot placeholder system here
+        // This is where you would:
+        // 1. Create a bot to replace the disconnected player
+        // 2. Update the UI to show the player is now a bot
+        // 3. Handle the bot's turns automatically
+        
+        Debug.LogWarning($"[GameManager] Bot placeholder system should activate for disconnected player {clientId}");
+    }
 
     public void ShowcaseSuperPower(string powerName, float fadeDuration = 0.5f, float displayDuration = 1f)
 
@@ -4399,6 +4436,19 @@ public class GameManager : MonoBehaviour
         // 7. Unfreeze input (ensure this always runs)
         SyncLog("Step 7: Unfreezing client after resync");
         UnfreezeClientAfterResync();
+
+        // 8. Handle reconnection completion
+        SyncLog("Step 8: Checking if this was a reconnection");
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient)
+        {
+            // Check if this was a reconnection by looking for saved game info
+            var networkManagerUI = FindObjectOfType<NetworkManagerUI>();
+            if (networkManagerUI != null && !string.IsNullOrEmpty(networkManagerUI.GetLastGameJoinCode()))
+            {
+                SyncLog("Step 8: This was a reconnection - notifying completion");
+                OnReconnectionGameStateApplied();
+            }
+        }
 
         SyncLog($"ApplyGameStateCoroutine completed successfully for snapshot v{snapshot.snapshotVersion}");
         // Final detailed dump AFTER apply for comparison

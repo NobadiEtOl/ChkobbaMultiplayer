@@ -2540,6 +2540,9 @@ MonoBehaviour:
   quickPlayFourPlayerButton: {fileID: 719691627}
   inputField: {fileID: 289141633}
   joinCodeText: {fileID: 1101665327}
+  heartbeatInterval: 5
+  disconnectTimeout: 15
+  enableAutomaticReconnection: 1
 --- !u!1 &183490869
 GameObject:
   m_ObjectHideFlags: 0
@@ -19580,7 +19583,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 1bca6ba52301a034186a7f57ae75cf4b, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 12380
+      value: 12377.9
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 1bca6ba52301a034186a7f57ae75cf4b, type: 3}
       propertyPath: m_LocalPosition.y
