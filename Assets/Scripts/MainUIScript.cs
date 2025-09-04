@@ -245,11 +245,13 @@ public class MainUIScript : MonoBehaviour
     {
         Debug.Log("[MainUIScript] Clearing pending network operations...");
         
-        // Reset any server state if it exists
+        // CRITICAL FIX: Do NOT reset server state during disconnection
+        // This was causing connectedPlayerCount to be reset to 0 before OnClientDisconnected() could run
+        // The server needs to maintain its state for proper disconnection handling
         if (Server.Singleton != null)
         {
-            Debug.Log("[MainUIScript] Resetting Server state...");
-            Server.Singleton.ResetAllServerVariables();
+            Debug.Log("[MainUIScript] NOT resetting Server state during disconnection - server handles its own cleanup");
+            // Server.Singleton.ResetAllServerVariables(); // COMMENTED OUT - causes double counting bug
         }
         
         // Reset any game manager state if it exists
@@ -294,6 +296,13 @@ public class MainUIScript : MonoBehaviour
     public void OnDisconnectDetected()
     {
         Debug.Log("[MainUIScript] Disconnect detected - returning to main page");
-        ReturnToMainPage();
+        
+        // CRITICAL FIX: Do NOT call ReturnToMainPage() which resets server state
+        // Just close the UI and let the server handle the disconnection properly
+        CloseAllUIPages();
+        ResetToMainPage();
+        
+        // DO NOT call ClearPendingNetworkOperations() - this resets server state!
+        // The server will handle the disconnection in OnClientDisconnected()
     }
 }

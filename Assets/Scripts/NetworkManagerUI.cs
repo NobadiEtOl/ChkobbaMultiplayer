@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.UI;
@@ -41,6 +42,14 @@ public class NetworkManagerUI : MonoBehaviour
     private bool isHeartbeatActive = false;
     private Coroutine heartbeatCoroutine;
     private Coroutine disconnectCheckCoroutine;
+    
+    // === CLIENT RELAY KEEP-ALIVE ===
+    private Coroutine clientRelayKeepAliveCoroutine;
+    private bool isClientRelayKeepAliveActive = false;
+    
+    // === DEBUG CHAIN ===
+    private List<string> reconnectionDebugChain = new List<string>();
+    
     public Lobby currentLobby; // Store the current lobby when you join/create it
     public Lobby CurrentLobby { get { return currentLobby; } } // Public access for Server
 
@@ -71,7 +80,7 @@ public class NetworkManagerUI : MonoBehaviour
         LAST_PLAYER_COUNT_KEY = $"LastPlayerCount_{uniqueId}";
         LAST_GAME_TIMESTAMP_KEY = $"LastGameTimestamp_{uniqueId}";
         
-        Debug.Log($"[NetworkManagerUI] Initialized PlayerPrefs keys with unique ID: {uniqueId}");
+        // Debug.Log($"[NetworkManagerUI] Initialized PlayerPrefs keys with unique ID: {uniqueId}");
     }
 
     void Start()
@@ -111,6 +120,7 @@ public class NetworkManagerUI : MonoBehaviour
         
         // Stop coroutines
         StopDisconnectDetection();
+        StopClientRelayKeepAlive();
     }
 
     // === DISCONNECT DETECTION & HEARTBEAT ===
@@ -126,7 +136,7 @@ public class NetworkManagerUI : MonoBehaviour
         heartbeatCoroutine = StartCoroutine(HeartbeatCoroutine());
         disconnectCheckCoroutine = StartCoroutine(DisconnectCheckCoroutine());
         
-        Debug.Log("[NetworkManagerUI] Disconnect detection started");
+        // Debug.Log("[NetworkManagerUI] Disconnect detection started");
     }
 
     /// <summary>
@@ -150,7 +160,7 @@ public class NetworkManagerUI : MonoBehaviour
             disconnectCheckCoroutine = null;
         }
         
-        Debug.Log("[NetworkManagerUI] Disconnect detection stopped");
+        // Debug.Log("[NetworkManagerUI] Disconnect detection stopped");
     }
 
     /// <summary>
@@ -198,7 +208,7 @@ public class NetworkManagerUI : MonoBehaviour
             {
                 networkRelay.SendHeartbeatServerRPC();
                 lastHeartbeatTime = Time.time;
-                Debug.Log($"[NetworkManagerUI] Heartbeat sent at {Time.time:F2}");
+                // Debug.Log($"[NetworkManagerUI] Heartbeat sent at {Time.time:F2}");
             }
         }
     }
@@ -210,7 +220,7 @@ public class NetworkManagerUI : MonoBehaviour
     {
         if (Time.time - lastHeartbeatTime > disconnectTimeout)
         {
-            Debug.LogWarning($"[NetworkManagerUI] Heartbeat timeout detected! Last heartbeat: {lastHeartbeatTime:F2}, Current time: {Time.time:F2}");
+            // Debug.LogWarning($"[NetworkManagerUI] Heartbeat timeout detected! Last heartbeat: {lastHeartbeatTime:F2}, Current time: {Time.time:F2}");
             OnDisconnectDetected("Heartbeat timeout");
         }
     }
@@ -220,7 +230,7 @@ public class NetworkManagerUI : MonoBehaviour
     /// </summary>
     private void OnDisconnectDetected(string reason)
     {
-        Debug.LogWarning($"[NetworkManagerUI] Disconnect detected: {reason}");
+        // Debug.LogWarning($"[NetworkManagerUI] Disconnect detected: {reason}");
         
         // Stop disconnect detection
         StopDisconnectDetection();
@@ -234,12 +244,12 @@ public class NetworkManagerUI : MonoBehaviour
         
         if (!isHost && enableAutomaticReconnection && !string.IsNullOrEmpty(lastGameJoined))
         {
-            Debug.Log($"[NetworkManagerUI] Client attempting automatic reconnection to: {lastGameJoined}");
+            // Debug.Log($"[NetworkManagerUI] Client attempting automatic reconnection to: {lastGameJoined}");
             StartCoroutine(AttemptReconnection());
         }
         else if (isHost)
         {
-            Debug.Log("[NetworkManagerUI] Host detected disconnect - waiting for client to reconnect");
+            // Debug.Log("[NetworkManagerUI] Host detected disconnect - waiting for client to reconnect");
             // Host should just return to main page, not try to reconnect
             if (mainUIScript != null)
             {
@@ -248,7 +258,7 @@ public class NetworkManagerUI : MonoBehaviour
         }
         else
         {
-            Debug.Log("[NetworkManagerUI] No automatic reconnection - returning to main page");
+            // Debug.Log("[NetworkManagerUI] No automatic reconnection - returning to main page");
             // Notify MainUIScript to return to main page
             if (mainUIScript != null)
             {
@@ -264,7 +274,7 @@ public class NetworkManagerUI : MonoBehaviour
     /// </summary>
     private void OnClientConnected(ulong clientId)
     {
-        Debug.Log($"[NetworkManagerUI] Client connected: {clientId}");
+        // Debug.Log($"[NetworkManagerUI] Client connected: {clientId}");
         
         // Mark as in game
         isInGame = true;
@@ -278,7 +288,7 @@ public class NetworkManagerUI : MonoBehaviour
     /// </summary>
     private void OnClientDisconnected(ulong clientId)
     {
-        Debug.LogWarning($"[NetworkManagerUI] Client disconnected: {clientId}");
+        // Debug.LogWarning($"[NetworkManagerUI] Client disconnected: {clientId}");
         OnDisconnectDetected("Network disconnect event");
     }
 
@@ -287,7 +297,7 @@ public class NetworkManagerUI : MonoBehaviour
     /// </summary>
     private void OnServerStarted()
     {
-        Debug.Log("[NetworkManagerUI] Server started");
+        // Debug.Log("[NetworkManagerUI] Server started");
         
         // CRITICAL FIX: Host should NOT start disconnect detection
         // Host doesn't need to send heartbeats or detect disconnections
@@ -320,12 +330,12 @@ public class NetworkManagerUI : MonoBehaviour
     /// </summary>
     private IEnumerator AutoInitializeUnityServicesOnStartup()
     {
-        Debug.Log("[NetworkManagerUI] Auto-initializing Unity Services on startup...");
+        // Debug.Log("[NetworkManagerUI] Auto-initializing Unity Services on startup...");
         
         // Check if Unity Services is already initialized
         if (IsUnityServicesInitialized())
         {
-            Debug.Log("[NetworkManagerUI] Unity Services already initialized - skipping");
+            // Debug.Log("[NetworkManagerUI] Unity Services already initialized - skipping");
             yield break;
         }
         
@@ -346,11 +356,11 @@ public class NetworkManagerUI : MonoBehaviour
         
         if (initializationSuccess)
         {
-            Debug.Log("[NetworkManagerUI] Unity Services auto-initialized successfully");
+            // Debug.Log("[NetworkManagerUI] Unity Services auto-initialized successfully");
         }
         else
         {
-            Debug.LogWarning("[NetworkManagerUI] Unity Services auto-initialization failed");
+            // Debug.LogWarning("[NetworkManagerUI] Unity Services auto-initialization failed");
         }
     }
     
@@ -360,7 +370,7 @@ public class NetworkManagerUI : MonoBehaviour
     private IEnumerator InitializeUnityServicesCoroutine(System.Action<bool> callback)
     {
         // Initialize Unity Services
-        Debug.Log("[NetworkManagerUI] Initializing Unity Services...");
+        // Debug.Log("[NetworkManagerUI] Initializing Unity Services...");
         var initialOptions = new InitializationOptions();
         
         #if UNITY_EDITOR
@@ -368,7 +378,7 @@ public class NetworkManagerUI : MonoBehaviour
         {
             string parrelArgument = ClonesManager.GetArgument();
             initialOptions.SetProfile(parrelArgument);
-            Debug.Log("ParrelSync argument: " + parrelArgument);
+            // Debug.Log("ParrelSync argument: " + parrelArgument);
         }
         #endif
         
@@ -385,7 +395,7 @@ public class NetworkManagerUI : MonoBehaviour
             yield break;
         }
         
-        Debug.Log("[NetworkManagerUI] Unity Services initialized successfully");
+        // Debug.Log("[NetworkManagerUI] Unity Services initialized successfully");
         
         // Sign in anonymously
         Debug.Log("[NetworkManagerUI] Signing in anonymously...");
@@ -402,7 +412,7 @@ public class NetworkManagerUI : MonoBehaviour
             yield break;
         }
         
-        Debug.Log("[NetworkManagerUI] Anonymous sign-in completed");
+        // Debug.Log("[NetworkManagerUI] Anonymous sign-in completed");
         callback?.Invoke(true);
     }
     
@@ -420,23 +430,23 @@ public class NetworkManagerUI : MonoBehaviour
         // Add a small delay to ensure everything is properly initialized
         yield return new WaitForSeconds(1f);
         
-        Debug.Log("[NetworkManagerUI] Unity Services ready, checking for saved games...");
+        // Debug.Log("[NetworkManagerUI] Unity Services ready, checking for saved games...");
         
         // Check if we have a saved join code
         if (string.IsNullOrEmpty(lastGameJoined))
         {
-            Debug.Log("[NetworkManagerUI] No saved game found - ready for manual connection");
+            // Debug.Log("[NetworkManagerUI] No saved game found - ready for manual connection");
             yield break;
         }
         
         // CRITICAL: Don't auto-reconnect if we're already connected to a game
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient)
         {
-            Debug.Log("[NetworkManagerUI] Already connected to a game - skipping auto-reconnection");
+            // Debug.Log("[NetworkManagerUI] Already connected to a game - skipping auto-reconnection");
             yield break;
         }
         
-        Debug.Log($"[NetworkManagerUI] Found saved game: {lastGameJoined} - attempting reconnection...");
+        // Debug.Log($"[NetworkManagerUI] Found saved game: {lastGameJoined} - attempting reconnection...");
         
         // Show connecting UI to user - use the saved player count
         int lastPlayerCount = PlayerPrefs.GetInt(LAST_PLAYER_COUNT_KEY, 2);
@@ -462,14 +472,14 @@ public class NetworkManagerUI : MonoBehaviour
         
         if (reconnectionSuccess)
         {
-            Debug.Log("[NetworkManagerUI] Auto-reconnection successful! Connected to lobby only (step-by-step testing)");
+            // Debug.Log("[NetworkManagerUI] Auto-reconnection successful! Connected to lobby only (step-by-step testing)");
             
             // STOP HERE - Don't close waiting screen or request game state sync
             // The UI will show the lobby code instead of "Reconnecting..."
         }
         else
         {
-            Debug.LogWarning("[NetworkManagerUI] Auto-reconnection failed - returning to main menu");
+            // Debug.LogWarning("[NetworkManagerUI] Auto-reconnection failed - returning to main menu");
             ClearSavedGameInfo();
             
             // Return to main page
@@ -497,7 +507,7 @@ public class NetworkManagerUI : MonoBehaviour
         // CRITICAL: Don't auto-reconnect if we're already connected to a game
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient)
         {
-            Debug.Log("[NetworkManagerUI] Already connected to a game - skipping auto-reconnection");
+            // Debug.Log("[NetworkManagerUI] Already connected to a game - skipping auto-reconnection");
             yield break;
         }
         
@@ -530,7 +540,7 @@ public class NetworkManagerUI : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("[NetworkManagerUI] Auto-reconnection failed - returning to main menu");
+            // Debug.LogWarning("[NetworkManagerUI] Auto-reconnection failed - returning to main menu");
             ClearSavedGameInfo();
             
             // Return to main page
@@ -558,7 +568,7 @@ public class NetworkManagerUI : MonoBehaviour
         {
             string parrelArgument = ClonesManager.GetArgument();
             initialOptions.SetProfile(parrelArgument);
-            Debug.Log("ParrelSync argument: " + parrelArgument);
+            // Debug.Log("ParrelSync argument: " + parrelArgument);
         }
         #endif
         
@@ -575,7 +585,7 @@ public class NetworkManagerUI : MonoBehaviour
             yield break;
         }
         
-        Debug.Log("[NetworkManagerUI] Unity Services initialized successfully");
+        // Debug.Log("[NetworkManagerUI] Unity Services initialized successfully");
         
         // Step 2: Sign in anonymously
         Debug.Log("[NetworkManagerUI] Signing in anonymously...");
@@ -592,7 +602,7 @@ public class NetworkManagerUI : MonoBehaviour
             yield break;
         }
         
-        Debug.Log("[NetworkManagerUI] Anonymous sign-in completed");
+        // Debug.Log("[NetworkManagerUI] Anonymous sign-in completed");
         
         // Step 3: Check if the saved game is still active and attempt reconnection
         Debug.Log($"[NetworkManagerUI] Checking if saved game {lastGameJoined} is still active...");
@@ -626,7 +636,7 @@ public class NetworkManagerUI : MonoBehaviour
         PlayerPrefs.SetString(LAST_GAME_TIMESTAMP_KEY, DateTime.UtcNow.ToString("O"));
         PlayerPrefs.Save();
         
-        Debug.Log($"[NetworkManagerUI] Saved game join code: {joinCode} for {playerCount} players");
+        // Debug.Log($"[NetworkManagerUI] Saved game join code: {joinCode} for {playerCount} players");
     }
 
     /// <summary>
@@ -640,7 +650,7 @@ public class NetworkManagerUI : MonoBehaviour
         
         if (!string.IsNullOrEmpty(lastGameJoined))
         {
-            Debug.Log($"[NetworkManagerUI] Loaded last game: {lastGameJoined} ({lastPlayerCount} players) from {lastTimestamp}");
+            // Debug.Log($"[NetworkManagerUI] Loaded last game: {lastGameJoined} ({lastPlayerCount} players) from {lastTimestamp}");
         }
     }
 
@@ -655,7 +665,7 @@ public class NetworkManagerUI : MonoBehaviour
         PlayerPrefs.DeleteKey(LAST_GAME_TIMESTAMP_KEY);
         PlayerPrefs.Save();
         
-        Debug.Log("[NetworkManagerUI] Cleared saved game info");
+        // Debug.Log("[NetworkManagerUI] Cleared saved game info");
     }
 
     // === AUTOMATIC RECONNECTION ===
@@ -665,7 +675,7 @@ public class NetworkManagerUI : MonoBehaviour
     /// </summary>
     private IEnumerator AttemptReconnection()
     {
-        Debug.Log($"[NetworkManagerUI] Starting reconnection attempt to: {lastGameJoined}");
+        // Debug.Log($"[NetworkManagerUI] Starting reconnection attempt to: {lastGameJoined}");
         
         // Wait a moment before attempting reconnection
         yield return new WaitForSeconds(2f);
@@ -689,12 +699,12 @@ public class NetworkManagerUI : MonoBehaviour
         
         if (reconnectionResult)
         {
-            Debug.Log("[NetworkManagerUI] Reconnection successful!");
+            // Debug.Log("[NetworkManagerUI] Reconnection successful!");
             // The game will continue from where it left off
         }
         else
         {
-            Debug.LogWarning("[NetworkManagerUI] Reconnection failed - returning to main page");
+            // Debug.LogWarning("[NetworkManagerUI] Reconnection failed - returning to main page");
             ClearSavedGameInfo();
             
             // Notify MainUIScript to return to main page
@@ -727,35 +737,109 @@ public class NetworkManagerUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Attempts to reconnect to lobby only (step-by-step testing)
+    /// Attempts to reconnect to lobby and relay using stored relay join code
     /// </summary>
     private async Task<bool> AttemptReconnectionToGame(string lobbyJoinCode)
     {
+        // Initialize debug chain
+        reconnectionDebugChain.Clear();
+        AddDebugStep($"Starting reconnection attempt for lobby code: {lobbyJoinCode}");
+        
+        // Add ParrelSync debugging information
+        AddParrelSyncDebugInfo();
+        
         try
         {
-            Debug.Log($"[NetworkManagerUI] STEP-BY-STEP RECONNECTION: Attempting to reconnect to lobby only: {lobbyJoinCode}");
+            AddDebugStep("FULL RECONNECTION: Attempting to reconnect to lobby and relay");
             
             // Step 1: Join lobby using saved lobby join code
-            Debug.Log($"[NetworkManagerUI] Step 1: Joining lobby with code: {lobbyJoinCode}");
+            AddDebugStep($"Step 1: Joining lobby with code: {lobbyJoinCode}");
             currentLobby = await Lobbies.Instance.JoinLobbyByCodeAsync(lobbyJoinCode);
-            Debug.Log($"[NetworkManagerUI] SUCCESS: Successfully rejoined lobby: {currentLobby.Name}");
-            Debug.Log($"[NetworkManagerUI] Lobby ID: {currentLobby.Id}");
-            Debug.Log($"[NetworkManagerUI] Lobby Code: {currentLobby.LobbyCode}");
-            Debug.Log($"[NetworkManagerUI] Players in lobby: {currentLobby.Players.Count}");
+            AddDebugStep($"SUCCESS: Successfully rejoined lobby: {currentLobby.Name}");
+            AddDebugStep($"Lobby ID: {currentLobby.Id}");
+            AddDebugStep($"Lobby Code: {currentLobby.LobbyCode}");
+            AddDebugStep($"Players in lobby: {currentLobby.Players.Count} (currently occupied slots)");
+            AddDebugStep($"Max players in lobby: {currentLobby.MaxPlayers} (total available slots)");
+            AddDebugStep($"Available slots: {currentLobby.AvailableSlots} (empty slots)");
             
-            // Update UI to show lobby code instead of "Reconnecting..."
+            // Update UI to show lobby code
             if (mainUIScript != null)
             {
                 mainUIScript.OpenWaitingScreenUI("yellow", "2", currentLobby.LobbyCode);
             }
             
-            // STOP HERE - Don't attempt relay connection or game state sync
-            Debug.Log($"[NetworkManagerUI] LOBBY RECONNECTION SUCCESS: Connected to lobby, stopping here for testing");
-            return true;
+            // Step 2: Wait for lobby connection to stabilize
+            AddDebugStep("Step 2: Waiting for lobby connection to stabilize...");
+            await Task.Delay(2000); // 2 second delay
+            AddDebugStep("Lobby connection stabilized");
+            
+            // Step 3: Get relay join code from lobby metadata
+            if (currentLobby.Data != null && currentLobby.Data.ContainsKey("RelayJoinCode"))
+            {
+                string relayJoinCode = currentLobby.Data["RelayJoinCode"].Value;
+                AddDebugStep($"Step 3: Retrieved relay join code from lobby: {relayJoinCode}");
+                AddDebugStep($"Lobby metadata keys: {string.Join(", ", currentLobby.Data.Keys)}");
+                string hostAllocationId = currentLobby.Data.ContainsKey("HostAllocationId") ? currentLobby.Data["HostAllocationId"].Value : "NOT FOUND";
+                AddDebugStep($"Host allocation ID: {hostAllocationId}");
+                
+                // Wait a bit more before relay connection
+                AddDebugStep("Preparing for relay connection...");
+                await Task.Delay(1000); // 1 second delay
+                
+                // Step 4: Connect to relay using stored relay join code (get fresh connection token)
+                AddDebugStep($"Step 4: Getting fresh connection token for relay with code: {relayJoinCode}");
+                AddDebugStep($"Relay join code length: {relayJoinCode?.Length ?? 0}");
+                AddDebugStep($"Relay join code characters: {relayJoinCode?.ToCharArray().Select(c => (int)c).ToArray() ?? new int[0]}");
+                
+                // CRITICAL: Attempt to join relay allocation (this will fail if no slots available)
+                AddDebugStep("Step 4.1: Attempting to join relay allocation...");
+                var joinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode: relayJoinCode);
+                AddDebugStep("Fresh connection token obtained successfully");
+                
+                // Step 4.5: Set the fresh relay server data with new connection token
+                AddDebugStep("Step 4.5: Setting fresh relay server data");
+                NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(joinAllocation, "wss"));
+                AddDebugStep("Fresh relay server data set successfully");
+                
+                // Wait for transport to be ready
+                AddDebugStep("Waiting for transport to be ready...");
+                await Task.Delay(1000); // 1 second delay
+                
+                // Step 5: Start client connection
+                AddDebugStep("Step 5: Starting NetworkManager client...");
+                bool success = NetworkManager.Singleton.StartClient();
+                
+                if (success)
+                {
+                    AddDebugStep("RELAY RECONNECTION SUCCESS: Connected to both lobby and relay");
+                    PrintDebugChain("SUCCESS");
+                    // Stop client relay keep-alive since we're now properly connected
+                    StopClientRelayKeepAlive();
+                    return true;
+                }
+                else
+                {
+                    AddDebugStep("Failed to start NetworkManager client");
+                    PrintDebugChain("FAILED - NetworkManager.StartClient() returned false");
+                    // DON'T disconnect - keep in lobby for debugging
+                    return false;
+                }
+            }
+            else
+            {
+                AddDebugStep("ERROR: Lobby doesn't contain RelayJoinCode in metadata!");
+                PrintDebugChain("FAILED - No RelayJoinCode in lobby metadata");
+                // DON'T disconnect - keep in lobby for debugging
+                return false;
+            }
         }
         catch (Exception e)
         {
-            Debug.LogError($"[NetworkManagerUI] LOBBY RECONNECTION FAILED: {e.Message}");
+            AddDebugStep($"EXCEPTION: RELAY RECONNECTION FAILED: {e.Message}");
+            AddDebugStep($"Exception Type: {e.GetType().Name}");
+            AddDebugStep($"Stack Trace: {e.StackTrace}");
+            PrintDebugChain($"FAILED - Exception: {e.Message}");
+            // DON'T disconnect - keep in lobby for debugging
             return false;
         }
     }
@@ -829,6 +913,17 @@ public class NetworkManagerUI : MonoBehaviour
     public string GetLastGameJoinCode()
     {
         return lastGameJoined;
+    }
+
+    /// <summary>
+    /// Context menu method to manually clear saved game info (for testing/debugging)
+    /// </summary>
+    [ContextMenu("Clear Saved Game Info")]
+    public void ClearSavedGameInfoContextMenu()
+    {
+        Debug.Log("[NetworkManagerUI] Context Menu: Clearing saved game info...");
+        ClearSavedGameInfo();
+        Debug.Log("[NetworkManagerUI] Context Menu: Saved game info cleared successfully");
     }
 
     // === ORIGINAL METHODS (UPDATED) ===
@@ -934,14 +1029,22 @@ public class NetworkManagerUI : MonoBehaviour
         
         Server.Singleton.SetPlayerCount(playerCount);
         
-        // CRITICAL: Start relay keep-alive system to maintain connections
-        if (Server.Singleton != null)
+        bool hostStarted = NetworkManager.Singleton.StartHost();
+        if (hostStarted)
         {
-            Server.Singleton.StartRelayKeepAlive(allocation.AllocationId.ToString());
-            Debug.Log($"[NetworkManagerUI] Started relay keep-alive system for allocation: {allocation.AllocationId}");
+            Debug.Log($"[NetworkManagerUI] Host started successfully with relay join code: {joinCodeVar}");
+            
+            // CRITICAL: Start relay keep-alive system AFTER host is started
+            // Use a coroutine to ensure Server singleton is fully initialized
+            StartCoroutine(StartRelayKeepAliveAfterHostStart(allocation.AllocationId.ToString()));
+            
+            return joinCodeVar;
         }
-        
-        return NetworkManager.Singleton.StartHost() ? joinCodeVar : null;
+        else
+        {
+            Debug.LogError($"[NetworkManagerUI] CRITICAL ERROR: Failed to start host! Relay keep-alive may not work properly.");
+            return null;
+        }
     }
 
     public async Task<bool> StartClientWithRelay()
@@ -974,9 +1077,13 @@ public class NetworkManagerUI : MonoBehaviour
                 string relayJoinCode = currentLobby.Data["RelayJoinCode"].Value;
                 Debug.Log($"[NetworkManagerUI] Step 2: Retrieved relay join code from lobby: {relayJoinCode}");
                 
-                // Step 3: Connect to relay using the stored relay join code
-                Debug.Log($"[NetworkManagerUI] Step 3: Connecting to relay with code: {relayJoinCode}");
+                // Step 3: Connect to relay using the stored relay join code (get fresh connection token)
+                Debug.Log($"[NetworkManagerUI] Step 3: Getting fresh connection token for relay with code: {relayJoinCode}");
                 var joinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode: relayJoinCode);
+                Debug.Log($"[NetworkManagerUI] Fresh connection token obtained successfully");
+                
+                // Set the fresh relay server data with new connection token
+                Debug.Log($"[NetworkManagerUI] Setting fresh relay server data");
                 NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(joinAllocation, "wss"));
                 
                 // Step 4: Save LOBBY join code for reconnection (not relay code)
@@ -1023,7 +1130,11 @@ public class NetworkManagerUI : MonoBehaviour
                             Debug.Log($"[NetworkManagerUI] FALLBACK: Found lobby with matching relay code: {lobby.Name}");
                             currentLobby = await Lobbies.Instance.JoinLobbyByIdAsync(lobby.Id);
                             
+                            Debug.Log($"[NetworkManagerUI] FALLBACK: Getting fresh connection token for relay with code: {inputJoinCode}");
                             var joinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode: inputJoinCode);
+                            Debug.Log($"[NetworkManagerUI] FALLBACK: Fresh connection token obtained successfully");
+                            
+                            Debug.Log($"[NetworkManagerUI] FALLBACK: Setting fresh relay server data");
                             NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(joinAllocation, "wss"));
                             
                             SaveGameJoinCode(lobby.LobbyCode, lobby.MaxPlayers);
@@ -1118,8 +1229,13 @@ public class NetworkManagerUI : MonoBehaviour
             string relayJoinCode = lobby.Data["RelayJoinCode"].Value;
             Debug.Log($"[NetworkManagerUI] QUICKPLAY: Retrieved relay join code: {relayJoinCode}");
             
-            // Connect to relay using stored relay join code
+            // Connect to relay using stored relay join code (get fresh connection token)
+            Debug.Log($"[NetworkManagerUI] QUICKPLAY: Getting fresh connection token for relay with code: {relayJoinCode}");
             var joinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode: relayJoinCode);
+            Debug.Log($"[NetworkManagerUI] QUICKPLAY: Fresh connection token obtained successfully");
+            
+            // Set the fresh relay server data with new connection token
+            Debug.Log($"[NetworkManagerUI] QUICKPLAY: Setting fresh relay server data");
             NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(joinAllocation, "wss"));
 
             // CRITICAL: Save LOBBY code for reconnection (not relay code)
@@ -1168,11 +1284,24 @@ public class NetworkManagerUI : MonoBehaviour
                 Debug.Log("[NetworkManagerUI] Player kept in lobby for reconnection");
             }
             
-            // STEP 2: Shutdown NetworkManager if it's running
+            // STEP 2: CRITICAL FIX - Keep relay allocation alive by NOT shutting down NetworkManager
             if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
             {
-                Debug.Log("[NetworkManagerUI] Shutting down NetworkManager");
-                NetworkManager.Singleton.Shutdown();
+                Debug.Log("[NetworkManagerUI] Keeping NetworkManager alive to maintain relay allocation for reconnection");
+                
+                if (NetworkManager.Singleton.IsHost)
+                {
+                    Debug.Log("[NetworkManagerUI] Host keeping relay allocation alive");
+                }
+                else if (NetworkManager.Singleton.IsClient)
+                {
+                    Debug.Log("[NetworkManagerUI] Client keeping relay allocation alive - NOT shutting down NetworkManager");
+                    // CRITICAL: Do NOT shutdown NetworkManager for clients - this deallocates their relay slot
+                    // The client will stay connected to the relay but disconnected from the game
+                    
+                    // NOTE: Client-side keep-alive removed - server handles keep-alive for disconnected clients
+                    Debug.Log("[NetworkManagerUI] Client disconnected - server will maintain relay allocation");
+                }
             }
             
             // STEP 3: KEEP Unity Services connected (don't sign out)
@@ -1205,4 +1334,204 @@ public class NetworkManagerUI : MonoBehaviour
             }
         }
     }
+
+    // === CLIENT RELAY KEEP-ALIVE SYSTEM ===
+    
+    /// <summary>
+    /// Starts client-side relay keep-alive to prevent allocation deallocation
+    /// </summary>
+    private void StartClientRelayKeepAlive()
+    {
+        if (isClientRelayKeepAliveActive) return;
+        
+        isClientRelayKeepAliveActive = true;
+        clientRelayKeepAliveCoroutine = StartCoroutine(ClientRelayKeepAliveCoroutine());
+        Debug.Log("[NetworkManagerUI] Started client relay keep-alive to prevent allocation deallocation");
+    }
+    
+    /// <summary>
+    /// Stops client-side relay keep-alive
+    /// </summary>
+    private void StopClientRelayKeepAlive()
+    {
+        if (!isClientRelayKeepAliveActive) return;
+        
+        isClientRelayKeepAliveActive = false;
+        
+        if (clientRelayKeepAliveCoroutine != null)
+        {
+            StopCoroutine(clientRelayKeepAliveCoroutine);
+            clientRelayKeepAliveCoroutine = null;
+        }
+        
+        Debug.Log("[NetworkManagerUI] Stopped client relay keep-alive");
+    }
+    
+    /// <summary>
+    /// Coroutine that sends PING messages every 5 seconds to keep relay allocation alive
+    /// </summary>
+    private IEnumerator ClientRelayKeepAliveCoroutine()
+    {
+        Debug.Log("[NetworkManagerUI] Client relay keep-alive coroutine started");
+        
+        while (isClientRelayKeepAliveActive)
+        {
+            yield return new WaitForSeconds(5f); // Send PING every 5 seconds
+            
+            if (isClientRelayKeepAliveActive && NetworkManager.Singleton != null && NetworkManager.Singleton.IsClient)
+            {
+                // Send a minimal RPC to keep the relay connection alive
+                var networkRelay = FindObjectOfType<NetworkRelay>();
+                if (networkRelay != null)
+                {
+                    networkRelay.SendHeartbeatServerRPC();
+                    Debug.Log($"[NetworkManagerUI] Sent client relay keep-alive PING at {DateTime.UtcNow:HH:mm:ss}");
+                }
+            }
+        }
+        
+        Debug.Log("[NetworkManagerUI] Client relay keep-alive coroutine stopped");
+    }
+
+    // === RELAY KEEP-ALIVE DELAYED START ===
+    
+    /// <summary>
+    /// Starts relay keep-alive after host is fully initialized
+    /// </summary>
+    private IEnumerator StartRelayKeepAliveAfterHostStart(string hostAllocationId)
+    {
+        // Wait for Server singleton to be fully initialized
+        yield return new WaitForSeconds(1f);
+        
+        // Try multiple times to ensure Server singleton is ready
+        int attempts = 0;
+        while (Server.Singleton == null && attempts < 10)
+        {
+            Debug.LogWarning($"[NetworkManagerUI] Waiting for Server.Singleton to initialize... attempt {attempts + 1}");
+            yield return new WaitForSeconds(0.5f);
+            attempts++;
+        }
+        
+        if (Server.Singleton != null)
+        {
+            Server.Singleton.StartRelayKeepAlive(hostAllocationId);
+            Debug.Log($"[NetworkManagerUI] Successfully started relay keep-alive system for allocation: {hostAllocationId}");
+        }
+        else
+        {
+            Debug.LogError($"[NetworkManagerUI] CRITICAL ERROR: Server.Singleton is still NULL after 10 attempts! Cannot start relay keep-alive for allocation: {hostAllocationId}");
+        }
+    }
+
+    // === DEBUG CHAIN SYSTEM ===
+    
+    /// <summary>
+    /// Adds a step to the reconnection debug chain
+    /// </summary>
+    private void AddDebugStep(string step)
+    {
+        string timestamp = DateTime.UtcNow.ToString("HH:mm:ss.fff");
+        string debugStep = $"[{timestamp}] {step}";
+        reconnectionDebugChain.Add(debugStep);
+        Debug.LogWarning($"[RECONNECTION DEBUG] {debugStep}");
+    }
+    
+    /// <summary>
+    /// Adds ParrelSync-specific debugging information
+    /// </summary>
+    private void AddParrelSyncDebugInfo()
+    {
+        #if UNITY_EDITOR
+        bool isClone = ClonesManager.IsClone();
+        AddDebugStep($"ParrelSync - Is Clone: {isClone}");
+        
+        if (isClone)
+        {
+            string argument = ClonesManager.GetArgument();
+            AddDebugStep($"ParrelSync - Clone Argument: {argument}");
+        }
+        
+        AddDebugStep($"ParrelSync - Project Path: {Application.dataPath}");
+        AddDebugStep($"ParrelSync - Persistent Data Path: {Application.persistentDataPath}");
+        #else
+        AddDebugStep("ParrelSync - Not in Editor (Build)");
+        #endif
+        
+        // PlayerPrefs debugging
+        string uniqueId = GetUniquePlayerId();
+        AddDebugStep($"PlayerPrefs - Unique ID: {uniqueId}");
+        AddDebugStep($"PlayerPrefs - Last Join Code Key: {LAST_JOIN_CODE_KEY}");
+        AddDebugStep($"PlayerPrefs - Last Player Count Key: {LAST_PLAYER_COUNT_KEY}");
+        AddDebugStep($"PlayerPrefs - Last Game Timestamp Key: {LAST_GAME_TIMESTAMP_KEY}");
+        
+        // Authentication debugging
+        try
+        {
+            string playerId = AuthenticationService.Instance.PlayerId;
+            AddDebugStep($"Authentication - Player ID: {playerId}");
+            AddDebugStep($"Authentication - Is Signed In: {AuthenticationService.Instance.IsSignedIn}");
+        }
+        catch (Exception e)
+        {
+            AddDebugStep($"Authentication - Error: {e.Message}");
+        }
+        
+        // Unity Services debugging
+        try
+        {
+            AddDebugStep($"Unity Services - Is Initialized: {IsUnityServicesInitialized()}");
+        }
+        catch (Exception e)
+        {
+            AddDebugStep($"Unity Services - Error: {e.Message}");
+        }
+        
+        // NetworkManager debugging
+        try
+        {
+            if (NetworkManager.Singleton != null)
+            {
+                AddDebugStep($"NetworkManager - Is Connected Client: {NetworkManager.Singleton.IsConnectedClient}");
+                AddDebugStep($"NetworkManager - Is Host: {NetworkManager.Singleton.IsHost}");
+                AddDebugStep($"NetworkManager - Is Server: {NetworkManager.Singleton.IsServer}");
+                AddDebugStep($"NetworkManager - Is Listening: {NetworkManager.Singleton.IsListening}");
+            }
+            else
+            {
+                AddDebugStep("NetworkManager - Singleton is NULL");
+            }
+        }
+        catch (Exception e)
+        {
+            AddDebugStep($"NetworkManager - Error: {e.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// Prints the complete debug chain in one log for easy copy-pasting
+    /// </summary>
+    private void PrintDebugChain(string result)
+    {
+        // Build the complete debug chain as one string
+        var debugChainText = new System.Text.StringBuilder();
+        debugChainText.AppendLine("Önemli");
+        debugChainText.AppendLine("=== RECONNECTION DEBUG CHAIN ===");
+        debugChainText.AppendLine($"RESULT: {result}");
+        debugChainText.AppendLine($"TOTAL STEPS: {reconnectionDebugChain.Count}");
+        debugChainText.AppendLine("STEPS:");
+        
+        for (int i = 0; i < reconnectionDebugChain.Count; i++)
+        {
+            debugChainText.AppendLine($"  {i + 1:D2}. {reconnectionDebugChain[i]}");
+        }
+        
+        debugChainText.AppendLine("=== END RECONNECTION DEBUG CHAIN ===");
+        
+        // Print as one log entry
+        Debug.LogError(debugChainText.ToString());
+        
+        // Clear the chain for next attempt
+        reconnectionDebugChain.Clear();
+    }
+
 }

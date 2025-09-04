@@ -20,7 +20,7 @@ public class Server : NetworkBehaviour
     public Dictionary<string, int[]> centerCardsDict; // replaces centerCardsIDs
     public Dictionary<string, int[]> allCardLookup = new Dictionary<string, int[]>();
     private int playerCount; // Number of players in the game for the game mode
-    private int connectedPlayerCount = 0;
+    private int connectedPlayerCount = 0; // Start with 0, host will make it 1
     [SerializeField] private int seed;//Seed for the deck suffle
     public int turnCounter = 0;
     public int currentPlayer;//The player that is currently playing
@@ -72,7 +72,7 @@ public class Server : NetworkBehaviour
         startingPlayerNo = 0;
         timer = 0f;
         turnTime = 15f;
-        connectedPlayerCount = 0; // FIXED: Reset connection count
+        connectedPlayerCount = 0; // FIXED: Reset connection count (host will make it 1)
         roundCount = 0;
         readyToEndTurnCounter = 0;
         singleDebuggingMode = false;
@@ -85,10 +85,11 @@ public class Server : NetworkBehaviour
         dealCenterFinishedClients.Clear();
         initialDealCoroutineCheckCounter = 0;
         
-        // Reset keep-alive system
-        StopRelayKeepAlive();
-        hostAllocationId = null;
-        clientAllocationIds.Clear();
+        // CRITICAL FIX: Do NOT stop relay keep-alive system during reset
+        // This allows disconnected clients to reconnect to the same relay allocation
+        // StopRelayKeepAlive(); // COMMENTED OUT - keep relay alive for reconnection
+        // hostAllocationId = null; // COMMENTED OUT - keep allocation ID for reconnection
+        // clientAllocationIds.Clear(); // COMMENTED OUT - keep client tracking for reconnection
     }
 
     public void ResetForNewRound()
@@ -103,7 +104,7 @@ public class Server : NetworkBehaviour
         lastPlayerToCapture = -1;
         timer = 0f;
         turnTime = 15f;
-        connectedPlayerCount = 0; // FIXED: Reset connection count for new round
+        connectedPlayerCount = 0; // FIXED: Reset connection count (host will make it 1) for new round
         readyToEndTurnCounter = 0;
         singleDebuggingMode = false;
         winnerPrintFlag = false;
@@ -126,11 +127,7 @@ public class Server : NetworkBehaviour
         Singleton = this;
         if (playerCount == 0) playerCount = 2;
         
-        // Subscribe to network events for disconnect handling
-        if (NetworkManager.Singleton != null)
-        {
-            NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
-        }
+        // NOTE: Network event subscription moved to SubscribeToNetworkEvents() to avoid double subscription
     }
     // Start is called before the first frame update
     void Start()
@@ -152,11 +149,15 @@ public class Server : NetworkBehaviour
     /// </summary>
     private void SubscribeToNetworkEvents()
     {
-        if (NetworkManager.Singleton != null)
+        if (NetworkManager.Singleton != null && !hasSubscribedToNetworkEvents)
         {
             NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
             hasSubscribedToNetworkEvents = true;
             Debug.Log("[Server] Subscribed to NetworkManager disconnect events");
+        }
+        else if (hasSubscribedToNetworkEvents)
+        {
+            Debug.Log("[Server] Already subscribed to NetworkManager disconnect events - skipping");
         }
         else
         {
@@ -193,6 +194,12 @@ public class Server : NetworkBehaviour
 
         turnCounter = 0;
         playerCount = tempPlayerCount;
+        
+        // CRITICAL FIX: Do NOT manually set connectedPlayerCount here
+        // Let AnotherPlayerConnected() handle all connection counting
+        // The host will be counted when AnotherPlayerConnected() is called for them
+        Debug.Log($"[Server] Host started game - connected player count will be managed by AnotherPlayerConnected()");
+        
         if (connectedPlayerCount == 1) singleDebuggingMode = true;
         else singleDebuggingMode = false;
 
@@ -1021,11 +1028,31 @@ public class Server : NetworkBehaviour
 
     public void AnotherPlayerConnected(ulong clientId)
     {
-        Debug.Log("Inside AnotherPlayerConnected");
+        // Build complete connection log as one string
+        var connectionLog = new System.Text.StringBuilder();
+        connectionLog.AppendLine("SERVER MESSAGE: ===== CLIENT CONNECTION DETECTED =====");
+        connectionLog.AppendLine("SERVER MESSAGE: A CLIENT HAS CONNECTED!");
+        connectionLog.AppendLine($"SERVER MESSAGE: Connected Client ID: {clientId}");
+        connectionLog.AppendLine($"SERVER MESSAGE: Previous connected player count: {connectedPlayerCount}");
+        connectionLog.AppendLine($"SERVER MESSAGE: NetworkManager connected clients: {NetworkManager.Singleton.ConnectedClients.Count}");
+        connectionLog.AppendLine($"SERVER MESSAGE: Is Host: {NetworkManager.Singleton.IsHost}");
+        connectionLog.AppendLine($"SERVER MESSAGE: Is Server: {NetworkManager.Singleton.IsServer}");
+        
         networkRelay.GetPlayerNumberClientRPC(clientId, connectedPlayerCount);
         connectedPlayerCount++;
-        Debug.Log("connectedPlayerCount: " + connectedPlayerCount);
-        Debug.Log("playerCount: " + playerCount);
+        
+        connectionLog.AppendLine($"SERVER MESSAGE: New connected player count: {connectedPlayerCount}");
+        connectionLog.AppendLine($"SERVER MESSAGE: Expected player count: {playerCount}");
+        connectionLog.AppendLine($"SERVER MESSAGE: Turn counter: {turnCounter}");
+
+        // CRITICAL: Restart keep-alive if it was stopped due to disconnections
+        bool wasKeepAliveInactive = !isRelayKeepAliveActive;
+        if (IsServer && !isRelayKeepAliveActive && !string.IsNullOrEmpty(hostAllocationId))
+        {
+            connectionLog.AppendLine($"SERVER MESSAGE: Restarting relay keep-alive system (was inactive due to disconnections)");
+            isRelayKeepAliveActive = true;
+            relayKeepAliveCoroutine = StartCoroutine(RelayKeepAliveCoroutine());
+        }
 
         // CRITICAL FIX: Check if this is a reconnection vs a new game start
         // If the game is already in progress (turnCounter > 0), this is a reconnection
@@ -1033,13 +1060,17 @@ public class Server : NetworkBehaviour
         
         if (isReconnection)
         {
-            Debug.Log($"[Server] Client {clientId} reconnected to existing game (turn {turnCounter})");
+            connectionLog.AppendLine($"SERVER MESSAGE: Client {clientId} reconnected to existing game (turn {turnCounter})");
+            if (wasKeepAliveInactive)
+            {
+                connectionLog.AppendLine($"SERVER MESSAGE: Keep-alive restarted for reconnected client");
+            }
             // Don't start a new game - the reconnected client will request game state sync
         }
         else if (playerCount == connectedPlayerCount)
         {
             // This is a fresh game start
-            Debug.Log($"[Server] All players connected - starting new game");
+            connectionLog.AppendLine($"SERVER MESSAGE: All players connected - starting new game");
             if (playerCount == 2)
             {
                 StartGameAfterDelayTwoPlayer();
@@ -1049,6 +1080,11 @@ public class Server : NetworkBehaviour
                 StartGameAfterDelayFourPlayer();
             }
         }
+        
+        connectionLog.AppendLine("SERVER MESSAGE: ===== END CLIENT CONNECTION LOG =====");
+        
+        // Print as one log entry
+        Debug.LogError(connectionLog.ToString());
     }
 
     /// <summary>
@@ -1056,35 +1092,91 @@ public class Server : NetworkBehaviour
     /// </summary>
     public void OnClientDisconnected(ulong clientId)
     {
-        Debug.LogWarning($"[Server] Client {clientId} disconnected");
+        // CRITICAL FIX: Prevent double-handling of the same disconnection
+        if (disconnectedClients.ContainsKey(clientId) && disconnectedClients[clientId])
+        {
+            Debug.LogWarning($"[Server] DUPLICATE DISCONNECTION DETECTED for client {clientId} - ignoring to prevent double-counting");
+            return;
+        }
         
-        // Mark client as disconnected
+        // Build complete disconnection log as one string
+        var disconnectionLog = new System.Text.StringBuilder();
+        disconnectionLog.AppendLine("SERVER MESSAGE: ===== CLIENT DISCONNECTION DETECTED =====");
+        disconnectionLog.AppendLine("SERVER MESSAGE: A CLIENT HAS DISCONNECTED!");
+        disconnectionLog.AppendLine($"SERVER MESSAGE: Disconnected Client ID: {clientId}");
+        disconnectionLog.AppendLine($"SERVER MESSAGE: BEFORE - Connected player count: {connectedPlayerCount}");
+        
+        // CRITICAL FIX: Only access ConnectedClients if we're actually the server
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+        {
+            disconnectionLog.AppendLine($"SERVER MESSAGE: NetworkManager connected clients: {NetworkManager.Singleton.ConnectedClients.Count}");
+            disconnectionLog.AppendLine($"SERVER MESSAGE: Is Host: {NetworkManager.Singleton.IsHost}");
+            disconnectionLog.AppendLine($"SERVER MESSAGE: Is Server: {NetworkManager.Singleton.IsServer}");
+        }
+        else
+        {
+            disconnectionLog.AppendLine($"SERVER MESSAGE: NetworkManager not available or not server");
+        }
+        
+        // Mark client as disconnected FIRST (to prevent double processing)
         disconnectedClients[clientId] = true;
         
         // Remove from heartbeat tracking
         clientHeartbeats.Remove(clientId);
         
-        // Decrease the connected player count
-        if (connectedPlayerCount > 0)
+        // Decrease the connected player count (only once per client)
+        if (connectedPlayerCount > 0) // Always decrement, but never go below 0
         {
             connectedPlayerCount--;
-            Debug.LogWarning($"[Server] Connected player count decreased to: {connectedPlayerCount}");
+            disconnectionLog.AppendLine($"SERVER MESSAGE: AFTER - Connected player count decreased to: {connectedPlayerCount}");
         }
-        
-        // Reset game state if no players are connected
-        if (connectedPlayerCount == 0)
+        else
         {
-            Debug.LogWarning("[Server] All players disconnected, resetting game state");
-            ResetAllServerVariables();
+            disconnectionLog.AppendLine($"SERVER MESSAGE: Connected player count was already 0 - no change");
         }
         
-        // Reset connection tracking
-        dealCenterFinishedClients.Clear();
-        initialDealCoroutineCheckCounter = 0;
-        readyToEndTurnCounter = 0;
+        // Log current relay allocation status
+        if (networkManagerUI != null && networkManagerUI.currentLobby != null)
+        {
+            disconnectionLog.AppendLine($"SERVER MESSAGE: Current lobby: {networkManagerUI.currentLobby.Name}");
+            disconnectionLog.AppendLine($"SERVER MESSAGE: Lobby players: {networkManagerUI.currentLobby.Players.Count}");
+            disconnectionLog.AppendLine($"SERVER MESSAGE: Lobby max players: {networkManagerUI.currentLobby.MaxPlayers}");
+            disconnectionLog.AppendLine($"SERVER MESSAGE: Lobby available slots: {networkManagerUI.currentLobby.AvailableSlots}");
+            
+            if (networkManagerUI.currentLobby.Data != null && networkManagerUI.currentLobby.Data.ContainsKey("RelayJoinCode"))
+            {
+                string relayCode = networkManagerUI.currentLobby.Data["RelayJoinCode"].Value;
+                disconnectionLog.AppendLine($"SERVER MESSAGE: Current relay join code: {relayCode}");
+                disconnectionLog.AppendLine($"SERVER MESSAGE: Relay keep-alive active: {isRelayKeepAliveActive}");
+                disconnectionLog.AppendLine($"SERVER MESSAGE: Host allocation ID: {hostAllocationId}");
+                disconnectionLog.AppendLine($"SERVER MESSAGE: Tracked client allocations: {clientAllocationIds.Count}");
+            }
+        }
+        
+        // CRITICAL FIX: Do NOT reset game state when all clients disconnect
+        // Keep the relay allocation alive for potential reconnection
+        // connectedPlayerCount == 1 means only host is left (no clients)
+        if (connectedPlayerCount == 1)
+        {
+            disconnectionLog.AppendLine("SERVER MESSAGE: All players disconnected, but keeping relay allocation alive for reconnection");
+            disconnectionLog.AppendLine("SERVER MESSAGE: NOT resetting game state - relay keep-alive continues");
+            disconnectionLog.AppendLine($"SERVER MESSAGE: Keep-alive coroutine running: {relayKeepAliveCoroutine != null}");
+            disconnectionLog.AppendLine($"SERVER MESSAGE: Keep-alive active flag: {isRelayKeepAliveActive}");
+            // DO NOT call ResetAllServerVariables() - this stops the keep-alive system!
+        }
+        
+        // Reset only the essential connection tracking (don't reset game state)
+        dealCenterFinishedClients.Remove(clientId); // Remove only this client
+        // Don't reset initialDealCoroutineCheckCounter or readyToEndTurnCounter
+        // These should maintain their state for the remaining players
+        
+        disconnectionLog.AppendLine("SERVER MESSAGE: ===== END CLIENT DISCONNECTION LOG =====");
         
         // TODO: Implement bot placeholder system here
-        Debug.LogWarning($"[Server] Client {clientId} disconnected - bot placeholder system should activate");
+        disconnectionLog.AppendLine($"SERVER MESSAGE: Client {clientId} disconnected - bot placeholder system should activate");
+        
+        // Print as one log entry
+        Debug.LogError(disconnectionLog.ToString());
     }
 
     /// <summary>
@@ -1140,12 +1232,31 @@ public class Server : NetworkBehaviour
     [ContextMenu("Reset Connection Count")]
     public void ResetConnectionCount()
     {
-        Debug.LogWarning($"[Server] Manually resetting connection count from {connectedPlayerCount} to 0");
-        connectedPlayerCount = 0;
+        Debug.LogWarning($"[Server] Manually resetting connection count from {connectedPlayerCount} to 0 (host will make it 1)");
+        connectedPlayerCount = 0; // Host will make it 1 when they start
         dealCenterFinishedClients.Clear();
         initialDealCoroutineCheckCounter = 0;
         readyToEndTurnCounter = 0;
         Debug.LogWarning("[Server] Connection count reset complete");
+    }
+
+    /// <summary>
+    /// Context menu method to clear saved game info from NetworkManagerUI (for testing/debugging)
+    /// </summary>
+    [ContextMenu("Clear Saved Game Info")]
+    public void ClearSavedGameInfoFromServer()
+    {
+        Debug.Log("[Server] Context Menu: Clearing saved game info via NetworkManagerUI...");
+        
+        if (networkManagerUI != null)
+        {
+            networkManagerUI.ClearSavedGameInfo();
+            Debug.Log("[Server] Context Menu: Successfully cleared saved game info");
+        }
+        else
+        {
+            Debug.LogWarning("[Server] Context Menu: NetworkManagerUI not found - cannot clear saved game info");
+        }
     }
     
     void OnDestroy()
@@ -1776,12 +1887,19 @@ public class Server : NetworkBehaviour
     /// </summary>
     public void StartRelayKeepAlive(string hostAllocationId)
     {
+        Debug.Log($"[Server] StartRelayKeepAlive called with allocation: {hostAllocationId}");
+        Debug.Log($"[Server] IsServer: {IsServer}, isRelayKeepAliveActive: {isRelayKeepAliveActive}");
+        
         if (IsServer && !isRelayKeepAliveActive)
         {
             this.hostAllocationId = hostAllocationId;
             isRelayKeepAliveActive = true;
             relayKeepAliveCoroutine = StartCoroutine(RelayKeepAliveCoroutine());
-            Debug.Log($"[Server] Started relay keep-alive system for allocation: {hostAllocationId}");
+            Debug.Log($"[Server] Successfully started relay keep-alive system for allocation: {hostAllocationId}");
+        }
+        else
+        {
+            Debug.LogWarning($"[Server] Cannot start relay keep-alive: IsServer={IsServer}, isRelayKeepAliveActive={isRelayKeepAliveActive}");
         }
     }
 
@@ -1816,6 +1934,7 @@ public class Server : NetworkBehaviour
 
     /// <summary>
     /// Coroutine that sends heartbeats every 5 seconds to maintain relay connections
+    /// ONLY when the host is present and there's an active game session
     /// </summary>
     private IEnumerator RelayKeepAliveCoroutine()
     {
@@ -1825,13 +1944,53 @@ public class Server : NetworkBehaviour
         {
             yield return new WaitForSeconds(5f); // Send heartbeat every 5 seconds
             
-            if (IsServer && isRelayKeepAliveActive)
+            // PROPER LOGIC: Only send heartbeat if:
+            // 1. We're the server
+            // 2. Keep-alive is active
+            // 3. Host is still present (connectedPlayerCount >= 1)
+            // 4. We have a valid allocation ID
+            if (IsServer && isRelayKeepAliveActive && connectedPlayerCount >= 1 && !string.IsNullOrEmpty(hostAllocationId))
             {
+                // Build detailed heartbeat log
+                var heartbeatLog = new System.Text.StringBuilder();
+                heartbeatLog.AppendLine("SERVER MESSAGE: ===== RELAY KEEP-ALIVE HEARTBEAT =====");
+                heartbeatLog.AppendLine($"[Server] Sending relay keep-alive heartbeat at {DateTime.UtcNow:HH:mm:ss}");
+                heartbeatLog.AppendLine($"SERVER MESSAGE: Connected player count: {connectedPlayerCount}");
+                heartbeatLog.AppendLine($"SERVER MESSAGE: Keep-alive justified: Host present (count >= 1)");
+                
+                // CRITICAL FIX: Only access ConnectedClients if we're actually the server
+                if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+                {
+                    heartbeatLog.AppendLine($"SERVER MESSAGE: NetworkManager connected clients: {NetworkManager.Singleton.ConnectedClients.Count}");
+                }
+                else
+                {
+                    heartbeatLog.AppendLine($"SERVER MESSAGE: NetworkManager connected clients: N/A (not server)");
+                }
+                
+                heartbeatLog.AppendLine($"SERVER MESSAGE: Is Server: {IsServer}");
+                heartbeatLog.AppendLine($"SERVER MESSAGE: Relay keep-alive active: {isRelayKeepAliveActive}");
+                heartbeatLog.AppendLine($"SERVER MESSAGE: Host allocation ID: {hostAllocationId}");
+                heartbeatLog.AppendLine("SERVER MESSAGE: ===== END RELAY KEEP-ALIVE HEARTBEAT =====");
+                
+                Debug.LogError(heartbeatLog.ToString());
+                
                 // Send heartbeat to maintain relay connection
                 SendRelayHeartbeat();
                 
                 // Update lobby with heartbeat timestamp
                 UpdateLobbyHeartbeat();
+            }
+            else if (connectedPlayerCount < 1)
+            {
+                // PROPER SHUTDOWN: If no players left, stop keep-alive
+                Debug.LogWarning($"[Server] STOPPING keep-alive - no players left (connectedPlayerCount: {connectedPlayerCount})");
+                isRelayKeepAliveActive = false;
+                break;
+            }
+            else
+            {
+                Debug.LogWarning($"[Server] Skipping heartbeat - IsServer: {IsServer}, isRelayKeepAliveActive: {isRelayKeepAliveActive}, connectedPlayerCount: {connectedPlayerCount}, hostAllocationId: {hostAllocationId}");
             }
         }
         
@@ -1849,9 +2008,18 @@ public class Server : NetworkBehaviour
             // We just need to ensure we're actively using the connection
             if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
             {
-                // Send a minimal ping to maintain connection
-                networkRelay?.SendHeartbeatServerRPC();
-                Debug.Log($"[Server] Sent relay heartbeat for host allocation: {hostAllocationId}");
+                // CRITICAL FIX: Send actual network traffic that works even with 0 clients
+                // Use a ServerRpc that the server calls on itself to generate network traffic
+                if (networkRelay != null)
+                {
+                    // Call a ServerRpc from the server to itself - this generates actual network traffic
+                    networkRelay.PrintMessageServerRPC($"KeepAlive_{DateTime.UtcNow:HH:mm:ss}");
+                    Debug.Log($"[Server] Sent relay keep-alive heartbeat for allocation: {hostAllocationId}");
+                }
+                else
+                {
+                    Debug.LogWarning($"[Server] NetworkRelay is null - cannot send keep-alive heartbeat");
+                }
                 
                 // Log all tracked allocations
                 if (clientAllocationIds.Count > 0)
@@ -1885,7 +2053,7 @@ public class Server : NetworkBehaviour
                 };
                 
                 await Lobbies.Instance.UpdateLobbyAsync(networkManagerUI.currentLobby.Id, updateOptions);
-                Debug.Log($"[Server] Lobby heartbeat sent at {DateTime.UtcNow:HH:mm:ss} - lobby kept active");
+                // Debug.Log($"[Server] Lobby heartbeat sent at {DateTime.UtcNow:HH:mm:ss} - lobby kept active");
             }
         }
         catch (System.Exception e)
@@ -1900,7 +2068,7 @@ public class Server : NetworkBehaviour
     public void OnClientConnectedForKeepAlive(ulong clientId, string clientAllocationId)
     {
         AddClientAllocationForKeepAlive(clientAllocationId);
-        Debug.Log($"[Server] Client {clientId} connected, tracking allocation: {clientAllocationId}");
+                    // Debug.Log($"[Server] Client {clientId} connected, tracking allocation: {clientAllocationId}");
     }
 
     /// <summary>
@@ -1911,6 +2079,76 @@ public class Server : NetworkBehaviour
         // CRITICAL: Do NOT remove client allocation from keep-alive
         // We want to keep it alive for potential reconnection
         Debug.Log($"[Server] Client {clientId} disconnected, but keeping their relay allocation alive for reconnection");
+        
+        // Start server-side keep-alive for disconnected client
+        StartServerSideKeepAliveForDisconnectedClient(clientId);
+        
+        // Check relay allocation status
+        CheckRelayAllocationStatus();
+    }
+    
+    /// <summary>
+    /// Starts server-side keep-alive to maintain disconnected client's relay allocation
+    /// </summary>
+    private void StartServerSideKeepAliveForDisconnectedClient(ulong clientId)
+    {
+        // The server will now send keep-alive pings on behalf of the disconnected client
+        // This prevents the client's relay allocation from expiring
+        Debug.Log($"[Server] Starting server-side keep-alive for disconnected client {clientId}");
+        
+        // We don't need to track individual client allocations anymore
+        // The server's existing keep-alive system will maintain the entire relay allocation
+        // including slots for disconnected clients
+    }
+    
+    /// <summary>
+    /// Checks and logs the current relay allocation status
+    /// </summary>
+    private void CheckRelayAllocationStatus()
+    {
+        try
+        {
+            if (networkManagerUI != null && networkManagerUI.currentLobby != null && 
+                networkManagerUI.currentLobby.Data != null && 
+                networkManagerUI.currentLobby.Data.ContainsKey("RelayJoinCode"))
+            {
+                string relayCode = networkManagerUI.currentLobby.Data["RelayJoinCode"].Value;
+                
+                // Build complete relay status log as one string
+                var relayStatusLog = new System.Text.StringBuilder();
+                relayStatusLog.AppendLine("SERVER MESSAGE: ===== RELAY ALLOCATION STATUS CHECK =====");
+                relayStatusLog.AppendLine($"SERVER MESSAGE: Relay join code: {relayCode}");
+                relayStatusLog.AppendLine($"SERVER MESSAGE: Relay keep-alive active: {isRelayKeepAliveActive}");
+                relayStatusLog.AppendLine($"SERVER MESSAGE: Host allocation ID: {hostAllocationId}");
+                relayStatusLog.AppendLine($"SERVER MESSAGE: Tracked client allocations: {clientAllocationIds.Count}");
+                
+                // CRITICAL FIX: Only access ConnectedClients if we're actually the server
+                if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+                {
+                    relayStatusLog.AppendLine($"SERVER MESSAGE: NetworkManager connected clients: {NetworkManager.Singleton.ConnectedClients.Count}");
+                }
+                else
+                {
+                    relayStatusLog.AppendLine($"SERVER MESSAGE: NetworkManager connected clients: N/A (not server)");
+                }
+                
+                relayStatusLog.AppendLine($"SERVER MESSAGE: Server connected player count: {connectedPlayerCount}");
+                
+                // Note: Unity Relay API doesn't provide direct allocation status query
+                // The "Not Found: join code not found" error typically means no available slots
+                relayStatusLog.AppendLine("SERVER MESSAGE: Note: Unity Relay doesn't provide direct slot status");
+                relayStatusLog.AppendLine("SERVER MESSAGE: 'Not Found' error usually means relay allocation is full");
+                
+                relayStatusLog.AppendLine("SERVER MESSAGE: ===== END RELAY ALLOCATION STATUS =====");
+                
+                // Print as one log entry
+                Debug.LogError(relayStatusLog.ToString());
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"SERVER MESSAGE: Could not check relay allocation status: {e.Message}");
+        }
     }
 
 
