@@ -1741,6 +1741,35 @@ public class DeckController : MonoBehaviour
     {
         playerCount = playerC;
         ElHolderScript.LocalInstance.SetHandMode(playerCount);
+        
+        // SIMPLE RECONNECTION: Initialize UI screens (like StartGame does)
+        Debug.Log($"[DeckController] GetPlayerCount called - initializing UI screens for reconnection");
+        
+        // Find and manage UI screens (same as InitialGameManagerSetUp and InitializeCardPrefabs do)
+        var waitingScreen = GameObject.Find("WaitingScreen");
+        if (waitingScreen != null && waitingScreen.activeSelf)
+        {
+            Debug.Log("[DeckController] ✓ Closing waiting screen for reconnection");
+            waitingScreen.SetActive(false);
+        }
+        
+        var winScreen = GameObject.Find("WinScreen");
+        if (winScreen != null && winScreen.activeSelf)
+        {
+            Debug.Log("[DeckController] ✓ Closing win screen for reconnection");
+            winScreen.SetActive(false);
+        }
+        
+        var mainScreen = GameObject.Find("MainScreen");
+        if (mainScreen != null && !mainScreen.activeSelf)
+        {
+            Debug.Log("[DeckController] ✓ Activating main screen for reconnection");
+            mainScreen.SetActive(true);
+        }
+        
+        Debug.Log($"[DeckController] UI screens initialized for player count: {playerC}");
+        
+        // Note: Desync detection now happens in GameManager.DeckReady() after card initialization
     }
 
     private void InitialDeckSetUp()

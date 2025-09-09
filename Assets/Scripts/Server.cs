@@ -47,6 +47,8 @@ public class Server : NetworkBehaviour
     private SerializableGameState manualSavedState;
     private bool hasManualSavedState = false;
     private int snapshotVersionCounter = 0;
+    
+    // Note: Reconnection now uses existing desync detection system
 
     // KEEP-ALIVE SYSTEM for relay connections
     private Coroutine relayKeepAliveCoroutine;
@@ -84,6 +86,8 @@ public class Server : NetworkBehaviour
         // Reset connection tracking
         dealCenterFinishedClients.Clear();
         initialDealCoroutineCheckCounter = 0;
+        
+        // Note: No longer tracking client sync state - using desync detection instead
         
         // CRITICAL FIX: Do NOT stop relay keep-alive system during reset
         // This allows disconnected clients to reconnect to the same relay allocation
@@ -236,7 +240,7 @@ public class Server : NetworkBehaviour
         if (networkRelay != null)
         {
             Invoke("CallUpdateCurrentPlayer", 1);
-            networkRelay.InitializeCardPrefabsClientRPC();
+            networkRelay.InitializeCardPrefabsClientRPC(false); // false = not reconnection
         }
     }
 
@@ -1065,7 +1069,28 @@ public class Server : NetworkBehaviour
             {
                 connectionLog.AppendLine($"SERVER MESSAGE: Keep-alive restarted for reconnected client");
             }
-            // Don't start a new game - the reconnected client will request game state sync
+            
+            // SIMPLE RECONNECTION: Initialize client scene like StartGame() does
+            connectionLog.AppendLine($"SERVER MESSAGE: Client {clientId} reconnected - initializing scene and letting desync detection handle sync");
+            Debug.Log($"[Server] ===== CLIENT {clientId} RECONNECTED - INITIALIZING SCENE =====");
+            Debug.Log($"[Server] Game state: turn {turnCounter}, players: {playerCount}, connected: {connectedPlayerCount}");
+            Debug.Log($"[Server] Calling GivePlayerCount() to initialize reconnected client scene (like StartGame does)");
+            
+            // Initialize the reconnected client's scene (same as StartGame does)
+            GivePlayerCount();
+            
+            // CRITICAL: Initialize card system for reconnected player BEFORE sync
+            Debug.Log($"[Server] Calling InitializeCardPrefabsClientRPC() to initialize card objects for reconnected client");
+            if (networkRelay != null)
+            {
+                networkRelay.InitializeCardPrefabsClientRPC(true); // true = isReconnection
+            }
+            else
+            {
+                Debug.LogError($"[Server] NetworkRelay is null - cannot initialize card prefabs for reconnected client");
+            }
+            
+            Debug.Log($"[Server] Reconnected client scene and cards initialized - desync detection will handle game state sync");
         }
         else if (playerCount == connectedPlayerCount)
         {
@@ -2150,6 +2175,10 @@ public class Server : NetworkBehaviour
             Debug.LogError($"SERVER MESSAGE: Could not check relay allocation status: {e.Message}");
         }
     }
+
+    // Note: Reconnection now uses existing desync detection system - no special methods needed
+    
+    // Note: Sync timeout checking removed - using desync detection system
 
 
 }

@@ -42,10 +42,10 @@ public class NetworkRelay : NetworkBehaviour
         }
     }
     [ClientRpc(RequireOwnership = false)]
-    public void InitializeCardPrefabsClientRPC()
+    public void InitializeCardPrefabsClientRPC(bool isReconnection = false)
     {
-        Debug.Log("InitializeCardPrefabsClientRPC called");
-        StartCoroutine(GameManager.LocalInstance.InitializeCardPrefabs());
+        Debug.Log($"InitializeCardPrefabsClientRPC called - isReconnection: {isReconnection}");
+        StartCoroutine(GameManager.LocalInstance.InitializeCardPrefabs(isReconnection));
     }
 
     [ClientRpc(RequireOwnership = false)]
@@ -638,6 +638,48 @@ public class NetworkRelay : NetworkBehaviour
         else
         {
             Debug.LogError("[NetworkRelay] Server.Singleton is null - cannot provide game state");
+        }
+    }
+
+    // Note: Reconnection now uses existing desync detection system
+
+    // Note: Client sync completion notification removed - using desync detection system
+
+    // ===== MOVE BUFFERING RPCs =====
+    
+    /// <summary>
+    /// Buffers a move during client synchronization
+    /// </summary>
+    [ClientRpc(RequireOwnership = false)]
+    public void BufferMoveForSyncingClientClientRPC(GameMove move, ulong targetClientId)
+    {
+        // Only buffer if this is the target client and we're in sync mode
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.LocalClientId == targetClientId)
+        {
+            Debug.Log($"[NetworkRelay] Buffering move for syncing client {targetClientId}: {move.moveType} by P{move.playerNumber}");
+            
+            if (GameManager.LocalInstance != null)
+            {
+                GameManager.LocalInstance.BufferMoveForSync(move);
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Applies all buffered moves after sync is complete
+    /// </summary>
+    [ClientRpc(RequireOwnership = false)]
+    public void ApplyBufferedMovesClientRPC(GameMove[] bufferedMoves, ulong targetClientId)
+    {
+        // Only apply if this is the target client
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.LocalClientId == targetClientId)
+        {
+            Debug.Log($"[NetworkRelay] Applying {bufferedMoves.Length} buffered moves for client {targetClientId}");
+            
+            if (GameManager.LocalInstance != null)
+            {
+                GameManager.LocalInstance.ApplyBufferedMoves(bufferedMoves);
+            }
         }
     }
 

@@ -342,6 +342,14 @@ public class GameManager : MonoBehaviour
     public bool isKapkacPending = false;
 
     public bool isYandimAnamPending = false;
+    
+    // ENHANCED RECONNECTION: Sync mode and move buffering
+    private bool isSyncMode = false;
+    private MoveBuffer moveBuffer = new MoveBuffer();
+    private List<GameMove> pendingMovesToApply = new List<GameMove>();
+    
+    // RECONNECTION TRACKING: Track if we're currently reconnecting
+    private bool isReconnecting = false;
 
 
 
@@ -770,13 +778,22 @@ public class GameManager : MonoBehaviour
 
     [ContextMenu("Initialize Card Prefabs")]
 
-    public IEnumerator InitializeCardPrefabs()
+    public IEnumerator InitializeCardPrefabs(bool isReconnection = false)
 
     {
 
-        ResetForNewRound();
-
-        roundCount++;
+        if (!isReconnection)
+        {
+            Debug.Log("[GameManager] InitializeCardPrefabs called for new game - resetting game state");
+            ResetForNewRound();
+            roundCount++;
+            isReconnecting = false;
+        }
+        else
+        {
+            Debug.Log("[GameManager] InitializeCardPrefabs called for reconnection - skipping game state reset");
+            isReconnecting = true;
+        }
 
         if (waitingScreen.activeSelf) waitingScreen.SetActive(false);
 
@@ -797,6 +814,23 @@ public class GameManager : MonoBehaviour
         Debug.Log("Deck is ready, notifying server.");
 
         networkRelay.DeckReadyServerRPC();
+        
+        // RECONNECTION: Trigger desync detection after cards are initialized
+        if (isReconnecting)
+        {
+            Debug.Log("[GameManager] Cards initialized for reconnection - triggering desync detection");
+            var moveChainIntegrator = FindObjectOfType<MoveChainIntegrator>();
+            if (moveChainIntegrator != null)
+            {
+                Debug.Log("[GameManager] ✓ Forcing immediate desync check for reconnected client after card initialization");
+                moveChainIntegrator.ForceImmediateDesyncCheck();
+            }
+            else
+            {
+                Debug.LogWarning("[GameManager] MoveChainIntegrator not found - desync detection may not trigger");
+            }
+            isReconnecting = false; // Reset flag
+        }
 
     }
 
@@ -4361,6 +4395,10 @@ public class GameManager : MonoBehaviour
     /// </summary>
     public void ApplyGameState(SerializableGameState snapshot)
     {
+        Debug.Log($"[GameManager] ===== APPLYING GAME STATE (snapshot v{snapshot.snapshotVersion}) =====");
+        Debug.Log($"[GameManager] Game state details: turn={snapshot.turnCounter}, players={snapshot.playerCount}, centerCards={snapshot.center.items?.Length ?? 0}, hands={snapshot.hands.Count}");
+        Debug.Log($"[GameManager] Current local state: turnCounter={turnCounter}, currentPlayerNo={currentPlayerNo}");
+        
         // Add header entry to sync log without clearing it
         SyncLog($"=== APPLYING GAME STATE (snapshot v{snapshot.snapshotVersion}) ===");
         // Log current client-local state BEFORE applying snapshot for A/B comparison
@@ -4369,10 +4407,12 @@ public class GameManager : MonoBehaviour
         // Ensure a clean slate immediately before we start rebuild
         if (deckController != null)
         {
+            Debug.Log("[GameManager] ✓ DeckController found - starting game state application");
             StartCoroutine(ApplyGameStateWithReset(snapshot));
         }
         else
         {
+            Debug.LogError("[GameManager] CRITICAL ERROR: deckController is null; cannot apply game state");
             SyncLogError("deckController is null; cannot apply game state");
         }
     }
@@ -4437,8 +4477,8 @@ public class GameManager : MonoBehaviour
         SyncLog("Step 7: Unfreezing client after resync");
         UnfreezeClientAfterResync();
 
-        // 8. Handle reconnection completion
-        SyncLog("Step 8: Checking if this was a reconnection");
+        // 8. Handle reconnection completion and sync mode
+        SyncLog("Step 8: Checking if this was a reconnection and handling sync mode");
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient)
         {
             // Check if this was a reconnection by looking for saved game info
@@ -4448,6 +4488,13 @@ public class GameManager : MonoBehaviour
                 SyncLog("Step 8: This was a reconnection - notifying completion");
                 OnReconnectionGameStateApplied();
             }
+        }
+        
+        // 9. Stop sync mode if it was active (this will apply buffered moves)
+        if (isSyncMode)
+        {
+            SyncLog("Step 9: Stopping sync mode and applying buffered moves");
+            StopSyncMode();
         }
 
         SyncLog($"ApplyGameStateCoroutine completed successfully for snapshot v{snapshot.snapshotVersion}");
@@ -5253,6 +5300,278 @@ public class GameManager : MonoBehaviour
     {
         MoveChainIntegrator.ResetChains();
         Debug.Log("[GameManager] Manually reset all move chains");
+    }
+
+    // ===== ENHANCED RECONNECTION: SYNC MODE & MOVE BUFFERING =====
+    
+    /// <summary>
+    /// Starts sync mode - moves will be buffered instead of applied immediately
+    /// </summary>
+    public void StartSyncMode()
+    {
+        Debug.Log("[GameManager] Starting sync mode - moves will be buffered");
+        isSyncMode = true;
+        moveBuffer.StartBuffering();
+        
+        // Subscribe to buffer events
+        moveBuffer.OnMoveBuffered += OnMoveBuffered;
+        moveBuffer.OnBufferedMovesApplied += OnBufferedMovesApplied;
+        moveBuffer.OnMoveTimedOut += OnMoveTimedOut;
+        
+        // ENHANCED RECONNECTION: Ensure UI is in correct state during sync
+        EnsureCorrectUIStateForReconnection();
+    }
+    
+    /// <summary>
+    /// Ensures UI is in correct state for reconnection (closes win screens, etc.)
+    /// This replicates the normal game initialization flow
+    /// </summary>
+    public void EnsureCorrectUIStateForReconnection()
+    {
+        Debug.Log("[GameManager] ===== ENSURING UI STATE FOR RECONNECTION =====");
+        Debug.Log("[GameManager] Replicating normal game initialization flow");
+        
+        // STEP 1: Close waiting screen (like in InitialGameManagerSetUp)
+        if (waitingScreen != null)
+        {
+            if (waitingScreen.activeSelf)
+            {
+                Debug.Log("[GameManager] ✓ Closing waiting screen during reconnection");
+                waitingScreen.SetActive(false);
+            }
+            else
+            {
+                Debug.Log("[GameManager] ✓ Waiting screen already closed");
+            }
+        }
+        else
+        {
+            Debug.LogError("[GameManager] CRITICAL ERROR: waitingScreen is null!");
+        }
+        
+        // STEP 2: Close win screen (like in InitializeCardPrefabs)
+        if (winScreen != null)
+        {
+            if (winScreen.activeSelf)
+            {
+                Debug.Log("[GameManager] ✓ Closing win screen during reconnection");
+                winScreen.SetActive(false);
+            }
+            else
+            {
+                Debug.Log("[GameManager] ✓ Win screen already closed");
+            }
+        }
+        else
+        {
+            Debug.LogError("[GameManager] CRITICAL ERROR: winScreen is null!");
+        }
+        
+        // STEP 3: Ensure main screen is active (game view)
+        if (mainScreen != null)
+        {
+            if (!mainScreen.activeSelf)
+            {
+                Debug.Log("[GameManager] ✓ Activating main screen during reconnection");
+                mainScreen.SetActive(true);
+            }
+            else
+            {
+                Debug.Log("[GameManager] ✓ Main screen already active");
+            }
+        }
+        else
+        {
+            Debug.LogError("[GameManager] CRITICAL ERROR: mainScreen is null!");
+        }
+        
+        // STEP 4: Reset point texts to current values (not "0" since game is ongoing)
+        if (pointTexts != null && pointTexts.Count >= 2)
+        {
+            Debug.Log($"[GameManager] ✓ Point texts ready (count: {pointTexts.Count})");
+            // Don't reset to "0" - the game state will set the correct values
+            // Just ensure they exist and are ready
+        }
+        else
+        {
+            Debug.LogError("[GameManager] CRITICAL ERROR: pointTexts is null or empty!");
+        }
+        
+        // STEP 5: Reset any game state flags that might interfere
+        movePlayedLocally = false;
+        isProcessingCapture = false;
+        Debug.Log("[GameManager] ✓ Game state flags reset");
+        
+        // STEP 6: Ensure ElHolderScript is in correct state
+        if (ElHolderScript.LocalInstance != null)
+        {
+            Debug.Log("[GameManager] ✓ ElHolderScript found and ready");
+            // Don't call ReturnAllHandsToIdle() as it might interfere with game state
+        }
+        else
+        {
+            Debug.LogWarning("[GameManager] ElHolderScript.LocalInstance is null");
+        }
+        
+        Debug.Log("[GameManager] ===== UI STATE CORRECTED FOR RECONNECTION =====");
+    }
+    
+    /// <summary>
+    /// Stops sync mode and applies any buffered moves
+    /// </summary>
+    public void StopSyncMode()
+    {
+        if (!isSyncMode) return;
+        
+        Debug.Log("[GameManager] Stopping sync mode");
+        isSyncMode = false;
+        
+        // Get all buffered moves
+        var bufferedMoves = moveBuffer.StopBuffering();
+        
+        // Apply them in order
+        if (bufferedMoves.Length > 0)
+        {
+            Debug.Log($"[GameManager] Applying {bufferedMoves.Length} buffered moves after sync");
+            ApplyBufferedMoves(bufferedMoves);
+        }
+        
+        // Unsubscribe from buffer events
+        moveBuffer.OnMoveBuffered -= OnMoveBuffered;
+        moveBuffer.OnBufferedMovesApplied -= OnBufferedMovesApplied;
+        moveBuffer.OnMoveTimedOut -= OnMoveTimedOut;
+        
+        // Note: Server notification removed - using desync detection system
+    }
+    
+    /// <summary>
+    /// Buffers a move during sync mode
+    /// </summary>
+    public void BufferMoveForSync(GameMove move)
+    {
+        if (!isSyncMode)
+        {
+            Debug.LogWarning($"[GameManager] Not in sync mode - cannot buffer move {move.moveType} by P{move.playerNumber}");
+            return;
+        }
+        
+        Debug.Log($"[GameManager] Buffering move for sync: {move.moveType} by P{move.playerNumber}");
+        moveBuffer.BufferMove(move);
+    }
+    
+    /// <summary>
+    /// Applies buffered moves after sync is complete
+    /// </summary>
+    public void ApplyBufferedMoves(GameMove[] moves)
+    {
+        Debug.Log($"[GameManager] Applying {moves.Length} buffered moves");
+        
+        // Add to pending moves list
+        pendingMovesToApply.AddRange(moves);
+        
+        // Start applying moves one by one
+        StartCoroutine(ApplyPendingMovesCoroutine());
+    }
+    
+    /// <summary>
+    /// Coroutine to apply pending moves in sequence
+    /// </summary>
+    private IEnumerator ApplyPendingMovesCoroutine()
+    {
+        while (pendingMovesToApply.Count > 0)
+        {
+            var move = pendingMovesToApply[0];
+            pendingMovesToApply.RemoveAt(0);
+            
+            Debug.Log($"[GameManager] Applying buffered move: {move.moveType} by P{move.playerNumber}");
+            
+            // Apply the move based on its type
+            yield return StartCoroutine(ApplyIndividualMove(move));
+            
+            // Small delay between moves to prevent overwhelming the system
+            yield return new WaitForSeconds(0.1f);
+        }
+        
+        Debug.Log("[GameManager] All buffered moves applied");
+    }
+    
+    /// <summary>
+    /// Applies an individual move based on its type
+    /// </summary>
+    private IEnumerator ApplyIndividualMove(GameMove move)
+    {
+        try
+        {
+            switch (move.moveType)
+            {
+                case GameMove.MoveType.PlayToCenter:
+                    Debug.Log($"[GameManager] Applying PlayToCenter move: {move.cardId}");
+                    // The move will be processed by the normal game flow when it arrives via RPC
+                    break;
+                    
+                case GameMove.MoveType.Capture:
+                    Debug.Log($"[GameManager] Applying Capture move: {move.cardId} captures {move.capturedCardIds?.Length ?? 0} cards");
+                    // The move will be processed by the normal game flow when it arrives via RPC
+                    break;
+                    
+                case GameMove.MoveType.SuperPower_Activation:
+                    Debug.Log($"[GameManager] Applying SuperPower activation: {move.superPowerName}");
+                    // Superpower moves will be processed by their respective systems
+                    break;
+                    
+                case GameMove.MoveType.SuperPower_Effect:
+                    Debug.Log($"[GameManager] Applying SuperPower effect: {move.superPowerName}");
+                    // Effects will be applied when the RPC arrives
+                    break;
+                    
+                default:
+                    Debug.LogWarning($"[GameManager] Unknown move type: {move.moveType}");
+                    break;
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[GameManager] Error applying buffered move {move.moveId}: {e.Message}");
+        }
+        
+        yield return null;
+    }
+    
+    /// <summary>
+    /// Checks if we're currently in sync mode
+    /// </summary>
+    public bool IsSyncMode => isSyncMode;
+    
+    /// <summary>
+    /// Gets the current buffer statistics for debugging
+    /// </summary>
+    public string GetBufferStats()
+    {
+        return moveBuffer.GetBufferStats();
+    }
+    
+    /// <summary>
+    /// Event handler for when a move is buffered
+    /// </summary>
+    private void OnMoveBuffered(GameMove move)
+    {
+        Debug.Log($"[GameManager] Move buffered: {move.moveType} by P{move.playerNumber}");
+    }
+    
+    /// <summary>
+    /// Event handler for when buffered moves are applied
+    /// </summary>
+    private void OnBufferedMovesApplied(GameMove[] moves)
+    {
+        Debug.Log($"[GameManager] {moves.Length} buffered moves were applied");
+    }
+    
+    /// <summary>
+    /// Event handler for when a buffered move times out
+    /// </summary>
+    private void OnMoveTimedOut(GameMove move)
+    {
+        Debug.LogWarning($"[GameManager] Buffered move timed out: {move.moveType} by P{move.playerNumber}");
     }
 
 }

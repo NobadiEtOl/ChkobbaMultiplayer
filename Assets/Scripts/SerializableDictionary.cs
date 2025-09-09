@@ -50,6 +50,12 @@ public struct SerializableDictionary : INetworkSerializable
         values.Clear();
     }
 
+    // Get the count of items in the dictionary
+    public int Count
+    {
+        get { return keys?.Count ?? 0; }
+    }
+
     // Serialize and deserialize the dictionary
     public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
     {

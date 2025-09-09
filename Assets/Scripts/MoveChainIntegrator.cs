@@ -229,6 +229,8 @@ public class MoveChainIntegrator : MonoBehaviour
         DebugChainPrinter.LocalInstance?.TrackLocalAction($"OnClientDesyncDetected called for move index {mismatchIndex}");
         DebugChainPrinter.LocalInstance?.TrackMoveChain($"Client desync handler triggered for index {mismatchIndex}");
         
+        // Note: UI initialization now handled by DeckController.GetPlayerCount() during reconnection
+        
         // Request full state sync from server
         RequestFullStateSync();
     }
@@ -277,6 +279,9 @@ public class MoveChainIntegrator : MonoBehaviour
         // Track in debug chain
         DebugChainPrinter.LocalInstance?.TrackLocalAction($"Server card play: {cardId} by P{playerNumber}");
         DebugChainPrinter.LocalInstance?.TrackMoveChain($"Server card play: {cardId} by P{playerNumber}");
+        
+        // ENHANCED RECONNECTION: Check for syncing clients and buffer moves if needed
+        // Note: Move buffering removed - using simple desync detection for reconnection
         
         // STEP 1: Record the move on the server chain
         if (MoveChainTracker.ServerInstance != null)
@@ -784,6 +789,20 @@ public class MoveChainIntegrator : MonoBehaviour
         StartCoroutine(TriggerValidationNextFrame());
     }
     
+    /// <summary>
+    /// Public method to force desync check for reconnected clients
+    /// </summary>
+    public void ForceImmediateDesyncCheck()
+    {
+        Debug.Log("[MoveChainIntegrator] Force immediate desync check for reconnected client");
+        
+        // Immediately trigger validation without waiting for periodic check
+        TriggerPeriodicValidation();
+        
+        // Also reset validation timer to ensure next check happens soon
+        lastValidationTime = 0f;
+    }
+    
 
     
     private System.Collections.IEnumerator TriggerValidationNextFrame()
@@ -842,6 +861,58 @@ public class MoveChainIntegrator : MonoBehaviour
         
         Debug.Log("[MoveChainIntegrator] Chain updates confirmed complete, proceeding with visual changes");
         onComplete?.Invoke();
+    }
+    
+    // Note: Move buffering system removed - using simple desync detection for reconnection
+    
+    /// <summary>
+    /// Gets the next move ID for tracking
+    /// </summary>
+    private static int GetNextMoveId()
+    {
+        // Use server instance if available, otherwise generate a unique ID
+        if (MoveChainTracker.ServerInstance != null)
+        {
+            var serverChain = MoveChainTracker.ServerInstance.GetCurrentChain();
+            return serverChain.chainVersion + 1;
+        }
+        
+        // Fallback: use timestamp-based ID
+        return (int)(System.DateTime.UtcNow.Ticks / 10000000); // Convert to seconds
+    }
+    
+    /// <summary>
+    /// Pauses move tracking during sync operations
+    /// </summary>
+    public static void PauseMoveTracking(string reason)
+    {
+        if (LocalInstance != null)
+        {
+            LocalInstance.isPowerOperationInProgress = true;
+            LocalInstance.powerOperationStartTime = Time.time;
+            Debug.Log($"[MoveChainIntegrator] Move tracking paused: {reason}");
+        }
+    }
+    
+    /// <summary>
+    /// Resumes move tracking after sync operations
+    /// </summary>
+    public static void ResumeMoveTracking(string reason)
+    {
+        if (LocalInstance != null)
+        {
+            LocalInstance.isPowerOperationInProgress = false;
+            var pauseDuration = Time.time - LocalInstance.powerOperationStartTime;
+            Debug.Log($"[MoveChainIntegrator] Move tracking resumed after {pauseDuration:F2}s: {reason}");
+        }
+    }
+    
+    /// <summary>
+    /// Checks if move tracking is currently paused
+    /// </summary>
+    public static bool IsMoveTrackingPaused()
+    {
+        return LocalInstance != null && LocalInstance.isPowerOperationInProgress;
     }
     
 

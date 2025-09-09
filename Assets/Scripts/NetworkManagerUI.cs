@@ -855,29 +855,20 @@ public class NetworkManagerUI : MonoBehaviour
         // Wait a moment for the network connection to stabilize
         yield return new WaitForSeconds(1f);
         
-        // Close the waiting screen
+        // ENHANCED RECONNECTION: Don't close the main UI - just close waiting screens
         if (mainUIScript != null)
         {
-            Debug.Log("[NetworkManagerUI] Closing reconnection waiting screen");
-            mainUIScript.ReturnToMainPage();
+            Debug.Log("[NetworkManagerUI] Closing reconnection waiting screen (keeping game UI open)");
+            // Don't call ReturnToMainPage() as it would close the game screen
+            // The waiting screen should already be closed by the reconnection process
         }
         
         // Wait a bit more for UI to close
         yield return new WaitForSeconds(0.5f);
         
-        // Request game state sync from server
-        var networkRelay = FindObjectOfType<NetworkRelay>();
-        if (networkRelay != null)
-        {
-            Debug.Log("[NetworkManagerUI] Requesting game state sync from server");
-            networkRelay.RequestGameStateSyncForReconnectedClientServerRPC();
-        }
-        else
-        {
-            Debug.LogError("[NetworkManagerUI] NetworkRelay not found - cannot request game state sync");
-        }
-        
-        Debug.Log("[NetworkManagerUI] Reconnection handling complete");
+        // SIMPLE RECONNECTION: Let server handle scene initialization via GivePlayerCount()
+        // No need to force desync detection here - DeckController.GetPlayerCount() will handle it
+        Debug.Log("[NetworkManagerUI] Reconnection handling complete - server will initialize scene and sync");
     }
 
     // === PUBLIC METHODS FOR EXTERNAL USE ===
