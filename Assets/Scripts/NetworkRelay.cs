@@ -44,8 +44,14 @@ public class NetworkRelay : NetworkBehaviour
     [ClientRpc(RequireOwnership = false)]
     public void InitializeCardPrefabsClientRPC(bool isReconnection = false)
     {
-        Debug.Log($"InitializeCardPrefabsClientRPC called - isReconnection: {isReconnection}");
+        Debug.Log($"[NetworkRelay] ===== ÖNEMLİ: INITIALIZE CARD PREFABS CLIENT RPC RECEIVED =====\n" +
+                 $"IsReconnection: {isReconnection}\n" +
+                 $"GameManager.LocalInstance: {(GameManager.LocalInstance != null ? "FOUND" : "NULL")}\n" +
+                 $"Calling GameManager.InitializeCardPrefabs({isReconnection})");
+        
         StartCoroutine(GameManager.LocalInstance.InitializeCardPrefabs(isReconnection));
+        
+        Debug.Log($"[NetworkRelay] ===== ÖNEMLİ: INITIALIZE CARD PREFABS CLIENT RPC COMPLETED =====");
     }
 
     [ClientRpc(RequireOwnership = false)]
@@ -109,7 +115,14 @@ public class NetworkRelay : NetworkBehaviour
     [ClientRpc(RequireOwnership = false)]
     public void GivePlayerCountClientRPC(int playerCount)
     {
+        Debug.Log($"[NetworkRelay] ===== ÖNEMLİ: GIVE PLAYER COUNT CLIENT RPC RECEIVED =====\n" +
+                 $"PlayerCount: {playerCount}\n" +
+                 $"DeckController.LocalInstance: {(DeckController.LocalInstance != null ? "FOUND" : "NULL")}\n" +
+                 $"Calling DeckController.GetPlayerCount({playerCount})");
+        
         DeckController.LocalInstance.GetPlayerCount(playerCount);
+        
+        Debug.Log($"[NetworkRelay] ===== ÖNEMLİ: GIVE PLAYER COUNT CLIENT RPC COMPLETED =====");
     }
     [ClientRpc(RequireOwnership = false)]
     public void GetPlayerNumberClientRPC(ulong clientID, int playerNumber)
@@ -478,7 +491,16 @@ public class NetworkRelay : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void NotifyCientConnectedServerRPC(ulong clientId)
     {
+        Debug.Log($"[NetworkRelay] ===== ÖNEMLİ: NOTIFY CLIENT CONNECTED SERVER RPC RECEIVED =====\n" +
+                 $"ClientId from RPC: {clientId}\n" +
+                 $"OwnerClientId: {OwnerClientId}\n" +
+                 $"IsServer: {IsServer}\n" +
+                 $"Server instance: {(server != null ? "FOUND" : "NULL")}\n" +
+                 $"Calling server.AnotherPlayerConnected({clientId})");
+        
         server.AnotherPlayerConnected(clientId);
+        
+        Debug.Log($"[NetworkRelay] ===== ÖNEMLİ: ANOTHER PLAYER CONNECTED CALL COMPLETED =====");
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -491,7 +513,62 @@ public class NetworkRelay : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void DeckReadyServerRPC()
     {
+        ulong clientId = OwnerClientId; // Use OwnerClientId to get the client that called this RPC
+        
+        Debug.Log($"[NetworkRelay] ===== ÖNEMLİ: DECK READY SERVER RPC RECEIVED =====\n" +
+                 $"ClientId: {clientId}\n" +
+                 $"IsServer: {IsServer}\n" +
+                 $"Server instance: {(server != null ? "FOUND" : "NULL")}\n" +
+                 $"This is for NORMAL GAME FLOW only - reconnection handled by ReconnectingClientCardsReadyServerRPC");
+        
+        // NORMAL GAME FLOW ONLY - proceed with initial deals
+        Debug.Log($"[NetworkRelay] Normal game flow - proceeding with initial deals for client {clientId}");
         server.InitialDealCoroutineCheck();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void ReconnectingClientCardsReadyServerRPC(ulong clientId)
+    {
+        Debug.Log($"[NetworkRelay] ===== ÖNEMLİ: RECONNECTING CLIENT CARDS READY RPC RECEIVED =====\n" +
+                 $"ClientId: {clientId}\n" +
+                 $"IsServer: {IsServer}\n" +
+                 $"Server instance: {(server != null ? "FOUND" : "NULL")}\n" +
+                 $"This RPC is specifically for reconnection - no client ID check needed");
+        
+        // RECONNECTION: Always proceed with reconnection sync (no client ID check)
+        // Build current game state and send to reconnected client
+        var gameState = server.BuildGameStateSnapshot();
+        
+        // Single comprehensive log for reconnection sync start
+        Debug.Log($"[NetworkRelay] ===== ÖNEMLİ: RECONNECTION SYNC START =====\n" +
+                 $"Client {clientId} cards are ready - applying game state for reconnection\n" +
+                 $"Server game state: turn={server.turnCounter}, currentPlayer={server.currentPlayer}\n" +
+                 $"Built game state snapshot: version={gameState.snapshotVersion}, centerCards={gameState.center.items?.Length ?? 0}, hands={gameState.hands.Count}\n" +
+                 $"Sending ApplyGameStateClientRPC to all clients");
+        
+        // RECONNECTION FIX: Send game state only to the reconnecting client, not all clients
+        // This prevents triggering normal game flow on other clients
+        ApplyGameStateToReconnectedClientClientRPC(gameState, clientId);
+        
+        // Update current player info for reconnected client
+        server.CallUpdateCurrentPlayer();
+        
+        // Remove client from reconnecting set (if it exists)
+        server.RemoveReconnectingClient(clientId);
+        
+        // RECONNECTION FIX: Trigger desync check after game state is applied
+        // This ensures the reconnecting client's move chain is synchronized
+        TriggerDesyncCheckForReconnectedClientClientRPC(clientId);
+        
+        // RECONNECTION FIX: Do NOT call InitialDealCoroutineCheck() during reconnection
+        // The reconnecting client will sync via existing desync detection system
+        
+        // Single comprehensive log for reconnection sync end
+        Debug.Log($"[NetworkRelay] ===== ÖNEMLİ: RECONNECTION SYNC COMPLETED =====\n" +
+                 $"Game state applied to reconnected client {clientId}\n" +
+                 $"Client removed from reconnecting set\n" +
+                 $"Current player updated and sync process finished\n" +
+                 $"InitialDealCoroutineCheck() called to ensure normal game flow continues");
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -537,6 +614,22 @@ public class NetworkRelay : NetworkBehaviour
         {
             Debug.Log($"[NetworkRelay] Applying game state snapshot v{snapshot.snapshotVersion} to reconnected client {targetClientId}");
             GameManager.LocalInstance?.ApplyGameState(snapshot);
+        }
+    }
+
+    [ClientRpc(RequireOwnership = false)]
+    public void TriggerDesyncCheckForReconnectedClientClientRPC(ulong targetClientId)
+    {
+        // Only trigger desync check if this is the target client
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.LocalClientId == targetClientId)
+        {
+            Debug.Log($"[NetworkRelay] Triggering desync check for reconnected client {targetClientId}");
+            
+            // Trigger desync check after a short delay to ensure game state is fully applied
+            if (GameManager.LocalInstance != null)
+            {
+                GameManager.LocalInstance.StartCoroutine(GameManager.LocalInstance.TriggerDesyncCheckAfterReconnection());
+            }
         }
     }
 

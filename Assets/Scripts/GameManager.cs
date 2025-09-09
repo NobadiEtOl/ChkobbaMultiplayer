@@ -501,9 +501,14 @@ public class GameManager : MonoBehaviour
     public void NotifyConnection()
 
     {
+        Debug.Log($"[GameManager] ===== ÖNEMLİ: NOTIFY CONNECTION CALLED =====\n" +
+                 $"LocalClientId: {NetworkManager.Singleton.LocalClientId}\n" +
+                 $"IsHost: {NetworkManager.Singleton.IsHost}\n" +
+                 $"IsServer: {NetworkManager.Singleton.IsServer}\n" +
+                 $"IsConnectedClient: {NetworkManager.Singleton.IsConnectedClient}\n" +
+                 $"Calling NotifyCientConnectedServerRPC to notify server of client connection");
 
         networkRelay.NotifyCientConnectedServerRPC(NetworkManager.Singleton.LocalClientId);// Tells the server that a client is started
-
     }
 
     /// <summary>
@@ -781,6 +786,12 @@ public class GameManager : MonoBehaviour
     public IEnumerator InitializeCardPrefabs(bool isReconnection = false)
 
     {
+        Debug.Log($"[GameManager] ===== ÖNEMLİ: INITIALIZE CARD PREFABS START =====\n" +
+                 $"IsReconnection: {isReconnection}\n" +
+                 $"DeckController: {(deckController != null ? "FOUND" : "NULL")}\n" +
+                 $"WaitingScreen: {(waitingScreen != null ? "FOUND" : "NULL")}\n" +
+                 $"WinScreen: {(winScreen != null ? "FOUND" : "NULL")}\n" +
+                 $"MainScreen: {(mainScreen != null ? "FOUND" : "NULL")}");
 
         if (!isReconnection)
         {
@@ -791,17 +802,47 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            Debug.Log("[GameManager] InitializeCardPrefabs called for reconnection - skipping game state reset");
+            Debug.Log("[GameManager] InitializeCardPrefabs called for reconnection - following normal StartGame flow");
             isReconnecting = true;
+            
+            // RECONNECTION FIX: Do NOT clear cardLookup - let it be populated normally
+            // The card IDs will be deterministic and match the server
+            
+            // CRITICAL: Reset event subscription flag for reconnection
+            Debug.Log("[GameManager] Resetting alreadySubbed flag for reconnection");
+            alreadySubbed = false;
         }
 
-        if (waitingScreen.activeSelf) waitingScreen.SetActive(false);
+        Debug.Log("[GameManager] Checking and managing UI screens...");
+        if (waitingScreen.activeSelf) 
+        {
+            Debug.Log("[GameManager] Closing waiting screen");
+            waitingScreen.SetActive(false);
+        }
 
+        Debug.Log("[GameManager] Starting DeckController.DeckStart() coroutine...");
         yield return StartCoroutine(deckController.DeckStart());
+        Debug.Log("[GameManager] DeckController.DeckStart() coroutine completed");
+        
+        // RECONNECTION: Let the normal flow handle everything
+        // The card IDs will be deterministic and match the server
+        // The existing desync detection will handle synchronization
 
-        if (winScreen.activeSelf) winScreen.SetActive(false);
+        if (winScreen.activeSelf) 
+        {
+            Debug.Log("[GameManager] Closing win screen");
+            winScreen.SetActive(false);
+        }
 
-        if (mainScreen.activeSelf) mainScreen.SetActive(false);
+        if (mainScreen.activeSelf) 
+        {
+            Debug.Log("[GameManager] Closing main screen");
+            mainScreen.SetActive(false);
+        }
+
+        Debug.Log($"[GameManager] ===== ÖNEMLİ: INITIALIZE CARD PREFABS COMPLETED =====\n" +
+                 $"IsReconnection: {isReconnection}\n" +
+                 $"IsReconnecting flag: {isReconnecting}");
 
     }
 
@@ -810,27 +851,33 @@ public class GameManager : MonoBehaviour
     public void DeckReady()
 
     {
+        Debug.Log($"[GameManager] ===== ÖNEMLİ: DECK READY CALLED =====\n" +
+                 $"IsReconnecting: {isReconnecting}\n" +
+                 $"NetworkRelay: {(networkRelay != null ? "FOUND" : "NULL")}\n" +
+                 $"IsConnectedClient: {NetworkManager.Singleton.IsConnectedClient}\n" +
+                 $"IsHost: {NetworkManager.Singleton.IsHost}\n" +
+                 $"IsServer: {NetworkManager.Singleton.IsServer}\n" +
+                 $"LocalClientId: {NetworkManager.Singleton.LocalClientId}");
 
         Debug.Log("Deck is ready, notifying server.");
 
-        networkRelay.DeckReadyServerRPC();
-        
-        // RECONNECTION: Trigger desync detection after cards are initialized
         if (isReconnecting)
         {
-            Debug.Log("[GameManager] Cards initialized for reconnection - triggering desync detection");
-            var moveChainIntegrator = FindObjectOfType<MoveChainIntegrator>();
-            if (moveChainIntegrator != null)
-            {
-                Debug.Log("[GameManager] ✓ Forcing immediate desync check for reconnected client after card initialization");
-                moveChainIntegrator.ForceImmediateDesyncCheck();
-            }
-            else
-            {
-                Debug.LogWarning("[GameManager] MoveChainIntegrator not found - desync detection may not trigger");
-            }
-            isReconnecting = false; // Reset flag
+            // For reconnecting clients, use the specific RPC that passes the client ID explicitly
+            Debug.Log($"[GameManager] Calling networkRelay.ReconnectingClientCardsReadyServerRPC({NetworkManager.Singleton.LocalClientId})...");
+            networkRelay.ReconnectingClientCardsReadyServerRPC(NetworkManager.Singleton.LocalClientId);
+            Debug.Log($"[GameManager] networkRelay.ReconnectingClientCardsReadyServerRPC() call completed");
         }
+        else
+        {
+            // For normal game flow, use the regular RPC
+            Debug.Log($"[GameManager] Calling networkRelay.DeckReadyServerRPC()...");
+            networkRelay.DeckReadyServerRPC();
+            Debug.Log($"[GameManager] networkRelay.DeckReadyServerRPC() call completed");
+        }
+        
+        // Note: For reconnection, game state sync is now handled directly in the RPC
+        // No need for desync detection since we call ApplyGameStateClientRPC() directly
 
     }
 
@@ -881,17 +928,18 @@ public class GameManager : MonoBehaviour
     public void CardPrefabsToPlayers(int playerCount, SerializableDictionary serializableDictionary)
 
     {
-
         //Converts serializablelist to a normal dictionary
-
         Dictionary<int, List<string>> playerHands = serializableDictionary.ToDictionary();
 
-
+        // RECONNECTION FIX: Skip dealing during reconnection - let ApplyGameState handle it
+        if (isReconnecting)
+        {
+            Debug.Log("[GameManager] CardPrefabsToPlayers called during reconnection - skipping deal, will be handled by ApplyGameState");
+            return;
+        }
 
         //Informs the deckController to deal the players' cards
-
         StartCoroutine(DelayedDealPlayers(playerCount, playerHands));
-
     }
 
 
@@ -921,6 +969,13 @@ public class GameManager : MonoBehaviour
         Debug.Log("CardPrefabsToCenter called with serializableCard: " + serializableCard.ToString());
         //Converts serializablelist to a normal list
         List<string> centerCardIDs = serializableCard.ToDictionary().Keys.ToList();
+
+        // RECONNECTION FIX: Skip dealing during reconnection - let ApplyGameState handle it
+        if (isReconnecting)
+        {
+            Debug.Log("[GameManager] CardPrefabsToCenter called during reconnection - skipping deal, will be handled by ApplyGameState");
+            return;
+        }
 
         //Informs the deckController to deal the center cards
         if (deckController) StartCoroutine(deckController.DealCenter(centerCardIDs));
@@ -1148,7 +1203,6 @@ public class GameManager : MonoBehaviour
         AddToDebugLog($"[GameManager] hasAlreadySentRPC: {hasAlreadySentRPC}");
 
         
-
         if (hasAlreadySentRPC)
 
         {
@@ -4395,9 +4449,13 @@ public class GameManager : MonoBehaviour
     /// </summary>
     public void ApplyGameState(SerializableGameState snapshot)
     {
-        Debug.Log($"[GameManager] ===== APPLYING GAME STATE (snapshot v{snapshot.snapshotVersion}) =====");
-        Debug.Log($"[GameManager] Game state details: turn={snapshot.turnCounter}, players={snapshot.playerCount}, centerCards={snapshot.center.items?.Length ?? 0}, hands={snapshot.hands.Count}");
-        Debug.Log($"[GameManager] Current local state: turnCounter={turnCounter}, currentPlayerNo={currentPlayerNo}");
+        // Single comprehensive log for game state application start
+        Debug.Log($"[GameManager] ===== ÖNEMLİ: APPLYING GAME STATE START =====\n" +
+                 $"Snapshot version: {snapshot.snapshotVersion}\n" +
+                 $"Game state details: turn={snapshot.turnCounter}, players={snapshot.playerCount}, centerCards={snapshot.center.items?.Length ?? 0}, hands={snapshot.hands.Count}\n" +
+                 $"Current local state: turnCounter={turnCounter}, currentPlayerNo={currentPlayerNo}\n" +
+                 $"Player number: {deckController?.thisPlayerNumber ?? -1}, isReconnecting: {isReconnecting}\n" +
+                 $"DeckController found: {(deckController != null ? "YES" : "NO")}");
         
         // Add header entry to sync log without clearing it
         SyncLog($"=== APPLYING GAME STATE (snapshot v{snapshot.snapshotVersion}) ===");
@@ -4407,7 +4465,6 @@ public class GameManager : MonoBehaviour
         // Ensure a clean slate immediately before we start rebuild
         if (deckController != null)
         {
-            Debug.Log("[GameManager] ✓ DeckController found - starting game state application");
             StartCoroutine(ApplyGameStateWithReset(snapshot));
         }
         else
@@ -4497,6 +4554,14 @@ public class GameManager : MonoBehaviour
             StopSyncMode();
         }
 
+        // Single comprehensive log for game state application completion
+        Debug.Log($"[GameManager] ===== ÖNEMLİ: APPLYING GAME STATE COMPLETED =====\n" +
+                 $"Snapshot version: {snapshot.snapshotVersion}\n" +
+                 $"Final state: turnCounter={turnCounter}, currentPlayerNo={currentPlayerNo}\n" +
+                 $"Center cards: {centerCards.Count}, My cards: {myCards.Count}\n" +
+                 $"Sync mode active: {isSyncMode}, Reconnecting: {isReconnecting}\n" +
+                 $"Game state application process finished successfully");
+        
         SyncLog($"ApplyGameStateCoroutine completed successfully for snapshot v{snapshot.snapshotVersion}");
         // Final detailed dump AFTER apply for comparison
         LogDetailedLocalState("CLIENT AFTER APPLY");
@@ -4568,8 +4633,16 @@ public class GameManager : MonoBehaviour
         
         // CRITICAL: Reset move chains to prevent infinite desync loops
         // When we apply a full game state, the chains should be reset to match the new state
-        MoveChainIntegrator.ResetChains();
-        Debug.Log("[GameManager] Reset all move chains to prevent desync loops after full state sync");
+        // BUT: For reconnection, let the desync detection handle the synchronization naturally
+        if (!isReconnecting)
+        {
+            MoveChainIntegrator.ResetChains();
+            Debug.Log("[GameManager] Reset all move chains to prevent desync loops after full state sync");
+        }
+        else
+        {
+            Debug.Log("[GameManager] Skipping move chain reset for reconnection - letting desync detection handle synchronization");
+        }
     }
 
     /// <summary>
@@ -4579,8 +4652,12 @@ public class GameManager : MonoBehaviour
     {
         Debug.Log("[GameManager] Applying core game state");
         
-        // Update turn and player info
+        // Update turn and player info from server snapshot
         currentPlayerNo = snapshot.currentPlayer;
+        turnCounter = snapshot.turnCounter;
+        roundCount = snapshot.roundCount;
+        
+        Debug.Log($"[GameManager] Applied server game state - currentPlayer: {currentPlayerNo}, turnCounter: {turnCounter}, roundCount: {roundCount}");
         
         // The server will handle sending the updated current player via existing RPC
         // We just need to trust that the snapshot is correct
@@ -4625,9 +4702,21 @@ public class GameManager : MonoBehaviour
         for (int i = 0; i < centerList.Count; i++)
         {
             string cardId = centerList[i];
-            if (CardInteraction.cardLookup.ContainsKey(cardId))
+            CardInteraction cardInteraction = null;
+            
+            // SIMPLIFIED: Just use the cardLookup directly - no mapping needed
+            if (CardInteraction.cardLookup.TryGetValue(cardId, out cardInteraction))
             {
-                var cardInteraction = CardInteraction.cardLookup[cardId];
+                // Card found in cardLookup
+            }
+            else
+            {
+                SyncLogWarning($"Center rebuild: card not found {cardId}");
+                continue;
+            }
+            
+            if (cardInteraction != null)
+            {
                 var cardObject = cardInteraction.gameObject;
                 cardObject.transform.SetParent(centerTransform, false);
                 centerCardsObjects.Add(cardObject);
@@ -5573,6 +5662,106 @@ public class GameManager : MonoBehaviour
     {
         Debug.LogWarning($"[GameManager] Buffered move timed out: {move.moveType} by P{move.playerNumber}");
     }
+    
+    /// <summary>
+    /// Rebuilds cardLookup for reconnection by mapping newly created cards to server IDs
+    /// </summary>
+    private void RebuildCardLookupForReconnection()
+    {
+        Debug.Log($"[GameManager] Rebuilding cardLookup for reconnection");
+        Debug.Log($"[GameManager] Current cardLookup count: {CardInteraction.cardLookup.Count}");
+        
+        // Clear the existing cardLookup (it has wrong IDs)
+        CardInteraction.cardLookup.Clear();
+        
+        // Get all card interactions from DeckController
+        if (deckController != null && deckController.cardInteractionList != null)
+        {
+            Debug.Log($"[GameManager] Found {deckController.cardInteractionList.Count} card interactions");
+            
+            // For each card interaction, we need to map it to the correct server ID
+            // The issue is that we don't know which server ID corresponds to which card
+            // We need to wait for the game state to be applied to know the correct mapping
+            
+            // For now, just log that we're ready to rebuild
+            Debug.Log($"[GameManager] Card interactions ready for server ID mapping");
+        }
+        else
+        {
+            Debug.LogError("[GameManager] DeckController or cardInteractionList is null - cannot rebuild cardLookup");
+        }
+    }
+    
+    
+    /// <summary>
+    /// Ensures the move chain system is properly initialized for reconnected clients
+    /// </summary>
+    private void EnsureMoveChainSystemInitialized()
+    {
+        // Check if MoveChainIntegrator exists and is properly initialized
+        if (MoveChainIntegrator.LocalInstance == null)
+        {
+            Debug.LogError("[GameManager] MoveChainIntegrator.LocalInstance is null - move chain system not initialized!");
+            return;
+        }
+        
+        // Check if MoveChainTracker is properly set up
+        var moveChainTracker = GetComponent<MoveChainTracker>();
+        if (moveChainTracker == null)
+        {
+            Debug.LogWarning("[GameManager] MoveChainTracker not found on GameManager - this should be added by MoveChainIntegrator");
+        }
+        else
+        {
+            Debug.Log("[GameManager] MoveChainTracker found and ready");
+        }
+        
+        // Ensure move tracking is enabled
+        Debug.Log("[GameManager] Move chain system initialization check completed");
+    }
+
+    /// <summary>
+    /// Triggers a desync check after reconnection to ensure move chains are synchronized
+    /// </summary>
+    public IEnumerator TriggerDesyncCheckAfterReconnection()
+    {
+        Debug.Log("[GameManager] TriggerDesyncCheckAfterReconnection called - waiting for game state to be fully applied");
+        
+        // Wait for the game state to be fully applied
+        yield return new WaitForSeconds(1.0f);
+        
+        // Check if MoveChainIntegrator is available
+        if (MoveChainIntegrator.LocalInstance != null)
+        {
+            Debug.Log("[GameManager] Triggering forced desync check for reconnected client");
+            MoveChainIntegrator.LocalInstance.ForceImmediateDesyncCheck();
+        }
+        else
+        {
+            Debug.LogWarning("[GameManager] MoveChainIntegrator.LocalInstance is null - cannot force desync check");
+        }
+    }
+    
+    /// <summary>
+    /// Forces a desync check after reconnection to ensure move chains are synchronized
+    /// </summary>
+    private IEnumerator ForceDesyncCheckAfterReconnection()
+    {
+        // Wait for the game state to be fully applied
+        yield return new WaitForSeconds(0.5f);
+        
+        // Check if MoveChainIntegrator is available
+        if (MoveChainIntegrator.LocalInstance != null)
+        {
+            Debug.Log("[GameManager] Triggering forced desync check for reconnected client");
+            MoveChainIntegrator.LocalInstance.ForceImmediateDesyncCheck();
+        }
+        else
+        {
+            Debug.LogWarning("[GameManager] MoveChainIntegrator.LocalInstance is null - cannot force desync check");
+        }
+    }
+    
 
 }
 

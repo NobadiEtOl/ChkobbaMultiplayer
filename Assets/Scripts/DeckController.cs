@@ -21,7 +21,7 @@ public class DeckController : MonoBehaviour
     private Dictionary<string, GameObject> cardPrefabs;//A dictionary to keep track of each card prefabs with its ID
     private Dictionary<string, GameObject> deckPool;//A dictionary of card ID and a list of all the instantiated cards
     private List<GameObject> activeCards = new List<GameObject>();
-    private List<CardInteraction> cardInteractionList; // List to store CardInteraction references
+    public List<CardInteraction> cardInteractionList; // List to store CardInteraction references
     public List<Transform> playerHandTransforms = new List<Transform>();
     public List<Transform> playerPoolTransforms = new List<Transform>();
     public Transform centerTransform;
@@ -93,19 +93,33 @@ public class DeckController : MonoBehaviour
     //Called when the deck is ready to start
     public IEnumerator DeckStart()
     {
+        Debug.Log($"[DeckController] ===== ÖNEMLİ: DECK START BEGIN =====\n" +
+                 $"GameManager: {(gameManager != null ? "FOUND" : "NULL")}\n" +
+                 $"CardPrefabsList: {(cardPrefabsList != null ? "FOUND" : "NULL")}\n" +
+                 $"CardPrefabsList Count: {cardPrefabsList?.Count ?? 0}");
+        
+        Debug.Log("[DeckController] Starting DefineCardPrefabs coroutine...");
         yield return StartCoroutine(DefineCardPrefabs());
+        Debug.Log("[DeckController] DefineCardPrefabs coroutine completed");
+        
+        Debug.Log("[DeckController] Starting  coroutine...");
         yield return StartCoroutine(InitializeCardPool());
+        Debug.Log("[DeckController] InitializeCardPool coroutine completed");
         
         // Move deck to reach point for initial dealing
+        Debug.Log("[DeckController] Moving deck to reach point...");
         MoveDeckToReachPoint();
         
         // Wait for deck to reach position before notifying that deck is ready
+        Debug.Log("[DeckController] Waiting for deck to reach position...");
         while (isDeckMoving || !isDeckAtReachPoint)
         {
             yield return null;
         }
         
         Debug.Log("[DeckController] Deck is ready and in position for dealing");
+        Debug.Log($"[DeckController] ===== ÖNEMLİ: DECK START COMPLETED =====\n" +
+                 $"Calling gameManager.DeckReady()");
         gameManager.DeckReady();
     }
 
@@ -158,7 +172,9 @@ public class DeckController : MonoBehaviour
                 CardInteraction cardInteraction = card.GetComponent<CardInteraction>();
                 if (cardInteraction != null)
                 {
-                    string uniqueID = "card_" + uniqueCardCounter++;
+                    // CRITICAL FIX: Use deterministic ID based on suit and value, not counter
+                    // This ensures server and client always have matching IDs
+                    string uniqueID = "card_" + counter; // Use counter instead of uniqueCardCounter
                     cardInteraction.SetUniqueID(uniqueID, cardID);
                     cardInteractionList.Add(cardInteraction);
                 }
@@ -178,6 +194,9 @@ public class DeckController : MonoBehaviour
 
         else yield return StartCoroutine(ResetCards());
 
+        // CRITICAL: Send card interactions to GameManager for reconnection
+        Debug.Log($"[DeckController] Sending {cardInteractionList.Count} card interactions to GameManager for reconnection");
+        SendCardInteractionsToGameManager();
 
     }
 
@@ -1739,6 +1758,10 @@ public class DeckController : MonoBehaviour
 
     public void GetPlayerCount(int playerC)
     {
+        Debug.Log($"[DeckController] ===== ÖNEMLİ: GET PLAYER COUNT CALLED =====\n" +
+                 $"PlayerCount: {playerC}\n" +
+                 $"ElHolderScript.LocalInstance: {(ElHolderScript.LocalInstance != null ? "FOUND" : "NULL")}");
+        
         playerCount = playerC;
         ElHolderScript.LocalInstance.SetHandMode(playerCount);
         
@@ -1767,7 +1790,8 @@ public class DeckController : MonoBehaviour
             mainScreen.SetActive(true);
         }
         
-        Debug.Log($"[DeckController] UI screens initialized for player count: {playerC}");
+        Debug.Log($"[DeckController] ===== ÖNEMLİ: GET PLAYER COUNT COMPLETED =====\n" +
+                 $"UI screens initialized for player count: {playerC}");
         
         // Note: Desync detection now happens in GameManager.DeckReady() after card initialization
     }
@@ -2413,14 +2437,15 @@ public class DeckController : MonoBehaviour
 
             foreach (string cardID in cardIDs)
             {
-                if (CardInteraction.cardLookup.TryGetValue(cardID, out var cardInteraction))
+                // SIMPLIFIED: Just use the cardLookup directly - no mapping needed
+                if (CardInteraction.cardLookup.TryGetValue(cardID, out CardInteraction cardInteraction))
                 {
                     GameObject cardObj = cardInteraction.gameObject;
                     cardObj.transform.SetParent(handTransform, false);
                 }
                 else
                 {
-                    Debug.LogWarning($"CardInteraction.cardLookup does not contain cardID: {cardID}");
+                    Debug.LogWarning($"Could not find card for cardID: {cardID}");
                 }
             }
         }
@@ -2543,6 +2568,7 @@ public class DeckController : MonoBehaviour
         if (deckMoveSequence != null)
             deckMoveSequence.Kill();
     }
+    
     
     private void OnDrawGizmosSelected()
     {

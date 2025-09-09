@@ -48,7 +48,8 @@ public class Server : NetworkBehaviour
     private bool hasManualSavedState = false;
     private int snapshotVersionCounter = 0;
     
-    // Note: Reconnection now uses existing desync detection system
+    // RECONNECTION TRACKING: Track which clients are reconnecting
+    private HashSet<ulong> reconnectingClients = new HashSet<ulong>();
 
     // KEEP-ALIVE SYSTEM for relay connections
     private Coroutine relayKeepAliveCoroutine;
@@ -259,6 +260,14 @@ public class Server : NetworkBehaviour
     public void InitialDealCoroutineCheck()
     {
         Debug.LogWarning("InitialDealCoroutineCheck called, connectedPlayerCount: " + connectedPlayerCount);
+        
+        // RECONNECTION: Skip initial deals if any clients are reconnecting
+        if (reconnectingClients.Count > 0)
+        {
+            Debug.Log($"[Server] Skipping initial deals - {reconnectingClients.Count} clients are reconnecting");
+            return;
+        }
+        
         initialDealCoroutineCheckCounter++;
         if (initialDealCoroutineCheckCounter == connectedPlayerCount)
         {
@@ -1032,6 +1041,13 @@ public class Server : NetworkBehaviour
 
     public void AnotherPlayerConnected(ulong clientId)
     {
+        Debug.Log($"[Server] ===== ÖNEMLİ: ANOTHER PLAYER CONNECTED METHOD CALLED =====\n" +
+                 $"ClientId: {clientId}\n" +
+                 $"IsServer: {IsServer}\n" +
+                 $"TurnCounter: {turnCounter}\n" +
+                 $"ConnectedPlayerCount: {connectedPlayerCount}\n" +
+                 $"PlayerCount: {playerCount}");
+        
         // Build complete connection log as one string
         var connectionLog = new System.Text.StringBuilder();
         connectionLog.AppendLine("SERVER MESSAGE: ===== CLIENT CONNECTION DETECTED =====");
@@ -1070,27 +1086,42 @@ public class Server : NetworkBehaviour
                 connectionLog.AppendLine($"SERVER MESSAGE: Keep-alive restarted for reconnected client");
             }
             
-            // SIMPLE RECONNECTION: Initialize client scene like StartGame() does
-            connectionLog.AppendLine($"SERVER MESSAGE: Client {clientId} reconnected - initializing scene and letting desync detection handle sync");
-            Debug.Log($"[Server] ===== CLIENT {clientId} RECONNECTED - INITIALIZING SCENE =====");
-            Debug.Log($"[Server] Game state: turn {turnCounter}, players: {playerCount}, connected: {connectedPlayerCount}");
-            Debug.Log($"[Server] Calling GivePlayerCount() to initialize reconnected client scene (like StartGame does)");
+            // RECONNECTION: Track this client as reconnecting
+            reconnectingClients.Add(clientId);
             
-            // Initialize the reconnected client's scene (same as StartGame does)
+            // Single comprehensive log for reconnection start
+            Debug.Log($"[Server] ===== ÖNEMLİ: RECONNECTION START =====\n" +
+                     $"Client {clientId} reconnected to existing game\n" +
+                     $"Game state: turn {turnCounter}, players: {playerCount}, connected: {connectedPlayerCount}\n" +
+                     $"Center cards: {centerCardsDict?.Count ?? 0}, Player hands: {playersHandCardsIDs?.Count ?? 0}\n" +
+                     $"Keep-alive was inactive: {wasKeepAliveInactive}\n" +
+                     $"Client added to reconnecting set: {reconnectingClients.Count} clients reconnecting");
+            
+            // RECONNECTION: Follow the same initialization as StartGame() but with sync instead of deals
+            // Step 1: Give player count (same as StartGame)
             GivePlayerCount();
             
-            // CRITICAL: Initialize card system for reconnected player BEFORE sync
-            Debug.Log($"[Server] Calling InitializeCardPrefabsClientRPC() to initialize card objects for reconnected client");
+            // Step 2: Initialize card system (same as StartGame but with reconnection flag)
             if (networkRelay != null)
             {
+                // Step 3: Call UpdateCurrentPlayer (same as StartGame)
+                Invoke("CallUpdateCurrentPlayer", 1);
+                
+                // Step 4: Initialize card prefabs (same as StartGame but with reconnection flag)
                 networkRelay.InitializeCardPrefabsClientRPC(true); // true = isReconnection
+                
+                // Single comprehensive log for reconnection initialization complete
+                Debug.Log($"[Server] ===== ÖNEMLİ: RECONNECTION INITIALIZATION COMPLETE =====\n" +
+                         $"Client {clientId} scene and cards initialized\n" +
+                         $"GivePlayerCount() called to set up UI screens\n" +
+                         $"CallUpdateCurrentPlayer() scheduled for 1 second\n" +
+                         $"InitializeCardPrefabsClientRPC(true) called for card objects\n" +
+                         $"Will sync game state when client calls ReconnectingClientCardsReadyServerRPC()");
             }
             else
             {
                 Debug.LogError($"[Server] NetworkRelay is null - cannot initialize card prefabs for reconnected client");
             }
-            
-            Debug.Log($"[Server] Reconnected client scene and cards initialized - desync detection will handle game state sync");
         }
         else if (playerCount == connectedPlayerCount)
         {
@@ -2179,6 +2210,26 @@ public class Server : NetworkBehaviour
     // Note: Reconnection now uses existing desync detection system - no special methods needed
     
     // Note: Sync timeout checking removed - using desync detection system
+
+    /// <summary>
+    /// Checks if a client is currently reconnecting
+    /// </summary>
+    public bool IsClientReconnecting(ulong clientId)
+    {
+        return reconnectingClients.Contains(clientId);
+    }
+
+    /// <summary>
+    /// Removes a client from the reconnecting set
+    /// </summary>
+    public void RemoveReconnectingClient(ulong clientId)
+    {
+        if (reconnectingClients.Contains(clientId))
+        {
+            reconnectingClients.Remove(clientId);
+            Debug.Log($"[Server] Removed client {clientId} from reconnecting set");
+        }
+    }
 
 
 }
