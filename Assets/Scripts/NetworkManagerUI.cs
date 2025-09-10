@@ -983,9 +983,7 @@ public class NetworkManagerUI : MonoBehaviour
         Allocation allocation = await RelayService.Instance.CreateAllocationAsync(playerCount);
         NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(allocation, "wss"));
         joinCodeVar = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
-        joinCodeText.text = joinCodeVar;
-
-        if(privateFlag)mainUIScript.OpenWaitingScreenUI("blue", playerCount.ToString(), joinCodeVar);
+        // DON'T set joinCodeText.text here - we'll set it to the lobby code after creating the lobby
 
         CreateLobbyOptions options = new CreateLobbyOptions
         {
@@ -1003,21 +1001,29 @@ public class NetworkManagerUI : MonoBehaviour
 
         currentLobby = await Lobbies.Instance.CreateLobbyAsync("MyLobby", playerCount, options);
         
-        // CRITICAL: Display lobby codes for client connection, save lobby codes for reconnection
+        // CRITICAL: Display LOBBY codes for client connection, save LOBBY codes for reconnection
         if (privateFlag)
         {
-            Debug.Log($"Host created private lobby with Relay join code: {joinCodeVar}");
-            Debug.Log($"Private lobby code for clients: {currentLobby.LobbyCode}");
+            Debug.LogError($"[HOST] Created private lobby with Relay join code: {joinCodeVar}");
+            Debug.LogError($"[HOST] Private lobby code for clients: {currentLobby.LobbyCode}");
+            Debug.LogError($"[HOST] UI will show LOBBY code: {currentLobby.LobbyCode} (NOT relay code: {joinCodeVar})");
             joinCodeText.text = currentLobby.LobbyCode; // Clients use this to join lobby first
+            
+            // Show LOBBY code in waiting screen (not relay code)
+            mainUIScript.OpenWaitingScreenUI("blue", playerCount.ToString(), currentLobby.LobbyCode);
             
             // CRITICAL: Save LOBBY code for reconnection (lobby-first approach)
             SaveGameJoinCode(currentLobby.LobbyCode, playerCount);
         }
         else
         {
-            Debug.Log($"Host created public lobby with Relay join code: {joinCodeVar}");
-            Debug.Log($"Public lobby code for clients: {currentLobby.LobbyCode}");
+            Debug.LogError($"[HOST] Created public lobby with Relay join code: {joinCodeVar}");
+            Debug.LogError($"[HOST] Public lobby code for clients: {currentLobby.LobbyCode}");
+            Debug.LogError($"[HOST] UI will show LOBBY code: {currentLobby.LobbyCode} (NOT relay code: {joinCodeVar})");
             joinCodeText.text = currentLobby.LobbyCode; // Clients use this to join lobby first
+            
+            // Show LOBBY code in waiting screen (not relay code)
+            mainUIScript.OpenWaitingScreenUI("blue", playerCount.ToString(), currentLobby.LobbyCode);
             
             // CRITICAL: Save LOBBY code for reconnection (lobby-first approach)
             SaveGameJoinCode(currentLobby.LobbyCode, playerCount);
@@ -1056,22 +1062,23 @@ public class NetworkManagerUI : MonoBehaviour
         }
         
         Debug.Log("[NetworkManagerUI] Using existing Unity Services connection for client");
-        Debug.Log($"[NetworkManagerUI] LOBBY-FIRST CONNECTION: Trying to join lobby with code: {inputJoinCode}");
+        Debug.LogError($"[CLIENT] LOBBY-FIRST CONNECTION: Trying to join lobby with code: {inputJoinCode}");
+        Debug.LogError($"[CLIENT] This should be a LOBBY code (not a relay code)");
         joinCodeText.text = inputJoinCode;
 
         // CRITICAL: LOBBY-FIRST CONNECTION FLOW
         // Step 1: Join the lobby using the provided lobby join code
         try
         {
-            Debug.Log($"[NetworkManagerUI] Step 1: Joining lobby with code: {inputJoinCode}");
+            Debug.LogError($"[CLIENT] Step 1: Joining lobby with code: {inputJoinCode}");
             currentLobby = await Lobbies.Instance.JoinLobbyByCodeAsync(inputJoinCode);
-            Debug.Log($"[NetworkManagerUI] Successfully joined lobby: {currentLobby.Name}");
+            Debug.LogError($"[CLIENT] Successfully joined lobby: {currentLobby.Name}");
             
             // Step 2: Get relay join code from lobby metadata
             if (currentLobby.Data != null && currentLobby.Data.ContainsKey("RelayJoinCode"))
             {
                 string relayJoinCode = currentLobby.Data["RelayJoinCode"].Value;
-                Debug.Log($"[NetworkManagerUI] Step 2: Retrieved relay join code from lobby: {relayJoinCode}");
+                Debug.LogError($"[CLIENT] Step 2: Retrieved relay join code from lobby: {relayJoinCode}");
                 
                 // Step 3: Connect to relay using the stored relay join code (get fresh connection token)
                 Debug.Log($"[NetworkManagerUI] Step 3: Getting fresh connection token for relay with code: {relayJoinCode}");

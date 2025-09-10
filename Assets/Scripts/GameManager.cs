@@ -4682,6 +4682,14 @@ public class GameManager : MonoBehaviour
         turnCounter = snapshot.turnCounter;
         roundCount = snapshot.roundCount;
         
+        // CRITICAL FIX: Sync startingPlayerNoCounter with roundCount for reconnection
+        // Both represent "how many rounds have been completed" and should be equal
+        if (deckController != null)
+        {
+            deckController.SetStartingPlayerNoCounter(snapshot.roundCount);
+            Debug.LogError($"[GAME STATE] Applied roundCount {snapshot.roundCount} to startingPlayerNoCounter for reconnection");
+        }
+        
         Debug.Log($"[GameManager] Applied server game state - currentPlayer: {currentPlayerNo}, turnCounter: {turnCounter}, roundCount: {roundCount}");
         
         // The server will handle sending the updated current player via existing RPC

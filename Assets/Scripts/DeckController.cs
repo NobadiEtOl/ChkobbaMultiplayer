@@ -1669,7 +1669,16 @@ public class DeckController : MonoBehaviour
         PlayerPrefs.Save();
         Debug.LogError($"[PLAYER NUMBER] Saved player number {playerNumber} to PlayerPrefs for reconnection");
     }
-
+    
+    /// <summary>
+    /// Sets the startingPlayerNoCounter from server game state during reconnection
+    /// </summary>
+    public void SetStartingPlayerNoCounter(int counter)
+    {
+        startingPlayerNoCounter = counter;
+        Debug.LogError($"[GAME STATE] SetStartingPlayerNoCounter called with counter: {counter}, startingPlayerNoCounter now: {startingPlayerNoCounter}");
+    }
+ 
     public int SendPlayerNumber()
     {
         return thisPlayerNumber;
