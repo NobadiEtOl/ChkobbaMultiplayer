@@ -2687,6 +2687,13 @@ public class GameManager : MonoBehaviour
         
         // Track power completion
         MoveChainIntegrator.ReportPowerCompletion("BayaBayaBak", deckController.thisPlayerNumber, $"Revealed opponent {opponentPlayerNo} cards");
+        
+        // CRITICAL FIX: Force game state save after power completion to ensure reconnection sync
+        if (Server.Singleton != null)
+        {
+            Debug.Log("[GameManager] Power effect completed - forcing game state save for reconnection sync");
+            Server.Singleton.SaveCurrentGameState();
+        }
 
         deckController.PeekOpponentCardAll(opponentPlayerNo);
 
@@ -2983,6 +2990,13 @@ public class GameManager : MonoBehaviour
             
             // Track power completion
             MoveChainIntegrator.ReportPowerCompletion("Kopyala Yapıştır", currentPlayerNo, $"Copied {sourceUniqueID} to {targetUniqueID}");
+            
+            // CRITICAL FIX: Force game state save after power completion to ensure reconnection sync
+            if (Server.Singleton != null)
+            {
+                Debug.Log("[GameManager] Power effect completed - forcing game state save for reconnection sync");
+                Server.Singleton.SaveCurrentGameState();
+            }
 
             // Copy cardID and sprite
 
@@ -3826,6 +3840,13 @@ public class GameManager : MonoBehaviour
 
         // Track power completion
         MoveChainIntegrator.ReportPowerCompletion("Bu Daha İyi", playerNo, $"Swapped hand card {handCardID} with center card {centerCardID}");
+        
+        // CRITICAL FIX: Force game state save after power completion to ensure reconnection sync
+        if (Server.Singleton != null)
+        {
+            Debug.Log("[GameManager] Power effect completed - forcing game state save for reconnection sync");
+            Server.Singleton.SaveCurrentGameState();
+        }
 
         // Swap card objects visually
 
@@ -3872,6 +3893,13 @@ public class GameManager : MonoBehaviour
         
         // Track power completion
         MoveChainIntegrator.ReportPowerCompletion("Şunu Değiş Tokuş", myPlayerNo, $"Swapped {myHandCardID} with {otherHandCardID} from P{otherPlayerNo}");
+        
+        // CRITICAL FIX: Force game state save after power completion to ensure reconnection sync
+        if (Server.Singleton != null)
+        {
+            Debug.Log("[GameManager] Power effect completed - forcing game state save for reconnection sync");
+            Server.Singleton.SaveCurrentGameState();
+        }
         
         // Swap in myCards if relevant
         if (deckController.thisPlayerNumber == myPlayerNo)
@@ -3944,6 +3972,8 @@ public class GameManager : MonoBehaviour
     public IEnumerator OnSunuDegisBunuTokusSynced(int myPlayerNo, int otherPlayerNo, string myHandCardID, string otherHandCardID, int myHandIndex, bool readyToExit = false)
 
     {
+        // Track power completion for move chain synchronization
+        MoveChainIntegrator.ReportPowerCompletion("Şunu Değiş Bunu Tokuş", myPlayerNo, $"Swapped {myHandCardID} with {otherHandCardID} from P{otherPlayerNo}");
 
         // Update myCards if relevant
 
@@ -3987,6 +4017,13 @@ public class GameManager : MonoBehaviour
         {
             deckController.ExitShowcaseAllOtherHands();
             deckController.TryStopShowcaseCenterCards();
+            
+            // CRITICAL FIX: Force game state save after power completion to ensure reconnection sync
+            if (Server.Singleton != null)
+            {
+                Debug.Log("[GameManager] Power effect completed - forcing game state save for reconnection sync");
+                Server.Singleton.SaveCurrentGameState();
+            }
         }
 
     }
@@ -4899,9 +4936,48 @@ public class GameManager : MonoBehaviour
         cardPowerEffects = snapshot.cardPowerEffects.ToDictionary();
         ApplyCardPowerEffects();
 
-        // TODO: Apply copied card map if needed
-        // var copiedCards = snapshot.copiedCardMap.ToDictionary();
-        // Handle card copying state restoration here
+        // CRITICAL FIX: Apply copied card map to restore Kopyala Yapıştır visual changes
+        var copiedCards = snapshot.copiedCardMap.ToDictionary();
+        ApplyCopiedCardMap(copiedCards);
+    }
+
+    /// <summary>
+    /// Applies copied card map to restore Kopyala Yapıştır visual changes after reconnection
+    /// </summary>
+    private void ApplyCopiedCardMap(Dictionary<string, string> copiedCards)
+    {
+        if (copiedCards == null || copiedCards.Count == 0) return;
+        
+        Debug.Log($"[GameManager] Applying copied card map with {copiedCards.Count} copied cards");
+        
+        foreach (var kvp in copiedCards)
+        {
+            string targetCardID = kvp.Key;
+            string sourceCardID = kvp.Value;
+            
+            Debug.Log($"[GameManager] Restoring copied card: {targetCardID} <- {sourceCardID}");
+            
+            // Find the target and source cards
+            if (CardInteraction.cardLookup.TryGetValue(targetCardID, out var targetCard) &&
+                CardInteraction.cardLookup.TryGetValue(sourceCardID, out var sourceCard))
+            {
+                // Restore the visual appearance
+                int[] newCardID = sourceCard.GetCardID();
+                Sprite newSprite = sourceCard.GetComponent<SpriteRenderer>().sprite;
+                
+                // Apply the visual change
+                targetCard.SetCardIDAndSprite(newCardID, newSprite);
+                targetCard.activePowerEffect = sourceCard.activePowerEffect;
+                
+                Debug.Log($"[GameManager] Successfully restored copied card {targetCardID} to look like {sourceCardID}");
+            }
+            else
+            {
+                Debug.LogWarning($"[GameManager] Could not find cards for copied mapping: {targetCardID} <- {sourceCardID}");
+            }
+        }
+        
+        Debug.Log("[GameManager] Copied card map application complete");
     }
 
     /// <summary>

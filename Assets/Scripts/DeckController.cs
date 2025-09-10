@@ -1076,6 +1076,7 @@ public class DeckController : MonoBehaviour
     [SerializeField] private float centerShowcaseMoveDuration = 0.4f; // Movement duration for showcase animation
     
     private bool isCenterShowcasing = false;
+    private bool isCenterShowcaseAnimating = false; // Flag to track if showcase animation is running
     private Dictionary<GameObject, (Vector3 pos, Quaternion rot, Vector3 scale)> centerShowcaseOriginalTransforms = new Dictionary<GameObject, (Vector3, Quaternion, Vector3)>();
     
     [ContextMenu("Showcase Player Pool Cards")]
@@ -1196,8 +1197,13 @@ public class DeckController : MonoBehaviour
     public void ShowcaseCenterCards()
     {
         if (isCenterShowcasing) return; // Already showcasing
+        if (isCenterShowcaseAnimating) return; // Animation in progress, ignore
+        
+        // OPTION 2: Force-kill all center animations before starting
+        KillAllCenterCardAnimations();
         
         isCenterShowcasing = true;
+        isCenterShowcaseAnimating = true; // Set animation flag
         centerShowcaseOriginalTransforms.Clear();
         
         // Get all center cards
@@ -1258,8 +1264,10 @@ public class DeckController : MonoBehaviour
     public void StopShowcaseCenterCards()
     {
         if (!isCenterShowcasing) return;
+        if (isCenterShowcaseAnimating) return; // Animation in progress, ignore
         
         isCenterShowcasing = false;
+        isCenterShowcaseAnimating = true; // Set animation flag for closing
         
         // Restore all center cards to their original positions
         foreach (var kvp in centerShowcaseOriginalTransforms)
@@ -1297,6 +1305,11 @@ public class DeckController : MonoBehaviour
         moveSeq.Join(cardObject.transform.DOScale(scale, duration));
 
         yield return moveSeq.WaitForCompletion();
+        
+        // Clear animation flag when this specific card's animation completes
+        // Note: This will be called for each card, but we only need to clear it once
+        // We'll use a counter or check if all animations are done
+        CheckAndClearShowcaseAnimationFlag();
     }
     
 
@@ -1307,6 +1320,58 @@ public class DeckController : MonoBehaviour
     public bool IsCenterShowcasing()
     {
         return isCenterShowcasing;
+    }
+    
+    /// <summary>
+    /// Public method to check if center showcase animation is currently running
+    /// </summary>
+    public bool IsCenterShowcaseAnimating()
+    {
+        return isCenterShowcaseAnimating;
+    }
+    
+    /// <summary>
+    /// Check if all showcase animations are complete and clear the flag
+    /// </summary>
+    private void CheckAndClearShowcaseAnimationFlag()
+    {
+        // Check if any center cards are still animating
+        if (centerTransform != null)
+        {
+            foreach (Transform child in centerTransform)
+            {
+                var cardInteraction = child.GetComponent<CardInteraction>();
+                if (cardInteraction != null && cardInteraction.IsAnimating())
+                {
+                    return; // Still animating, don't clear flag yet
+                }
+            }
+        }
+        
+        // All animations complete, clear the flag
+        isCenterShowcaseAnimating = false;
+        Debug.Log("[DeckController] Center showcase animation completed, flag cleared");
+    }
+    
+    /// <summary>
+    /// Force-kills all animations on center cards (Option 2 approach)
+    /// </summary>
+    public void KillAllCenterCardAnimations()
+    {
+        if (centerTransform != null)
+        {
+            foreach (Transform child in centerTransform)
+            {
+                var cardInteraction = child.GetComponent<CardInteraction>();
+                if (cardInteraction != null)
+                {
+                    cardInteraction.KillAllTweens();
+                }
+            }
+        }
+        
+        // Clear animation flag when force-killing animations
+        isCenterShowcaseAnimating = false;
     }
 
     [ContextMenu("Showcase All Piştis and Point Cards")]

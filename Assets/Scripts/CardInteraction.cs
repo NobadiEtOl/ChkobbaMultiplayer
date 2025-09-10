@@ -223,6 +223,13 @@ public class CardInteraction : MonoBehaviour
             // Handle center card showcase
             if (DeckController.LocalInstance != null)
             {
+                // OPTION 1: Prevent clicks during animation (safer approach)
+                if (DeckController.LocalInstance.IsCenterShowcaseAnimating())
+                {
+                    Debug.Log("[CardInteraction] Center showcase animation in progress - ignoring click");
+                    return;
+                }
+                
                 if (DeckController.LocalInstance.IsCenterShowcasing())
                 {
                     Debug.Log("[CardInteraction] Stopping center showcase");
@@ -676,7 +683,13 @@ public class CardInteraction : MonoBehaviour
             yield return null;
     }
 
-
+    /// <summary>
+    /// Check if this card is currently animating (has active DOTween tweens)
+    /// </summary>
+    public bool IsAnimating()
+    {
+        return DOTween.IsTweening(transform);
+    }
 
     public IEnumerator WaitForAllTweens(Transform target)
     {

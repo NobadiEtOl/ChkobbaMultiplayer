@@ -190,6 +190,36 @@ public class SuperPowerSpawner : MonoBehaviour
     private void HandleTokenRaycast(RaycastHit hit)
     {
         Debug.LogWarning("Object touched: " + hit.collider.gameObject.tag);
+        Debug.LogWarning("Object name: " + hit.collider.gameObject.name);
+        
+        // Check if it's a button click
+        Button clickedButton = hit.collider.GetComponent<Button>();
+        if (clickedButton != null)
+        {
+            Debug.LogError("🔴 [SuperPowerSpawner] BUTTON CLICKED VIA RAYCAST: " + hit.collider.gameObject.name);
+            
+            // Check if it's the close button
+            if (hit.collider.gameObject.name.Contains("Close") || clickedButton == closeButton)
+            {
+                Debug.LogError("🔴 [SuperPowerSpawner] CLOSE BUTTON CLICKED VIA RAYCAST!");
+                // Manually trigger the close button action
+                if (SuperPowerToken.ActiveInstance != null)
+                {
+                    Debug.LogError($"[SuperPowerSpawner] Destroying power: {SuperPowerToken.ActiveInstance.power?.name}");
+                    RemoveSpawnedSuperPower(SuperPowerToken.ActiveInstance.gameObject);
+                    UpdateTokenPositions();
+                    StartCoroutine(SuperPowerToken.ActiveInstance.FadeOutSprite());
+                    StartCoroutine(CloseInfoBox());
+                }
+                else
+                {
+                    Debug.LogError("[SuperPowerSpawner] Close button clicked but SuperPowerToken.ActiveInstance is null!");
+                    StartCoroutine(CloseInfoBox());
+                }
+                return;
+            }
+        }
+        
         if (hit.collider.gameObject.tag == "Token")
         {
             SuperPowerToken superPowerToken = hit.collider.GetComponent<SuperPowerToken>();
@@ -207,6 +237,7 @@ public class SuperPowerSpawner : MonoBehaviour
 
     private void GetUIElements()
     {
+        Debug.LogError("🔧 [SuperPowerSpawner] GetUIElements() called!");
         backgroundPanel = GameObject.Find("InfoBoxBackGroundPanel")?.gameObject;
         
         if (backgroundPanel == null)
@@ -239,16 +270,60 @@ public class SuperPowerSpawner : MonoBehaviour
         closeButton = infoBoxCanvas.transform.Find("CloseButton")?.GetComponent<Button>();
         if (closeButton == null)
             closeButton = GameObject.Find("CloseButton")?.GetComponent<Button>();
+            
+        Debug.LogError($"[SuperPowerSpawner] Close button search result: {closeButton != null}");
+        if (closeButton != null)
+        {
+            Debug.LogError($"[SuperPowerSpawner] Close button found: {closeButton.gameObject.name}");
+        }
 
         // Debug what we found
-        Debug.Log($"[SuperPowerSpawner] UI Elements found:");
-        Debug.Log($"  - backgroundPanel: {(backgroundPanel != null ? "✓" : "✗")}");
-        Debug.Log($"  - infoBoxCanvas: {(infoBoxCanvas != null ? "✓" : "✗")}");
-        Debug.Log($"  - nameText: {(nameText != null ? "✓" : "✗")}");
-        Debug.Log($"  - descriptionText: {(descriptionText != null ? "✓" : "✗")}");
-        Debug.Log($"  - activateButton: {(activateButton != null ? "✓" : "✗")}");
-        Debug.Log($"  - falseActivateButton: {(falseActivateButton != null ? "✓" : "✗")}");
-        Debug.Log($"  - closeButton: {(closeButton != null ? "✓" : "✗")}");
+        Debug.LogError($"[SuperPowerSpawner] UI Elements found:");
+        Debug.LogError($"  - backgroundPanel: {(backgroundPanel != null ? "✓" : "✗")}");
+        Debug.LogError($"  - infoBoxCanvas: {(infoBoxCanvas != null ? "✓" : "✗")}");
+        Debug.LogError($"  - nameText: {(nameText != null ? "✓" : "✗")}");
+        Debug.LogError($"  - descriptionText: {(descriptionText != null ? "✓" : "✗")}");
+        Debug.LogError($"  - activateButton: {(activateButton != null ? "✓" : "✗")}");
+        Debug.LogError($"  - falseActivateButton: {(falseActivateButton != null ? "✓" : "✗")}");
+        Debug.LogError($"  - closeButton: {(closeButton != null ? "✓" : "✗")}");
+        
+        // CRITICAL: Detailed close button debugging
+        if (closeButton != null)
+        {
+            Debug.LogError($"🔍 [SuperPowerSpawner] CLOSE BUTTON DETAILS:");
+            Debug.LogError($"  - GameObject Name: {closeButton.gameObject.name}");
+            Debug.LogError($"  - GameObject Active: {closeButton.gameObject.activeInHierarchy}");
+            Debug.LogError($"  - Button Component: {closeButton != null}");
+            Debug.LogError($"  - Button Interactable: {closeButton.interactable}");
+            Debug.LogError($"  - Button Enabled: {closeButton.enabled}");
+            Debug.LogError($"  - Button GameObject Active: {closeButton.gameObject.activeSelf}");
+            Debug.LogError($"  - Button Parent: {(closeButton.transform.parent != null ? closeButton.transform.parent.name : "NULL")}");
+            Debug.LogError($"  - Button Position: {closeButton.transform.position}");
+            Debug.LogError($"  - Button Scale: {closeButton.transform.localScale}");
+            
+            // Check if button has a collider
+            var collider = closeButton.GetComponent<Collider>();
+            Debug.LogError($"  - Has Collider: {collider != null}");
+            if (collider != null)
+            {
+                Debug.LogError($"  - Collider Enabled: {collider.enabled}");
+                Debug.LogError($"  - Collider IsTrigger: {collider.isTrigger}");
+            }
+            
+            // Check if button has a CanvasGroup
+            var canvasGroup = closeButton.GetComponent<CanvasGroup>();
+            Debug.LogError($"  - Has CanvasGroup: {canvasGroup != null}");
+            if (canvasGroup != null)
+            {
+                Debug.LogError($"  - CanvasGroup Alpha: {canvasGroup.alpha}");
+                Debug.LogError($"  - CanvasGroup Interactable: {canvasGroup.interactable}");
+                Debug.LogError($"  - CanvasGroup BlocksRaycasts: {canvasGroup.blocksRaycasts}");
+            }
+        }
+        else
+        {
+            Debug.LogError("❌ [SuperPowerSpawner] CLOSE BUTTON IS NULL!");
+        }
 
         if (nameText == null || descriptionText == null || activateButton == null || closeButton == null)
         {
@@ -260,15 +335,41 @@ public class SuperPowerSpawner : MonoBehaviour
             return;
         }
 
+        // CRITICAL FIX: Remove existing listeners before adding new ones to prevent multiple listeners
+        Debug.LogError("🔧 [SuperPowerSpawner] Setting up button listeners...");
+        activateButton.onClick.RemoveAllListeners();
+        falseActivateButton.onClick.RemoveAllListeners();
+        closeButton.onClick.RemoveAllListeners();
+        
+        Debug.LogError($"[SuperPowerSpawner] Close button found: {closeButton != null}");
+        Debug.LogError($"[SuperPowerSpawner] Close button GameObject: {(closeButton != null ? closeButton.gameObject.name : "NULL")}");
+        
         activateButton.onClick.AddListener(OnTokenClicked);
         falseActivateButton.onClick.AddListener(GetActiveButtonErrorMessage);
+        
+        Debug.LogError("🔧 [SuperPowerSpawner] Adding close button listener...");
         closeButton.onClick.AddListener(() =>
         {
-            RemoveSpawnedSuperPower(SuperPowerToken.ActiveInstance.gameObject);
-            UpdateTokenPositions();
-            StartCoroutine(SuperPowerToken.ActiveInstance.FadeOutSprite());
-            StartCoroutine(CloseInfoBox());
+            Debug.LogError("🔴 [SuperPowerSpawner] CLOSE BUTTON CLICKED! 🔴");
+            Debug.LogError($"[SuperPowerSpawner] Close button GameObject: {closeButton.gameObject.name}");
+            Debug.LogError($"[SuperPowerSpawner] Close button active: {closeButton.gameObject.activeInHierarchy}");
+            Debug.LogError($"[SuperPowerSpawner] Close button interactable: {closeButton.interactable}");
+            
+            if (SuperPowerToken.ActiveInstance != null)
+            {
+                Debug.LogError($"[SuperPowerSpawner] Destroying power: {SuperPowerToken.ActiveInstance.power?.name}");
+                RemoveSpawnedSuperPower(SuperPowerToken.ActiveInstance.gameObject);
+                UpdateTokenPositions();
+                StartCoroutine(SuperPowerToken.ActiveInstance.FadeOutSprite());
+                StartCoroutine(CloseInfoBox());
+            }
+            else
+            {
+                Debug.LogError("[SuperPowerSpawner] Close button clicked but SuperPowerToken.ActiveInstance is null!");
+                StartCoroutine(CloseInfoBox());
+            }
         });
+        Debug.LogError("✅ [SuperPowerSpawner] Close button listener added successfully!");
 
         StartCoroutine(CloseInfoBoxImmediate()); // Ensure the info box is closed initially without animation
     }

@@ -919,13 +919,61 @@ public class NetworkManagerUI : MonoBehaviour
 
     // === ORIGINAL METHODS (UPDATED) ===
 
+    /// <summary>
+    /// Clears only game-related PlayerPrefs to prevent automatic reconnection interference
+    /// </summary>
+    private void ClearGamePlayerPrefs()
+    {
+        Debug.Log("[NetworkManagerUI] Clearing game-related PlayerPrefs for fresh game start");
+        
+        // Clear game-specific PlayerPrefs that could interfere with new games
+        string[] gameRelatedKeys = {
+            "PlayerNumber",
+            "LastGameJoined", 
+            "LastGamePlayerCount",
+            "GameInProgress",
+            "JoinCode",
+            "LobbyCode"
+        };
+        
+        foreach (string key in gameRelatedKeys)
+        {
+            if (PlayerPrefs.HasKey(key))
+            {
+                string value = PlayerPrefs.GetString(key, "");
+                if (string.IsNullOrEmpty(value))
+                {
+                    int intValue = PlayerPrefs.GetInt(key, -999);
+                    if (intValue != -999)
+                    {
+                        Debug.Log($"[NetworkManagerUI] Cleared {key}: {intValue}");
+                    }
+                }
+                else
+                {
+                    Debug.Log($"[NetworkManagerUI] Cleared {key}: {value}");
+                }
+                PlayerPrefs.DeleteKey(key);
+            }
+        }
+        
+        // Save the changes
+        PlayerPrefs.Save();
+        
+        // Reset internal state
+        lastGameJoined = "";
+        isInGame = false;
+        
+        Debug.Log("[NetworkManagerUI] Game PlayerPrefs cleared successfully - fresh game start ready");
+    }
+
     void SetupButtonListeners()
     {
-        clientButton.onClick.AddListener(async () => { await StartClientWithRelay(); });
-        hostTwoPlayerButton.onClick.AddListener(async () => {await StartHostWithRelay(2,true); });
-        hostFourPlayerButton.onClick.AddListener(async () => {await StartHostWithRelay(4,true); });
-        quickPlayTwoPlayerButton.onClick.AddListener(async () => { await FindLobbiesAndStartHostIfNoneExist(2); });
-        quickPlayFourPlayerButton.onClick.AddListener(async () => { await FindLobbiesAndStartHostIfNoneExist(4); });
+        clientButton.onClick.AddListener(async () => { ClearGamePlayerPrefs(); await StartClientWithRelay(); });
+        hostTwoPlayerButton.onClick.AddListener(async () => { ClearGamePlayerPrefs(); await StartHostWithRelay(2,true); });
+        hostFourPlayerButton.onClick.AddListener(async () => { ClearGamePlayerPrefs(); await StartHostWithRelay(4,true); });
+        quickPlayTwoPlayerButton.onClick.AddListener(async () => { ClearGamePlayerPrefs(); await FindLobbiesAndStartHostIfNoneExist(2); });
+        quickPlayFourPlayerButton.onClick.AddListener(async () => { ClearGamePlayerPrefs(); await FindLobbiesAndStartHostIfNoneExist(4); });
 
         //FindLobbiesAndStartHostIfNoneExist(4);
     }
