@@ -439,7 +439,9 @@ public class GameManager : MonoBehaviour
 
         }
 
-
+        // NOTE: Do NOT clear PlayerPrefs on new round - this is still the same game/lobby
+        // Player numbers and join codes should persist across rounds within the same game
+        // Only clear PlayerPrefs when starting a completely new game (different lobby/relay)
 
     }
 
@@ -802,8 +804,19 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            Debug.Log("[GameManager] InitializeCardPrefabs called for reconnection - following normal StartGame flow");
-            isReconnecting = true;
+            // SAFETY CHECK: Only process reconnection logic if we're not the host
+            if (NetworkManager.Singleton.IsHost)
+            {
+                Debug.LogError("[GameManager] SAFETY CHECK: Host received reconnection InitializeCardPrefabs - this should not happen! Treating as new game instead.");
+                ResetForNewRound();
+                roundCount++;
+                isReconnecting = false;
+            }
+            else
+            {
+                Debug.Log("[GameManager] InitializeCardPrefabs called for reconnection - following normal StartGame flow");
+                isReconnecting = true;
+            }
             
             // RECONNECTION FIX: Do NOT clear cardLookup - let it be populated normally
             // The card IDs will be deterministic and match the server
@@ -811,6 +824,9 @@ public class GameManager : MonoBehaviour
             // CRITICAL: Reset event subscription flag for reconnection
             Debug.Log("[GameManager] Resetting alreadySubbed flag for reconnection");
             alreadySubbed = false;
+            
+            // CRITICAL FIX: Restore player number from PlayerPrefs for reconnection
+            RestorePlayerNumberFromPrefs();
         }
 
         Debug.Log("[GameManager] Checking and managing UI screens...");
@@ -863,10 +879,19 @@ public class GameManager : MonoBehaviour
 
         if (isReconnecting)
         {
-            // For reconnecting clients, use the specific RPC that passes the client ID explicitly
-            Debug.Log($"[GameManager] Calling networkRelay.ReconnectingClientCardsReadyServerRPC({NetworkManager.Singleton.LocalClientId})...");
-            networkRelay.ReconnectingClientCardsReadyServerRPC(NetworkManager.Singleton.LocalClientId);
-            Debug.Log($"[GameManager] networkRelay.ReconnectingClientCardsReadyServerRPC() call completed");
+            // SAFETY CHECK: Only process reconnection logic if we're not the host
+            if (NetworkManager.Singleton.IsHost)
+            {
+                Debug.LogError("[GameManager] SAFETY CHECK: Host is in reconnecting state - this should not happen! Using normal flow instead.");
+                networkRelay.DeckReadyServerRPC();
+            }
+            else
+            {
+                // For reconnecting clients, use the specific RPC that passes the client ID explicitly
+                Debug.Log($"[GameManager] Calling networkRelay.ReconnectingClientCardsReadyServerRPC({NetworkManager.Singleton.LocalClientId})...");
+                networkRelay.ReconnectingClientCardsReadyServerRPC(NetworkManager.Singleton.LocalClientId);
+                Debug.Log($"[GameManager] networkRelay.ReconnectingClientCardsReadyServerRPC() call completed");
+            }
         }
         else
         {
@@ -2060,7 +2085,7 @@ public class GameManager : MonoBehaviour
     public void GetPlayerNumber(int playerNumber)
 
     {
-
+        Debug.LogError($"[PLAYER NUMBER] GetPlayerNumber called with playerNumber: {playerNumber}");
         deckController.SetPlayerNumber(playerNumber);
 
     }
@@ -5730,6 +5755,11 @@ public class GameManager : MonoBehaviour
         // Wait for the game state to be fully applied
         yield return new WaitForSeconds(1.0f);
         
+        // CRITICAL FIX: Reset isReconnecting flag after reconnection sync is complete
+        // This allows normal dealing to work again
+        isReconnecting = false;
+        Debug.LogError("[RECONNECTION] isReconnecting flag reset to false - normal dealing can now work");
+        
         // Check if MoveChainIntegrator is available
         if (MoveChainIntegrator.LocalInstance != null)
         {
@@ -5762,6 +5792,51 @@ public class GameManager : MonoBehaviour
         }
     }
     
+    /// <summary>
+    /// Restores player number from PlayerPrefs during reconnection
+    /// </summary>
+    private void RestorePlayerNumberFromPrefs()
+    {
+        Debug.LogError($"[PLAYER NUMBER] ===== RESTORING PLAYER NUMBER FROM PREFS =====");
+        Debug.LogError($"[PLAYER NUMBER] PlayerPrefs.HasKey('PlayerNumber'): {PlayerPrefs.HasKey("PlayerNumber")}");
+        
+        if (PlayerPrefs.HasKey("PlayerNumber"))
+        {
+            int savedPlayerNumber = PlayerPrefs.GetInt("PlayerNumber");
+            Debug.LogError($"[PLAYER NUMBER] Restoring player number {savedPlayerNumber} from PlayerPrefs during reconnection");
+            
+            // Set the player number directly on DeckController
+            if (deckController != null)
+            {
+                Debug.LogError($"[PLAYER NUMBER] DeckController found, calling SetPlayerNumber({savedPlayerNumber})");
+                deckController.SetPlayerNumber(savedPlayerNumber);
+                Debug.LogError($"[PLAYER NUMBER] Successfully restored player number {savedPlayerNumber} to DeckController");
+                Debug.LogError($"[PLAYER NUMBER] DeckController.thisPlayerNumber is now: {deckController.thisPlayerNumber}");
+            }
+            else
+            {
+                Debug.LogError($"[PLAYER NUMBER] ERROR: DeckController is null, cannot restore player number");
+            }
+        }
+        else
+        {
+            Debug.LogError($"[PLAYER NUMBER] WARNING: No saved player number found in PlayerPrefs during reconnection");
+            Debug.LogError($"[PLAYER NUMBER] Available PlayerPrefs keys: {string.Join(", ", GetAllPlayerPrefsKeys())}");
+        }
+        
+        Debug.LogError($"[PLAYER NUMBER] ===== END RESTORING PLAYER NUMBER =====");
+    }
+    
+    private string[] GetAllPlayerPrefsKeys()
+    {
+        // This is a helper method to debug what's in PlayerPrefs
+        // Note: Unity doesn't provide a direct way to get all keys, so we'll check common ones
+        var keys = new List<string>();
+        if (PlayerPrefs.HasKey("PlayerNumber")) keys.Add("PlayerNumber");
+        if (PlayerPrefs.HasKey("JoinCode")) keys.Add("JoinCode");
+        if (PlayerPrefs.HasKey("LobbyCode")) keys.Add("LobbyCode");
+        return keys.ToArray();
+    }
 
 }
 

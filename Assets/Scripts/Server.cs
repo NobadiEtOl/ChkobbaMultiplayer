@@ -403,6 +403,8 @@ public class Server : NetworkBehaviour
     //Chooses the cards to be dealth to the players
     private void DealCardsToPlayerHands()
     {
+        Debug.LogError($"[DEALING] DealCardsToPlayerHands CALLED - turnCounter: {turnCounter}, deckCardsDict.Count: {deckCardsDict?.Count ?? 0}, reconnectingClients.Count: {reconnectingClients.Count}");
+        
         InitializePlayersHands();//With each new deal players has to start with a fresh hand
         for (int i = 0; i < 4; i++)
         {
@@ -417,6 +419,8 @@ public class Server : NetworkBehaviour
                 deckCardsDict.Remove(uniqueID);
             }
         }
+
+        Debug.LogError($"[DEALING] DealCardsToPlayerHands COMPLETED - dealt {playerCount * 4} cards, remaining deck: {deckCardsDict?.Count ?? 0}");
 
         //Sends players hand to the gameManger so that card objects be given to the players
         SerializableDictionary playersHandCardsIDsSerialized = new SerializableDictionary(playersHandCardsIDs);
@@ -497,10 +501,10 @@ public class Server : NetworkBehaviour
         //if(!singleDebuggingMode)
         //{
         readyToEndTurnCounter++;
-        // Debug.Log($"[Server] EndTurnCheck called, readyToEndTurnCounter: {readyToEndTurnCounter}, connectedPlayerCount: {connectedPlayerCount}, currentPlayer: {currentPlayer}");
+        Debug.LogError($"[END TURN CHECK] readyToEndTurnCounter: {readyToEndTurnCounter}, connectedPlayerCount: {connectedPlayerCount}, currentPlayer: {currentPlayer}, turnCounter: {turnCounter}");
         if (readyToEndTurnCounter == connectedPlayerCount)
         {
-            // Debug.Log($"[Server] All players ready, calling EndTurn()");
+            Debug.LogError($"[END TURN CHECK] All players ready, calling EndTurn() - turnCounter: {turnCounter}");
             EndTurn();
             readyToEndTurnCounter = 0;
         }
@@ -509,6 +513,12 @@ public class Server : NetworkBehaviour
     //Called at the end of each turn
     public void EndTurn()
     {
+        // Debug.Log($"[Server] ===== END TURN CALLED =====\n" +
+        //          $"TurnCounter: {turnCounter}\n" +
+        //          $"PlayerCount: {playerCount}\n" +
+        //          $"ConnectedPlayerCount: {connectedPlayerCount}\n" +
+        //          $"ReconnectingClients: {reconnectingClients.Count}");
+        
         //Debug.LogWarning("InsideEndTurn");
         if (turnCounter == 47)
         {
@@ -516,11 +526,21 @@ public class Server : NetworkBehaviour
             //DecideWinner();
         }
         // NOTE: Oynayamazsın pending logic moved to GetMove() to activate when next card is played
-        if (turnCounter % (playerCount * 4) == (playerCount * 4) - 1)
+        
+        int modulo = turnCounter % (playerCount * 4);
+        int target = (playerCount * 4) - 1;
+        
+        Debug.LogError($"[DEALING CHECK] turnCounter: {turnCounter}, playerCount: {playerCount}, modulo: {modulo}, target: {target}, shouldDeal: {modulo == target}");
+        
+        if (modulo == target)
         {
             //If each player played their 4 cards new cards are dealt
+            Debug.LogError($"[DEALING] TIME TO DEAL NEW CARDS! turnCounter: {turnCounter}, calling DealCardsToPlayerHands in 1 second");
             Invoke("DealCardsToPlayerHands", 1f);
         }
+        
+        // CRITICAL FIX: Increment turn counter AFTER checking if it's time to deal
+        // This ensures the dealing logic works correctly with the original design
         NextTurn();
 
         // NOTE: Ver Zehri and Kutsal Deste pending logic moved to GetMove() to activate when next card is played
@@ -531,7 +551,10 @@ public class Server : NetworkBehaviour
 
     private void NextTurn()
     {
+        int oldTurnCounter = turnCounter;
         turnCounter++;
+
+        Debug.LogError($"[TURN COUNTER] INCREMENTED: {oldTurnCounter} → {turnCounter}");
 
         currentPlayer = (currentPlayer + 1) % playerCount;
 
@@ -1058,7 +1081,23 @@ public class Server : NetworkBehaviour
         connectionLog.AppendLine($"SERVER MESSAGE: Is Host: {NetworkManager.Singleton.IsHost}");
         connectionLog.AppendLine($"SERVER MESSAGE: Is Server: {NetworkManager.Singleton.IsServer}");
         
-        networkRelay.GetPlayerNumberClientRPC(clientId, connectedPlayerCount);
+        // CRITICAL FIX: Check if this is a reconnection vs a new game start
+        // If the game is already in progress (turnCounter > 0), this is a reconnection
+        // BUT: Only the reconnecting client should go through reconnection flow, not the host
+        bool isReconnection = turnCounter > 0 && clientId != NetworkManager.Singleton.LocalClientId;
+        
+        // Only assign player number to new players, not reconnecting ones
+        // Reconnecting players will restore their player number from PlayerPrefs
+        if (!isReconnection)
+        {
+            networkRelay.GetPlayerNumberClientRPC(clientId, connectedPlayerCount);
+            Debug.LogError($"[PLAYER NUMBER] Assigned player number {connectedPlayerCount} to new client {clientId}");
+        }
+        else
+        {
+            Debug.LogError($"[PLAYER NUMBER] Skipping player number assignment for reconnecting client {clientId} - will restore from PlayerPrefs");
+        }
+        
         connectedPlayerCount++;
         
         connectionLog.AppendLine($"SERVER MESSAGE: New connected player count: {connectedPlayerCount}");
@@ -1073,13 +1112,19 @@ public class Server : NetworkBehaviour
             isRelayKeepAliveActive = true;
             relayKeepAliveCoroutine = StartCoroutine(RelayKeepAliveCoroutine());
         }
-
-        // CRITICAL FIX: Check if this is a reconnection vs a new game start
-        // If the game is already in progress (turnCounter > 0), this is a reconnection
-        bool isReconnection = turnCounter > 0;
+        
+        // Debug.Log($"[Server] ===== TURN COUNTER CHECK =====\n" +
+        //          $"ClientId: {clientId}\n" +
+        //          $"TurnCounter: {turnCounter}\n" +
+        //          $"IsReconnection: {isReconnection}\n" +
+        //          $"ConnectedPlayerCount: {connectedPlayerCount}\n" +
+        //          $"PlayerCount: {playerCount}\n" +
+        //          $"RoundCount: {roundCount}");
         
         if (isReconnection)
         {
+            Debug.LogError($"[RECONNECTION] Client {clientId} reconnected to existing game - turnCounter: {turnCounter}, connectedPlayerCount: {connectedPlayerCount}");
+            
             connectionLog.AppendLine($"SERVER MESSAGE: Client {clientId} reconnected to existing game (turn {turnCounter})");
             if (wasKeepAliveInactive)
             {
@@ -1089,17 +1134,22 @@ public class Server : NetworkBehaviour
             // RECONNECTION: Track this client as reconnecting
             reconnectingClients.Add(clientId);
             
+            // RECONNECTION FIX: Reset turn counters to ensure proper turn processing
+            readyToEndTurnCounter = 0;
+            Debug.LogError($"[RECONNECTION] Reset readyToEndTurnCounter to 0 for reconnected client");
+            
             // Single comprehensive log for reconnection start
             Debug.Log($"[Server] ===== ÖNEMLİ: RECONNECTION START =====\n" +
                      $"Client {clientId} reconnected to existing game\n" +
                      $"Game state: turn {turnCounter}, players: {playerCount}, connected: {connectedPlayerCount}\n" +
                      $"Center cards: {centerCardsDict?.Count ?? 0}, Player hands: {playersHandCardsIDs?.Count ?? 0}\n" +
                      $"Keep-alive was inactive: {wasKeepAliveInactive}\n" +
-                     $"Client added to reconnecting set: {reconnectingClients.Count} clients reconnecting");
+                     $"Client added to reconnecting set: {reconnectingClients.Count} clients reconnecting\n" +
+                     $"Reset readyToEndTurnCounter to 0 for proper turn processing");
             
             // RECONNECTION: Follow the same initialization as StartGame() but with sync instead of deals
-            // Step 1: Give player count (same as StartGame)
-            GivePlayerCount();
+            // Step 1: Give player count (same as StartGame) - but only to reconnecting client
+            networkRelay.GivePlayerCountForReconnectedClientClientRPC(playerCount, clientId);
             
             // Step 2: Initialize card system (same as StartGame but with reconnection flag)
             if (networkRelay != null)
@@ -1108,7 +1158,8 @@ public class Server : NetworkBehaviour
                 Invoke("CallUpdateCurrentPlayer", 1);
                 
                 // Step 4: Initialize card prefabs (same as StartGame but with reconnection flag)
-                networkRelay.InitializeCardPrefabsClientRPC(true); // true = isReconnection
+                // CRITICAL FIX: Only send to the reconnecting client, not all clients
+                networkRelay.InitializeCardPrefabsForReconnectedClientClientRPC(true, clientId); // true = isReconnection
                 
                 // Single comprehensive log for reconnection initialization complete
                 Debug.Log($"[Server] ===== ÖNEMLİ: RECONNECTION INITIALIZATION COMPLETE =====\n" +

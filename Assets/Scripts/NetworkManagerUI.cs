@@ -973,6 +973,11 @@ public class NetworkManagerUI : MonoBehaviour
             return null;
         }
         
+        // CRITICAL FIX: Clear PlayerPrefs when starting a completely new game/lobby
+        // This ensures fresh player assignment for new games, but preserves data within the same game
+        PlayerPrefs.DeleteKey("PlayerNumber");
+        Debug.LogError("[PLAYER NUMBER] Cleared saved player number for new game/lobby");
+        
         Debug.Log("[NetworkManagerUI] Using existing Unity Services connection for hosting");
 
         Allocation allocation = await RelayService.Instance.CreateAllocationAsync(playerCount);

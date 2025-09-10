@@ -44,26 +44,42 @@ public class NetworkRelay : NetworkBehaviour
     [ClientRpc(RequireOwnership = false)]
     public void InitializeCardPrefabsClientRPC(bool isReconnection = false)
     {
-        Debug.Log($"[NetworkRelay] ===== ÖNEMLİ: INITIALIZE CARD PREFABS CLIENT RPC RECEIVED =====\n" +
-                 $"IsReconnection: {isReconnection}\n" +
-                 $"GameManager.LocalInstance: {(GameManager.LocalInstance != null ? "FOUND" : "NULL")}\n" +
-                 $"Calling GameManager.InitializeCardPrefabs({isReconnection})");
+        // Debug.Log($"[NetworkRelay] ===== ÖNEMLİ: INITIALIZE CARD PREFABS CLIENT RPC RECEIVED =====\n" +
+        //          $"IsReconnection: {isReconnection}\n" +
+        //          $"GameManager.LocalInstance: {(GameManager.LocalInstance != null ? "FOUND" : "NULL")}\n" +
+        //          $"Calling GameManager.InitializeCardPrefabs({isReconnection})");
         
         StartCoroutine(GameManager.LocalInstance.InitializeCardPrefabs(isReconnection));
         
-        Debug.Log($"[NetworkRelay] ===== ÖNEMLİ: INITIALIZE CARD PREFABS CLIENT RPC COMPLETED =====");
+        // Debug.Log($"[NetworkRelay] ===== ÖNEMLİ: INITIALIZE CARD PREFABS CLIENT RPC COMPLETED =====");
+    }
+    
+    [ClientRpc(RequireOwnership = false)]
+    public void InitializeCardPrefabsForReconnectedClientClientRPC(bool isReconnection, ulong targetClientId)
+    {
+        // Only process if this is the target client
+        if (NetworkManager.Singleton.LocalClientId == targetClientId)
+        {
+            Debug.LogError($"[RECONNECTION] InitializeCardPrefabsForReconnectedClientClientRPC received by target client {targetClientId}");
+            StartCoroutine(GameManager.LocalInstance.InitializeCardPrefabs(isReconnection));
+        }
+        else
+        {
+            Debug.LogError($"[RECONNECTION] InitializeCardPrefabsForReconnectedClientClientRPC received by non-target client {NetworkManager.Singleton.LocalClientId}, target was {targetClientId}");
+        }
     }
 
     [ClientRpc(RequireOwnership = false)]
     public void DealCardPrefabsToPlayersClientRPC(int playerCount, SerializableDictionary serializableDictionary)
     {
+        Debug.LogError($"[DEALING RPC] DealCardPrefabsToPlayersClientRPC received - playerCount: {playerCount}, hands: {serializableDictionary.Count}");
         GameManager.LocalInstance.CardPrefabsToPlayers(playerCount, serializableDictionary);
     }
 
     [ClientRpc(RequireOwnership = false)]
     public void DealCardPrefabsToCenterClientRPC(SerializableCard serializableCard)
     {
-        Debug.Log("DealCardPrefabsToCenterClientRPC called");
+        // Debug.Log("DealCardPrefabsToCenterClientRPC called");
         GameManager.LocalInstance.CardPrefabsToCenter(serializableCard);
     }
 
@@ -115,14 +131,29 @@ public class NetworkRelay : NetworkBehaviour
     [ClientRpc(RequireOwnership = false)]
     public void GivePlayerCountClientRPC(int playerCount)
     {
-        Debug.Log($"[NetworkRelay] ===== ÖNEMLİ: GIVE PLAYER COUNT CLIENT RPC RECEIVED =====\n" +
-                 $"PlayerCount: {playerCount}\n" +
-                 $"DeckController.LocalInstance: {(DeckController.LocalInstance != null ? "FOUND" : "NULL")}\n" +
-                 $"Calling DeckController.GetPlayerCount({playerCount})");
+        // Debug.Log($"[NetworkRelay] ===== ÖNEMLİ: GIVE PLAYER COUNT CLIENT RPC RECEIVED =====\n" +
+        //          $"PlayerCount: {playerCount}\n" +
+        //          $"DeckController.LocalInstance: {(DeckController.LocalInstance != null ? "FOUND" : "NULL")}\n" +
+        //          $"Calling DeckController.GetPlayerCount({playerCount})");
         
-        DeckController.LocalInstance.GetPlayerCount(playerCount);
+        DeckController.LocalInstance.GetPlayerCount(playerCount, false); // false = not reconnection
         
-        Debug.Log($"[NetworkRelay] ===== ÖNEMLİ: GIVE PLAYER COUNT CLIENT RPC COMPLETED =====");
+        // Debug.Log($"[NetworkRelay] ===== ÖNEMLİ: GIVE PLAYER COUNT CLIENT RPC COMPLETED =====");
+    }
+    
+    [ClientRpc(RequireOwnership = false)]
+    public void GivePlayerCountForReconnectedClientClientRPC(int playerCount, ulong targetClientId)
+    {
+        // Only process if this is the target client
+        if (NetworkManager.Singleton.LocalClientId == targetClientId)
+        {
+            Debug.LogError($"[RECONNECTION] GivePlayerCountForReconnectedClientClientRPC received by target client {targetClientId}");
+            DeckController.LocalInstance.GetPlayerCount(playerCount, true); // true = isReconnection
+        }
+        else
+        {
+            Debug.LogError($"[RECONNECTION] GivePlayerCountForReconnectedClientClientRPC received by non-target client {NetworkManager.Singleton.LocalClientId}, target was {targetClientId}");
+        }
     }
     [ClientRpc(RequireOwnership = false)]
     public void GetPlayerNumberClientRPC(ulong clientID, int playerNumber)
@@ -148,14 +179,14 @@ public class NetworkRelay : NetworkBehaviour
     [ClientRpc]
     public void UseBayaBayaBakClientRPC(int opponentPlayerNo)
     {
-        Debug.Log($"[NetworkRelay] UseBayaBayaBakClientRPC received - Opponent: {opponentPlayerNo}, Time: {Time.time}");
+        // Debug.Log($"[NetworkRelay] UseBayaBayaBakClientRPC received - Opponent: {opponentPlayerNo}, Time: {Time.time}");
         
         // Track the RPC call
         DebugChainPrinter.LocalInstance?.TrackNetworkRPC("UseBayaBayaBakClientRPC", $"opponentPlayerNo={opponentPlayerNo}");
         DebugChainPrinter.LocalInstance?.TrackLocalAction($"UseBayaBayaBakClientRPC received for opponent {opponentPlayerNo}");
         
         GameManager.LocalInstance.OnBayaBayaBakSynced(opponentPlayerNo);
-        Debug.Log($"[NetworkRelay] UseBayaBayaBakClientRPC complete");
+        // Debug.Log($"[NetworkRelay] UseBayaBayaBakClientRPC complete");
     }
 
     [ClientRpc]

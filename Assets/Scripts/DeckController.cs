@@ -93,33 +93,33 @@ public class DeckController : MonoBehaviour
     //Called when the deck is ready to start
     public IEnumerator DeckStart()
     {
-        Debug.Log($"[DeckController] ===== ÖNEMLİ: DECK START BEGIN =====\n" +
-                 $"GameManager: {(gameManager != null ? "FOUND" : "NULL")}\n" +
-                 $"CardPrefabsList: {(cardPrefabsList != null ? "FOUND" : "NULL")}\n" +
-                 $"CardPrefabsList Count: {cardPrefabsList?.Count ?? 0}");
+        // Debug.Log($"[DeckController] ===== ÖNEMLİ: DECK START BEGIN =====\n" +
+        //          $"GameManager: {(gameManager != null ? "FOUND" : "NULL")}\n" +
+        //          $"CardPrefabsList: {(cardPrefabsList != null ? "FOUND" : "NULL")}\n" +
+        //          $"CardPrefabsList Count: {cardPrefabsList?.Count ?? 0}");
         
-        Debug.Log("[DeckController] Starting DefineCardPrefabs coroutine...");
+        // Debug.Log("[DeckController] Starting DefineCardPrefabs coroutine...");
         yield return StartCoroutine(DefineCardPrefabs());
-        Debug.Log("[DeckController] DefineCardPrefabs coroutine completed");
+        // Debug.Log("[DeckController] DefineCardPrefabs coroutine completed");
         
-        Debug.Log("[DeckController] Starting  coroutine...");
+        // Debug.Log("[DeckController] Starting  coroutine...");
         yield return StartCoroutine(InitializeCardPool());
-        Debug.Log("[DeckController] InitializeCardPool coroutine completed");
+        // Debug.Log("[DeckController] InitializeCardPool coroutine completed");
         
         // Move deck to reach point for initial dealing
-        Debug.Log("[DeckController] Moving deck to reach point...");
+        // Debug.Log("[DeckController] Moving deck to reach point...");
         MoveDeckToReachPoint();
         
         // Wait for deck to reach position before notifying that deck is ready
-        Debug.Log("[DeckController] Waiting for deck to reach position...");
+        // Debug.Log("[DeckController] Waiting for deck to reach position...");
         while (isDeckMoving || !isDeckAtReachPoint)
         {
             yield return null;
         }
         
-        Debug.Log("[DeckController] Deck is ready and in position for dealing");
-        Debug.Log($"[DeckController] ===== ÖNEMLİ: DECK START COMPLETED =====\n" +
-                 $"Calling gameManager.DeckReady()");
+        // Debug.Log("[DeckController] Deck is ready and in position for dealing");
+        // Debug.Log($"[DeckController] ===== ÖNEMLİ: DECK START COMPLETED =====\n" +
+        //          $"Calling gameManager.DeckReady()");
         gameManager.DeckReady();
     }
 
@@ -195,7 +195,7 @@ public class DeckController : MonoBehaviour
         else yield return StartCoroutine(ResetCards());
 
         // CRITICAL: Send card interactions to GameManager for reconnection
-        Debug.Log($"[DeckController] Sending {cardInteractionList.Count} card interactions to GameManager for reconnection");
+        // Debug.Log($"[DeckController] Sending {cardInteractionList.Count} card interactions to GameManager for reconnection");
         SendCardInteractionsToGameManager();
 
     }
@@ -272,12 +272,12 @@ public class DeckController : MonoBehaviour
         // Check if deck is already at reach point (initial dealing) or needs to be moved (subsequent dealing)
         if (isDeckAtReachPoint && !isDeckMoving)
         {
-            Debug.Log("[DeckController] Deck already at reach point (initial dealing), starting immediately");
+            // Debug.Log("[DeckController] Deck already at reach point (initial dealing), starting immediately");
             StartCoroutine(DelayedDealPlayersCoroutine(playerHands));
         }
         else
         {
-            Debug.Log("[DeckController] Deck not at reach point (subsequent dealing), moving deck first");
+            // Debug.Log("[DeckController] Deck not at reach point (subsequent dealing), moving deck first");
             MoveDeckToReachPoint();
             StartCoroutine(DelayedDealPlayersCoroutine(playerHands));
         }
@@ -304,7 +304,24 @@ public class DeckController : MonoBehaviour
 
     private IEnumerator DealTwoPlayers(Dictionary<int, List<string>> playerHands)
     {
-        Debug.Log("[DeckController] Starting to deal cards to 2 players");
+        Debug.LogError($"[DEALING] DealTwoPlayers called - thisPlayerNumber: {thisPlayerNumber}, playerCount: {playerCount}, startingPlayerNoCounter: {startingPlayerNoCounter}");
+        
+        // CRITICAL FIX: Wait for player number to be set (for reconnection cases)
+        int retryCount = 0;
+        while (thisPlayerNumber == -1 && retryCount < 50) // Wait up to 5 seconds
+        {
+            Debug.LogError($"[DEALING] Waiting for player number to be set... retry {retryCount}/50");
+            yield return new WaitForSeconds(0.1f);
+            retryCount++;
+        }
+        
+        if (thisPlayerNumber == -1)
+        {
+            Debug.LogError($"[DEALING] ERROR: thisPlayerNumber is still -1 after waiting, cannot deal cards. Aborting deal.");
+            yield break;
+        }
+        
+        Debug.LogError($"[DEALING] Player number is now set to {thisPlayerNumber}, proceeding with deal");
         
         var cardObjects = new List<GameObject>();
         var positions = new List<Vector3>();
@@ -316,7 +333,7 @@ public class DeckController : MonoBehaviour
         {
             int i = (startingPlayerNoCounter + n) % 2;
             relativeIndex = (i - thisPlayerNumber + playerCount) % playerCount;
-            Debug.LogWarning("relativeIndex: " + relativeIndex);
+            Debug.LogError($"[DEALING] Player {n}: i={i}, thisPlayerNumber={thisPlayerNumber}, relativeIndex={relativeIndex}");
 
             if (relativeIndex == 0)
             {
@@ -382,7 +399,24 @@ public class DeckController : MonoBehaviour
 
     private IEnumerator DealFourPlayers(Dictionary<int, List<string>> playerHands)
     {
-        Debug.Log("[DeckController] Starting to deal cards to 4 players");
+        Debug.LogError($"[DEALING] DealFourPlayers called - thisPlayerNumber: {thisPlayerNumber}, playerCount: {playerCount}, startingPlayerNoCounter: {startingPlayerNoCounter}");
+        
+        // CRITICAL FIX: Wait for player number to be set (for reconnection cases)
+        int retryCount = 0;
+        while (thisPlayerNumber == -1 && retryCount < 50) // Wait up to 5 seconds
+        {
+            Debug.LogError($"[DEALING] Waiting for player number to be set... retry {retryCount}/50");
+            yield return new WaitForSeconds(0.1f);
+            retryCount++;
+        }
+        
+        if (thisPlayerNumber == -1)
+        {
+            Debug.LogError($"[DEALING] ERROR: thisPlayerNumber is still -1 after waiting, cannot deal cards. Aborting deal.");
+            yield break;
+        }
+        
+        Debug.LogError($"[DEALING] Player number is now set to {thisPlayerNumber}, proceeding with deal");
         
         var cardObjects = new List<GameObject>();
         var positions = new List<Vector3>();
@@ -1628,7 +1662,12 @@ public class DeckController : MonoBehaviour
     public void SetPlayerNumber(int playerNumber)
     {
         thisPlayerNumber = playerNumber;
-        //Debug.LogWarning("thisPlayerNumber: " + thisPlayerNumber);
+        Debug.LogError($"[PLAYER NUMBER] SetPlayerNumber called with playerNumber: {playerNumber}, thisPlayerNumber now: {thisPlayerNumber}");
+        
+        // CRITICAL FIX: Save player number to PlayerPrefs for reconnection
+        PlayerPrefs.SetInt("PlayerNumber", playerNumber);
+        PlayerPrefs.Save();
+        Debug.LogError($"[PLAYER NUMBER] Saved player number {playerNumber} to PlayerPrefs for reconnection");
     }
 
     public int SendPlayerNumber()
@@ -1756,38 +1795,46 @@ public class DeckController : MonoBehaviour
         return poolIndex;
     }
 
-    public void GetPlayerCount(int playerC)
+    public void GetPlayerCount(int playerC, bool isReconnection = false)
     {
         Debug.Log($"[DeckController] ===== ÖNEMLİ: GET PLAYER COUNT CALLED =====\n" +
                  $"PlayerCount: {playerC}\n" +
+                 $"IsReconnection: {isReconnection}\n" +
                  $"ElHolderScript.LocalInstance: {(ElHolderScript.LocalInstance != null ? "FOUND" : "NULL")}");
         
         playerCount = playerC;
         ElHolderScript.LocalInstance.SetHandMode(playerCount);
         
-        // SIMPLE RECONNECTION: Initialize UI screens (like StartGame does)
-        Debug.Log($"[DeckController] GetPlayerCount called - initializing UI screens for reconnection");
-        
-        // Find and manage UI screens (same as InitialGameManagerSetUp and InitializeCardPrefabs do)
-        var waitingScreen = GameObject.Find("WaitingScreen");
-        if (waitingScreen != null && waitingScreen.activeSelf)
+        // Only do UI management during reconnection, not during normal game start
+        if (isReconnection)
         {
-            Debug.Log("[DeckController] ✓ Closing waiting screen for reconnection");
-            waitingScreen.SetActive(false);
+            Debug.Log($"[DeckController] GetPlayerCount called for reconnection - initializing UI screens");
+            
+            // Find and manage UI screens (same as InitialGameManagerSetUp and InitializeCardPrefabs do)
+            var waitingScreen = GameObject.Find("WaitingScreen");
+            if (waitingScreen != null && waitingScreen.activeSelf)
+            {
+                Debug.Log("[DeckController] ✓ Closing waiting screen for reconnection");
+                waitingScreen.SetActive(false);
+            }
+            
+            var winScreen = GameObject.Find("WinScreen");
+            if (winScreen != null && winScreen.activeSelf)
+            {
+                Debug.Log("[DeckController] ✓ Closing win screen for reconnection");
+                winScreen.SetActive(false);
+            }
+            
+            var mainScreen = GameObject.Find("MainScreen");
+            if (mainScreen != null && !mainScreen.activeSelf)
+            {
+                Debug.Log("[DeckController] ✓ Activating main screen for reconnection");
+                mainScreen.SetActive(true);
+            }
         }
-        
-        var winScreen = GameObject.Find("WinScreen");
-        if (winScreen != null && winScreen.activeSelf)
+        else
         {
-            Debug.Log("[DeckController] ✓ Closing win screen for reconnection");
-            winScreen.SetActive(false);
-        }
-        
-        var mainScreen = GameObject.Find("MainScreen");
-        if (mainScreen != null && !mainScreen.activeSelf)
-        {
-            Debug.Log("[DeckController] ✓ Activating main screen for reconnection");
-            mainScreen.SetActive(true);
+            Debug.Log($"[DeckController] GetPlayerCount called for normal game start - skipping UI management");
         }
         
         Debug.Log($"[DeckController] ===== ÖNEMLİ: GET PLAYER COUNT COMPLETED =====\n" +
