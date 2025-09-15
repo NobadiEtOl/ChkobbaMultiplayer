@@ -560,6 +560,7 @@ public class NetworkRelay : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void ReconnectingClientCardsReadyServerRPC(ulong clientId)
     {
+        Debug.LogError("[Visual Sync] ===== RECONNECTING CLIENT CARDS READY SERVER RPC RECEIVED =====");
         Debug.Log($"[NetworkRelay] ===== ÖNEMLİ: RECONNECTING CLIENT CARDS READY RPC RECEIVED =====\n" +
                  $"ClientId: {clientId}\n" +
                  $"IsServer: {IsServer}\n" +
@@ -651,16 +652,29 @@ public class NetworkRelay : NetworkBehaviour
     [ClientRpc(RequireOwnership = false)]
     public void TriggerDesyncCheckForReconnectedClientClientRPC(ulong targetClientId)
     {
+        Debug.LogError($"[Visual Sync] ===== TRIGGER DESYNC CHECK FOR RECONNECTED CLIENT RPC CALLED =====");
+        Debug.LogError($"[Visual Sync] Target client ID: {targetClientId}, Local client ID: {NetworkManager.Singleton?.LocalClientId}");
+        
         // Only trigger desync check if this is the target client
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.LocalClientId == targetClientId)
         {
+            Debug.LogError($"[Visual Sync] Client ID matches - proceeding with desync check");
             Debug.Log($"[NetworkRelay] Triggering desync check for reconnected client {targetClientId}");
             
             // Trigger desync check after a short delay to ensure game state is fully applied
             if (GameManager.LocalInstance != null)
             {
-                GameManager.LocalInstance.StartCoroutine(GameManager.LocalInstance.TriggerDesyncCheckAfterReconnection());
+                Debug.LogError($"[Visual Sync] GameManager found - calling TriggerDesyncCheckAfterReconnection method");
+                GameManager.LocalInstance.TriggerDesyncCheckAfterReconnection();
             }
+            else
+            {
+                Debug.LogError($"[Visual Sync] ERROR: GameManager.LocalInstance is null");
+            }
+        }
+        else
+        {
+            Debug.LogError($"[Visual Sync] Client ID does not match - skipping desync check");
         }
     }
 

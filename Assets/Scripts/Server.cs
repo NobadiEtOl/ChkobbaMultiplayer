@@ -34,6 +34,14 @@ public class Server : NetworkBehaviour
     private int readyToEndTurnCounter = 0; //Counter to make sure every connected player is ready to end the turn
     private bool singleDebuggingMode;
     public bool winnerPrintFlag = false;
+    
+    // Bot system for 1v1 games
+    [SerializeField] private bool isBotModeEnabled = false;
+    [SerializeField] private float botMoveDelay = 2.0f; // Delay before bot makes a move (inspector editable)
+    private bool botPlayerActive = false; // Tracks if bot is playing as player 1
+    private int botPlayerNumber = 1; // Bot plays as player 1 (opponent)
+    private Coroutine botMoveCoroutine;
+    
     // Server.cs
     private Dictionary<string, string> copiedCardMap = new Dictionary<string, string>();
     private bool oynayamazsinPending = false;
@@ -84,6 +92,14 @@ public class Server : NetworkBehaviour
         zaferPuaniPoints.Clear();
         bombedCards.Clear();
         
+        // Reset bot system
+        botPlayerActive = false;
+        if (botMoveCoroutine != null)
+        {
+            StopCoroutine(botMoveCoroutine);
+            botMoveCoroutine = null;
+        }
+        
         // Reset connection tracking
         dealCenterFinishedClients.Clear();
         initialDealCoroutineCheckCounter = 0;
@@ -116,6 +132,13 @@ public class Server : NetworkBehaviour
         copiedCardMap.Clear();
         zaferPuaniPoints.Clear();
         bombedCards.Clear(); // Clear bombed cards for new round
+        
+        // Reset bot system for new round but keep botPlayerActive status
+        if (botMoveCoroutine != null)
+        {
+            StopCoroutine(botMoveCoroutine);
+            botMoveCoroutine = null;
+        }
         
         // Reset connection tracking
         dealCenterFinishedClients.Clear();
@@ -208,7 +231,21 @@ public class Server : NetworkBehaviour
         if (connectedPlayerCount == 1) singleDebuggingMode = true;
         else singleDebuggingMode = false;
 
+        // Bot system: Activate bot for 1v1 games if bot mode is enabled
+        // Bot activates when we have a 1v1 game and bot mode is enabled
+        if (isBotModeEnabled && playerCount == 2)
+        {
+            botPlayerActive = true;
+            Debug.Log($"[Server] Bot mode activated! Bot will play as player {botPlayerNumber}");
+            Debug.Log($"[Server] Connected players: {connectedPlayerCount}, Bot will fill the second slot");
+        }
+        else
+        {
+            botPlayerActive = false;
+        }
+
         Debug.Log("singleDebuggingMode: " + singleDebuggingMode);
+        Debug.Log("botPlayerActive: " + botPlayerActive);
 
         if (!IsServer)
         {
@@ -248,6 +285,13 @@ public class Server : NetworkBehaviour
     public void CallUpdateCurrentPlayer()
     {
         networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer, turnCounter);
+        
+        // Bot system: Check if it's the bot's turn at game start
+        if (botPlayerActive && currentPlayer == botPlayerNumber)
+        {
+            Debug.Log($"[Server] It's bot's turn at game start (player {botPlayerNumber}), scheduling bot move");
+            ScheduleBotMove();
+        }
     }
 
     private int initialDealCoroutineCheckCounter = 0;
@@ -269,7 +313,22 @@ public class Server : NetworkBehaviour
         }
         
         initialDealCoroutineCheckCounter++;
-        if (initialDealCoroutineCheckCounter == connectedPlayerCount)
+        
+        // Bot mode: Start deal when we have 1 human player + bot mode enabled
+        // Normal mode: Start deal when all players are connected
+        bool shouldStartDeal = false;
+        if (isBotModeEnabled && botPlayerActive && playerCount == 2 && initialDealCoroutineCheckCounter == 1)
+        {
+            shouldStartDeal = true;
+            Debug.Log($"[Server] Bot mode: Starting deal with 1 human player + bot");
+        }
+        else if (initialDealCoroutineCheckCounter == connectedPlayerCount)
+        {
+            shouldStartDeal = true;
+            Debug.Log($"[Server] Normal mode: Starting deal with all {connectedPlayerCount} players connected");
+        }
+        
+        if (shouldStartDeal)
         {
             StartCoroutine(InitialDealCoroutine());
             initialDealCoroutineCheckCounter = 0;
@@ -559,6 +618,13 @@ public class Server : NetworkBehaviour
         currentPlayer = (currentPlayer + 1) % playerCount;
 
         networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer, turnCounter);
+
+        // Bot system: Check if it's the bot's turn
+        if (botPlayerActive && currentPlayer == botPlayerNumber)
+        {
+            Debug.Log($"[Server] It's bot's turn (player {botPlayerNumber}), scheduling bot move");
+            ScheduleBotMove();
+        }
     }
 
     private void GivePlayerCount()
@@ -1174,10 +1240,20 @@ public class Server : NetworkBehaviour
                 Debug.LogError($"[Server] NetworkRelay is null - cannot initialize card prefabs for reconnected client");
             }
         }
-        else if (playerCount == connectedPlayerCount)
+        else if (playerCount == connectedPlayerCount || (isBotModeEnabled && playerCount == 2 && connectedPlayerCount == 1))
         {
             // This is a fresh game start
-            connectionLog.AppendLine($"SERVER MESSAGE: All players connected - starting new game");
+            // Normal case: All players connected
+            // Bot case: 1 human player + bot mode enabled for 1v1
+            if (isBotModeEnabled && playerCount == 2 && connectedPlayerCount == 1)
+            {
+                connectionLog.AppendLine($"SERVER MESSAGE: Bot mode enabled - starting 1v1 game with bot");
+            }
+            else
+            {
+                connectionLog.AppendLine($"SERVER MESSAGE: All players connected - starting new game");
+            }
+            
             if (playerCount == 2)
             {
                 StartGameAfterDelayTwoPlayer();
@@ -2280,6 +2356,236 @@ public class Server : NetworkBehaviour
             reconnectingClients.Remove(clientId);
             Debug.Log($"[Server] Removed client {clientId} from reconnecting set");
         }
+    }
+
+    // ===== BOT SYSTEM =====
+
+    /// <summary>
+    /// Public method to enable/disable bot mode for 1v1 games
+    /// </summary>
+    [ContextMenu("Toggle Bot Mode")]
+    public void ToggleBotMode()
+    {
+        isBotModeEnabled = !isBotModeEnabled;
+        Debug.Log($"[Server] Bot mode {(isBotModeEnabled ? "ENABLED" : "DISABLED")}");
+        
+        // If disabling bot mode during an active bot game, deactivate the bot
+        if (!isBotModeEnabled && botPlayerActive)
+        {
+            botPlayerActive = false;
+            if (botMoveCoroutine != null)
+            {
+                StopCoroutine(botMoveCoroutine);
+                botMoveCoroutine = null;
+            }
+            Debug.Log("[Server] Bot deactivated due to bot mode being disabled");
+        }
+    }
+
+    /// <summary>
+    /// Schedules a bot move after a short delay
+    /// </summary>
+    private void ScheduleBotMove()
+    {
+        if (botMoveCoroutine != null)
+        {
+            StopCoroutine(botMoveCoroutine);
+        }
+        botMoveCoroutine = StartCoroutine(ExecuteBotMoveCoroutine());
+    }
+
+    /// <summary>
+    /// Coroutine that waits for a delay then executes a bot move
+    /// </summary>
+    private IEnumerator ExecuteBotMoveCoroutine()
+    {
+        yield return new WaitForSeconds(botMoveDelay);
+        
+        if (botPlayerActive && currentPlayer == botPlayerNumber)
+        {
+            ExecuteBotMove();
+        }
+        
+        botMoveCoroutine = null;
+    }
+
+    /// <summary>
+    /// Executes a bot move by selecting a card and determining if it can capture
+    /// </summary>
+    private void ExecuteBotMove()
+    {
+        Debug.Log($"[Server] Executing bot move for player {botPlayerNumber}");
+        
+        // Get bot's hand
+        if (playersHandCardsIDs == null || !playersHandCardsIDs.ContainsKey(botPlayerNumber))
+        {
+            Debug.LogError($"[Server] Bot player {botPlayerNumber} has no hand cards available");
+            return;
+        }
+
+        List<string> botHand = playersHandCardsIDs[botPlayerNumber];
+        if (botHand == null || botHand.Count == 0)
+        {
+            Debug.LogError($"[Server] Bot player {botPlayerNumber} hand is empty");
+            return;
+        }
+
+        // Select card to play using improved strategy
+        string selectedCardId = SelectBotCard(botHand);
+        int[] selectedCard = allCardLookup[selectedCardId];
+        
+        Debug.Log($"[Server] Bot selected card: {selectedCardId} [{selectedCard[0]}, {selectedCard[1]}]");
+
+        // Check for possible captures
+        SerializableCard captureCards = FindBestCapture(selectedCard);
+        int sumValue = 0;
+        
+        if (captureCards.ToDictionary().Count > 0)
+        {
+            // Bot can capture - calculate sum value
+            var captureDict = captureCards.ToDictionary();
+            sumValue = captureDict.Values.LastOrDefault()?[1] ?? 0;
+            Debug.Log($"[Server] Bot capturing {captureDict.Count} cards with sum value {sumValue}");
+        }
+        else
+        {
+            // Bot is playing to center
+            Debug.Log($"[Server] Bot playing card to center (no captures available)");
+        }
+
+        // Execute the move using the same flow as human players
+        // The turn will end automatically when the client-side animation completes
+        GetMove(selectedCardId, captureCards, botPlayerNumber, sumValue);
+    }
+
+    /// <summary>
+    /// Finds the best capture for the given card
+    /// Returns a SerializableCard containing cards that can be captured
+    /// </summary>
+    private SerializableCard FindBestCapture(int[] selectedCard)
+    {
+        Dictionary<string, int[]> captures = new Dictionary<string, int[]>();
+        
+        if (centerCardsDict == null || centerCardsDict.Count == 0)
+        {
+            Debug.Log($"[Server] Bot: No center cards to capture");
+            return new SerializableCard(captures); // No center cards to capture
+        }
+
+        int cardValue = selectedCard[1];
+        Debug.Log($"[Server] Bot checking captures for card value {cardValue}, center has {centerCardsDict.Count} cards");
+        
+        // Debug: Print all center cards
+        foreach (var kvp in centerCardsDict)
+        {
+            Debug.Log($"[Server] Center card: {kvp.Key} [{kvp.Value[0]}, {kvp.Value[1]}]");
+        }
+        
+        // Simple bot logic: Try to capture cards that match the selected card's value
+        // Or capture all cards if playing a Jack (value 11)
+        if (cardValue == 11) // Jack captures all
+        {
+            captures = new Dictionary<string, int[]>(centerCardsDict);
+            Debug.Log($"[Server] Bot playing Jack - capturing all {captures.Count} center cards");
+        }
+        else
+        {
+            // Look for exact value matches - only capture matching cards
+            foreach (var kvp in centerCardsDict)
+            {
+                if (kvp.Value[1] == cardValue)
+                {
+                    captures[kvp.Key] = kvp.Value;
+                    Debug.Log($"[Server] Bot found exact match: {kvp.Key} [{kvp.Value[0]}, {kvp.Value[1]}] matches played card value {cardValue}");
+                    // Only take one match for now (simple bot logic)
+                    break;
+                }
+            }
+            
+            if (captures.Count == 0)
+            {
+                Debug.Log($"[Server] Bot: No exact matches found for card value {cardValue}");
+            }
+        }
+
+        Debug.Log($"[Server] Bot capture result: {captures.Count} cards will be captured");
+        return new SerializableCard(captures);
+    }
+
+    /// <summary>
+    /// Selects which card the bot should play using a simple strategy
+    /// Priority: 1) Card that can capture 2) Jack (captures all) 3) Sequential order
+    /// </summary>
+    private string SelectBotCard(List<string> botHand)
+    {
+        // Strategy 1: Look for cards that can capture something
+        foreach (string cardId in botHand)
+        {
+            int[] card = allCardLookup[cardId];
+            SerializableCard testCapture = FindBestCapture(card);
+            if (testCapture.ToDictionary().Count > 0)
+            {
+                Debug.Log($"[Server] Bot choosing capture card: {cardId} [{card[0]}, {card[1]}]");
+                return cardId;
+            }
+        }
+
+        // Strategy 2: If no captures available, prefer Jacks (they're powerful)
+        foreach (string cardId in botHand)
+        {
+            int[] card = allCardLookup[cardId];
+            if (card[1] == 11) // Jack
+            {
+                Debug.Log($"[Server] Bot choosing Jack: {cardId} [{card[0]}, {card[1]}]");
+                return cardId;
+            }
+        }
+
+        // Strategy 3: Default to first card (sequential order)
+        string defaultCard = botHand[0];
+        int[] defaultCardData = allCardLookup[defaultCard];
+        Debug.Log($"[Server] Bot choosing default card: {defaultCard} [{defaultCardData[0]}, {defaultCardData[1]}]");
+        return defaultCard;
+    }
+
+
+    /// <summary>
+    /// Context menu method to force a bot move (for testing)
+    /// </summary>
+    [ContextMenu("Force Bot Move")]
+    public void ForceBotMove()
+    {
+        if (botPlayerActive)
+        {
+            Debug.Log("[Server] Forcing bot move via context menu");
+            ExecuteBotMove();
+        }
+        else
+        {
+            Debug.LogWarning("[Server] Cannot force bot move - bot is not active");
+        }
+    }
+
+    /// <summary>
+    /// Context menu method to start a bot game manually (for testing)
+    /// </summary>
+    [ContextMenu("Start Bot Game")]
+    public void StartBotGame()
+    {
+        if (!isBotModeEnabled)
+        {
+            Debug.LogWarning("[Server] Bot mode is not enabled! Enable it first.");
+            return;
+        }
+
+        if (playerCount != 2)
+        {
+            Debug.LogWarning("[Server] Bot games only work with 2 players. Set playerCount to 2 first.");
+            return;
+        }
+
+        Debug.Log("[Server] Manually starting bot game");
+        StartGame(2);
     }
 
 

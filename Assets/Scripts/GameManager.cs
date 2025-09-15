@@ -867,6 +867,7 @@ public class GameManager : MonoBehaviour
     public void DeckReady()
 
     {
+        Debug.LogError("[Visual Sync] ===== DECK READY CALLED =====");
         Debug.Log($"[GameManager] ===== ÖNEMLİ: DECK READY CALLED =====\n" +
                  $"IsReconnecting: {isReconnecting}\n" +
                  $"NetworkRelay: {(networkRelay != null ? "FOUND" : "NULL")}\n" +
@@ -888,8 +889,10 @@ public class GameManager : MonoBehaviour
             else
             {
                 // For reconnecting clients, use the specific RPC that passes the client ID explicitly
+                Debug.LogError("[Visual Sync] ===== CALLING RECONNECTING CLIENT CARDS READY SERVER RPC =====");
                 Debug.Log($"[GameManager] Calling networkRelay.ReconnectingClientCardsReadyServerRPC({NetworkManager.Singleton.LocalClientId})...");
                 networkRelay.ReconnectingClientCardsReadyServerRPC(NetworkManager.Singleton.LocalClientId);
+                Debug.LogError("[Visual Sync] ===== RECONNECTING CLIENT CARDS READY SERVER RPC CALL COMPLETED =====");
                 Debug.Log($"[GameManager] networkRelay.ReconnectingClientCardsReadyServerRPC() call completed");
             }
         }
@@ -4511,6 +4514,7 @@ public class GameManager : MonoBehaviour
     /// </summary>
     public void ApplyGameState(SerializableGameState snapshot)
     {
+        Debug.LogError("[Visual Sync] ===== APPLY GAME STATE CALLED =====");
         // Single comprehensive log for game state application start
         Debug.Log($"[GameManager] ===== ÖNEMLİ: APPLYING GAME STATE START =====\n" +
                  $"Snapshot version: {snapshot.snapshotVersion}\n" +
@@ -4527,6 +4531,7 @@ public class GameManager : MonoBehaviour
         // Ensure a clean slate immediately before we start rebuild
         if (deckController != null)
         {
+            Debug.LogError("[Visual Sync] Starting ApplyGameStateWithReset coroutine");
             StartCoroutine(ApplyGameStateWithReset(snapshot));
         }
         else
@@ -4538,13 +4543,16 @@ public class GameManager : MonoBehaviour
 
     private IEnumerator ApplyGameStateWithReset(SerializableGameState snapshot)
     {
+        Debug.LogError("[Visual Sync] ===== APPLY GAME STATE WITH RESET STARTED =====");
         // Hard reset the scene cards first so we do not stack
         SyncLog("Starting ResetCards to clear scene");
         yield return StartCoroutine(deckController.ResetCards());
         SyncLog("ResetCards completed");
         
+        Debug.LogError("[Visual Sync] About to call ApplyGameStateCoroutine");
         // Then continue the usual coroutine
         yield return StartCoroutine(ApplyGameStateCoroutine(snapshot));
+        Debug.LogError("[Visual Sync] ApplyGameStateCoroutine completed");
     }
 
     /// <summary>
@@ -4583,6 +4591,11 @@ public class GameManager : MonoBehaviour
         // 4. Rebuild card containers
         SyncLog("Step 4: Rebuilding card containers");
         yield return StartCoroutine(RebuildCardContainers(snapshot));
+
+        // NOTE: Visual restoration moved to AFTER desync detection completes
+        // This ensures the move chain is properly synchronized before restoring visuals
+        Debug.LogError("[Visual Sync] ===== SKIPPING VISUAL RESTORATION IN APPLY GAME STATE =====");
+        Debug.LogError("[Visual Sync] Visual restoration will happen after desync detection completes");
 
         // 5. Apply effects and flags
         SyncLog("Step 5: Applying effects and flags");
@@ -4731,6 +4744,196 @@ public class GameManager : MonoBehaviour
         
         // The server will handle sending the updated current player via existing RPC
         // We just need to trust that the snapshot is correct
+    }
+
+    /// <summary>
+    /// NEW: Restores visual states by parsing move chain for power effects
+    /// This runs after card containers are rebuilt but before applying current effects
+    /// </summary>
+    private IEnumerator RestoreVisualStatesFromMoveChain()
+    {
+        Debug.LogError("[Visual Sync] ===== RESTORE VISUAL STATES FROM MOVE CHAIN STARTED =====");
+        SyncLog("RestoreVisualStatesFromMoveChain started");
+        
+        // Get the current move chain to parse for visual effects
+        if (MoveChainTracker.ClientInstance == null)
+        {
+            Debug.LogError("[Visual Sync] ERROR: MoveChainTracker.ClientInstance is null - cannot restore visual states");
+            SyncLogWarning("MoveChainTracker.ClientInstance is null - cannot restore visual states");
+            yield break;
+        }
+        
+        var moveChain = MoveChainTracker.ClientInstance.GetCurrentChain();
+        Debug.LogError($"[Visual Sync] Move chain retrieved - version: {moveChain.chainVersion}, moves count: {moveChain.moves?.Length ?? 0}");
+        
+        if (moveChain.moves == null || moveChain.moves.Length == 0)
+        {
+            Debug.LogError("[Visual Sync] No moves in chain to process for visual state restoration");
+            SyncLog("No moves in chain to process for visual state restoration");
+            yield break;
+        }
+        
+        Debug.LogError($"[Visual Sync] Processing {moveChain.moves.Length} moves from chain v{moveChain.chainVersion} for visual effects");
+        SyncLog($"Processing {moveChain.moves.Length} moves from chain v{moveChain.chainVersion} for visual effects");
+        
+        int visualEffectsRestored = 0;
+        int superPowerEffectMoves = 0;
+        
+        // Parse each move in the chain for visual-changing powers
+        for (int i = 0; i < moveChain.moves.Length; i++)
+        {
+            var move = moveChain.moves[i];
+            Debug.LogError($"[Visual Sync] Move {i}: Type={move.moveType}, Power={move.superPowerName}, Cards={string.Join(",", move.affectedCardIds ?? new string[0])}");
+            
+            if (move.moveType == GameMove.MoveType.SuperPower_Effect)
+            {
+                superPowerEffectMoves++;
+                Debug.LogError($"[Visual Sync] Found SuperPower_Effect move: {move.superPowerName}");
+                
+                // This is a power effect - check if it changes visuals
+                if (IsVisualChangingPower(move.superPowerName))
+                {
+                    Debug.LogError($"[Visual Sync] Power {move.superPowerName} is visual-changing - restoring effect");
+                    yield return StartCoroutine(RestoreVisualEffectFromMove(move));
+                    visualEffectsRestored++;
+                    Debug.LogError($"[Visual Sync] Completed restoration for {move.superPowerName}");
+                }
+                else
+                {
+                    Debug.LogError($"[Visual Sync] Power {move.superPowerName} is NOT visual-changing - skipping");
+                }
+            }
+        }
+        
+        Debug.LogError($"[Visual Sync] ===== RESTORE VISUAL STATES COMPLETED =====");
+        Debug.LogError($"[Visual Sync] Total moves: {moveChain.moves.Length}, SuperPower_Effect moves: {superPowerEffectMoves}, Visual effects restored: {visualEffectsRestored}");
+        SyncLog($"RestoreVisualStatesFromMoveChain completed - restored {visualEffectsRestored} visual effects");
+    }
+    
+    /// <summary>
+    /// Checks if a power changes card visuals and needs restoration
+    /// </summary>
+    private bool IsVisualChangingPower(string powerName)
+    {
+        bool isVisual = powerName == "Kopyala Yapıştır" || 
+                       powerName == "Kapkaç" || 
+                       powerName == "Yandım Anam";
+        
+        Debug.LogError($"[Visual Sync] IsVisualChangingPower({powerName}) = {isVisual}");
+        return isVisual;
+        // Add more powers here as needed
+    }
+    
+    /// <summary>
+    /// Restores visual effect from a specific move
+    /// </summary>
+    private IEnumerator RestoreVisualEffectFromMove(GameMove move)
+    {
+        Debug.LogError($"[Visual Sync] RestoreVisualEffectFromMove called for power: {move.superPowerName}");
+        SyncLog($"Restoring visual effect for power: {move.superPowerName}");
+        
+        switch (move.superPowerName)
+        {
+            case "Kopyala Yapıştır":
+                Debug.LogError("[Visual Sync] Calling RestoreKopyalaYapistirVisual");
+                yield return StartCoroutine(RestoreKopyalaYapistirVisual(move));
+                break;
+                
+            case "Kapkaç":
+                Debug.LogError("[Visual Sync] Calling RestoreKapkacVisual");
+                yield return StartCoroutine(RestoreKapkacVisual(move));
+                break;
+                
+            case "Yandım Anam":
+                Debug.LogError("[Visual Sync] Calling RestoreYandimAnamVisual");
+                yield return StartCoroutine(RestoreYandimAnamVisual(move));
+                break;
+                
+            default:
+                Debug.LogError($"[Visual Sync] Unknown visual power: {move.superPowerName}");
+                SyncLogWarning($"Unknown visual power: {move.superPowerName}");
+                break;
+        }
+        
+        Debug.LogError($"[Visual Sync] RestoreVisualEffectFromMove completed for {move.superPowerName}");
+    }
+    
+    /// <summary>
+    /// Restores Kopyala Yapıştır visual effect from move data
+    /// </summary>
+    private IEnumerator RestoreKopyalaYapistirVisual(GameMove move)
+    {
+        var effectData = move.superPowerData.ToDictionary();
+        if (effectData == null || !effectData.ContainsKey("targetCard") || !effectData.ContainsKey("sourceCard"))
+        {
+            SyncLogWarning("Kopyala Yapıştır move missing target/source card data");
+            yield break;
+        }
+        
+        string targetCardId = effectData["targetCard"];
+        string sourceCardId = effectData["sourceCard"];
+        
+        SyncLog($"Restoring Kopyala Yapıştır: {sourceCardId} -> {targetCardId}");
+        
+        // Use existing OnKopyalaYapistir method to restore visual state
+        OnKopyalaYapistir(targetCardId, sourceCardId);
+        
+        yield return null; // Allow one frame for processing
+    }
+    
+    /// <summary>
+    /// Restores Kapkaç visual effect from move data
+    /// </summary>
+    private IEnumerator RestoreKapkacVisual(GameMove move)
+    {
+        Debug.LogError($"[Visual Sync] RestoreKapkacVisual called - affectedCardIds: {string.Join(",", move.affectedCardIds ?? new string[0])}");
+        
+        if (move.affectedCardIds == null || move.affectedCardIds.Length == 0)
+        {
+            Debug.LogError("[Visual Sync] ERROR: Kapkaç move missing affected card data");
+            SyncLogWarning("Kapkaç move missing affected card data");
+            yield break;
+        }
+        
+        string cardId = move.affectedCardIds[0];
+        Debug.LogError($"[Visual Sync] Restoring Kapkaç visual effect for card: {cardId}");
+        SyncLog($"Restoring Kapkaç visual effect for card: {cardId}");
+        
+        // Check if card exists in lookup before calling
+        if (!CardInteraction.cardLookup.ContainsKey(cardId))
+        {
+            Debug.LogError($"[Visual Sync] ERROR: Card {cardId} not found in cardLookup during Kapkaç restoration");
+            yield break;
+        }
+        
+        Debug.LogError($"[Visual Sync] Card {cardId} found in lookup - calling OnKapkacCardChanged");
+        
+        // Use existing OnKapkacCardChanged method to restore visual state
+        OnKapkacCardChanged(cardId);
+        
+        Debug.LogError($"[Visual Sync] OnKapkacCardChanged completed for card: {cardId}");
+        
+        yield return null; // Allow one frame for processing
+    }
+    
+    /// <summary>
+    /// Restores Yandım Anam visual effect from move data
+    /// </summary>
+    private IEnumerator RestoreYandimAnamVisual(GameMove move)
+    {
+        if (move.affectedCardIds == null || move.affectedCardIds.Length == 0)
+        {
+            SyncLogWarning("Yandım Anam move missing affected card data");
+            yield break;
+        }
+        
+        string cardId = move.affectedCardIds[0];
+        SyncLog($"Restoring Yandım Anam visual effect for card: {cardId}");
+        
+        // Use existing OnYandimAnamCardChanged method to restore visual state
+        OnYandimAnamCardChanged(cardId);
+        
+        yield return null; // Allow one frame for processing
     }
 
     /// <summary>
@@ -5832,9 +6035,22 @@ public class GameManager : MonoBehaviour
     /// <summary>
     /// Triggers a desync check after reconnection to ensure move chains are synchronized
     /// </summary>
-    public IEnumerator TriggerDesyncCheckAfterReconnection()
+    public void TriggerDesyncCheckAfterReconnection()
     {
-        Debug.Log("[GameManager] TriggerDesyncCheckAfterReconnection called - waiting for game state to be fully applied");
+        Debug.LogError("[Visual Sync] ===== TRIGGER DESYNC CHECK AFTER RECONNECTION CALLED =====");
+        Debug.Log("[GameManager] TriggerDesyncCheckAfterReconnection called - starting coroutine");
+        
+        // Start the coroutine on this GameManager instance
+        StartCoroutine(TriggerDesyncCheckAfterReconnectionCoroutine());
+    }
+    
+    /// <summary>
+    /// Coroutine that handles the actual desync check after reconnection
+    /// </summary>
+    private IEnumerator TriggerDesyncCheckAfterReconnectionCoroutine()
+    {
+        Debug.LogError("[Visual Sync] ===== TRIGGER DESYNC CHECK AFTER RECONNECTION COROUTINE STARTED =====");
+        Debug.Log("[GameManager] TriggerDesyncCheckAfterReconnection coroutine - waiting for game state to be fully applied");
         
         // Wait for the game state to be fully applied
         yield return new WaitForSeconds(1.0f);
@@ -5847,13 +6063,38 @@ public class GameManager : MonoBehaviour
         // Check if MoveChainIntegrator is available
         if (MoveChainIntegrator.LocalInstance != null)
         {
+            Debug.LogError("[Visual Sync] MoveChainIntegrator found - triggering desync check");
             Debug.Log("[GameManager] Triggering forced desync check for reconnected client");
             MoveChainIntegrator.LocalInstance.ForceImmediateDesyncCheck();
+            
+            // NEW: After desync check, trigger visual restoration
+            Debug.LogError("[Visual Sync] ===== TRIGGERING VISUAL RESTORATION AFTER DESYNC CHECK =====");
+            StartCoroutine(TriggerVisualRestorationAfterDesyncCheck());
         }
         else
         {
+            Debug.LogError("[Visual Sync] ERROR: MoveChainIntegrator.LocalInstance is null - cannot force desync check");
             Debug.LogWarning("[GameManager] MoveChainIntegrator.LocalInstance is null - cannot force desync check");
         }
+    }
+    
+    /// <summary>
+    /// NEW: Triggers visual restoration after desync check completes
+    /// This ensures the move chain is properly synchronized before restoring visuals
+    /// </summary>
+    private IEnumerator TriggerVisualRestorationAfterDesyncCheck()
+    {
+        Debug.LogError("[Visual Sync] ===== TRIGGER VISUAL RESTORATION AFTER DESYNC CHECK STARTED =====");
+        
+        // Wait for desync check to complete and move chain to be synchronized
+        yield return new WaitForSeconds(2.0f);
+        
+        Debug.LogError("[Visual Sync] Desync check should be complete - starting visual restoration");
+        
+        // Now restore visual states from the properly synchronized move chain
+        yield return StartCoroutine(RestoreVisualStatesFromMoveChain());
+        
+        Debug.LogError("[Visual Sync] ===== VISUAL RESTORATION AFTER DESYNC CHECK COMPLETED =====");
     }
     
     /// <summary>
