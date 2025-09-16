@@ -725,4 +725,32 @@ public class CardInteraction : MonoBehaviour
             isOneCardSelected = false;
         }
     }
+    
+    /// <summary>
+    /// Public method for bot to trigger card play
+    /// </summary>
+    public void PlayCardForBot(int playerNumber)
+    {
+        Debug.Log($"[CardInteraction] PlayCardForBot called for player {playerNumber}");
+        Debug.Log($"[CardInteraction] Card ID: {this.uniqueCardInstanceID}, GameObject: {this.gameObject.name}");
+        Debug.Log($"[CardInteraction] OnCardsPlayed event has {OnCardsPlayed?.GetInvocationList()?.Length ?? 0} subscribers");
+        
+        // Set this card as selected
+        currentlySelectedCard = this;
+        isOneCardSelected = true;
+        Debug.Log($"[CardInteraction] Set currentlySelectedCard and isOneCardSelected = true");
+        
+        // Also set GameManager's currentSelectedHandCard (required for CheckIfLegal)
+        if (GameManager.LocalInstance != null)
+        {
+            GameManager.LocalInstance.currentSelectedHandCard = this.uniqueCardInstanceID;
+            Debug.Log($"[CardInteraction] Set GameManager.currentSelectedHandCard to: {this.uniqueCardInstanceID}");
+        }
+        
+        // Invoke OnCardsPlayed event
+        Debug.Log($"[CardInteraction] About to invoke OnCardsPlayed event");
+        OnCardsPlayed?.Invoke(this.uniqueCardInstanceID, this.gameObject, playerNumber);
+        
+        Debug.Log($"[CardInteraction] OnCardsPlayed event invoked - Bot card play triggered");
+    }
 }

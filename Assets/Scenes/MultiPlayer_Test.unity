@@ -23174,6 +23174,8 @@ MonoBehaviour:
   currentPlayer: 0
   lastPlayerToCapture: 1
   winnerPrintFlag: 0
+  isBotModeEnabled: 1
+  botMoveDelay: 2
   blockCount: 0
 --- !u!4 &2001506851
 Transform:

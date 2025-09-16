@@ -8,6 +8,8 @@ using Unity.VisualScripting;
 
 using System.Linq;
 
+using System.Reflection;
+
 using UnityEngine;
 
 using Unity.Netcode;
@@ -17,6 +19,7 @@ using UnityEngine.UI;
 using UnityEngine.UIElements;
 
 using TMPro;
+using System.Reflection;
 
 using UnityEngine.EventSystems;
 
@@ -496,6 +499,110 @@ public class GameManager : MonoBehaviour
             DontDestroyOnLoad(debugPrinterObj);
             Debug.Log("[GameManager] Created DebugChainPrinter instance");
         }
+        
+        // Bot creation moved to game start flow - see DealPlayers method
+    }
+    
+    
+    /// <summary>
+    /// Checks if bot mode is enabled and creates BotPlayer component if needed
+    /// Only creates bot on the host client
+    /// Called when the game actually starts (during DelayedDealPlayers)
+    /// </summary>
+    private void CheckAndCreateBotPlayer()
+    {
+        // At this point, NetworkManager should be properly initialized
+        if (!NetworkManager.Singleton.IsHost)
+        {
+            Debug.Log("[Bot] GameManager is not host - skipping bot creation");
+            return;
+        }
+        
+        Debug.Log("[Bot] Confirmed as host - proceeding with bot creation");
+        
+        // Check if bot mode is enabled by looking at Server component
+        Server server = FindObjectOfType<Server>();
+        if (server == null)
+        {
+            Debug.Log("[Bot] No Server component found - skipping bot creation");
+            return;
+        }
+        
+        // Use reflection to check if bot mode is enabled (since it's private)
+        var botModeField = typeof(Server).GetField("isBotModeEnabled", 
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        
+        if (botModeField == null)
+        {
+            Debug.Log("[Bot] Could not access isBotModeEnabled field - skipping bot creation");
+            return;
+        }
+        
+        bool isBotModeEnabled = (bool)botModeField.GetValue(server);
+        
+        if (!isBotModeEnabled)
+        {
+            Debug.Log("[Bot] Bot mode is not enabled - skipping bot creation");
+            return;
+        }
+        
+        // Check if BotPlayer already exists
+        BotPlayer existingBot = GetComponent<BotPlayer>();
+        if (existingBot != null)
+        {
+            Debug.Log("[Bot] BotPlayer component already exists - skipping creation");
+            return;
+        }
+        
+        // Create BotPlayer component
+        Debug.Log("[Bot] Creating BotPlayer component on GameManager");
+        BotPlayer botPlayer = gameObject.AddComponent<BotPlayer>();
+        
+        // Initialize the bot
+        Debug.Log("[Bot] BotPlayer component created and will initialize automatically");
+    }
+    
+    /// <summary>
+    /// Context menu method to manually create BotPlayer (for testing)
+    /// </summary>
+    [ContextMenu("Create Bot Player")]
+    public void CreateBotPlayerManually()
+    {
+        Debug.Log("[Bot] Manually creating BotPlayer component");
+        
+        // Check if BotPlayer already exists
+        BotPlayer existingBot = GetComponent<BotPlayer>();
+        if (existingBot != null)
+        {
+            Debug.Log("[Bot] BotPlayer component already exists - destroying and recreating");
+            DestroyImmediate(existingBot);
+        }
+        
+        // Create BotPlayer component
+        BotPlayer botPlayer = gameObject.AddComponent<BotPlayer>();
+        Debug.Log("[Bot] BotPlayer component created manually");
+    }
+    
+    /// <summary>
+    /// Context menu method to force check bot creation (for testing)
+    /// </summary>
+    [ContextMenu("Force Check Bot Creation")]
+    public void ForceCheckBotCreation()
+    {
+        Debug.Log("[Bot] Force checking bot creation");
+        Debug.Log($"[Bot] NetworkManager.IsHost: {NetworkManager.Singleton?.IsHost ?? false}");
+        Debug.Log($"[Bot] Server component exists: {FindObjectOfType<Server>() != null}");
+        CheckAndCreateBotPlayer();
+    }
+    
+    /// <summary>
+    /// Context menu method to manually trigger bot turn (for testing)
+    /// </summary>
+    [ContextMenu("Trigger Bot Turn")]
+    public void TriggerBotTurn()
+    {
+        Debug.Log("[Bot] Manually triggering bot turn");
+        NotifyBotOfTurnChange(2); // Force player 2's turn
     }
 
 
@@ -974,6 +1081,9 @@ public class GameManager : MonoBehaviour
 
     private IEnumerator DelayedDealPlayers(int playerCount, Dictionary<int, List<string>> playerHands)
     {
+        // Create bot player if needed (this is when the game actually starts)
+        CheckAndCreateBotPlayer();
+        
         deckController.DealPlayers(playerCount, playerHands);
 
         yield return new WaitForSeconds(0f);
@@ -1877,6 +1987,8 @@ public class GameManager : MonoBehaviour
 
         AddToDebugLog($"[GameManager] Previous currentPlayerNo: {currentPlayerNo}, deckController.thisPlayerNumber: {deckController.thisPlayerNumber}");
 
+        Debug.Log($"[Bot] GameManager UpdateCurrentPlayer called - Player: {playerNumber}, Turn: {turnC}");
+
         
 
         // --- Use relative index logic for turn indication ---
@@ -1900,7 +2012,193 @@ public class GameManager : MonoBehaviour
         AddToDebugLog($"[GameManager] Updated currentPlayerNo to: {currentPlayerNo}");
 
         turnCounter = turnC;
+        
+        Debug.Log($"[Bot] GameManager currentPlayerNo updated to: {currentPlayerNo}");
+        
+        // Check if it's the bot's turn and we need to wait for dealing
+        BotPlayer botPlayer = GetComponent<BotPlayer>();
+        if (botPlayer != null && playerNumber == 1)
+        {
+            // Always check if dealing might be in progress when it's the bot's turn
+            if (ShouldWaitForDealing())
+            {
+                Debug.Log($"[Bot] Bot's turn (turn {turnC}) - waiting for dealing to complete");
+                StartCoroutine(WaitForDealingCompleteThenNotifyBot(playerNumber));
+            }
+            else
+            {
+                Debug.Log($"[Bot] Bot's turn (turn {turnC}) - no dealing in progress, notifying immediately");
+                NotifyBotOfTurnChange(playerNumber);
+            }
+        }
+        else
+        {
+            // Not bot's turn - no special handling needed
+            Debug.Log($"[Bot] Not bot's turn (player {playerNumber}) - no notification sent");
+        }
 
+    }
+    
+    /// <summary>
+    /// Check if we should wait for dealing to complete before notifying the bot
+    /// This handles both initial dealing and subsequent dealing throughout the game
+    /// </summary>
+    private bool ShouldWaitForDealing()
+    {
+        // Check if PlayerHand3 (bot's hand) has very few cards, indicating dealing might be in progress
+        Transform playerHand3 = GameObject.Find("PlayerHand3")?.transform;
+        if (playerHand3 == null)
+        {
+            Debug.Log("[Bot] PlayerHand3 not found - assuming dealing needed");
+            return true;
+        }
+        
+        int hand3CardCount = 0;
+        // Count actual cards (skip first 2 children which are not cards)
+        for (int i = 2; i < playerHand3.childCount; i++)
+        {
+            if (playerHand3.GetChild(i).GetComponent<CardInteraction>() != null)
+            {
+                hand3CardCount++;
+            }
+        }
+        
+        Debug.Log($"[Bot] PlayerHand3 has {hand3CardCount} cards (total children: {playerHand3.childCount})");
+        
+        // If bot has very few cards (0-1), check if dealing is actually in progress
+        if (hand3CardCount <= 1)
+        {
+            // Check if this is likely the end of the round (bot running out of cards)
+            // vs dealing in progress (bot should have more cards)
+            
+            // If bot has 0 cards, definitely need dealing
+            if (hand3CardCount == 0)
+            {
+                Debug.Log("[Bot] Bot has 0 cards - dealing definitely needed");
+                return true;
+            }
+            
+            // If bot has 1 card, check if dealing is actually happening
+            // by checking if the deck is moving or if dealing coroutines are active
+            Debug.Log("[Bot] Bot has 1 card - checking if dealing is actually in progress");
+            
+            // Check if deck is moving (indicates dealing animation in progress)
+            DeckController deckCtrl = FindObjectOfType<DeckController>();
+            if (deckCtrl != null)
+            {
+                // Use reflection to check if deck is moving
+                var isDeckMovingField = typeof(DeckController).GetField("isDeckMoving", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                if (isDeckMovingField != null)
+                {
+                    bool isDeckMoving = (bool)isDeckMovingField.GetValue(deckCtrl);
+                    if (isDeckMoving)
+                    {
+                        Debug.Log("[Bot] Deck is moving - dealing in progress, waiting");
+                        return true;
+                    }
+                }
+            }
+            
+            // If deck is not moving and bot has 1 card, assume end of round
+            Debug.Log("[Bot] Bot has 1 card and deck not moving - assuming end of round, not waiting for dealing");
+            return false;
+        }
+        
+        // Check if deck is moving (indicates dealing animation in progress)
+        DeckController deckController = FindObjectOfType<DeckController>();
+        if (deckController != null)
+        {
+            // Use reflection to check private fields if needed, or add public properties
+            // For now, we'll use the card count as the primary indicator
+        }
+        
+        Debug.Log("[Bot] Bot has sufficient cards - no dealing wait needed");
+        return false;
+    }
+    
+    /// <summary>
+    /// Wait for dealing coroutines to complete before notifying bot
+    /// </summary>
+    private IEnumerator WaitForDealingCompleteThenNotifyBot(int playerNumber)
+    {
+        Debug.Log("[Bot] Waiting for dealing coroutines to complete...");
+        
+        // Wait for dealing to complete by checking if cards are properly set up
+        float waitTime = 0f;
+        float maxWaitTime = 15f; // Increased timeout for subsequent dealing
+        
+        while (waitTime < maxWaitTime)
+        {
+            // Check if PlayerHand3 has sufficient cards (bot's hand)
+            Transform playerHand3 = GameObject.Find("PlayerHand3")?.transform;
+            if (playerHand3 != null)
+            {
+                // Count actual cards (skip first 2 children which are not cards)
+                int cardCount = 0;
+                for (int i = 2; i < playerHand3.childCount; i++)
+                {
+                    if (playerHand3.GetChild(i).GetComponent<CardInteraction>() != null)
+                    {
+                        cardCount++;
+                    }
+                }
+                
+                Debug.Log($"[Bot] PlayerHand3 has {cardCount} actual cards (total children: {playerHand3.childCount})");
+                
+                // If bot has at least 2 cards, dealing is likely complete
+                if (cardCount >= 2)
+                {
+                    Debug.Log($"[Bot] Bot has sufficient cards ({cardCount}) - dealing appears complete");
+                    break;
+                }
+            }
+            else
+            {
+                Debug.LogWarning("[Bot] PlayerHand3 not found during wait");
+            }
+            
+            yield return new WaitForSeconds(0.1f);
+            waitTime += 0.1f;
+        }
+        
+        if (waitTime >= maxWaitTime)
+        {
+            Debug.LogWarning("[Bot] Timeout waiting for dealing to complete - proceeding anyway");
+        }
+        
+        Debug.Log("[Bot] Dealing wait complete - notifying bot");
+        
+        // Tell the bot it just finished waiting for dealing (so it uses longer delay)
+        BotPlayer botPlayer = GetComponent<BotPlayer>();
+        if (botPlayer != null)
+        {
+            botPlayer.SetJustFinishedWaitingForDeal(true);
+        }
+        
+        NotifyBotOfTurnChange(playerNumber);
+    }
+
+    /// <summary>
+    /// Notifies the bot when it's the bot's turn to play
+    /// </summary>
+    private void NotifyBotOfTurnChange(int playerNumber)
+    {
+        Debug.Log($"[Bot] GameManager NotifyBotOfTurnChange called for player {playerNumber}");
+        Debug.Log($"[Bot] Current game state - currentPlayerNo: {currentPlayerNo}, turnCounter: {turnCounter}");
+        
+        // Check if there's a BotPlayer component and if it's the bot's turn
+        BotPlayer botPlayer = GetComponent<BotPlayer>();
+        Debug.Log($"[Bot] BotPlayer component found: {botPlayer != null}");
+        
+        if (botPlayer != null && playerNumber == 1) // Bot plays as player 2 (opponent)
+        {
+            Debug.Log($"[Bot] GameManager notifying bot that it's player {playerNumber}'s turn");
+            botPlayer.OnTurnChanged(playerNumber);
+        }
+        else
+        {
+            Debug.Log($"[Bot] GameManager not notifying bot - BotPlayer: {botPlayer != null}, PlayerNumber: {playerNumber}, Expected: 2");
+        }
     }
 
 
@@ -2366,6 +2664,21 @@ public class GameManager : MonoBehaviour
         AddToDebugLog($"[GameManager] Is my turn: {isMyTurn}");
 
 
+
+        // Check if this is a bot request - if so, skip all restrictions
+        BotPlayer botPlayer = GetComponent<BotPlayer>();
+        if (botPlayer != null && CardInteraction.currentlySelectedCard != null)
+        {
+            // Check if the currently selected card is from PlayerHand3 (bot's hand)
+            bool isBotCard = CardInteraction.currentlySelectedCard.transform.parent != null && 
+                           CardInteraction.currentlySelectedCard.transform.parent.name == "PlayerHand3";
+            
+            if (isBotCard)
+            {
+                AddToDebugLog($"[GameManager] Bot card detected - skipping all restrictions");
+                return true;
+            }
+        }
 
         // Check if the card's parent is "PlayerHand1"
 
