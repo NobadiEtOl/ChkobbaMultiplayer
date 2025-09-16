@@ -1989,7 +1989,21 @@ public class GameManager : MonoBehaviour
 
         Debug.Log($"[Bot] GameManager UpdateCurrentPlayer called - Player: {playerNumber}, Turn: {turnC}");
 
-        
+        // CRITICAL FIX: Check if win screen is active - if so, skip dealing logic
+        if (winScreen != null && winScreen.activeSelf)
+        {
+            Debug.Log($"[ROUND RESTART] Win screen is active - skipping dealing logic for turn {turnC}");
+            // Still update the UI elements but don't trigger dealing
+            int winScreenRelativeIndex = (playerNumber - DeckController.LocalInstance.thisPlayerNumber + DeckController.LocalInstance.playerCount) % DeckController.LocalInstance.playerCount;
+            if (ElHolderScript.LocalInstance != null)
+            {
+                ElHolderScript.LocalInstance.UpdateCurrentPlayer(winScreenRelativeIndex);
+            }
+            currentPlayerNo = playerNumber;
+            turnCounter = turnC;
+            Debug.Log($"[ROUND RESTART] UI updated but dealing logic skipped due to active win screen");
+            return;
+        }
 
         // --- Use relative index logic for turn indication ---
 
@@ -2343,7 +2357,14 @@ public class GameManager : MonoBehaviour
 
     }
 
-
+    public void CloseWinScreen()
+    {
+        if (winScreen != null)
+        {
+            winScreen.SetActive(false);
+            Debug.Log("[GameManager] Win screen closed");
+        }
+    }
 
     private void UpdatePointText(int point0, int point1)
 

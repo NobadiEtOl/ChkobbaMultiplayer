@@ -9,6 +9,7 @@ using UnityEngine.Pool;
 using UnityEngine.Tilemaps;
 using Unity.Services.Lobbies;
 using Unity.Services.Lobbies.Models;
+using UnityEngine.UI;
 
 public class Server : NetworkBehaviour
 {
@@ -30,6 +31,7 @@ public class Server : NetworkBehaviour
     private int startingPlayerNo = 0;
     private float timer = 0;
     private float turnTime = 15f; // the time player has before turn skips
+    // Win screen timer removed - using simple Invoke instead
     private int roundCount = 0;
     private int readyToEndTurnCounter = 0; //Counter to make sure every connected player is ready to end the turn
     private bool singleDebuggingMode;
@@ -37,6 +39,7 @@ public class Server : NetworkBehaviour
     
     // Bot system for 1v1 games
     [SerializeField] private bool isBotModeEnabled = false;
+    [SerializeField] private GameObject botModeToggle;
     
     // Server.cs
     private Dictionary<string, string> copiedCardMap = new Dictionary<string, string>();
@@ -103,17 +106,23 @@ public class Server : NetworkBehaviour
 
     public void ResetForNewRound()
     {
-        deckCardsDict = null;
+        // DO NOT reset deckCardsDict - keep the deck persistent to preserve card changes
+        // deckCardsDict = null; // ← REMOVED - keep deck persistent
+        
         centerCardsDict = null;
         playersHandCardsIDs = null;
-        playersPooledCardsIDs = null;
-        seed = 0; // Optionally keep or randomize for each round
+        // DO NOT reset playersPooledCardsIDs here - we need it to restore the deck
+        // playersPooledCardsIDs = null; // ← REMOVED - will be reset after deck restoration
+        
+        // DO NOT reset seed to 0 - we'll randomize it in StartGame for new shuffling
+        // seed = 0; // ← REMOVED - will be randomized in StartGame
+        
         turnCounter = 0;
         currentPlayer = 0;
         lastPlayerToCapture = -1;
         timer = 0f;
         turnTime = 15f;
-        connectedPlayerCount = 0; // FIXED: Reset connection count (host will make it 1) for new round
+        //connectedPlayerCount = 0; // FIXED: Reset connection count (host will make it 1) for new round
         readyToEndTurnCounter = 0;
         singleDebuggingMode = false;
         winnerPrintFlag = false;
@@ -142,7 +151,7 @@ public class Server : NetworkBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        print("server.cs start");
+        // print("server.cs start");
         ResetAllServerVariables();
         
         // Subscribe to network events if NetworkManager is available
@@ -150,6 +159,9 @@ public class Server : NetworkBehaviour
         
         // Initialize NetworkManagerUI reference
         networkManagerUI = FindObjectOfType<NetworkManagerUI>();
+        
+        // Initialize bot mode toggle
+        InitializeBotModeToggle();
         
         //StartCoroutine(ServerSubsciribe());
     }
@@ -163,21 +175,24 @@ public class Server : NetworkBehaviour
         {
             NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
             hasSubscribedToNetworkEvents = true;
-            Debug.Log("[Server] Subscribed to NetworkManager disconnect events");
+            // Debug.Log("[Server] Subscribed to NetworkManager disconnect events");
         }
         else if (hasSubscribedToNetworkEvents)
         {
-            Debug.Log("[Server] Already subscribed to NetworkManager disconnect events - skipping");
+            // Debug.Log("[Server] Already subscribed to NetworkManager disconnect events - skipping");
         }
         else
         {
-            Debug.LogWarning("[Server] NetworkManager.Singleton is null, cannot subscribe to events");
+            // Debug.LogWarning("[Server] NetworkManager.Singleton is null, cannot subscribe to events");
         }
     }
 
     void Update()
     {
         timer += Time.deltaTime;
+        
+        // Win screen timer is now handled by simple Invoke - no need for Update logic
+        
         if (winnerPrintFlag)
         {
             DecideWinner();
@@ -199,8 +214,24 @@ public class Server : NetworkBehaviour
 
     public void StartGame(int tempPlayerCount)
     {
+        var step5Log = new System.Text.StringBuilder();
+        step5Log.AppendLine($"[ROUND RESTART] ===== STEP 5: STARTGAME CALLED =====");
+        step5Log.AppendLine($"[ROUND RESTART] Parameters: tempPlayerCount={tempPlayerCount}, roundCount={roundCount}");
+        step5Log.AppendLine($"[ROUND RESTART] Before any operations - deckCardsDict: {(deckCardsDict == null ? "NULL" : $"Count: {deckCardsDict.Count}")}");
+        
         timer = 0;
-        if (roundCount > 0) ResetForNewRound();
+        step5Log.AppendLine($"[ROUND RESTART] Timer reset");
+        
+        if (roundCount > 0) 
+        {
+            step5Log.AppendLine($"[ROUND RESTART] Round count > 0, calling ResetForNewRound()");
+            ResetForNewRound();
+            step5Log.AppendLine($"[ROUND RESTART] After ResetForNewRound - deckCardsDict: {(deckCardsDict == null ? "NULL" : $"Count: {deckCardsDict.Count}")}");
+        }
+        else
+        {
+            step5Log.AppendLine($"[ROUND RESTART] First round (roundCount: {roundCount}), skipping ResetForNewRound");
+        }
 
         turnCounter = 0;
         playerCount = tempPlayerCount;
@@ -208,21 +239,21 @@ public class Server : NetworkBehaviour
         // CRITICAL FIX: Do NOT manually set connectedPlayerCount here
         // Let AnotherPlayerConnected() handle all connection counting
         // The host will be counted when AnotherPlayerConnected() is called for them
-        Debug.Log($"[Server] Host started game - connected player count will be managed by AnotherPlayerConnected()");
+        // Debug.Log($"[Server] Host started game - connected player count will be managed by AnotherPlayerConnected()");
         
         if (connectedPlayerCount == 1) singleDebuggingMode = true;
         else singleDebuggingMode = false;
 
-        Debug.Log("singleDebuggingMode: " + singleDebuggingMode);
+        // Debug.Log("singleDebuggingMode: " + singleDebuggingMode);
 
         if (!IsServer)
         {
-            Debug.LogError("StartGame() called on a non-server instance!");
+            // Debug.LogError("StartGame() called on a non-server instance!");
             return;
         }
         if (networkRelay == null)
         {
-            Debug.LogError("Network relay script empty");
+            // Debug.LogError("Network relay script empty");
         }
         ServerStart();
 
@@ -233,21 +264,90 @@ public class Server : NetworkBehaviour
         // Debug.LogWarning("Starting player: " + startingPlayerNo);
 
         // Initialize the deck and shuffle it
-        SaveAllCards();
+        step5Log.AppendLine($"[ROUND RESTART] ===== STEP 6: DECK INITIALIZATION =====");
+        step5Log.AppendLine($"[ROUND RESTART] Before deck initialization - deckCardsDict: {(deckCardsDict == null ? "NULL" : $"Count: {deckCardsDict.Count}")}");
+        
+        if (roundCount == 0)
+        {
+            step5Log.AppendLine($"[ROUND RESTART] First round (roundCount: {roundCount}) - creating new deck");
+            // First round - create the deck
+            SaveAllCards();
+            step5Log.AppendLine($"[ROUND RESTART] ✓ First round - created new deck with {deckCardsDict.Count} cards");
+        }
+        else
+        {
+            step5Log.AppendLine($"[ROUND RESTART] Subsequent round (roundCount: {roundCount}) - checking restored deck");
+            step5Log.AppendLine($"[ROUND RESTART] Current deckCardsDict: {(deckCardsDict == null ? "NULL" : $"Count: {deckCardsDict.Count}")}");
+            
+            if (deckCardsDict == null || deckCardsDict.Count == 0)
+            {
+                step5Log.AppendLine($"[ROUND RESTART] ❌ CRITICAL ERROR: deckCardsDict is NULL or EMPTY!");
+                step5Log.AppendLine($"[ROUND RESTART] This should NOT happen - deck should have been restored in DecideWinner");
+                step5Log.AppendLine($"[ROUND RESTART] allCardLookup count: {allCardLookup?.Count ?? 0}");
+            }
+            else
+            {
+                step5Log.AppendLine($"[ROUND RESTART] ✓ Deck is properly restored with {deckCardsDict.Count} cards");
+            }
+            
+            // Randomize seed for new shuffling
+            System.Random random = new System.Random(DateTime.Now.Millisecond);
+            seed = random.Next();
+            step5Log.AppendLine($"[ROUND RESTART] New seed generated: {seed}");
+        }
+        step5Log.AppendLine($"[ROUND RESTART] ===== STEP 6 COMPLETE =====");
+        
+        // Safety check - ensure deck exists before shuffling
+        step5Log.AppendLine($"[ROUND RESTART] ===== STEP 7: SAFETY CHECK AND SHUFFLING =====");
+        step5Log.AppendLine($"[ROUND RESTART] Before safety check - deckCardsDict: {(deckCardsDict == null ? "NULL" : $"Count: {deckCardsDict.Count}")}");
+        
+        if (deckCardsDict == null || deckCardsDict.Count == 0)
+        {
+            step5Log.AppendLine($"[ROUND RESTART] ❌ CRITICAL ERROR: deckCardsDict is null or empty before shuffling!");
+            step5Log.AppendLine($"[ROUND RESTART] Creating emergency deck...");
+            SaveAllCards();
+            step5Log.AppendLine($"[ROUND RESTART] Emergency deck created with {deckCardsDict.Count} cards");
+        }
+        else
+        {
+            step5Log.AppendLine($"[ROUND RESTART] ✓ Safety check passed - deck has {deckCardsDict.Count} cards");
+        }
+        
+        step5Log.AppendLine($"[ROUND RESTART] Shuffling deck with seed: {seed}");
         SuffleCards(seed);
+        step5Log.AppendLine($"[ROUND RESTART] ✓ Deck shuffled successfully - final count: {deckCardsDict.Count} cards");
+        step5Log.AppendLine($"[ROUND RESTART] ===== STEP 7 COMPLETE =====");
+        
+        // DO NOT reset playersPooledCardsIDs here - we need it for the next round's restoration
+        // playersPooledCardsIDs = null; // ← REMOVED - will be reset after DecideWinner
 
         // Debug before ClientRpc calls
-        Debug.Log("About to call ClientRpc functions.");
+        // Debug.Log("About to call ClientRpc functions.");
 
+        step5Log.AppendLine($"[ROUND RESTART] ===== STEP 8: STARTING CARD DEALING =====");
+        step5Log.AppendLine($"[ROUND RESTART] Before dealing - deckCardsDict: {(deckCardsDict == null ? "NULL" : $"Count: {deckCardsDict.Count}")}");
+        
         GivePlayerCount();
+        step5Log.AppendLine($"[ROUND RESTART] GivePlayerCount() called");
 
         // Deal the cards
         InitializePlayerPools();
+        step5Log.AppendLine($"[ROUND RESTART] Player pools initialized");
+        
         if (networkRelay != null)
         {
+            step5Log.AppendLine($"[ROUND RESTART] NetworkRelay found - starting card dealing process");
             Invoke("CallUpdateCurrentPlayer", 1);
             networkRelay.InitializeCardPrefabsClientRPC(false); // false = not reconnection
+            step5Log.AppendLine($"[ROUND RESTART] ✓ Card dealing process initiated");
         }
+        else
+        {
+            step5Log.AppendLine($"[ROUND RESTART] ❌ NetworkRelay is NULL - cannot start card dealing!");
+        }
+        step5Log.AppendLine($"[ROUND RESTART] ===== STEP 8 COMPLETE =====");
+        step5Log.AppendLine($"[ROUND RESTART] ===== ROUND RESTART PROCESS COMPLETE =====");
+        Debug.Log(step5Log.ToString());
     }
 
     public void CallUpdateCurrentPlayer()
@@ -264,12 +364,12 @@ public class Server : NetworkBehaviour
     
     public void InitialDealCoroutineCheck()
     {
-        Debug.LogWarning("InitialDealCoroutineCheck called, connectedPlayerCount: " + connectedPlayerCount);
+        // Debug.LogWarning("InitialDealCoroutineCheck called, connectedPlayerCount: " + connectedPlayerCount);
         
         // RECONNECTION: Skip initial deals if any clients are reconnecting
         if (reconnectingClients.Count > 0)
         {
-            Debug.Log($"[Server] Skipping initial deals - {reconnectingClients.Count} clients are reconnecting");
+            // Debug.Log($"[Server] Skipping initial deals - {reconnectingClients.Count} clients are reconnecting");
             return;
         }
         
@@ -281,12 +381,12 @@ public class Server : NetworkBehaviour
         if (isBotModeEnabled && playerCount == 2 && initialDealCoroutineCheckCounter == 1)
         {
             shouldStartDeal = true;
-            Debug.Log($"[Server] Bot mode: Starting deal with 1 human player + bot");
+            // Debug.Log($"[Server] Bot mode: Starting deal with 1 human player + bot");
         }
         else if (initialDealCoroutineCheckCounter == connectedPlayerCount)
         {
             shouldStartDeal = true;
-            Debug.Log($"[Server] Normal mode: Starting deal with all {connectedPlayerCount} players connected");
+            // Debug.Log($"[Server] Normal mode: Starting deal with all {connectedPlayerCount} players connected");
         }
         
         if (shouldStartDeal)
@@ -297,7 +397,7 @@ public class Server : NetworkBehaviour
     }
     private IEnumerator InitialDealCoroutine()
     {
-        Debug.LogWarning("InitialDealCoroutine started");
+        // Debug.LogWarning("InitialDealCoroutine started");
         // Initialize cardObjects
 
         //AudioManager.Instance.PlayAudio(0, 5, false);
@@ -314,31 +414,31 @@ public class Server : NetworkBehaviour
     {
         if (!IsServer)
         {
-            print("Server no open");
+            // print("Server no open");
         }
         else
         {
             System.Random random = new System.Random(DateTime.Now.Millisecond);
             if (seed == 0) seed = random.Next();
 
-            Debug.Log("NetworkManager State: " + NetworkManager.Singleton.NetworkConfig.NetworkTransport);
+            // Debug.Log("NetworkManager State: " + NetworkManager.Singleton.NetworkConfig.NetworkTransport);
             //Invoke("StartGame",0f);
         }
 
         if (networkRelay != null)
         {
-            print("networkRelay is not null");
+            // print("networkRelay is not null");
             DelayedMessageSend();
         }
         else
         {
-            print("NetworkRelay is null.");
+            // print("NetworkRelay is null.");
         }
     }
 
     private void DelayedMessageSend()
     {
-        print("DelayedMessageSend");
+        // print("DelayedMessageSend");
         networkRelay.PrintMessageServerRPC("message sent");
     }
 
@@ -375,7 +475,7 @@ public class Server : NetworkBehaviour
         allCardLookup = new Dictionary<string, int[]>(deckCardsDict);
     }
 
-    //Suffle the deck according to the seed
+
     private void SuffleCards(int seed)
     {
         System.Random rng = new System.Random(seed);
@@ -410,20 +510,42 @@ public class Server : NetworkBehaviour
     //Add a new List<int[]> to the dictionary for each player representing the player hands.
     private void InitializePlayersHands()
     {
-        Debug.LogWarning("InitializePlayersHands called");
+        // Debug.LogWarning("InitializePlayersHands called");
         playersHandCardsIDs = new Dictionary<int, List<string>>();
 
         for (int i = 0; i < playerCount; i++)
         {
             playersHandCardsIDs[i] = new List<string>();
         }
-        Debug.LogWarning("InitializePlayersHands finished");
+        // Debug.LogWarning("InitializePlayersHands finished");
     }
 
     //Chooses the cards to be dealth to the players
     private void DealCardsToPlayerHands()
     {
-        Debug.LogError($"[DEALING] DealCardsToPlayerHands CALLED - turnCounter: {turnCounter}, deckCardsDict.Count: {deckCardsDict?.Count ?? 0}, reconnectingClients.Count: {reconnectingClients.Count}");
+        var dealingLog = new System.Text.StringBuilder();
+        dealingLog.AppendLine($"[ROUND RESTART] ===== DEALING: DEALCARDS TOPLAYERHANDS CALLED =====");
+        dealingLog.AppendLine($"[ROUND RESTART] TurnCounter: {turnCounter}, RoundCount: {roundCount}");
+        dealingLog.AppendLine($"[ROUND RESTART] deckCardsDict: {(deckCardsDict == null ? "NULL" : $"Count: {deckCardsDict.Count}")}");
+        dealingLog.AppendLine($"[ROUND RESTART] ReconnectingClients: {reconnectingClients.Count}");
+        
+        if (deckCardsDict == null)
+        {
+            dealingLog.AppendLine($"[ROUND RESTART] ❌ CRITICAL ERROR: deckCardsDict is NULL when trying to deal cards!");
+            dealingLog.AppendLine($"[ROUND RESTART] This will cause the 'Sequence contains no elements' error!");
+            Debug.LogError(dealingLog.ToString());
+            return;
+        }
+        
+        if (deckCardsDict.Count == 0)
+        {
+            dealingLog.AppendLine($"[ROUND RESTART] ❌ CRITICAL ERROR: deckCardsDict is EMPTY when trying to deal cards!");
+            dealingLog.AppendLine($"[ROUND RESTART] This will cause the 'Sequence contains no elements' error!");
+            Debug.LogError(dealingLog.ToString());
+            return;
+        }
+        
+        dealingLog.AppendLine($"[ROUND RESTART] ✓ Deck is valid - proceeding with card dealing");
         
         InitializePlayersHands();//With each new deal players has to start with a fresh hand
         for (int i = 0; i < 4; i++)
@@ -431,6 +553,11 @@ public class Server : NetworkBehaviour
             for (int j = 0; j < playerCount; j++)
             {
                 // Remove from the deck and add to player's hand
+                if(deckCardsDict == null || deckCardsDict.Count == 0)
+                {
+                    Debug.LogError("[DEALING] ERROR: deckCardsDict is null or empty! Cannot deal cards to players.");
+                    return;
+                }
                 var lastCard = deckCardsDict.Last();
                 string uniqueID = lastCard.Key;
                 int[] cardID = lastCard.Value;
@@ -439,16 +566,20 @@ public class Server : NetworkBehaviour
                 deckCardsDict.Remove(uniqueID);
                 
                 // Debug: Log which card goes to which player
-                Debug.LogError($"[DEALING] Dealt card {uniqueID} [{cardID[0]}, {cardID[1]}] to player {j}");
+                // Debug.LogError($"[DEALING] Dealt card {uniqueID} [{cardID[0]}, {cardID[1]}] to player {j}");
             }
         }
 
-        Debug.LogError($"[DEALING] DealCardsToPlayerHands COMPLETED - dealt {playerCount * 4} cards, remaining deck: {deckCardsDict?.Count ?? 0}");
+        dealingLog.AppendLine($"[ROUND RESTART] ===== DEALING: DEALCARDS TOPLAYERHANDS COMPLETED =====");
+        dealingLog.AppendLine($"[ROUND RESTART] ✓ Dealt {playerCount * 4} cards to players");
+        dealingLog.AppendLine($"[ROUND RESTART] Remaining deck: {(deckCardsDict == null ? "NULL" : $"{deckCardsDict.Count} cards")}");
+        dealingLog.AppendLine($"[ROUND RESTART] ===== DEALING COMPLETE =====");
+        Debug.Log(dealingLog.ToString());
         
         // Debug: Print final hands
         for (int j = 0; j < playerCount; j++)
         {
-            Debug.LogError($"[DEALING] Player {j} final hand: {string.Join(", ", playersHandCardsIDs[j])}");
+            // Debug.LogError($"[DEALING] Player {j} final hand: {string.Join(", ", playersHandCardsIDs[j])}");
         }
 
         //Sends players hand to the gameManger so that card objects be given to the players
@@ -497,17 +628,17 @@ public class Server : NetworkBehaviour
         var discardedDict = serializableCard.ToDictionary();
         
         // Debug: Print all cards being added to pool
-        Debug.Log($"[Server] AddDiscardedCardsToPlayerPool called for player {playerNumber} with {discardedDict.Count} cards:");
-        foreach (var kvp in discardedDict)
-        {
-            Debug.Log($"[Server] Adding to pool: {kvp.Key} [{kvp.Value[0]}, {kvp.Value[1]}]");
-        }
+        // Debug.Log($"[Server] AddDiscardedCardsToPlayerPool called for player {playerNumber} with {discardedDict.Count} cards:");
+        // foreach (var kvp in discardedDict)
+        // {
+        //     Debug.Log($"[Server] Adding to pool: {kvp.Key} [{kvp.Value[0]}, {kvp.Value[1]}]");
+        // }
         
         foreach (var kvp in discardedDict)
         {
             // kvp.Key is uniqueID, kvp.Value is int[] cardID
             playersPooledCardsIDs[playerNumber].Add(kvp.Key);
-            Debug.LogWarning("PlayerNumber: " + playerNumber + " discardedCardID: " + kvp.Value[0] + "_" + kvp.Value[1]);
+            // Debug.LogWarning("PlayerNumber: " + playerNumber + " discardedCardID: " + kvp.Value[0] + "_" + kvp.Value[1]);
         }
 
         int piştiPlayer = 5;
@@ -515,32 +646,32 @@ public class Server : NetworkBehaviour
 
         if (discardedDict.Count == 2)
         {
-            Debug.LogWarning("Inside Pişti - checking 2 cards for pişti");
+            // Debug.LogWarning("Inside Pişti - checking 2 cards for pişti");
             var values = new List<int[]>(discardedDict.Values);
             
             // Debug: Print the two cards being checked
-            Debug.Log($"[Server] Pişti check - Card 1: [{values[0][0]}, {values[0][1]}], Card 2: [{values[1][0]}, {values[1][1]}]");
+            // Debug.Log($"[Server] Pişti check - Card 1: [{values[0][0]}, {values[0][1]}], Card 2: [{values[1][0]}, {values[1][1]}]");
             
             // If the last two cards have the same value, it's a pişti
             if (values[values.Count - 1][1] == values[values.Count - 2][1])
             {
-                Debug.LogWarning("Correct Pişti - both cards have value " + values[values.Count - 1][1]);
+                // Debug.LogWarning("Correct Pişti - both cards have value " + values[values.Count - 1][1]);
                 if (values[values.Count - 1][1] == 11)
                 {
                     jPistiFlag = true;
-                    Debug.LogWarning("Jack Pişti detected!");
+                    // Debug.LogWarning("Jack Pişti detected!");
                 }
                 PlayerPişti(currentPlayer, jPistiFlag);
                 piştiPlayer = currentPlayer;
             }
             else
             {
-                Debug.LogWarning("No Pişti - cards have different values: " + values[values.Count - 1][1] + " vs " + values[values.Count - 2][1]);
+                // Debug.LogWarning("No Pişti - cards have different values: " + values[values.Count - 1][1] + " vs " + values[values.Count - 2][1]);
             }
         }
         else
         {
-            Debug.LogWarning($"No Pişti check - {discardedDict.Count} cards (need exactly 2)");
+            // Debug.LogWarning($"No Pişti check - {discardedDict.Count} cards (need exactly 2)");
         }
 
         //networkRelay.PrintPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs), piştiPlayer);
@@ -551,10 +682,10 @@ public class Server : NetworkBehaviour
         //if(!singleDebuggingMode)
         //{
         readyToEndTurnCounter++;
-        Debug.LogError($"[END TURN CHECK] readyToEndTurnCounter: {readyToEndTurnCounter}, connectedPlayerCount: {connectedPlayerCount}, currentPlayer: {currentPlayer}, turnCounter: {turnCounter}");
+        // Debug.LogError($"[END TURN CHECK] readyToEndTurnCounter: {readyToEndTurnCounter}, connectedPlayerCount: {connectedPlayerCount}, currentPlayer: {currentPlayer}, turnCounter: {turnCounter}");
         if (readyToEndTurnCounter == connectedPlayerCount)
         {
-            Debug.LogError($"[END TURN CHECK] All players ready, calling EndTurn() - turnCounter: {turnCounter}");
+            // Debug.LogError($"[END TURN CHECK] All players ready, calling EndTurn() - turnCounter: {turnCounter}");
             EndTurn();
             readyToEndTurnCounter = 0;
         }
@@ -570,24 +701,26 @@ public class Server : NetworkBehaviour
         //          $"ReconnectingClients: {reconnectingClients.Count}");
         
         //Debug.LogWarning("InsideEndTurn");
+        int modulo = turnCounter % (playerCount * 4);
+        int target = (playerCount * 4) - 1;
+
         if (turnCounter == 47)
         {
             //Round ends and a winner is decided after each card is played
-            //DecideWinner();
+            DecideWinner();
+        }
+        else if (modulo == target)
+        {
+            //If each player played their 4 cards new cards are dealt
+            // Debug.LogError($"[DEALING] TIME TO DEAL NEW CARDS! turnCounter: {turnCounter}, calling DealCardsToPlayerHands in 1 second");
+            Invoke("DealCardsToPlayerHands", 1f);
         }
         // NOTE: Oynayamazsın pending logic moved to GetMove() to activate when next card is played
         
-        int modulo = turnCounter % (playerCount * 4);
-        int target = (playerCount * 4) - 1;
         
-        Debug.LogError($"[DEALING CHECK] turnCounter: {turnCounter}, playerCount: {playerCount}, modulo: {modulo}, target: {target}, shouldDeal: {modulo == target}");
         
-        if (modulo == target)
-        {
-            //If each player played their 4 cards new cards are dealt
-            Debug.LogError($"[DEALING] TIME TO DEAL NEW CARDS! turnCounter: {turnCounter}, calling DealCardsToPlayerHands in 1 second");
-            Invoke("DealCardsToPlayerHands", 1f);
-        }
+        // Debug.LogError($"[DEALING CHECK] turnCounter: {turnCounter}, playerCount: {playerCount}, modulo: {modulo}, target: {target}, shouldDeal: {modulo == target}");
+        
         
         // CRITICAL FIX: Increment turn counter AFTER checking if it's time to deal
         // This ensures the dealing logic works correctly with the original design
@@ -604,7 +737,7 @@ public class Server : NetworkBehaviour
         int oldTurnCounter = turnCounter;
         turnCounter++;
 
-        Debug.LogError($"[TURN COUNTER] INCREMENTED: {oldTurnCounter} → {turnCounter}");
+        // Debug.LogError($"[TURN COUNTER] INCREMENTED: {oldTurnCounter} → {turnCounter}");
 
         currentPlayer = (currentPlayer + 1) % playerCount;
 
@@ -653,11 +786,11 @@ public class Server : NetworkBehaviour
         {
             int playerID = kvp.Key;
             List<string> cardList = kvp.Value;
-            Debug.Log($"Player {playerID} pooled cards: {string.Join(", ", cardList)}");
+            // Debug.Log($"Player {playerID} pooled cards: {string.Join(", ", cardList)}");
             foreach (var card in cardList)
             {
                 int[] cardID = allCardLookup[card];
-                Debug.Log($"Player {playerID} card: {card} ({cardID[0]}, {cardID[1]})");
+                // Debug.Log($"Player {playerID} card: {card} ({cardID[0]}, {cardID[1]})");
             }
         }
 
@@ -691,7 +824,7 @@ public class Server : NetworkBehaviour
             {
                 if (controlCardList.Contains(card))
                 {
-                    Debug.LogError("Duplicate card found in player's pool: " + card);
+                    // Debug.LogError("Duplicate card found in player's pool: " + card);
                     continue; // Skip duplicate cards
                 }
                 else
@@ -709,22 +842,22 @@ public class Server : NetworkBehaviour
 
                 if (value == 1) // Ace
                 {
-                    Debug.LogWarning("Player " + playerID + " has an Ace");
+                    // Debug.LogWarning("Player " + playerID + " has an Ace");
                     points[playerID]++;
                 }
                 else if (value == 11) // Jack
                 {
-                    Debug.LogWarning("Player " + playerID + " has a Jack");
+                    // Debug.LogWarning("Player " + playerID + " has a Jack");
                     points[playerID]++;
                 }
                 else if (kind == 1 && value == 2) // 2 of Clubs
                 {
-                    Debug.LogWarning("Player " + playerID + " has a 2 of Clubs");
+                    // Debug.LogWarning("Player " + playerID + " has a 2 of Clubs");
                     points[playerID] += 2;
                 }
                 else if (kind == 2 && value == 10) // 10 of Diamonds
                 {
-                    Debug.LogWarning("Player " + playerID + " has a 10 of Diamonds");
+                    // Debug.LogWarning("Player " + playerID + " has a 10 of Diamonds");
                     points[playerID] += 3;
                 }
             }
@@ -733,7 +866,7 @@ public class Server : NetworkBehaviour
         // Add 3-point bonus for most cards
         if (playerWithMostCards.Count == 1)
         {
-            Debug.LogWarning("Player with most cards: " + playerWithMostCards[0]);
+            // Debug.LogWarning("Player with most cards: " + playerWithMostCards[0]);
             points[playerWithMostCards[0]] += 3;
         }
 
@@ -741,7 +874,9 @@ public class Server : NetworkBehaviour
         var allPooledCards = pooledCards.SelectMany(kvp => kvp.Value).ToList();
         var duplicateCards = allPooledCards.GroupBy(x => x).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
         if (duplicateCards.Count > 0)
-            Debug.LogError("DUPLICATE CARDS ACROSS POOLS: " + string.Join(", ", duplicateCards));
+        {
+            // Debug.LogError("DUPLICATE CARDS ACROSS POOLS: " + string.Join(", ", duplicateCards));
+        }
 
         // Determine the winner (max points)
         int maxPoints = -1;
@@ -811,26 +946,48 @@ public class Server : NetworkBehaviour
             roundOverText += $"\n\nWaiting for another round to start";
         }
 
-        Debug.LogWarning(points[0] + "_" + points[1]);
+        // Debug.LogWarning(points[0] + "_" + points[1]);
 
         networkRelay.PrintPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs), 5);
 
         SendWinScreen(roundOverText, winnerSide, points[0], points[1]);
 
-        if (winnerSide == -1)
+        // CRITICAL: Restore deck at the very end of DecideWinner for next round
+        if (roundCount > 0) // Only restore for subsequent rounds
         {
-            Invoke("StartGameAutomatic", 10f);
+            var step1Log = new System.Text.StringBuilder();
+            step1Log.AppendLine($"[ROUND RESTART] ===== STEP 1: DECK RESTORATION IN DECIDEWINNER =====");
+            step1Log.AppendLine($"[ROUND RESTART] Round count: {roundCount}, allCardLookup count: {allCardLookup?.Count ?? 0}");
+            step1Log.AppendLine($"[ROUND RESTART] Before restoration - deckCardsDict: {(deckCardsDict == null ? "NULL" : $"Count: {deckCardsDict.Count}")}");
+            
+            deckCardsDict = new Dictionary<string, int[]>(allCardLookup);
+            
+            step1Log.AppendLine($"[ROUND RESTART] After restoration - deckCardsDict: {(deckCardsDict == null ? "NULL" : $"Count: {deckCardsDict.Count}")}");
+            step1Log.AppendLine($"[ROUND RESTART] ✓ DECK RESTORATION COMPLETE - {deckCardsDict.Count} cards ready for next round");
+            step1Log.AppendLine($"[ROUND RESTART] ===== STEP 1 COMPLETE =====");
+            Debug.Log(step1Log.ToString());
         }
+        else
+        {
+            Debug.Log($"[ROUND RESTART] First round (roundCount: {roundCount}) - skipping deck restoration");
+        }
+
+        // Simple approach: Just use Invoke to start new game after 10 seconds
+        Invoke("StartGameAutomatic", 10f);
     }
 
     private void StartGameAutomatic()
     {
-        if (timer >= 11)
-        {
-            StartGame(playerCount);
-            Debug.LogWarning("StartGameAutomatic called");
-        }
-
+        Debug.Log("[ROUND RESTART] ===== STARTGAMEAUTOMATIC CALLED =====");
+        Debug.Log($"[ROUND RESTART] Current deckCardsDict: {(deckCardsDict == null ? "NULL" : $"Count: {deckCardsDict.Count}")}");
+        
+        // Close win screen
+        networkRelay.CloseWinScreenClientRPC();
+        Debug.Log("[ROUND RESTART] Win screen closed");
+        
+        // Start new game
+        StartGame(playerCount);
+        Debug.Log("[ROUND RESTART] ===== STARTGAMEAUTOMATIC COMPLETE =====");
     }
 
     private void SendWinScreen(string message, int winnerSide, int point0, int point1)
@@ -845,9 +1002,9 @@ public class Server : NetworkBehaviour
         if (centerCardsDict == null) return;
         foreach (var kvp in centerCardsDict)
         {
-            Debug.LogWarning("Adding remaining card to player pool: " + kvp.Key);
-            if (playersPooledCardsIDs[lastPlayerToCapture].Contains(kvp.Key))
-                Debug.LogError("DUPLICATE ADD TO POOL: " + kvp.Key);
+            //Debug.LogWarning("Adding remaining card to player pool: " + kvp.Key);
+            //if (playersPooledCardsIDs[lastPlayerToCapture].Contains(kvp.Key))
+                //Debug.LogError("DUPLICATE ADD TO POOL: " + kvp.Key);
             playersPooledCardsIDs[lastPlayerToCapture].Add(kvp.Key);
         }
     }
@@ -866,7 +1023,7 @@ public class Server : NetworkBehaviour
 
     public void PlayerPişti(int playerID, bool jPiştiFlag)
     {
-        Debug.LogWarning("Player " + playerID + " Pişti");
+        //Debug.LogWarning("Player " + playerID + " Pişti");
         if (playerCount == 2)
         {
             if (jPiştiFlag) points[playerID] += 20;
@@ -912,18 +1069,18 @@ public class Server : NetworkBehaviour
     {
         if (dictionary == null || dictionary.Count == 0)
         {
-            Debug.Log("Dictionary is empty.");
+            //Debug.Log("Dictionary is empty.");
             return;
         }
 
         foreach (var kvp in dictionary)
         {
-            Debug.Log($"Key: {kvp.Key}");
-            Debug.Log("Values:");
+            //Debug.Log($"Key: {kvp.Key}");
+            //Debug.Log("Values:");
             foreach (var array in kvp.Value)
             {
                 string arrayContents = string.Join(", ", array);
-                Debug.Log($"  [{arrayContents}]");
+                //Debug.Log($"  [{arrayContents}]");
             }
         }
     }
@@ -946,29 +1103,29 @@ public class Server : NetworkBehaviour
 
     public void GetMove(string selectedHandCardUniqueID, SerializableCard serializableCard, int playerNumber, int sumValue)
     {
-        Debug.Log($"[Server] GetMove called with selectedHandCardUniqueID: {selectedHandCardUniqueID}, playerNumber: {playerNumber}, sumValue: {sumValue}");
-        Debug.Log($"[Server] allCardLookup contains key: {allCardLookup.ContainsKey(selectedHandCardUniqueID)}");
-        Debug.Log($"[Server] allCardLookup count: {allCardLookup.Count}");
-        Debug.Log($"[Server] selectedHandCardUniqueID is null: {selectedHandCardUniqueID == null}");
-        Debug.Log($"[Server] selectedHandCardUniqueID length: {(selectedHandCardUniqueID?.Length ?? 0)}");
+        // Debug.Log($"[Server] GetMove called with selectedHandCardUniqueID: {selectedHandCardUniqueID}, playerNumber: {playerNumber}, sumValue: {sumValue}");
+        // Debug.Log($"[Server] allCardLookup contains key: {allCardLookup.ContainsKey(selectedHandCardUniqueID)}");
+        // Debug.Log($"[Server] allCardLookup count: {allCardLookup.Count}");
+        // Debug.Log($"[Server] selectedHandCardUniqueID is null: {selectedHandCardUniqueID == null}");
+        // Debug.Log($"[Server] selectedHandCardUniqueID length: {(selectedHandCardUniqueID?.Length ?? 0)}");
         
         if (selectedHandCardUniqueID == null)
         {
-            Debug.LogError($"[Server] ERROR: selectedHandCardUniqueID is NULL!");
+            // Debug.LogError($"[Server] ERROR: selectedHandCardUniqueID is NULL!");
             return;
         }
         
         if (!allCardLookup.ContainsKey(selectedHandCardUniqueID))
         {
-            Debug.LogError($"[Server] ERROR: allCardLookup does not contain key: {selectedHandCardUniqueID}");
-            Debug.LogError($"[Server] Available keys in allCardLookup: {string.Join(", ", allCardLookup.Keys)}");
+            // Debug.LogError($"[Server] ERROR: allCardLookup does not contain key: {selectedHandCardUniqueID}");
+            // Debug.LogError($"[Server] Available keys in allCardLookup: {string.Join(", ", allCardLookup.Keys)}");
             return;
         }
         
         // === MOVE CHAIN TRACKING ===
         // Initialize variables needed for both hybrid power activation and regular card play
         int[] selectedHandCard = allCardLookup[selectedHandCardUniqueID];
-        Debug.Log($"[Server] selectedHandCard: [{selectedHandCard[0]}, {selectedHandCard[1]}]");
+        // Debug.Log($"[Server] selectedHandCard: [{selectedHandCard[0]}, {selectedHandCard[1]}]");
         
         string[] capturedCardIds = new string[0];
         var dict = serializableCard.ToDictionary();
@@ -1800,18 +1957,32 @@ public class Server : NetworkBehaviour
 
     public void OnClientDealCenterFinished(ulong clientId)
     {
+        var centerFinishedLog = new System.Text.StringBuilder();
+        centerFinishedLog.AppendLine($"[ROUND RESTART] ===== DEALING: ONCLIENTDEALCENTERFINISHED =====");
+        centerFinishedLog.AppendLine($"[ROUND RESTART] Client {clientId} finished DealCenter");
+        
         dealCenterFinishedClients.Add(clientId);
-        Debug.Log($"Client {clientId} finished DealCenter. Count: {dealCenterFinishedClients.Count}/{connectedPlayerCount}");
+        centerFinishedLog.AppendLine($"[ROUND RESTART] DealCenter finished count: {dealCenterFinishedClients.Count}/{connectedPlayerCount}");
+        centerFinishedLog.AppendLine($"[ROUND RESTART] Current deckCardsDict: {(deckCardsDict == null ? "NULL" : $"Count: {deckCardsDict.Count}")}");
 
         if (dealCenterFinishedClients.Count == connectedPlayerCount)
         {
+            centerFinishedLog.AppendLine($"[ROUND RESTART] ✓ All clients finished DealCenter - proceeding to deal player hands");
             // All clients finished DealCenter, now deal player hands
             dealCenterFinishedClients.Clear(); // Reset for next round
 
             // FIX: Make sure hands are dealt before sending them!
+            centerFinishedLog.AppendLine($"[ROUND RESTART] Calling DealCardsToPlayerHands()...");
             DealCardsToPlayerHands();
             // Now Delayed_DealCardPrefabsToPlayers will be called inside DealCardsToPlayerHands
+            centerFinishedLog.AppendLine($"[ROUND RESTART] ✓ DealCardsToPlayerHands() completed");
         }
+        else
+        {
+            centerFinishedLog.AppendLine($"[ROUND RESTART] Waiting for more clients to finish DealCenter...");
+        }
+        centerFinishedLog.AppendLine($"[ROUND RESTART] ===== DEALING: ONCLIENTDEALCENTERFINISHED COMPLETE =====");
+        Debug.Log(centerFinishedLog.ToString());
     }
 
     // ===== GAME STATE MANAGEMENT =====
@@ -2345,12 +2516,64 @@ public class Server : NetworkBehaviour
     // ===== BOT MODE MANAGEMENT =====
 
     /// <summary>
+    /// Initialize bot mode toggle UI connection
+    /// </summary>
+    private void InitializeBotModeToggle()
+    {
+        if (botModeToggle != null)
+        {
+            Toggle toggle = botModeToggle.GetComponent<Toggle>();
+            if (toggle != null)
+            {
+                // Set toggle state to match current isBotModeEnabled value
+                toggle.isOn = isBotModeEnabled;
+                
+                // Add listener for toggle value changes
+                toggle.onValueChanged.AddListener(OnBotModeToggleChanged);
+                
+                Debug.Log($"[Server] Bot mode toggle initialized - Current state: {isBotModeEnabled}");
+            }
+            else
+            {
+                Debug.LogWarning("[Server] Bot mode toggle GameObject found but no Toggle component attached!");
+            }
+        }
+        else
+        {
+            Debug.LogWarning("[Server] Bot mode toggle GameObject not assigned in inspector!");
+        }
+    }
+
+    /// <summary>
+    /// Called when the bot mode toggle value changes
+    /// </summary>
+    private void OnBotModeToggleChanged(bool isOn)
+    {
+        isBotModeEnabled = isOn;
+        Debug.Log($"[Server] Bot mode {(isBotModeEnabled ? "ENABLED" : "DISABLED")} via toggle");
+    }
+
+    /// <summary>
     /// Public method to enable/disable bot mode for 1v1 games
     /// </summary>
     [ContextMenu("Toggle Bot Mode")]
     public void ToggleBotMode()
     {
         isBotModeEnabled = !isBotModeEnabled;
+        
+        // Update toggle UI to reflect the change without triggering the listener
+        if (botModeToggle != null)
+        {
+            Toggle toggle = botModeToggle.GetComponent<Toggle>();
+            if (toggle != null)
+            {
+                // Temporarily remove listener to avoid recursion
+                toggle.onValueChanged.RemoveListener(OnBotModeToggleChanged);
+                toggle.isOn = isBotModeEnabled;
+                toggle.onValueChanged.AddListener(OnBotModeToggleChanged);
+            }
+        }
+        
         Debug.Log($"[Server] Bot mode {(isBotModeEnabled ? "ENABLED" : "DISABLED")}");
     }
 

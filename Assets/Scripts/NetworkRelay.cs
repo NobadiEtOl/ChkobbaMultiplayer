@@ -108,6 +108,15 @@ public class NetworkRelay : NetworkBehaviour
     }
 
     [ClientRpc(RequireOwnership = false)]
+    public void CloseWinScreenClientRPC()
+    {
+        if (GameManager.LocalInstance != null)
+        {
+            GameManager.LocalInstance.CloseWinScreen();
+        }
+    }
+
+    [ClientRpc(RequireOwnership = false)]
     public void GetPlayerNumberClientRPC(int playerNumber)
     {
         if (DeckController.LocalInstance.thisPlayerNumber == -1)

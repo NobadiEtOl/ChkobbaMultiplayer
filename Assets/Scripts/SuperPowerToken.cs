@@ -27,7 +27,7 @@ public class SuperPowerToken : MonoBehaviour
         StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
         StartCoroutine(FadeOutSprite()); // Destroy the token after activation
     }
-
+    
     public IEnumerator FadeOutSprite(float duration = 0.5f)
     {
         SpriteRenderer sr = GetComponent<SpriteRenderer>();
@@ -50,6 +50,12 @@ public class SuperPowerToken : MonoBehaviour
         sr.color = endColor;
 
         yield return new WaitForSeconds(duration); // Wait before destroying
+
+        // Clear the active instance before destroying
+        if (SuperPowerToken.ActiveInstance == this)
+        {
+            SuperPowerToken.ActiveInstance = null;
+        }
 
         Destroy(gameObject); // Destroy the token after fading out
     }
