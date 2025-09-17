@@ -10,13 +10,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: de640fe3d0db1804a85f9fc8f5cadab6, type: 3}
-  m_Name: Ultra_PipelineAsset_ForwardRenderer
+  m_Name: CRTForwardRenderer
   m_EditorClassIdentifier: 
   debugShaders:
     debugReplacementPS: {fileID: 4800000, guid: cf852408f2e174538bcd9b7fda1c5ae7, type: 3}
     hdrDebugViewPS: {fileID: 4800000, guid: 573620ae32aec764abd4d728906d2587, type: 3}
-  m_RendererFeatures: []
-  m_RendererFeatureMap: 
+  m_RendererFeatures:
+  - {fileID: 3208430035041796892}
+  m_RendererFeatureMap: 1c435c2d1ea2862c
   m_UseNativeRenderPass: 0
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}
@@ -55,7 +56,7 @@ MonoBehaviour:
   m_CopyDepthMode: 1
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 1
---- !u!114 &809923992495476239
+--- !u!114 &3208430035041796892
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -64,8 +65,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: eb7274e9e016bfc45bd24d86b2bc519f, type: 3}
-  m_Name: CRTPostProcessFeature
+  m_Script: {fileID: 11500000, guid: d0926a6e150be3a41878d0c9bfd175f6, type: 3}
+  m_Name: CRTFullScreenFeature
   m_EditorClassIdentifier: 
   m_Active: 1
-  CRTMaterial: {fileID: 2100000, guid: cfde404862b23ac48a65365e1a24abc6, type: 2}
+  settings:
+    crtMaterial: {fileID: 2100000, guid: 863451ee6bb14ec48a3cd6d8c590ed40, type: 2}
+    renderPassEvent: 500

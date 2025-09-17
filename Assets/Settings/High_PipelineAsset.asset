@@ -18,12 +18,13 @@ MonoBehaviour:
   m_RendererData: {fileID: 0}
   m_RendererDataList:
   - {fileID: 11400000, guid: 5c9bd680668e5f642b670ee64b2151f8, type: 2}
-  m_DefaultRendererIndex: 0
+  - {fileID: 11400000, guid: 65ca1367e7c203843ba0d6700e8a95ff, type: 2}
+  m_DefaultRendererIndex: 1
   m_RequireDepthTexture: 0
   m_RequireOpaqueTexture: 0
   m_OpaqueDownsampling: 1
   m_SupportsTerrainHoles: 1
-  m_SupportsHDR: 0
+  m_SupportsHDR: 1
   m_HDRColorBufferPrecision: 0
   m_MSAA: 1
   m_RenderScale: 1
@@ -69,7 +70,7 @@ MonoBehaviour:
   m_StoreActionsOptimization: 0
   m_EnableRenderGraph: 0
   m_UseAdaptivePerformance: 1
-  m_ColorGradingMode: 0
+  m_ColorGradingMode: 1
   m_ColorGradingLutSize: 32
   m_UseFastSRGBLinearConversion: 0
   m_SupportDataDrivenLensFlare: 1
@@ -80,8 +81,8 @@ MonoBehaviour:
   m_ShadowAtlasResolution: 256
   m_VolumeFrameworkUpdateMode: 0
   m_Textures:
-    blueNoise64LTex: {fileID: 0}
-    bayerMatrixTex: {fileID: 0}
+    blueNoise64LTex: {fileID: 2800000, guid: e3d24661c1e055f45a7560c033dbb837, type: 3}
+    bayerMatrixTex: {fileID: 2800000, guid: f9ee4ed84c1d10c49aabb9b210b0fc44, type: 3}
   m_PrefilteringModeMainLightShadows: 3
   m_PrefilteringModeAdditionalLight: 3
   m_PrefilteringModeAdditionalLightShadows: 2
@@ -91,7 +92,7 @@ MonoBehaviour:
   m_PrefilteringModeScreenSpaceOcclusion: 0
   m_PrefilterDebugKeywords: 1
   m_PrefilterWriteRenderingLayers: 1
-  m_PrefilterHDROutput: 1
+  m_PrefilterHDROutput: 0
   m_PrefilterSSAODepthNormals: 1
   m_PrefilterSSAOSourceDepthLow: 1
   m_PrefilterSSAOSourceDepthMedium: 1

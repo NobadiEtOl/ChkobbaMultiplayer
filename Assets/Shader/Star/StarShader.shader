@@ -1,5 +1,7 @@
-// CHANGE TRACKER: [CHANGE_COUNT: 10] - Added multiple controllable smoke points with texture movement
-// Ctrl+Z to count 9 to restore previous state, or count 0 for original
+// CHANGE TRACKER: [CHANGE_COUNT: 11] - Mobile performance optimizations
+// MOBILE OPTIMIZATIONS: Reduced star layers (15->8), simplified wave calculations, 
+// reduced smoke turbulence layers (4->2), limited emission lines (max 6), simplified wave distortion
+// Ctrl+Z to count 10 to restore previous state, or count 0 for original
 Shader "Unlit/StarShader"
 {
     Properties
@@ -234,21 +236,17 @@ Shader "Unlit/StarShader"
                 // Add smooth wavy distortion to the radius
                 float waveTime = _Time.y * _WaveSpeed;
                 
-                // Create smoother random phase offset for each layer
+                // Create smoother random phase offset for each layer (cached for performance)
                 float randomPhase = hash(layerIndex) * 6.28318; // 0 to 2π
                 
-                // Primary wave with smooth random phase
+                // Primary wave with smooth random phase (simplified for mobile)
                 float primaryWave = sin(angle * _WaveFrequency + waveTime + randomPhase);
                 
-                // Secondary wave with different frequency and smooth random phase
-                float secondaryPhase = hash(layerIndex + 100.0) * 6.28318;
-                float secondaryWave = sin(angle * (_WaveFrequency * 1.7) + (waveTime * 0.8) + secondaryPhase);
+                // Smooth random amplitude multiplier for each layer (cached)
+                float randomAmplitude = 0.8 + hash(layerIndex + 200.0) * 0.2; // 0.8 to 1.0 (less variation)
                 
-                // Smooth random amplitude multiplier for each layer
-                float randomAmplitude = 0.7 + hash(layerIndex + 200.0) * 0.3; // 0.7 to 1.0 (less variation)
-                
-                // Combine waves with smoother amplitude
-                float totalWave = (primaryWave + secondaryWave * 0.3) * _WaveAmplitude * randomAmplitude * size;
+                // Simplified wave calculation for mobile performance
+                float totalWave = primaryWave * _WaveAmplitude * randomAmplitude * size;
                 
                 // Apply wave distortion to radius
                 currentRadius += totalWave;
@@ -305,14 +303,12 @@ Shader "Unlit/StarShader"
                  // Calculate base radius: full size at points, reduced at valleys
                  float currentRadius = size * lerp(1.0, _InnerRadius, pointFactor);
                  
-                 // Add smooth wavy distortion to the radius (same as star shape)
+                 // Add smooth wavy distortion to the radius (simplified for mobile)
                  float waveTime = _Time.y * _WaveSpeed;
                  float randomPhase = hash(layerIndex) * 6.28318;
                  float primaryWave = sin(angle * _WaveFrequency + waveTime + randomPhase);
-                 float secondaryPhase = hash(layerIndex + 100.0) * 6.28318;
-                 float secondaryWave = sin(angle * (_WaveFrequency * 1.7) + (waveTime * 0.8) + secondaryPhase);
-                 float randomAmplitude = 0.7 + hash(layerIndex + 200.0) * 0.3;
-                 float totalWave = (primaryWave + secondaryWave * 0.3) * _WaveAmplitude * randomAmplitude * size;
+                 float randomAmplitude = 0.8 + hash(layerIndex + 200.0) * 0.2;
+                 float totalWave = primaryWave * _WaveAmplitude * randomAmplitude * size;
                  currentRadius += totalWave;
                  
                  // Calculate emission line direction (perpendicular to star edge)
@@ -322,7 +318,7 @@ Shader "Unlit/StarShader"
                   float totalEmission = 0.0;
                   float time = _Time.y * _EmissionSpeed;
                   
-                  for (int i = 0; i < _EmissionCount; i++)
+                  for (int i = 0; i < min(_EmissionCount, 6); i++)
                   {
                       // Calculate emission line angle
                       float emissionAngle = (float(i) / _EmissionCount) * 6.28318;
@@ -333,14 +329,12 @@ Shader "Unlit/StarShader"
                       // Calculate line direction (perpendicular to star edge)
                       float2 lineDir = float2(cos(emissionAngle), sin(emissionAngle));
                       
-                      // Add waviness to the line direction
+                      // Add waviness to the line direction (simplified for mobile)
                       float waveTime = _Time.y * _EmissionSpeed;
-                      float waveOffset = sin(waveTime + i * 0.5) * _EmissionWaveAmplitude;
-                      float waveAngle = sin(waveTime * _EmissionWaveFrequency + i * 0.3) * _EmissionWaveAmplitude;
+                      float waveOffset = sin(waveTime + i * 0.5) * _EmissionWaveAmplitude * 0.5; // Reduced complexity
                       
-                      // Apply wave distortion to line direction
-                      float2 waveDir = float2(cos(waveAngle), sin(waveAngle));
-                      lineDir = normalize(lineDir + waveDir * waveOffset);
+                      // Apply simplified wave distortion to line direction
+                      lineDir = normalize(lineDir + float2(waveOffset, waveOffset * 0.5));
                       
                       // Calculate distance from emission line
                       float2 toPoint = pos - emissionStart;
@@ -393,8 +387,8 @@ Shader "Unlit/StarShader"
                  // Create turbulent flow lines
                  float smoke = 0.0;
                  
-                 // Multiple turbulent layers with different frequencies
-                 for (int i = 1; i <= 4; i++)
+                 // Multiple turbulent layers with different frequencies (reduced for mobile)
+                 for (int i = 1; i <= 2; i++)
                  {
                      float layerFreq = float(i) * 0.5;
                      float layerSpeed = time * layerFreq;
@@ -468,15 +462,15 @@ Shader "Unlit/StarShader"
                 // Current time
                 float time = _Time.y * _ExpansionSpeed;
                 
-                // Create infinite expanding star layers with smoother transitions
-                for (int layer = 0; layer < 15; layer++)
+                // Create infinite expanding star layers with smoother transitions (reduced for mobile)
+                for (int layer = 0; layer < 8; layer++)
                 {
                     // Calculate when this star layer started
                     float layerStartTime = float(layer) * _StarInterval;
                     float layerAge = time - layerStartTime;
                     
                     // Calculate the total cycle time
-                    float totalCycleTime = 15.0 * _StarInterval;
+                    float totalCycleTime = 8.0 * _StarInterval;
                     
                     // Make layers cycle continuously with smoother transitions
                     while (layerAge < 0.0)
