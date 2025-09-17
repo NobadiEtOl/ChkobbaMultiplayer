@@ -42,6 +42,9 @@ public class Server : NetworkBehaviour
     private int botPlayerNumber = 1; // Bot plays as player 1 (opponent)
     private Coroutine botMoveCoroutine;
     
+    // Reference to BotPlayer script
+    private BotPlayer botPlayer;
+    
     // Server.cs
     private Dictionary<string, string> copiedCardMap = new Dictionary<string, string>();
     private bool oynayamazsinPending = false;
@@ -115,7 +118,7 @@ public class Server : NetworkBehaviour
 
     public void ResetForNewRound()
     {
-        deckCardsDict = null;
+        //deckCardsDict = null;
         centerCardsDict = null;
         playersHandCardsIDs = null;
         playersPooledCardsIDs = null;
@@ -125,7 +128,7 @@ public class Server : NetworkBehaviour
         lastPlayerToCapture = -1;
         timer = 0f;
         turnTime = 15f;
-        connectedPlayerCount = 0; // FIXED: Reset connection count (host will make it 1) for new round
+        //connectedPlayerCount = 0; // FIXED: Reset connection count (host will make it 1) for new round
         readyToEndTurnCounter = 0;
         singleDebuggingMode = false;
         winnerPrintFlag = false;
@@ -138,6 +141,12 @@ public class Server : NetworkBehaviour
         {
             StopCoroutine(botMoveCoroutine);
             botMoveCoroutine = null;
+        }
+        
+        // Reset BotPlayer for new round
+        if (botPlayer != null && botPlayerActive)
+        {
+            botPlayer.ResetForNewRound();
         }
         
         // Reset connection tracking
@@ -168,6 +177,13 @@ public class Server : NetworkBehaviour
         
         // Initialize NetworkManagerUI reference
         networkManagerUI = FindObjectOfType<NetworkManagerUI>();
+        
+        // Initialize BotPlayer reference
+        botPlayer = BotPlayer.Instance;
+        if (botPlayer != null)
+        {
+            botPlayer.SetMoveDelay(botMoveDelay);
+        }
         
         //StartCoroutine(ServerSubsciribe());
     }
@@ -238,10 +254,22 @@ public class Server : NetworkBehaviour
             botPlayerActive = true;
             Debug.Log($"[Server] Bot mode activated! Bot will play as player {botPlayerNumber}");
             Debug.Log($"[Server] Connected players: {connectedPlayerCount}, Bot will fill the second slot");
+            
+            // Activate the BotPlayer
+            if (botPlayer != null)
+            {
+                botPlayer.ActivateBot();
+            }
         }
         else
         {
             botPlayerActive = false;
+            
+            // Deactivate the BotPlayer
+            if (botPlayer != null)
+            {
+                botPlayer.DeactivateBot();
+            }
         }
 
         Debug.Log("singleDebuggingMode: " + singleDebuggingMode);
@@ -289,8 +317,11 @@ public class Server : NetworkBehaviour
         // Bot system: Check if it's the bot's turn at game start
         if (botPlayerActive && currentPlayer == botPlayerNumber)
         {
-            Debug.Log($"[Server] It's bot's turn at game start (player {botPlayerNumber}), scheduling bot move");
-            ScheduleBotMove();
+            Debug.Log($"[Server] It's bot's turn at game start (player {botPlayerNumber}), notifying BotPlayer");
+            if (botPlayer != null)
+            {
+                botPlayer.OnBotTurn();
+            }
         }
     }
 
@@ -579,12 +610,6 @@ public class Server : NetworkBehaviour
         //          $"ReconnectingClients: {reconnectingClients.Count}");
         
         //Debug.LogWarning("InsideEndTurn");
-        if (turnCounter == 47)
-        {
-            //Round ends and a winner is decided after each card is played
-            //DecideWinner();
-        }
-        // NOTE: Oynayamazsın pending logic moved to GetMove() to activate when next card is played
         
         int modulo = turnCounter % (playerCount * 4);
         int target = (playerCount * 4) - 1;
@@ -593,10 +618,22 @@ public class Server : NetworkBehaviour
         
         if (modulo == target)
         {
-            //If each player played their 4 cards new cards are dealt
-            Debug.LogError($"[DEALING] TIME TO DEAL NEW CARDS! turnCounter: {turnCounter}, calling DealCardsToPlayerHands in 1 second");
-            Invoke("DealCardsToPlayerHands", 1f);
+            //If each player played their 4 cards, check if we can deal new cards
+            if (deckCardsDict != null && deckCardsDict.Count >= (playerCount * 4))
+            {
+                //If there are enough cards in the deck, deal new cards
+                Debug.LogError($"[DEALING] TIME TO DEAL NEW CARDS! turnCounter: {turnCounter}, calling DealCardsToPlayerHands in 1 second");
+                Invoke("DealCardsToPlayerHands", 1f);
+            }
+            else
+            {
+                //If there are not enough cards in the deck, the round ends
+                Debug.LogError($"[ROUND END] Not enough cards to deal! turnCounter: {turnCounter}, deckCount: {deckCardsDict?.Count ?? 0}, calling DecideWinner");
+                DecideWinner();
+            }
         }
+        
+        // NOTE: Oynayamazsın pending logic moved to GetMove() to activate when next card is played
         
         // CRITICAL FIX: Increment turn counter AFTER checking if it's time to deal
         // This ensures the dealing logic works correctly with the original design
@@ -622,8 +659,11 @@ public class Server : NetworkBehaviour
         // Bot system: Check if it's the bot's turn
         if (botPlayerActive && currentPlayer == botPlayerNumber)
         {
-            Debug.Log($"[Server] It's bot's turn (player {botPlayerNumber}), scheduling bot move");
-            ScheduleBotMove();
+            Debug.Log($"[Server] It's bot's turn (player {botPlayerNumber}), notifying BotPlayer");
+            if (botPlayer != null)
+            {
+                botPlayer.OnBotTurn();
+            }
         }
     }
 
@@ -2378,10 +2418,19 @@ public class Server : NetworkBehaviour
                 StopCoroutine(botMoveCoroutine);
                 botMoveCoroutine = null;
             }
+            
+            // Deactivate the BotPlayer
+            if (botPlayer != null)
+            {
+                botPlayer.DeactivateBot();
+            }
+            
             Debug.Log("[Server] Bot deactivated due to bot mode being disabled");
         }
     }
 
+    // OLD BOT METHODS - NO LONGER USED (BotPlayer handles this now)
+    /*
     /// <summary>
     /// Schedules a bot move after a short delay
     /// </summary>
@@ -2393,7 +2442,9 @@ public class Server : NetworkBehaviour
         }
         botMoveCoroutine = StartCoroutine(ExecuteBotMoveCoroutine());
     }
+    */
 
+    /*
     /// <summary>
     /// Coroutine that waits for a delay then executes a bot move
     /// </summary>
@@ -2408,7 +2459,9 @@ public class Server : NetworkBehaviour
         
         botMoveCoroutine = null;
     }
+    */
 
+    /*
     /// <summary>
     /// Executes a bot move by selecting a card and determining if it can capture
     /// </summary>
@@ -2549,6 +2602,7 @@ public class Server : NetworkBehaviour
     }
 
 
+    /*
     /// <summary>
     /// Context menu method to force a bot move (for testing)
     /// </summary>
@@ -2563,6 +2617,24 @@ public class Server : NetworkBehaviour
         else
         {
             Debug.LogWarning("[Server] Cannot force bot move - bot is not active");
+        }
+    }
+    */
+
+    /// <summary>
+    /// Context menu method to force a bot move (for testing) - uses BotPlayer
+    /// </summary>
+    [ContextMenu("Force Bot Move")]
+    public void ForceBotMove()
+    {
+        if (botPlayerActive && botPlayer != null)
+        {
+            Debug.Log("[Server] Forcing bot move via context menu");
+            botPlayer.ForceBotMove();
+        }
+        else
+        {
+            Debug.LogWarning("[Server] Cannot force bot move - bot is not active or BotPlayer not found");
         }
     }
 

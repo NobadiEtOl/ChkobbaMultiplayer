@@ -986,6 +986,29 @@ public class GameManager : MonoBehaviour
         }
 
         SuperPowerSpawner.LocalInstance.ReadyToSpawnSuperPowers();
+        
+        // Notify bot that dealing is complete
+        NotifyBotDealingComplete();
+    }
+    
+    /// <summary>
+    /// Notifies the bot that dealing is complete
+    /// </summary>
+    private void NotifyBotDealingComplete()
+    {
+        AddToDebugLog($"[GameManager] NotifyBotDealingComplete called");
+        
+        // Find BotPlayer instance and notify it
+        BotPlayer botPlayer = FindObjectOfType<BotPlayer>();
+        if (botPlayer != null)
+        {
+            AddToDebugLog($"[GameManager] Notifying BotPlayer that dealing is complete");
+            botPlayer.OnDealingComplete();
+        }
+        else
+        {
+            AddToDebugLog($"[GameManager] No BotPlayer found - no notification needed");
+        }
     }
 
 
@@ -2367,19 +2390,22 @@ public class GameManager : MonoBehaviour
 
 
 
-        // Check if the card's parent is "PlayerHand1"
+        // Check if the card's parent is "PlayerHand1" or "PlayerHand3" (for bot)
 
         bool isInPlayerHand1 = false;
+        bool isInPlayerHand3 = false;
 
         if (cardObj != null && cardObj.transform.parent != null)
 
         {
 
             isInPlayerHand1 = cardObj.transform.parent.name == "PlayerHand1";
+            isInPlayerHand3 = cardObj.transform.parent.name == "PlayerHand3";
 
         }
 
         AddToDebugLog($"[GameManager] Card parent is PlayerHand1: {isInPlayerHand1}");
+        AddToDebugLog($"[GameManager] Card parent is PlayerHand3: {isInPlayerHand3}");
 
 
 
@@ -2390,14 +2416,17 @@ public class GameManager : MonoBehaviour
             return false;
         }
 
-        // Player can play only if it's their turn AND the card is in PlayerHand1
+        // Check if this is a bot playing from PlayerHand3
+        bool isBotPlaying = (isInPlayerHand3 && currentPlayerNo == 1); // Bot is player 1
+        AddToDebugLog($"[GameManager] Is bot playing: {isBotPlaying}");
 
-        if (isMyTurn && isInPlayerHand1)
-
+        // Player can play if:
+        // 1. It's their turn AND the card is in PlayerHand1, OR
+        // 2. It's the bot's turn AND the card is in PlayerHand3
+        if ((isMyTurn && isInPlayerHand1) || isBotPlaying)
         {
-
+            AddToDebugLog($"[GameManager] Player can play - isMyTurn: {isMyTurn}, isInPlayerHand1: {isInPlayerHand1}, isBotPlaying: {isBotPlaying}");
             return true;
-
         }
 
 
@@ -4061,6 +4090,19 @@ public class GameManager : MonoBehaviour
 
         AddToDebugLog($"[GameManager] hasAlreadySentRPC reset to false");
 
+    }
+
+    /// <summary>
+    /// Sets the current selected hand card (used by BotPlayer)
+    /// </summary>
+    public void SetCurrentSelectedHandCard(string cardID)
+    {
+        AddToDebugLog($"[GameManager] SetCurrentSelectedHandCard called with cardID: {cardID}");
+        AddToDebugLog($"[GameManager] currentSelectedHandCard before setting: {currentSelectedHandCard}");
+        
+        currentSelectedHandCard = cardID;
+        
+        AddToDebugLog($"[GameManager] currentSelectedHandCard after setting: {currentSelectedHandCard}");
     }
 
 

@@ -7098,6 +7098,7 @@ Transform:
   - {fileID: 1670917254}
   - {fileID: 1710103332}
   - {fileID: 67159273}
+  - {fileID: 697573794}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &566743148
@@ -9029,6 +9030,52 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 690742119}
   m_CullTransparentMesh: 1
+--- !u!1 &697573793
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 697573794}
+  - component: {fileID: 697573795}
+  m_Layer: 0
+  m_Name: BotPlayer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &697573794
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 697573793}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 561795238}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &697573795
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 697573793}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2cee96bf8a586a4db960e06d1615fa9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  botPlayerNumber: 1
+  moveDelay: 0.25
 --- !u!95 &700604825 stripped
 Animator:
   m_CorrespondingSourceObject: {fileID: 5464886210902847400, guid: 2e93de75ccda983438a73c2d99de5014, type: 3}
@@ -23174,6 +23221,8 @@ MonoBehaviour:
   currentPlayer: 0
   lastPlayerToCapture: 1
   winnerPrintFlag: 0
+  isBotModeEnabled: 0
+  botMoveDelay: 2
   blockCount: 0
 --- !u!4 &2001506851
 Transform:

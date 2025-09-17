@@ -725,4 +725,53 @@ public class CardInteraction : MonoBehaviour
             isOneCardSelected = false;
         }
     }
+    
+    /// <summary>
+    /// Public method for bot to play a card - invokes OnCardsPlayed event
+    /// </summary>
+    public void PlayCardForBot(int playerNumber)
+    {
+        Debug.Log($"[Bot] ===== CARDINTERACTION.PLAYCARDFORBOT START =====");
+        BotPlayer.AddBotLog($"[Bot] ===== CARDINTERACTION.PLAYCARDFORBOT START =====");
+        Debug.Log($"[Bot] PlayCardForBot called for player {playerNumber}");
+        BotPlayer.AddBotLog($"[Bot] PlayCardForBot called for player {playerNumber}");
+        Debug.Log($"[Bot] Card: {this.uniqueCardInstanceID}");
+        BotPlayer.AddBotLog($"[Bot] Card: {this.uniqueCardInstanceID}");
+        Debug.Log($"[Bot] Card data: {this.GetCardID()[0]}_{this.GetCardID()[1]}");
+        BotPlayer.AddBotLog($"[Bot] Card data: {this.GetCardID()[0]}_{this.GetCardID()[1]}");
+        
+        // Set the card as selected
+        Debug.Log($"[Bot] Setting card selection state...");
+        BotPlayer.AddBotLog($"[Bot] Setting card selection state...");
+        isOneCardSelected = true;
+        currentlySelectedCard = this;
+        Debug.Log($"[Bot] ✓ Card selection state set");
+        BotPlayer.AddBotLog($"[Bot] ✓ Card selection state set");
+        
+        // Set the card as selected in GameManager
+        if (GameManager.LocalInstance != null)
+        {
+            Debug.Log($"[Bot] Setting GameManager.currentSelectedHandCard...");
+            BotPlayer.AddBotLog($"[Bot] Setting GameManager.currentSelectedHandCard...");
+            GameManager.LocalInstance.currentSelectedHandCard = this.uniqueCardInstanceID;
+            Debug.Log($"[Bot] ✓ GameManager selection set");
+            BotPlayer.AddBotLog($"[Bot] ✓ GameManager selection set");
+        }
+        else
+        {
+            Debug.LogError($"[Bot] ERROR: GameManager.LocalInstance is null!");
+            BotPlayer.AddBotLog($"[Bot] ERROR: GameManager.LocalInstance is null!");
+        }
+        
+        Debug.Log($"[Bot] About to invoke OnCardsPlayed event...");
+        BotPlayer.AddBotLog($"[Bot] About to invoke OnCardsPlayed event...");
+        
+        // Invoke the OnCardsPlayed event
+        OnCardsPlayed?.Invoke(this.uniqueCardInstanceID, this.gameObject, playerNumber);
+        
+        Debug.Log($"[Bot] ✓ OnCardsPlayed event invoked");
+        BotPlayer.AddBotLog($"[Bot] ✓ OnCardsPlayed event invoked");
+        Debug.Log($"[Bot] ===== CARDINTERACTION.PLAYCARDFORBOT COMPLETE =====");
+        BotPlayer.AddBotLog($"[Bot] ===== CARDINTERACTION.PLAYCARDFORBOT COMPLETE =====");
+    }
 }
