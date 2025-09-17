@@ -12,7 +12,10 @@ public class BotPlayer : MonoBehaviour
 {
     [Header("Bot Configuration")]
     [SerializeField] private int botPlayerNumber = 1; // Bot plays as player 1 (opponent)
-    [SerializeField] private float moveDelay = 2.0f; // Delay before bot makes a move
+    [SerializeField] private float moveDelay = 0.1f; // Delay before bot makes a move (optimized for speed)
+    [SerializeField] private float fastModeDelay = 0.05f; // Delay when fast mode is enabled
+    [SerializeField] private float postDealingDelay = 1.0f; // Delay after dealing for layout animations
+    [SerializeField] private bool fastMode = true; // Enable fast mode for minimal delays
     
     [Header("References")]
     private GameManager gameManager;
@@ -105,6 +108,7 @@ public class BotPlayer : MonoBehaviour
         {
             Debug.LogError("[BotPlayer] NetworkRelay not found!");
         }
+        
     }
     
     /// <summary>
@@ -194,8 +198,11 @@ public class BotPlayer : MonoBehaviour
     /// </summary>
     private IEnumerator ExecuteBotMoveCoroutine()
     {
-        BotLog($"[Bot] ExecuteBotMoveCoroutine started, waiting {moveDelay} seconds...");
-        yield return new WaitForSeconds(moveDelay);
+        // Use fast mode delay or normal delay
+        float actualDelay = fastMode ? fastModeDelay : moveDelay;
+        
+        BotLog($"[Bot] ExecuteBotMoveCoroutine started, waiting {actualDelay} seconds... (fastMode: {fastMode})");
+        yield return new WaitForSeconds(actualDelay);
         
         BotLog($"[Bot] Delay complete, checking if bot is still active...");
         if (isActive)
@@ -316,7 +323,7 @@ public class BotPlayer : MonoBehaviour
         BotLog($"[Bot] WaitForDealingComplete coroutine started");
         
         float maxWaitTime = 10f; // Maximum wait time in seconds
-        float checkInterval = 0.5f; // Check every 0.5 seconds
+        float checkInterval = 0.1f; // Check every 0.1 seconds (faster response)
         float elapsedTime = 0f;
         
         while (elapsedTime < maxWaitTime)
@@ -343,12 +350,12 @@ public class BotPlayer : MonoBehaviour
         isWaitingForDealing = false;
         waitingForDealingCoroutine = null;
         
-        // Play the queued move if we have one
+        // Play the queued move if we have one (with delay for layout animations)
         if (hasQueuedMove)
         {
-            BotLog($"[Bot] Playing queued move after dealing complete");
+            BotLog($"[Bot] Playing queued move after dealing complete with {postDealingDelay}s delay for layout animations");
             hasQueuedMove = false;
-            ScheduleBotMove();
+            StartCoroutine(PlayQueuedMoveAfterDealing());
         }
         
         BotLog($"[Bot] ===== WAITING FOR DEALING COMPLETE FINISHED =====");
@@ -374,12 +381,12 @@ public class BotPlayer : MonoBehaviour
             
             isWaitingForDealing = false;
             
-            // Play the queued move if we have one
+            // Play the queued move if we have one (with delay for layout animations)
             if (hasQueuedMove)
             {
-                BotLog($"[Bot] Playing queued move after dealing notification");
+                BotLog($"[Bot] Playing queued move after dealing notification with {postDealingDelay}s delay for layout animations");
                 hasQueuedMove = false;
-                ScheduleBotMove();
+                StartCoroutine(PlayQueuedMoveAfterDealing());
             }
         }
         else
@@ -388,6 +395,22 @@ public class BotPlayer : MonoBehaviour
         }
         
         BotLog($"[Bot] ===== DEALING COMPLETE NOTIFICATION FINISHED =====");
+    }
+    
+    /// <summary>
+    /// Plays a queued move after dealing with a delay for layout animations
+    /// </summary>
+    private IEnumerator PlayQueuedMoveAfterDealing()
+    {
+        BotLog($"[Bot] ===== PLAYING QUEUED MOVE AFTER DEALING =====");
+        BotLog($"[Bot] Waiting {postDealingDelay} seconds for card layout animations to complete...");
+        
+        yield return new WaitForSeconds(postDealingDelay);
+        
+        BotLog($"[Bot] Layout animation delay complete, scheduling bot move");
+        ScheduleBotMove();
+        
+        BotLog($"[Bot] ===== QUEUED MOVE AFTER DEALING COMPLETE =====");
     }
     
     /// <summary>
@@ -504,7 +527,46 @@ public class BotPlayer : MonoBehaviour
     public void SetMoveDelay(float delay)
     {
         moveDelay = delay;
+        BotLog($"[Bot] Move delay set to: {delay} seconds");
     }
+    
+    /// <summary>
+    /// Sets the fast mode delay for the bot
+    /// </summary>
+    public void SetFastModeDelay(float delay)
+    {
+        fastModeDelay = delay;
+        BotLog($"[Bot] Fast mode delay set to: {delay} seconds");
+    }
+    
+    /// <summary>
+    /// Enables or disables fast mode for the bot
+    /// </summary>
+    public void SetFastMode(bool enabled)
+    {
+        fastMode = enabled;
+        BotLog($"[Bot] Fast mode {(enabled ? "enabled" : "disabled")}");
+    }
+    
+    /// <summary>
+    /// Sets the bot to maximum speed (fast mode + minimal delay)
+    /// </summary>
+    public void SetMaximumSpeed()
+    {
+        fastMode = true;
+        fastModeDelay = 0.05f;
+        BotLog($"[Bot] Maximum speed mode activated (fastMode: true, fastModeDelay: 0.05s)");
+    }
+    
+    /// <summary>
+    /// Sets the post-dealing delay for layout animations
+    /// </summary>
+    public void SetPostDealingDelay(float delay)
+    {
+        postDealingDelay = delay;
+        BotLog($"[Bot] Post-dealing delay set to: {delay} seconds");
+    }
+    
     
     /// <summary>
     /// Resets the bot for a new round
@@ -553,5 +615,85 @@ public class BotPlayer : MonoBehaviour
     public void ToggleBotLoggingContextMenu()
     {
         ToggleBotLogging();
+    }
+    
+    [ContextMenu("Set Maximum Speed")]
+    public void SetMaximumSpeedContextMenu()
+    {
+        SetMaximumSpeed();
+    }
+    
+    [ContextMenu("Toggle Fast Mode")]
+    public void ToggleFastModeContextMenu()
+    {
+        SetFastMode(!fastMode);
+    }
+    
+    
+    [ContextMenu("Set Post-Dealing Delay to 0.5s")]
+    public void SetPostDealingDelayShortContextMenu()
+    {
+        SetPostDealingDelay(0.5f);
+    }
+    
+    [ContextMenu("Set Post-Dealing Delay to 1.0s")]
+    public void SetPostDealingDelayMediumContextMenu()
+    {
+        SetPostDealingDelay(1.0f);
+    }
+    
+    [ContextMenu("Set Post-Dealing Delay to 2.0s")]
+    public void SetPostDealingDelayLongContextMenu()
+    {
+        SetPostDealingDelay(2.0f);
+    }
+    
+    [ContextMenu("Set Move Delay to 0.1s (Fast)")]
+    public void SetMoveDelayFastContextMenu()
+    {
+        SetMoveDelay(0.1f);
+    }
+    
+    [ContextMenu("Set Move Delay to 1.0s (Medium)")]
+    public void SetMoveDelayMediumContextMenu()
+    {
+        SetMoveDelay(1.0f);
+    }
+    
+    [ContextMenu("Set Move Delay to 3.0s (Slow)")]
+    public void SetMoveDelaySlowContextMenu()
+    {
+        SetMoveDelay(3.0f);
+    }
+    
+    [ContextMenu("Set Fast Mode Delay to 0.05s (Very Fast)")]
+    public void SetFastModeDelayVeryFastContextMenu()
+    {
+        SetFastModeDelay(0.05f);
+    }
+    
+    [ContextMenu("Set Fast Mode Delay to 0.2s (Fast)")]
+    public void SetFastModeDelayFastContextMenu()
+    {
+        SetFastModeDelay(0.2f);
+    }
+    
+    [ContextMenu("Set Fast Mode Delay to 0.5s (Medium)")]
+    public void SetFastModeDelayMediumContextMenu()
+    {
+        SetFastModeDelay(0.5f);
+    }
+    
+    [ContextMenu("Test Bot Delays")]
+    public void TestBotDelaysContextMenu()
+    {
+        BotLog($"[Bot] ===== DELAY TEST =====");
+        BotLog($"[Bot] Current moveDelay: {moveDelay} seconds");
+        BotLog($"[Bot] Current fastModeDelay: {fastModeDelay} seconds");
+        BotLog($"[Bot] Current postDealingDelay: {postDealingDelay} seconds");
+        BotLog($"[Bot] Current fastMode: {fastMode}");
+        BotLog($"[Bot] Actual delay used: {(fastMode ? fastModeDelay : moveDelay)} seconds");
+        BotLog($"[Bot] ===== DELAY TEST COMPLETE =====");
+        PrintAllBotLogs();
     }
 }

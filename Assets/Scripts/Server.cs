@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.UI;
 using System.Linq;
 using Unity.Netcode;
 using UnityEngine.Pool;
@@ -36,7 +37,8 @@ public class Server : NetworkBehaviour
     public bool winnerPrintFlag = false;
     
     // Bot system for 1v1 games
-    [SerializeField] private bool isBotModeEnabled = false;
+    [SerializeField] private bool isBotModeEnabled = false; // Toggle bot mode on/off in inspector
+    [SerializeField] private Toggle botModeToggle; // UI Toggle component for bot mode
     [SerializeField] private float botMoveDelay = 2.0f; // Delay before bot makes a move (inspector editable)
     private bool botPlayerActive = false; // Tracks if bot is playing as player 1
     private int botPlayerNumber = 1; // Bot plays as player 1 (opponent)
@@ -180,12 +182,119 @@ public class Server : NetworkBehaviour
         
         // Initialize BotPlayer reference
         botPlayer = BotPlayer.Instance;
-        if (botPlayer != null)
-        {
-            botPlayer.SetMoveDelay(botMoveDelay);
-        }
+        // Note: BotPlayer manages its own delays, don't override them
+        
+        // Initialize bot mode toggle
+        InitializeBotModeToggle();
         
         //StartCoroutine(ServerSubsciribe());
+    }
+    
+    /// <summary>
+    /// Initializes the bot mode toggle UI component
+    /// </summary>
+    private void InitializeBotModeToggle()
+    {
+        if (botModeToggle != null)
+        {
+            // Set initial state
+            botModeToggle.isOn = isBotModeEnabled;
+            
+            // Subscribe to toggle changes
+            botModeToggle.onValueChanged.AddListener(OnBotModeToggleChanged);
+            
+            Debug.Log($"[Server] Bot mode toggle initialized: {isBotModeEnabled}");
+        }
+        else
+        {
+            Debug.LogWarning("[Server] Bot mode toggle not assigned in inspector");
+        }
+    }
+    
+    /// <summary>
+    /// Called when the bot mode toggle value changes
+    /// </summary>
+    private void OnBotModeToggleChanged(bool isOn)
+    {
+        isBotModeEnabled = isOn;
+        Debug.Log($"[Server] Bot mode toggle changed to: {isBotModeEnabled}");
+        
+        // Handle bot mode change
+        UpdateBotModeFromToggle();
+    }
+    
+    /// <summary>
+    /// Updates bot mode state when toggle changes
+    /// </summary>
+    private void UpdateBotModeFromToggle()
+    {
+        // If disabling bot mode during an active bot game, deactivate the bot
+        if (!isBotModeEnabled && botPlayerActive)
+        {
+            botPlayerActive = false;
+            if (botMoveCoroutine != null)
+            {
+                StopCoroutine(botMoveCoroutine);
+                botMoveCoroutine = null;
+            }
+            
+            // Deactivate the BotPlayer
+            if (botPlayer != null)
+            {
+                botPlayer.DeactivateBot();
+            }
+            
+            Debug.Log("[Server] Bot deactivated due to toggle being turned off");
+        }
+        
+        // Note: BotPlayer manages its own delays, don't override them
+    }
+
+    /// <summary>
+    /// Called when values change in the inspector
+    /// </summary>
+    private void OnValidate()
+    {
+        // Update bot mode when toggle changes in inspector
+        if (Application.isPlaying)
+        {
+            UpdateBotModeFromInspector();
+        }
+    }
+    
+    /// <summary>
+    /// Updates bot mode state when inspector value changes
+    /// </summary>
+    private void UpdateBotModeFromInspector()
+    {
+        Debug.Log($"[Server] Bot mode updated from inspector: {isBotModeEnabled}");
+        
+        // Sync toggle with inspector value
+        if (botModeToggle != null)
+        {
+            botModeToggle.isOn = isBotModeEnabled;
+        }
+        
+        // If disabling bot mode during an active bot game, deactivate the bot
+        if (!isBotModeEnabled && botPlayerActive)
+        {
+            botPlayerActive = false;
+            if (botMoveCoroutine != null)
+            {
+                StopCoroutine(botMoveCoroutine);
+                botMoveCoroutine = null;
+            }
+            
+            // Deactivate the BotPlayer
+            if (botPlayer != null)
+            {
+                botPlayer.DeactivateBot();
+            }
+            
+            Debug.Log("[Server] Bot deactivated due to bot mode being disabled from inspector");
+        }
+        
+        // Note: BotPlayer manages its own delays, don't override them
     }
 
     /// <summary>
@@ -1496,6 +1605,13 @@ public class Server : NetworkBehaviour
             hasSubscribedToNetworkEvents = false;
             Debug.Log("[Server] Unsubscribed from NetworkManager disconnect events");
         }
+        
+        // Unsubscribe from bot mode toggle
+        if (botModeToggle != null)
+        {
+            botModeToggle.onValueChanged.RemoveListener(OnBotModeToggleChanged);
+            Debug.Log("[Server] Unsubscribed from bot mode toggle events");
+        }
     }
     
     public void StartGameAfterDelayFourPlayer()
@@ -2408,6 +2524,35 @@ public class Server : NetworkBehaviour
     {
         isBotModeEnabled = !isBotModeEnabled;
         Debug.Log($"[Server] Bot mode {(isBotModeEnabled ? "ENABLED" : "DISABLED")}");
+        
+        // If disabling bot mode during an active bot game, deactivate the bot
+        if (!isBotModeEnabled && botPlayerActive)
+        {
+            botPlayerActive = false;
+            if (botMoveCoroutine != null)
+            {
+                StopCoroutine(botMoveCoroutine);
+                botMoveCoroutine = null;
+            }
+            
+            // Deactivate the BotPlayer
+            if (botPlayer != null)
+            {
+                botPlayer.DeactivateBot();
+            }
+            
+            Debug.Log("[Server] Bot deactivated due to bot mode being disabled");
+        }
+    }
+    
+    /// <summary>
+    /// Sets the bot mode enabled state (called by BotPlayer)
+    /// </summary>
+    /// <param name="enabled">True to enable bot mode, false to disable</param>
+    public void SetBotModeEnabled(bool enabled)
+    {
+        isBotModeEnabled = enabled;
+        Debug.Log($"[Server] Bot mode set to {(isBotModeEnabled ? "ENABLED" : "DISABLED")}");
         
         // If disabling bot mode during an active bot game, deactivate the bot
         if (!isBotModeEnabled && botPlayerActive)
