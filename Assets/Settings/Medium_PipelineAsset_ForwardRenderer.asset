@@ -15,8 +15,9 @@ MonoBehaviour:
   debugShaders:
     debugReplacementPS: {fileID: 4800000, guid: cf852408f2e174538bcd9b7fda1c5ae7, type: 3}
     hdrDebugViewPS: {fileID: 4800000, guid: 573620ae32aec764abd4d728906d2587, type: 3}
-  m_RendererFeatures: []
-  m_RendererFeatureMap: 
+  m_RendererFeatures:
+  - {fileID: 5642771271964100383}
+  m_RendererFeatureMap: 1f07333e93264f4e
   m_UseNativeRenderPass: 0
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}
@@ -55,3 +56,47 @@ MonoBehaviour:
   m_CopyDepthMode: 1
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 1
+--- !u!114 &5642771271964100383
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d26b8cda2614cfd49b62617c9c17c63c, type: 3}
+  m_Name: CRTRendererFeature
+  m_EditorClassIdentifier: 
+  m_Active: 1
+  shader: {fileID: 4800000, guid: 6f2fcdc189458914eb8a323f19e3a27b, type: 3}
+  injectionPoint: 550
+  preset: 4
+  pixelResolutionX: 320
+  pixelResolutionY: 200
+  screenBend: 8.3
+  screenOverscan: 1.5
+  vignetteSize: 5.7
+  vignetteSmooth: 2
+  vignetteRound: 13
+  blur: 1
+  bleed: 0.1
+  smidge: 0
+  scanlinesStrength: 9
+  apertureStrength: 4
+  shadowlines: 3.5
+  shadowlinesSpeed: 1.5
+  shadowlinesAlpha: 0.2
+  noiseSize: 26
+  noiseSpeed: 7.2
+  noiseAlpha: 0.25
+  brightness: 0
+  contrast: 1
+  gamma: 1
+  red: 1
+  green: 1
+  blue: 1
+  chromaticAberration: 1.5
+  redOffset: {x: 0.15, y: 0.15}
+  blueOffset: {x: 0, y: -0.21}
+  greenOffset: {x: -0.15, y: 0.15}
