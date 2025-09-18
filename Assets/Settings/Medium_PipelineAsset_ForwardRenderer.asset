@@ -83,16 +83,16 @@ MonoBehaviour:
   bleed: 0.1
   smidge: 0
   scanlinesStrength: 10
-  apertureStrength: 2
-  shadowlines: 50
+  apertureStrength: 2.52
+  shadowlines: 100
   shadowlinesSpeed: 1.5
-  shadowlinesAlpha: 0.015
+  shadowlinesAlpha: 0.0002
   noiseSize: 0
   noiseSpeed: 0
   noiseAlpha: 0
   brightness: 0
-  contrast: 1
-  gamma: 1
+  contrast: 1.001
+  gamma: 1.2
   red: 1
   green: 1
   blue: 1

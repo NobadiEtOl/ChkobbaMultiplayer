@@ -51,7 +51,7 @@ namespace CRTFilter
         public float scanlinesStrength = 3;
         [Range(0f, 10f)]
         public float apertureStrength = 3;
-        [Range(-50f, 50f)]
+        [Range(-200f, 200f)]
         public float shadowlines = 8;
         [Range(-20f, 20f)]
         public float shadowlinesSpeed = -2;

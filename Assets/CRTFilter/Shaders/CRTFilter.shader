@@ -268,8 +268,8 @@ Shader "Hidden/CRTFilter"
 				col.b *= m_blue;
 				
 				col = lerp(col, fixed(noise(buv * m_noiseSize)), m_noiseAlpha);
-				col = lerp(col, crt_line(buv.y, m_shadowlines, m_shadowlinesSpeed), m_shadowlinesAlpha * max(0, min(1, m_shadowlines)));
-				col = lerp(col, crt_line(buv.x, m_shadowlines, m_shadowlinesSpeed), m_shadowlinesAlpha * max(0, min(1, -m_shadowlines)));
+				col = lerp(col, crt_line(buv.y, m_shadowlines, m_shadowlinesSpeed), m_shadowlinesAlpha * max(0, m_shadowlines));
+				col = lerp(col, crt_line(buv.x, m_shadowlines, m_shadowlinesSpeed), m_shadowlinesAlpha * max(0, -m_shadowlines));
 
 				return col * vignette(i.uv);
 			}
