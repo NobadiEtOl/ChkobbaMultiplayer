@@ -97,6 +97,9 @@ public class MenuController : MonoBehaviour
             Debug.Log("[MenuController] SuperPowerSpawner.LocalInstance found, initializing immediately");
             InitializeMenu();
         }
+        
+        // Setup open button click handler
+        SetupOpenButtonClickHandler();
     }
     
     private IEnumerator WaitForSuperPowerSpawnerAndInitialize()
@@ -205,25 +208,35 @@ public class MenuController : MonoBehaviour
     [ContextMenu("Test Token Menu")]
     public void ShowTokenMenu()
     {
-        Debug.Log("[MenuController] ShowTokenMenu called - integrating with InfoBox");
+        Debug.Log("[MenuController] ShowTokenMenu called - toggle functionality");
         
-        if (!menuInitialized)
+        if (SuperPowerSpawner.LocalInstance == null)
         {
-            Debug.LogWarning("[MenuController] Menu not initialized yet, trying to initialize now...");
-            if (SuperPowerSpawner.LocalInstance != null)
-            {
-                InitializeMenu();
-            }
-            else
-            {
-                Debug.LogError("[MenuController] Cannot initialize - SuperPowerSpawner.LocalInstance is still null!");
-                return;
-            }
+            Debug.LogError("[MenuController] SuperPowerSpawner.LocalInstance is null, cannot toggle InfoBox");
+            return;
         }
         
-        // Open InfoBox with menu page
-        StartCoroutine(OpenMenuInInfoBox());
+        // Check if InfoBox is currently open (either menu or power information)
+        if (SuperPowerSpawner.LocalInstance.isInfoBoxOpen)
+        {
+            Debug.Log("[MenuController] InfoBox is open, closing it");
+            StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
+        }
+        else
+        {
+            Debug.Log("[MenuController] InfoBox is closed, opening menu");
+            
+            if (!menuInitialized)
+            {
+                Debug.LogWarning("[MenuController] Menu not initialized yet, trying to initialize now...");
+                InitializeMenu();
+            }
+            
+            // Open InfoBox with menu page
+            StartCoroutine(OpenMenuInInfoBox());
+        }
     }
+    
     
     [ContextMenu("Force Initialize Menu")]
     public void ForceInitializeMenu()
@@ -237,6 +250,37 @@ public class MenuController : MonoBehaviour
         
         InitializeMenu();
         Debug.Log("[MenuController] Force initialization complete");
+    }
+    
+    [ContextMenu("Test Toggle InfoBox")]
+    public void TestToggleInfoBox()
+    {
+        Debug.Log("[MenuController] Testing ShowTokenMenu toggle functionality via context menu");
+        ShowTokenMenu();
+    }
+    
+    /// <summary>
+    /// Check if the menu page is currently open in the InfoBox
+    /// </summary>
+    public bool IsMenuPageOpen()
+    {
+        if (SuperPowerSpawner.LocalInstance != null)
+        {
+            return SuperPowerSpawner.LocalInstance.isMenuPageOpen;
+        }
+        return false;
+    }
+    
+    /// <summary>
+    /// Check if the InfoBox is open (regardless of which page is shown)
+    /// </summary>
+    public bool IsInfoBoxOpen()
+    {
+        if (SuperPowerSpawner.LocalInstance != null)
+        {
+            return SuperPowerSpawner.LocalInstance.isInfoBoxOpen;
+        }
+        return false;
     }
     
     [ContextMenu("Debug Hierarchy State")]
@@ -531,7 +575,7 @@ public class MenuController : MonoBehaviour
         }
     }
     
-    private void SetMenuActive(bool active)
+    public void SetMenuActive(bool active)
     {
         Debug.Log($"[MenuController] Setting menu active: {active}");
         if (tokenDisplayArea != null)
@@ -735,7 +779,7 @@ public class MenuController : MonoBehaviour
             maxScroll = scrollableDistance;  // Bottom boundary (last token)
         }
         
-        Debug.Log($"[MenuController] Scroll limits calculated: tokenCount={tokenCount}, displayHeight={displayHeight}, totalContentHeight={totalContentHeight}, scrollableDistance={scrollableDistance}, limits=[{minScroll}, {maxScroll}]");
+        //Debug.Log($"[MenuController] Scroll limits calculated: tokenCount={tokenCount}, displayHeight={displayHeight}, totalContentHeight={totalContentHeight}, scrollableDistance={scrollableDistance}, limits=[{minScroll}, {maxScroll}]");
     }
     
     private float GetDisplayAreaHeight()
@@ -1133,6 +1177,46 @@ public class MenuController : MonoBehaviour
         
         Debug.Log("[MenuController] Menu opened in InfoBox with proper token behavior");
     }
+    
+    /// <summary>
+    /// Setup click handler for the open button to make it work as a toggle
+    /// </summary>
+    private void SetupOpenButtonClickHandler()
+    {
+        if (openButtonGameObject == null)
+        {
+            Debug.LogWarning("[MenuController] OpenButtonGameObject is null, cannot setup click handler");
+            return;
+        }
+        
+        // Get or add Button component
+        Button button = openButtonGameObject.GetComponent<Button>();
+        if (button == null)
+        {
+            button = openButtonGameObject.AddComponent<Button>();
+            Debug.Log("[MenuController] Added Button component to open button");
+        }
+        
+        // Ensure the button is properly configured
+        button.interactable = true;
+        
+        // Clear existing listeners to avoid duplicates
+        button.onClick.RemoveAllListeners();
+        
+        // Add the toggle listener - now calls ShowTokenMenu which has toggle logic
+        button.onClick.AddListener(ShowTokenMenu);
+        
+        // Ensure the button has a collider for 3D interaction if needed
+        Collider buttonCollider = openButtonGameObject.GetComponent<Collider>();
+        if (buttonCollider == null)
+        {
+            BoxCollider boxCollider = openButtonGameObject.AddComponent<BoxCollider>();
+            boxCollider.isTrigger = true;
+            Debug.Log("[MenuController] Added BoxCollider to open button for 3D interaction");
+        }
+        
+        Debug.Log("[MenuController] Open button listener setup complete - using Unity Button onClick");
+    }
 }
 
 // Click handler component for 3D tokens
@@ -1259,3 +1343,4 @@ public class WorldTextFollower : MonoBehaviour
         rectTransform.anchoredPosition = canvasPos;
     }
 }
+

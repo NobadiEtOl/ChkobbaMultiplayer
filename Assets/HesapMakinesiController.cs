@@ -72,7 +72,7 @@ public class HesapMakinesiController : MonoBehaviour
         spriteRenderer = GetComponent<SpriteRenderer>();
         if (spriteRenderer == null)
         {
-            Debug.LogError("HesapMakinesiController: No SpriteRenderer component found!");
+            //Debug.LogError("HesapMakinesiController: No SpriteRenderer component found!");
             return;
         }
         
@@ -134,14 +134,14 @@ public class HesapMakinesiController : MonoBehaviour
                 (obj.tag != null && obj.tag.ToLower().Contains("coin")))
             {
                 currentCoin = obj;
-                Debug.Log($"HesapMakinesiController: Found coin: {obj.name}");
+                //Debug.Log($"HesapMakinesiController: Found coin: {obj.name}");
                 break;
             }
         }
         
         if (currentCoin == null)
         {
-            Debug.LogWarning("HesapMakinesiController: No coin found in scene!");
+            //Debug.LogWarning("HesapMakinesiController: No coin found in scene!");
         }
     }
     
@@ -150,7 +150,7 @@ public class HesapMakinesiController : MonoBehaviour
     /// </summary>
     public void OnQuickDropDetected()
     {
-        Debug.Log("HesapMakinesiController: Quick drop detected! Moving to reach point");
+        //Debug.Log("HesapMakinesiController: Quick drop detected! Moving to reach point");
         hasMovedToReachPoint = true;
         MoveToReachPoint();
         

@@ -12,7 +12,7 @@ public class SuperPowerSpawner : MonoBehaviour
     public static SuperPowerSpawner LocalInstance { get; private set; }
     [SerializeField] private List<GameObject> superPowerTokens = new List<GameObject>();
     private Dictionary<SuperPower, GameObject> superPowerPrefabs = new Dictionary<SuperPower, GameObject>();
-    private List<SuperPower> superPowerList = new List<SuperPower>();
+    private List<SuperPower> superPowerList = new List<SuperPower>(); // Now contains unique powers only (no pre-pooling)
     [SerializeField] private int maxSuperPowers = 5;
     private int numberOfSuperPowersToSpawn = 3;
     private List<GameObject> spawnedSuperPowers = new List<GameObject>();
@@ -60,7 +60,8 @@ public class SuperPowerSpawner : MonoBehaviour
     [SerializeField] private float infoChangeDelay = 0.25f; // Delay before info changes (to match page change animation transition)
     [SerializeField] private float fadeDuration = 0.15f; // Duration of fade in/out animations
     [SerializeField] private float buttonFadeDuration = 0.3f; // Duration of button fade animations
-    private bool isInfoBoxOpen = false; // Track if info box is currently open
+    public bool isInfoBoxOpen = false; // Track if info box is currently open
+    public bool isMenuPageOpen = false; // Track if menu page is currently open in InfoBox
     private Coroutine currentAnimationCoroutine; // Track current animation to prevent overlaps
 
     void Awake()
@@ -192,34 +193,7 @@ public class SuperPowerSpawner : MonoBehaviour
         Debug.LogWarning("Object touched: " + hit.collider.gameObject.tag);
         Debug.LogWarning("Object name: " + hit.collider.gameObject.name);
         
-        // Check if it's a button click
-        Button clickedButton = hit.collider.GetComponent<Button>();
-        if (clickedButton != null)
-        {
-            Debug.LogError("🔴 [SuperPowerSpawner] BUTTON CLICKED VIA RAYCAST: " + hit.collider.gameObject.name);
-            
-            // Check if it's the close button
-            if (hit.collider.gameObject.name.Contains("Close") || clickedButton == closeButton)
-            {
-                Debug.LogError("🔴 [SuperPowerSpawner] CLOSE BUTTON CLICKED VIA RAYCAST!");
-                // Manually trigger the close button action
-                if (SuperPowerToken.ActiveInstance != null)
-                {
-                    Debug.LogError($"[SuperPowerSpawner] Destroying power: {SuperPowerToken.ActiveInstance.power?.name}");
-                    RemoveSpawnedSuperPower(SuperPowerToken.ActiveInstance.gameObject);
-                    UpdateTokenPositions();
-                    StartCoroutine(SuperPowerToken.ActiveInstance.FadeOutSprite());
-                    StartCoroutine(CloseInfoBox());
-                }
-                else
-                {
-                    Debug.LogError("[SuperPowerSpawner] Close button clicked but SuperPowerToken.ActiveInstance is null!");
-                    StartCoroutine(CloseInfoBox());
-                }
-                return;
-            }
-        }
-        
+        // Only handle token clicks - buttons now use proper Unity Button onClick events
         if (hit.collider.gameObject.tag == "Token")
         {
             SuperPowerToken superPowerToken = hit.collider.GetComponent<SuperPowerToken>();
@@ -229,10 +203,10 @@ public class SuperPowerSpawner : MonoBehaviour
                 return;
             }
         }
-        if (SuperPowerToken.ActiveInstance != null && hit.collider.gameObject.tag == "Respawn")
-        {
-            StartCoroutine(CloseInfoBox());
-        }
+        
+        // Note: Button clicks (including close button) are now handled by Unity Button onClick events
+        // No need for raycast-based button handling anymore
+        // InfoBox closing is now handled by the toggle system via the open button
     }
 
     private void GetUIElements()
@@ -477,7 +451,21 @@ public class SuperPowerSpawner : MonoBehaviour
             Debug.Log($"[SuperPowerSpawner] Set InfoBox to original position: {infoBoxOriginalPosition}");
 
             // Update content immediately for Case 1 (no delay needed for initial opening)
-            UpdateInfoBoxContent(superPowerToken);
+            // Check if this is a menu token
+            if (superPowerToken.power is MenuPagePower)
+            {
+                // For menu tokens, set menu flag to true and don't update content
+                isMenuPageOpen = true;
+                Debug.Log("[SuperPowerSpawner] Opening menu page - setting isMenuPageOpen to true");
+            }
+            else
+            {
+                // For regular power tokens, update content (which sets isMenuPageOpen to false)
+                UpdateInfoBoxContent(superPowerToken);
+            }
+
+            // Start button rotation simultaneously with InfoBox animation
+            StartCoroutine(RotateOpenButtonOut());
 
             // Animate to reach point
             if (infoBoxReachPoint != null)
@@ -509,10 +497,8 @@ public class SuperPowerSpawner : MonoBehaviour
                 }
             }
 
-            // Fade out the open button since InfoBox is now open
-            StartCoroutine(FadeOpenButtonOut());
-
             // Don't play page change animation for initial opening
+            // Note: isMenuPageOpen is already set to false by UpdateInfoBoxContent() above
             Debug.Log("Case 1: No page change animation - initial opening");
         }
         else
@@ -571,7 +557,18 @@ public class SuperPowerSpawner : MonoBehaviour
         if (canvasGroup == null)
         {
             Debug.LogWarning("InfoBoxCanvas or its CanvasGroup not found, updating content without fade");
-            UpdateInfoBoxContent(superPowerToken);
+            // Check if this is a menu token
+            if (superPowerToken.power is MenuPagePower)
+            {
+                // For menu tokens, set menu flag to true and don't update content
+                isMenuPageOpen = true;
+                Debug.Log("[SuperPowerSpawner] Fallback: Opening menu page - setting isMenuPageOpen to true");
+            }
+            else
+            {
+                // For regular power tokens, update content (which sets isMenuPageOpen to false)
+                UpdateInfoBoxContent(superPowerToken);
+            }
             yield break;
         }
 
@@ -586,7 +583,18 @@ public class SuperPowerSpawner : MonoBehaviour
         }
 
         // Phase 3: Update content while faded out
-        UpdateInfoBoxContent(superPowerToken);
+        // Check if this is a menu token
+        if (superPowerToken.power is MenuPagePower)
+        {
+            // For menu tokens, set menu flag to true and don't update content
+            isMenuPageOpen = true;
+            Debug.Log("[SuperPowerSpawner] Switching to menu page - setting isMenuPageOpen to true");
+        }
+        else
+        {
+            // For regular power tokens, update content (which sets isMenuPageOpen to false)
+            UpdateInfoBoxContent(superPowerToken);
+        }
 
         // Phase 4: Fade in new info (entire canvas)
         yield return StartCoroutine(FadeCanvasGroups(new CanvasGroup[] { canvasGroup }, 1f, fadeDuration));
@@ -712,6 +720,9 @@ public class SuperPowerSpawner : MonoBehaviour
             return;
         }
 
+        // Set menu page flag to false since we're showing power information
+        isMenuPageOpen = false;
+
         // Update content
         bool canActivate = CheckIfCardShouldBeSelected(superPowerToken.power.name);
         activateButton.gameObject.SetActive(canActivate);
@@ -731,6 +742,43 @@ public class SuperPowerSpawner : MonoBehaviour
         }
 
         Debug.Log($"Info updated for: {superPowerToken.power.name}");
+    }
+    
+    /// <summary>
+    /// Clear all InfoBox content to ensure clean state when closed
+    /// </summary>
+    private void ClearInfoBoxContent()
+    {
+        // Clear text content
+        if (nameText != null)
+        {
+            nameText.text = "";
+        }
+        
+        if (descriptionText != null)
+        {
+            descriptionText.text = "";
+        }
+        
+        // Clear current text variables
+        currentNameText = "";
+        currentDescriptionText = "";
+        
+        // Stop any error message if showing
+        if (errorMessageCoroutine != null)
+        {
+            StopCoroutine(errorMessageCoroutine);
+            errorMessageCoroutine = null;
+        }
+        
+        // Notify MenuController to hide menu if it's showing
+        MenuController menuController = FindObjectOfType<MenuController>();
+        if (menuController != null)
+        {
+            menuController.SetMenuActive(false);
+        }
+        
+        Debug.Log("[SuperPowerSpawner] InfoBox content cleared");
     }
 
     /// <summary>
@@ -779,6 +827,9 @@ public class SuperPowerSpawner : MonoBehaviour
         // Ensure UI elements are visible before closing
         EnsureUIElementsVisible();
 
+        // Start button rotation simultaneously with InfoBox closing animation
+        StartCoroutine(RotateOpenButtonIn());
+
         // Case 3: Animate from reach point back to original position
         Debug.Log($"[SuperPowerSpawner] Starting close animation to original position: {infoBoxOriginalPosition}");
         currentAnimationCoroutine = StartCoroutine(AnimateInfoBoxPosition(infoBoxOriginalPosition.position));
@@ -790,6 +841,9 @@ public class SuperPowerSpawner : MonoBehaviour
         if (activateButton != null) activateButton.gameObject.SetActive(false);
         if (falseActivateButton != null) falseActivateButton.gameObject.SetActive(false);
         if (closeButton != null) closeButton.gameObject.SetActive(false);
+        
+        // Clear InfoBox content to ensure clean state when closed
+        ClearInfoBoxContent();
         
         // Stop idle animation
         UIFrameAnimator frameAnimator = backgroundPanel.GetComponent<UIFrameAnimator>();
@@ -805,11 +859,9 @@ public class SuperPowerSpawner : MonoBehaviour
             }
         }
         
-        // Fade in the open button since InfoBox is now closed
-        StartCoroutine(FadeOpenButtonIn());
-        
         SuperPowerToken.ActiveInstance = null;
         isInfoBoxOpen = false;
+        isMenuPageOpen = false; // Reset menu page flag when InfoBox is closed
     }
 
     /// <summary>
@@ -831,6 +883,9 @@ public class SuperPowerSpawner : MonoBehaviour
         falseActivateButton.gameObject.SetActive(false);
         closeButton.gameObject.SetActive(false);
         
+        // Clear InfoBox content to ensure clean state when closed
+        ClearInfoBoxContent();
+        
         // Stop idle animation
         UIFrameAnimator frameAnimator = backgroundPanel.GetComponent<UIFrameAnimator>();
         if (frameAnimator != null)
@@ -847,6 +902,7 @@ public class SuperPowerSpawner : MonoBehaviour
         
         SuperPowerToken.ActiveInstance = null;
         isInfoBoxOpen = false;
+        isMenuPageOpen = false; // Reset menu page flag when InfoBox is closed immediately
         yield return null;
     }
 
@@ -976,14 +1032,17 @@ public class SuperPowerSpawner : MonoBehaviour
             if (!superPowerPrefabs.ContainsKey(powerInstance))
             {
                 superPowerPrefabs.Add(powerInstance, token);
-                for (int i = 0; i < powerInstance.rarityMultiplier; i++)
-                    superPowerList.Add(powerInstance);
+                // REMOVED PRE-POOLING: No longer add multiple copies to superPowerList
+                // Each power is now added only once, eliminating pool depletion issues
+                superPowerList.Add(powerInstance);
             }
             else
             {
                 Debug.LogWarning($"Super power {className} already exists in the dictionary.");
             }
         }
+        
+        Debug.Log($"[SuperPowerSpawner] Dictionary created with {superPowerPrefabs.Count} unique powers (no pre-pooling)");
     }
 
     [ContextMenu("Ready to Spawn Super Powers")]
@@ -1012,6 +1071,7 @@ public class SuperPowerSpawner : MonoBehaviour
         if (coinAmount < 0)
             return GetRandomSuperPower();
 
+        // Use unique powers from superPowerPrefabs.Keys - no pool depletion affects this
         List<SuperPower> powers = new List<SuperPower>(superPowerPrefabs.Keys);
         List<float> weights = new List<float>();
         float totalWeight = 0f;
@@ -1053,14 +1113,17 @@ public class SuperPowerSpawner : MonoBehaviour
 
     private SuperPower GetRandomSuperPower()
     {
-        if (superPowerList.Count == 0)
+        if (superPowerPrefabs.Count == 0)
         {
             Debug.LogWarning("No super powers available to spawn.");
             return null;
         }
-        int randomIndex = Random.Range(0, superPowerList.Count);
-        Debug.Log($"[SuperPowerSpawner] Uniform random selection: index={randomIndex}, power={superPowerList[randomIndex].name}");
-        return superPowerList[randomIndex];
+        
+        // Use unique powers from superPowerPrefabs.Keys instead of pooled superPowerList
+        List<SuperPower> uniquePowers = new List<SuperPower>(superPowerPrefabs.Keys);
+        int randomIndex = Random.Range(0, uniquePowers.Count);
+        Debug.Log($"[SuperPowerSpawner] Uniform random selection: index={randomIndex}, power={uniquePowers[randomIndex].name}");
+        return uniquePowers[randomIndex];
     }
 
     // Update SpawnSuperPower to accept origin and scale
@@ -1659,6 +1722,104 @@ public class SuperPowerSpawner : MonoBehaviour
     }
     
     /// <summary>
+    /// Rotates the open button 180 degrees on Z axis and moves to X=-1 when InfoBox opens
+    /// </summary>
+    private IEnumerator RotateOpenButtonOut()
+    {
+        MenuController menuController = FindObjectOfType<MenuController>();
+        if (menuController == null || menuController.OpenButtonGameObject == null)
+        {
+            yield break;
+        }
+        
+        GameObject openButton = menuController.OpenButtonGameObject;
+        
+        // Ensure button is active and visible
+        openButton.SetActive(true);
+        
+        // Get current rotation and position
+        Vector3 startRotation = openButton.transform.localEulerAngles;
+        Vector3 endRotation = startRotation + new Vector3(0f, 0f, 180f);
+        
+        Vector3 startPosition = openButton.transform.localPosition;
+        Vector3 endPosition = new Vector3(-1f, startPosition.y, startPosition.z);
+        
+        float elapsedTime = 0f;
+        
+        while (elapsedTime < buttonFadeDuration)
+        {
+            elapsedTime += Time.deltaTime;
+            float progress = elapsedTime / buttonFadeDuration;
+            
+            // Use smooth easing for both rotation and position
+            float easedProgress = Mathf.SmoothStep(0f, 1f, progress);
+            
+            // Interpolate rotation and position simultaneously
+            Vector3 currentRotation = Vector3.Lerp(startRotation, endRotation, easedProgress);
+            Vector3 currentPosition = Vector3.Lerp(startPosition, endPosition, easedProgress);
+            
+            openButton.transform.localEulerAngles = currentRotation;
+            openButton.transform.localPosition = currentPosition;
+            
+            yield return null;
+        }
+        
+        // Ensure final rotation and position are exact
+        openButton.transform.localEulerAngles = endRotation;
+        openButton.transform.localPosition = endPosition;
+        Debug.Log("[SuperPowerSpawner] Open button rotated 180 degrees on Z-axis and moved to X=-1");
+    }
+    
+    /// <summary>
+    /// Rotates the open button back 180 degrees on Z axis and moves to X=-1.5 when InfoBox closes
+    /// </summary>
+    private IEnumerator RotateOpenButtonIn()
+    {
+        MenuController menuController = FindObjectOfType<MenuController>();
+        if (menuController == null || menuController.OpenButtonGameObject == null)
+        {
+            yield break;
+        }
+        
+        GameObject openButton = menuController.OpenButtonGameObject;
+        
+        // Ensure button is active
+        openButton.SetActive(true);
+        
+        // Get current rotation and position
+        Vector3 startRotation = openButton.transform.localEulerAngles;
+        Vector3 endRotation = startRotation + new Vector3(0f, 0f, 180f);
+        
+        Vector3 startPosition = openButton.transform.localPosition;
+        Vector3 endPosition = new Vector3(-1.5f, startPosition.y, startPosition.z);
+        
+        float elapsedTime = 0f;
+        
+        while (elapsedTime < buttonFadeDuration)
+        {
+            elapsedTime += Time.deltaTime;
+            float progress = elapsedTime / buttonFadeDuration;
+            
+            // Use smooth easing for both rotation and position
+            float easedProgress = Mathf.SmoothStep(0f, 1f, progress);
+            
+            // Interpolate rotation and position simultaneously
+            Vector3 currentRotation = Vector3.Lerp(startRotation, endRotation, easedProgress);
+            Vector3 currentPosition = Vector3.Lerp(startPosition, endPosition, easedProgress);
+            
+            openButton.transform.localEulerAngles = currentRotation;
+            openButton.transform.localPosition = currentPosition;
+            
+            yield return null;
+        }
+        
+        // Ensure final rotation and position are exact
+        openButton.transform.localEulerAngles = endRotation;
+        openButton.transform.localPosition = endPosition;
+        Debug.Log("[SuperPowerSpawner] Open button rotated 180 degrees on Z-axis and moved to X=-1.5");
+    }
+    
+    /// <summary>
     /// Creates and animates a gold popup text at the specified location
     /// </summary>
     public void ShowGoldPopup(int goldAmount)
@@ -1998,10 +2159,11 @@ public class SuperPowerSpawner : MonoBehaviour
     [ContextMenu("Spawn Random Power")]
     public void SpawnRandomPower()
     {
-        if (superPowerList.Count > 0)
+        if (superPowerPrefabs.Count > 0)
         {
-            int randomIndex = Random.Range(0, superPowerList.Count);
-            SuperPower randomPower = superPowerList[randomIndex];
+            List<SuperPower> uniquePowers = new List<SuperPower>(superPowerPrefabs.Keys);
+            int randomIndex = Random.Range(0, uniquePowers.Count);
+            SuperPower randomPower = uniquePowers[randomIndex];
             SpawnSpecificPower(randomPower.name);
         }
         else
@@ -2024,9 +2186,9 @@ public class SuperPowerSpawner : MonoBehaviour
     /// </summary>
     private void SpawnSpecificPower(string powerName)
     {
-        // Find the power in the list
+        // Find the power in the unique powers from superPowerPrefabs
         SuperPower targetPower = null;
-        foreach (var power in superPowerList)
+        foreach (var power in superPowerPrefabs.Keys)
         {
             if (power.name == powerName)
             {
@@ -2037,11 +2199,11 @@ public class SuperPowerSpawner : MonoBehaviour
         
         if (targetPower == null)
         {
-            Debug.LogError($"[SuperPowerSpawner] Power '{powerName}' not found in superPowerList!");
+            Debug.LogError($"[SuperPowerSpawner] Power '{powerName}' not found in available powers!");
             return;
         }
         
-        // Check if we have a prefab for this power
+        // Check if we have a prefab for this power (should always be true since we found it in Keys)
         if (!superPowerPrefabs.ContainsKey(targetPower))
         {
             Debug.LogError($"[SuperPowerSpawner] No prefab found for power '{powerName}'!");
@@ -2076,11 +2238,11 @@ public class SuperPowerSpawner : MonoBehaviour
     [ContextMenu("Spawn All Powers")]
     public void SpawnAllPowers()
     {
-        foreach (var power in superPowerList)
+        foreach (var power in superPowerPrefabs.Keys)
         {
             SpawnSpecificPower(power.name);
         }
-        Debug.Log($"[SuperPowerSpawner] Attempted to spawn all {superPowerList.Count} powers.");
+        Debug.Log($"[SuperPowerSpawner] Attempted to spawn all {superPowerPrefabs.Count} unique powers.");
     }
     
     /// <summary>
@@ -2089,11 +2251,12 @@ public class SuperPowerSpawner : MonoBehaviour
     [ContextMenu("Print Available Powers")]
     public void PrintAvailablePowers()
     {
-        Debug.Log($"[SuperPowerSpawner] Available powers ({superPowerList.Count}):");
-        for (int i = 0; i < superPowerList.Count; i++)
+        List<SuperPower> uniquePowers = new List<SuperPower>(superPowerPrefabs.Keys);
+        Debug.Log($"[SuperPowerSpawner] Available unique powers ({uniquePowers.Count}):");
+        for (int i = 0; i < uniquePowers.Count; i++)
         {
-            var power = superPowerList[i];
-            Debug.Log($"  {i}: {power.name} - {power.description}");
+            var power = uniquePowers[i];
+            Debug.Log($"  {i}: {power.name} (rarity: {power.rarityMultiplier}) - {power.description}");
         }
         
         Debug.Log($"[SuperPowerSpawner] Available prefabs ({superPowerPrefabs.Count}):");
@@ -2101,6 +2264,239 @@ public class SuperPowerSpawner : MonoBehaviour
         {
             Debug.Log($"  {kvp.Key.name}: {kvp.Value.name}");
         }
+    }
+    
+    /// <summary>
+    /// Comprehensive power validation - checks all expected powers against available ones
+    /// </summary>
+    [ContextMenu("Validate All Powers")]
+    public void ValidateAllPowers()
+    {
+        // List of all expected power names from SuperPowerController
+        string[] expectedPowerNames = {
+            "Ucundan Göz At",
+            "Oynayamazsın", 
+            "Değiş Tokuş",
+            "Kapkaç",
+            "Vale Arar",
+            "Kopyala Yapıştır",
+            "Baya Baya Bak",
+            "Bomba",
+            "Yapamazsın",
+            "Ver Zehri",
+            "Kutsal Deste",
+            "Bu Daha İyi",
+            "Şunu Değiş Tokuş",
+            "Şunu Değiş Bunu Tokuş",
+            "Zafer Puanı",
+            "Yandım Anam"
+        };
+        
+        // List of corresponding class names
+        string[] expectedClassNames = {
+            "UcundanGözAt",
+            "Oynayamazsın",
+            "DeğişTokuş", 
+            "Kapkaç",
+            "ValeArar",
+            "KopyalaYapistir",
+            "BayaBayaBak",
+            "Bomba",
+            "Yapamazsın",
+            "VerZehri",
+            "KutsalDeste",
+            "BuDahaİyi",
+            "SunuDegisTokus",
+            "SunuDegisBunuTokus",
+            "ZaferPuani",
+            "YandımAnam"
+        };
+        
+        Debug.Log("=== POWER VALIDATION REPORT ===");
+        Debug.Log($"Expected powers: {expectedPowerNames.Length}");
+        Debug.Log($"Available powers: {superPowerPrefabs.Count}");
+        Debug.Log($"Token prefabs: {superPowerTokens.Count}");
+        
+        // Check each expected power
+        for (int i = 0; i < expectedPowerNames.Length; i++)
+        {
+            string powerName = expectedPowerNames[i];
+            string className = expectedClassNames[i];
+            
+            // Check if power exists in superPowerPrefabs
+            bool powerExists = false;
+            SuperPower foundPower = null;
+            foreach (var power in superPowerPrefabs.Keys)
+            {
+                if (power.name == powerName)
+                {
+                    powerExists = true;
+                    foundPower = power;
+                    break;
+                }
+            }
+            
+            if (powerExists)
+            {
+                Debug.Log($"✅ {powerName} - FOUND (rarity: {foundPower.rarityMultiplier})");
+            }
+            else
+            {
+                Debug.LogError($"❌ {powerName} - MISSING from superPowerPrefabs!");
+                
+                // Check if token prefab exists
+                bool tokenExists = false;
+                string tokenClassName = "";
+                foreach (var token in superPowerTokens)
+                {
+                    if (token == null) continue;
+                    
+                    var tokenScript = token.GetComponent<SuperPowerToken>();
+                    if (tokenScript != null && !string.IsNullOrEmpty(tokenScript.superPowerClassName))
+                    {
+                        tokenClassName = tokenScript.superPowerClassName;
+                        if (tokenClassName == className)
+                        {
+                            tokenExists = true;
+                            Debug.LogWarning($"   Token prefab exists: {token.name} with className: {tokenClassName}");
+                            break;
+                        }
+                    }
+                }
+                
+                if (!tokenExists)
+                {
+                    Debug.LogError($"   No token prefab found with className: {className}");
+                }
+                
+                // Test type resolution
+                var type = System.Type.GetType(className);
+                if (type == null)
+                {
+                    Debug.LogError($"   Type resolution failed for: {className}");
+                }
+                else
+                {
+                    Debug.Log($"   Type resolution successful for: {className}");
+                }
+            }
+        }
+        
+        Debug.Log("=== END VALIDATION REPORT ===");
+    }
+    
+    /// <summary>
+    /// Debug token prefab setup
+    /// </summary>
+    [ContextMenu("Debug Token Prefabs")]
+    public void DebugTokenPrefabs()
+    {
+        Debug.Log("=== TOKEN PREFAB DEBUG ===");
+        Debug.Log($"Total token prefabs: {superPowerTokens.Count}");
+        
+        for (int i = 0; i < superPowerTokens.Count; i++)
+        {
+            var token = superPowerTokens[i];
+            if (token == null)
+            {
+                Debug.LogError($"Token {i}: NULL");
+                continue;
+            }
+            
+            var tokenScript = token.GetComponent<SuperPowerToken>();
+            if (tokenScript == null)
+            {
+                Debug.LogError($"Token {i} ({token.name}): No SuperPowerToken component");
+                continue;
+            }
+            
+            string className = tokenScript.superPowerClassName;
+            if (string.IsNullOrEmpty(className))
+            {
+                Debug.LogWarning($"Token {i} ({token.name}): No superPowerClassName set");
+                continue;
+            }
+            
+            // Test type resolution
+            var type = System.Type.GetType(className);
+            if (type == null)
+            {
+                Debug.LogError($"Token {i} ({token.name}): Type resolution failed for className '{className}'");
+            }
+            else if (!typeof(SuperPower).IsAssignableFrom(type))
+            {
+                Debug.LogError($"Token {i} ({token.name}): Type '{className}' is not a SuperPower");
+            }
+            else
+            {
+                Debug.Log($"Token {i} ({token.name}): className='{className}' ✅");
+            }
+        }
+        
+        Debug.Log("=== END TOKEN PREFAB DEBUG ===");
+    }
+    
+    /// <summary>
+    /// Force rebuild the power dictionary - useful when token prefabs are updated
+    /// </summary>
+    [ContextMenu("Rebuild Power Dictionary")]
+    public void RebuildPowerDictionary()
+    {
+        Debug.Log("[SuperPowerSpawner] Rebuilding power dictionary...");
+        DictionaryCreation();
+        Debug.Log($"[SuperPowerSpawner] Power dictionary rebuilt. Found {superPowerPrefabs.Count} powers.");
+    }
+    
+    /// <summary>
+    /// Test spawning each power individually to identify which ones fail
+    /// </summary>
+    [ContextMenu("Test Spawn All Powers")]
+    public void TestSpawnAllPowers()
+    {
+        string[] expectedPowerNames = {
+            "Ucundan Göz At",
+            "Oynayamazsın", 
+            "Değiş Tokuş",
+            "Kapkaç",
+            "Vale Arar",
+            "Kopyala Yapıştır",
+            "Baya Baya Bak",
+            "Bomba",
+            "Yapamazsın",
+            "Ver Zehri",
+            "Kutsal Deste",
+            "Bu Daha İyi",
+            "Şunu Değiş Tokuş",
+            "Şunu Değiş Bunu Tokuş",
+            "Zafer Puanı",
+            "Yandım Anam"
+        };
+        
+        Debug.Log("=== TESTING POWER SPAWNING ===");
+        
+        for (int i = 0; i < expectedPowerNames.Length; i++)
+        {
+            string powerName = expectedPowerNames[i];
+            Debug.Log($"Testing spawn: {powerName}");
+            
+            try
+            {
+                SpawnSpecificPower(powerName);
+                Debug.Log($"✅ {powerName} - Spawn test successful");
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"❌ {powerName} - Spawn test failed: {e.Message}");
+            }
+            
+            // Small delay between spawns
+            if (i < expectedPowerNames.Length - 1)
+            {
+                System.Threading.Thread.Sleep(100);
+            }
+        }
+        
+        Debug.Log("=== END SPAWN TESTING ===");
     }
     
     /// <summary>
@@ -2114,13 +2510,88 @@ public class SuperPowerSpawner : MonoBehaviour
     }
     
     /// <summary>
+    /// Test open button rotation out (for debugging)
+    /// </summary>
+    [ContextMenu("Test Rotate Open Button Out")]
+    public void TestRotateOpenButtonOut()
+    {
+        StartCoroutine(RotateOpenButtonOut());
+    }
+    
+    /// <summary>
+    /// Test open button rotation in (for debugging)
+    /// </summary>
+    [ContextMenu("Test Rotate Open Button In")]
+    public void TestRotateOpenButtonIn()
+    {
+        StartCoroutine(RotateOpenButtonIn());
+    }
+    
+    /// <summary>
+    /// Reset open button rotation to 0 degrees (for debugging)
+    /// </summary>
+    [ContextMenu("Reset Open Button Rotation")]
+    public void ResetOpenButtonRotation()
+    {
+        MenuController menuController = FindObjectOfType<MenuController>();
+        if (menuController != null && menuController.OpenButtonGameObject != null)
+        {
+            Vector3 resetRotation = menuController.OpenButtonGameObject.transform.localEulerAngles;
+            resetRotation.y = 0f;
+            menuController.OpenButtonGameObject.transform.localEulerAngles = resetRotation;
+            Debug.Log("[SuperPowerSpawner] Open button rotation reset to 0 degrees");
+        }
+        else
+        {
+            Debug.LogWarning("[SuperPowerSpawner] Could not reset open button rotation - MenuController or OpenButtonGameObject is null");
+        }
+    }
+    
+    /// <summary>
+    /// Debug method to check current InfoBox and menu page states
+    /// </summary>
+    [ContextMenu("Debug InfoBox States")]
+    public void DebugInfoBoxStates()
+    {
+        Debug.Log($"[SuperPowerSpawner] InfoBox States:");
+        Debug.Log($"  - isInfoBoxOpen: {isInfoBoxOpen}");
+        Debug.Log($"  - isMenuPageOpen: {isMenuPageOpen}");
+        Debug.Log($"  - Active Token: {(SuperPowerToken.ActiveInstance != null ? SuperPowerToken.ActiveInstance.power.name : "None")}");
+        Debug.Log($"  - Name Text: '{(nameText != null ? nameText.text : "null")}'");
+        Debug.Log($"  - Description Text: '{(descriptionText != null ? descriptionText.text : "null")}'");
+        
+        if (isInfoBoxOpen && !isMenuPageOpen)
+        {
+            Debug.Log("  - Status: InfoBox is open showing power information");
+        }
+        else if (isInfoBoxOpen && isMenuPageOpen)
+        {
+            Debug.Log("  - Status: InfoBox is open showing menu page");
+        }
+        else if (!isInfoBoxOpen)
+        {
+            Debug.Log("  - Status: InfoBox is closed");
+        }
+    }
+    
+    /// <summary>
+    /// Test method to manually clear InfoBox content (for debugging)
+    /// </summary>
+    [ContextMenu("Test Clear InfoBox Content")]
+    public void TestClearInfoBoxContent()
+    {
+        Debug.Log("[SuperPowerSpawner] Testing InfoBox content clearing...");
+        ClearInfoBoxContent();
+    }
+    
+    /// <summary>
     /// Spawn a specific power at a specific position (like kese does)
     /// </summary>
     [ContextMenu("Spawn Kapkaç at Center")]
     public void SpawnKapkacAtCenter()
     {
         SuperPower kapkacPower = null;
-        foreach (var power in superPowerList)
+        foreach (var power in superPowerPrefabs.Keys)
         {
             if (power.name == "Kapkaç")
             {
@@ -2147,10 +2618,11 @@ public class SuperPowerSpawner : MonoBehaviour
     [ContextMenu("Spawn Random Power at Mouse")]
     public void SpawnRandomPowerAtMouse()
     {
-        if (superPowerList.Count > 0)
+        if (superPowerPrefabs.Count > 0)
         {
-            int randomIndex = Random.Range(0, superPowerList.Count);
-            SuperPower randomPower = superPowerList[randomIndex];
+            List<SuperPower> uniquePowers = new List<SuperPower>(superPowerPrefabs.Keys);
+            int randomIndex = Random.Range(0, uniquePowers.Count);
+            SuperPower randomPower = uniquePowers[randomIndex];
             
             Vector3 mousePos = Input.mousePosition;
             mousePos.z = 10f; // Distance from camera

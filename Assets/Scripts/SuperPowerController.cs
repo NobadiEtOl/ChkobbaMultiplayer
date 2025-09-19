@@ -34,7 +34,7 @@ public class UcundanGözAt : SuperPower
     {
         name = "Ucundan Göz At";
         description = "Rakibin rastgele bir kartını gör";
-        rarityMultiplier = 10;
+        rarityMultiplier = 5;
     }
     public override void ActivatePower()
     {
@@ -51,7 +51,7 @@ public class Oynayamazsın : SuperPower
     {
         name = "Oynayamazsın";
         description = "Oynanan kartı bir tur için kapatılamaz yap";
-        rarityMultiplier = 3;
+        rarityMultiplier = 12;
     }
     public override void ActivatePower()
     {
@@ -71,7 +71,7 @@ public class DeğişTokuş : SuperPower
     {
         name = "Değiş Tokuş";
         description = "Rakip ile rastgele bir kart değiş tokuş";
-        rarityMultiplier = 9;
+        rarityMultiplier = 7;
     }
     public override void ActivatePower()
     {
@@ -88,7 +88,7 @@ public class Kapkaç : SuperPower
     {
         name = "Kapkaç";
         description = "Bir sonraki seçtiğin kartını Sahte Vale'ye dönüştür";
-        rarityMultiplier = 5;
+        rarityMultiplier = 15;
     }
     public override void ActivatePower()
     {
@@ -123,7 +123,7 @@ public class ValeArar : SuperPower
     {
         name = "Vale Arar";
         description = "Tur boyunca Valeleri görmeni sağlar";
-        rarityMultiplier = 1;
+        rarityMultiplier = 30;
     }
     [ContextMenu("Vale Arar")]
     public override void ActivatePower()
@@ -143,7 +143,7 @@ public class KopyalaYapistir : SuperPower
     {
         name = "Kopyala Yapıştır";
         description = "Çoktan seçili kartı kopyalar, bir sonraki seçilen kartın üzerine kopyalar";
-        rarityMultiplier = 4;
+        rarityMultiplier = 20;
     }
     public override void ActivatePower()
     {
@@ -170,7 +170,7 @@ public class BayaBayaBak : SuperPower
     {
         name = "Baya Baya Bak";
         description = "Bir rakibin tüm kartlarını gör";
-        rarityMultiplier = 4;
+        rarityMultiplier = 17;
     }
     public override void ActivatePower()
     {
@@ -198,7 +198,7 @@ public class Bomba : SuperPower
     {
         name = "Bomba";
         description = "Ortadaki kartların hepsini patlat";
-        rarityMultiplier =3;
+        rarityMultiplier =18;
     }
     public override void ActivatePower()
     {
@@ -215,7 +215,7 @@ public class Yapamazsın : SuperPower
     {
         name = "Yapamazsın";
         description = "Bir sonraki oynanan süper gücü gizlice engelle";
-        rarityMultiplier = 5;
+        rarityMultiplier = 22;
     }
     public override void ActivatePower()
     {
@@ -232,7 +232,7 @@ public class VerZehri : SuperPower
     {
         name = "Ver Zehri";
         description = "Ortayı zehirle. Zehirli desteyi alan taraf ortadaki kart sayısı kadar puan kaybeder";
-        rarityMultiplier = 5;
+        rarityMultiplier = 25;
     }
     public override void ActivatePower()
     {
@@ -253,7 +253,7 @@ public class KutsalDeste : SuperPower
     {
         name = "Kutsal Deste";
         description = "Ortayı kutsa. Zehirli desteyi alan taraf ortadaki kart sayısı kadar puan kazanır";
-        rarityMultiplier = 5;
+        rarityMultiplier = 25;
     }
     public override void ActivatePower()
     {
@@ -274,7 +274,7 @@ public class BuDahaİyi : SuperPower
     {
         name = "Bu Daha İyi";
         description = "Çoktan seçili kart ile ortadaki kartı değiştir";
-        rarityMultiplier = 5;
+        rarityMultiplier = 20;
     }
     public override void ActivatePower()
     {
@@ -312,7 +312,7 @@ public class SunuDegisTokus : SuperPower
     {
         name = "Şunu Değiş Tokuş";
         description = "Çoktan seçilmiş kartınla rakibin istediğin kartını değiş tokuş";
-        rarityMultiplier = 4;
+        rarityMultiplier = 14;
     }
     public override void ActivatePower()
     {
@@ -339,7 +339,7 @@ public class SunuDegisBunuTokus : SuperPower
     {
         name = "Şunu Değiş Bunu Tokuş";
         description = "Tüm karlarını sırayla değiş tokuş";
-        rarityMultiplier = 2;
+        rarityMultiplier = 22;
     }
     public override void ActivatePower()
     {
@@ -367,8 +367,8 @@ public class ZaferPuani : SuperPower
     private void OnEnable()
     {
         name = "Zafer Puanı";
-        description = "Tur sonuna kadar elinde Zafer Puanı tutarsan 5 puan kazan";
-        rarityMultiplier = 3;
+        description = "Tur sonunda elinde bulunan her Zafer Puanı için 5'er puan kazan";
+        rarityMultiplier = 27;
     }
 
     public override void ActivatePower()
@@ -386,7 +386,7 @@ public class YandımAnam : SuperPower
     {
         name = "Yandım Anam";
         description = "Seçilen bir kartı yak.";
-        rarityMultiplier = 5;
+        rarityMultiplier = 19;
     }
     public override void ActivatePower()
     {
