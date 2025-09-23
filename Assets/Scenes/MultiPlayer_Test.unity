@@ -616,7 +616,10 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 4263812020432252998, guid: 0547bdc6482fdb0479bfbf10d66e62ec, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1357773702}
   m_SourcePrefab: {fileID: 100100000, guid: 0547bdc6482fdb0479bfbf10d66e62ec, type: 3}
 --- !u!1 &41927432
 GameObject:
@@ -11059,6 +11062,11 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1723709395}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &849601411 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 4263812020432252998, guid: 0547bdc6482fdb0479bfbf10d66e62ec, type: 3}
+  m_PrefabInstance: {fileID: 38424776}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &851207939
 GameObject:
   m_ObjectHideFlags: 0
@@ -16298,12 +16306,26 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 8858676597646837954, guid: 0547bdc6482fdb0479bfbf10d66e62ec, type: 3}
   m_PrefabInstance: {fileID: 38424776}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
+  m_GameObject: {fileID: 849601411}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b7bde7a7627615241adf1323fac6162d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &1357773702
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 849601411}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f89879ac59d969041b51bf799fe6d05e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  cardDealSound: {fileID: 8300000, guid: fbbbffc7fdb37d54aaebbc3d3e4ac2d8, type: 3}
+  audioSource: {fileID: 0}
 --- !u!1 &1372772508
 GameObject:
   m_ObjectHideFlags: 0
@@ -19426,6 +19448,10 @@ PrefabInstance:
       propertyPath: centerShowcaseXOffset
       value: -1750
       objectReference: {fileID: 0}
+    - target: {fileID: 1842771395134044240, guid: cf3cc37ee94f4e744b43568625920ac9, type: 3}
+      propertyPath: soundEffectsController
+      value: 
+      objectReference: {fileID: 1357773702}
     - target: {fileID: 4513221161132847409, guid: cf3cc37ee94f4e744b43568625920ac9, type: 3}
       propertyPath: m_Name
       value: DeckController

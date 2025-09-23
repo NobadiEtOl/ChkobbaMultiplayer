@@ -17,6 +17,7 @@ public class DeckController : MonoBehaviour
     public static DeckController LocalInstance;
     public int thisPlayerNumber;
     [SerializeField] private GameManager gameManager;
+    [SerializeField] private SoundEffectsController soundEffectsController;
     [SerializeField] private List<GameObject> cardPrefabsList;//Prefabs of all the cards.
     private Dictionary<string, GameObject> cardPrefabs;//A dictionary to keep track of each card prefabs with its ID
     private Dictionary<string, GameObject> deckPool;//A dictionary of card ID and a list of all the instantiated cards
@@ -391,6 +392,12 @@ public class DeckController : MonoBehaviour
         UpdateCurrentPlayerHandLayout();
         StartCoroutine(SetAutoRotateFlagTrue(myCardObjects));
         
+        // Reset pitch after player dealing is complete
+        if (soundEffectsController != null)
+        {
+            soundEffectsController.ResetPitch();
+        }
+        
         // After dealing to players is complete, close the deck
         Debug.Log("[DeckController] Finished dealing to 2 players, closing deck");
         MoveDeckToStartingPosition();
@@ -489,6 +496,12 @@ public class DeckController : MonoBehaviour
         yield return StartCoroutine(ChainMoveCards(positions, cardObjects, 10, rotations, scales));
         UpdateCurrentPlayerHandLayout();
         StartCoroutine(SetAutoRotateFlagTrue(myCardObjects));
+        
+        // Reset pitch after player dealing is complete
+        if (soundEffectsController != null)
+        {
+            soundEffectsController.ResetPitch();
+        }
         
         // After dealing to players is complete, close the deck
         Debug.Log("[DeckController] Finished dealing to 4 players, closing deck");
@@ -1789,6 +1802,12 @@ public class DeckController : MonoBehaviour
         //else yield return new WaitForSeconds(0.2f);
         for (int i = 0; i < cardObjects.Count; i++)
         {
+            // Play card deal sound effect for each individual card movement
+            if (soundEffectsController != null)
+            {
+                soundEffectsController.PlayCardDealSound();
+            }
+            
             yield return StartCoroutine(MoveCardCoroutine(positions[i], cardObjects[i], speed + (i * 0.25f), rotations[i], scales[i]));
         }
     }
