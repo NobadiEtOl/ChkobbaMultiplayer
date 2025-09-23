@@ -114,16 +114,20 @@ public class MainUIScript : MonoBehaviour
     {
         Debug.Log("[MainUIScript] Returning to main page and closing all network connections...");
         
-        // STEP 1: Close all UI popups/pages
+        // STEP 1: Reset Server singleton for fresh game start
+        Debug.Log("[MainUIScript] Resetting Server singleton for fresh game start");
+        Server.ResetServerSingletonForMainMenu();
+        
+        // STEP 2: Close all UI popups/pages
         CloseAllUIPages();
         
-        // STEP 2: Disconnect from network if connected
+        // STEP 3: Disconnect from network if connected
         DisconnectFromNetwork();
         
-        // STEP 3: Reset UI state to main page
+        // STEP 4: Reset UI state to main page
         ResetToMainPage();
         
-        // STEP 4: Clear any pending network operations
+        // STEP 5: Clear any pending network operations
         ClearPendingNetworkOperations();
         
         Debug.Log("[MainUIScript] Successfully returned to main page with clean network state");
@@ -291,18 +295,46 @@ public class MainUIScript : MonoBehaviour
     }
 
     /// <summary>
+    /// Called when returning from waiting screen - handles proper disconnection
+    /// </summary>
+    public void OnReturnFromWaitingScreen()
+    {
+        Debug.Log("[MainUIScript] Returning from waiting screen - cleaning up network state...");
+        
+        // Reset Server singleton for fresh game start
+        Debug.Log("[MainUIScript] Resetting Server singleton for fresh game start");
+        Server.ResetServerSingletonForMainMenu();
+        
+        // Close waiting screen UI
+        CloseAllUIPages();
+        
+        // Reset to main page
+        ResetToMainPage();
+        
+        Debug.Log("[MainUIScript] Successfully returned from waiting screen to main page");
+    }
+
+    /// <summary>
     /// Called when a disconnect is detected by NetworkManagerUI
     /// </summary>
     public void OnDisconnectDetected()
     {
-        Debug.Log("[MainUIScript] Disconnect detected - returning to main page");
+        Debug.Log("[MainUIScript] Disconnect detected - performing active disconnection like return button");
         
-        // CRITICAL FIX: Do NOT call ReturnToMainPage() which resets server state
-        // Just close the UI and let the server handle the disconnection properly
-        CloseAllUIPages();
-        ResetToMainPage();
-        
-        // DO NOT call ClearPendingNetworkOperations() - this resets server state!
-        // The server will handle the disconnection in OnClientDisconnected()
+        // CRITICAL FIX: Perform the same active disconnection as the return button
+        // This ensures the client properly disconnects from lobby and relay
+        var networkManagerUI = FindObjectOfType<NetworkManagerUI>();
+        if (networkManagerUI != null)
+        {
+            Debug.Log("[MainUIScript] Triggering active disconnection via NetworkManagerUI");
+            networkManagerUI.PerformClientDisconnection();
+        }
+        else
+        {
+            Debug.LogError("[MainUIScript] NetworkManagerUI not found - falling back to basic cleanup");
+            // Fallback: just close UI and reset to main page
+            CloseAllUIPages();
+            ResetToMainPage();
+        }
     }
 }

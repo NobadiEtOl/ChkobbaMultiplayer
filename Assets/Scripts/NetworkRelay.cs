@@ -729,6 +729,17 @@ public class NetworkRelay : NetworkBehaviour
     }
 
     [ClientRpc(RequireOwnership = false)]
+    public void SendHostHeartbeatClientRPC()
+    {
+        // Host sends heartbeat to all clients for timeout detection
+        var networkManagerUI = FindObjectOfType<NetworkManagerUI>();
+        if (networkManagerUI != null)
+        {
+            networkManagerUI.UpdateHostHeartbeat();
+        }
+    }
+
+    [ClientRpc(RequireOwnership = false)]
     public void OnPlayerDisconnectedClientRPC(ulong clientId, string reason)
     {
         Debug.LogWarning($"[NetworkRelay] Player {clientId} disconnected: {reason}");
@@ -818,6 +829,57 @@ public class NetworkRelay : NetworkBehaviour
             {
                 GameManager.LocalInstance.ApplyBufferedMoves(bufferedMoves);
             }
+        }
+    }
+
+    [ClientRpc(RequireOwnership = false)]
+    public void NotifyHostDisconnectedClientRPC()
+    {
+        Debug.Log("[NetworkRelay] Host disconnected - notifying client to return to main page");
+        
+        // Notify NetworkManagerUI to handle host disconnection
+        var networkManagerUI = FindObjectOfType<NetworkManagerUI>();
+        if (networkManagerUI != null)
+        {
+            networkManagerUI.OnHostDisconnected();
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void NotifyClientsToDisconnectServerRPC()
+    {
+        Debug.Log("[NetworkRelay] Host requesting all clients to disconnect");
+        
+        // Send RPC to all clients to disconnect
+        NotifyClientsToDisconnectClientRPC();
+    }
+
+    [ClientRpc(RequireOwnership = false)]
+    public void NotifyClientsToDisconnectClientRPC()
+    {
+        Debug.Log("[NetworkRelay] Host requested client to disconnect - performing disconnection");
+        
+        // Notify NetworkManagerUI to handle client disconnection
+        var networkManagerUI = FindObjectOfType<NetworkManagerUI>();
+        if (networkManagerUI != null)
+        {
+            networkManagerUI.OnClientRequestedToDisconnect();
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void ConfirmClientDisconnectionServerRPC(ulong clientId)
+    {
+        Debug.Log($"[NetworkRelay] Client {clientId} confirmed disconnection");
+        
+        // Notify server that this client has confirmed disconnection
+        if (server != null)
+        {
+            server.OnClientConfirmedDisconnection(clientId);
+        }
+        else
+        {
+            Debug.LogError("[NetworkRelay] Server reference is null - cannot confirm client disconnection");
         }
     }
 

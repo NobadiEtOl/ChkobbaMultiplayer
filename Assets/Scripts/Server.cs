@@ -64,6 +64,15 @@ public class Server : NetworkBehaviour
     // RECONNECTION TRACKING: Track which clients are reconnecting
     private HashSet<ulong> reconnectingClients = new HashSet<ulong>();
 
+    // COORDINATED DISCONNECTION TRACKING: Track clients that have confirmed disconnection
+    private HashSet<ulong> clientsConfirmedDisconnection = new HashSet<ulong>();
+    private bool isCoordinatedDisconnectionInProgress = false;
+    
+    /// <summary>
+    /// Public property to check if coordinated disconnection is in progress
+    /// </summary>
+    public bool IsCoordinatedDisconnectionInProgress => isCoordinatedDisconnectionInProgress;
+
     // KEEP-ALIVE SYSTEM for relay connections
     private Coroutine relayKeepAliveCoroutine;
     private bool isRelayKeepAliveActive = false;
@@ -1431,6 +1440,27 @@ public class Server : NetworkBehaviour
             return;
         }
         
+        // CRITICAL FIX: Check if this is a host disconnection - ALWAYS reset server when host disconnects
+        if (clientId == NetworkManager.Singleton.LocalClientId)
+        {
+            Debug.LogWarning($"[Server] HOST DISCONNECTED - performing complete server reset");
+            HandleHostDisconnection();
+            return;
+        }
+        
+        // CRITICAL FIX: Check if this is a pre-game disconnection (client only)
+        bool isPreGameDisconnection = IsPreGameDisconnection();
+        if (isPreGameDisconnection)
+        {
+            Debug.LogWarning($"[Server] PRE-GAME CLIENT DISCONNECTION DETECTED - Client {clientId} disconnected before game started");
+            
+            // Client disconnected - just remove them, don't reset server state
+            // Host should continue waiting for more players
+            Debug.LogWarning($"[Server] CLIENT DISCONNECTED before game started - removing client but keeping host waiting");
+            HandleClientPreGameDisconnection(clientId);
+            return;
+        }
+        
         // Build complete disconnection log as one string
         var disconnectionLog = new System.Text.StringBuilder();
         disconnectionLog.AppendLine("SERVER MESSAGE: ===== CLIENT DISCONNECTION DETECTED =====");
@@ -1573,6 +1603,322 @@ public class Server : NetworkBehaviour
     }
 
     /// <summary>
+    /// Completely resets the Server singleton for fresh game start
+    /// This should be called when returning to main menu to ensure clean state
+    /// </summary>
+    public static void ResetServerSingletonForMainMenu()
+    {
+        if (Singleton != null)
+        {
+            Debug.LogWarning($"[Server] ===== RESETTING SERVER SINGLETON FOR MAIN MENU =====");
+            Debug.LogWarning($"[Server] Current connectedPlayerCount: {Singleton.connectedPlayerCount}");
+            Debug.LogWarning($"[Server] Current turnCounter: {Singleton.turnCounter}");
+            Debug.LogWarning($"[Server] Current playerCount: {Singleton.playerCount}");
+            
+            // Perform complete reset
+            Singleton.ResetAllServerVariables();
+            
+            // Stop all keep-alive systems
+            Singleton.StopRelayKeepAlive();
+            
+            // Clear all tracking dictionaries
+            Singleton.disconnectedClients.Clear();
+            Singleton.clientHeartbeats.Clear();
+            Singleton.reconnectingClients.Clear();
+            
+            // Reset connection count to 0
+            Singleton.connectedPlayerCount = 0;
+            
+            Debug.LogWarning($"[Server] ===== SERVER SINGLETON RESET COMPLETE =====");
+            Debug.LogWarning($"[Server] Server state is now clean for fresh connections");
+        }
+        else
+        {
+            Debug.LogWarning("[Server] Server singleton is null - no reset needed");
+        }
+    }
+
+    /// <summary>
+    /// Determines if this is a disconnection before the game has started
+    /// </summary>
+    private bool IsPreGameDisconnection()
+    {
+        // Game hasn't started if:
+        // 1. No cards have been dealt (deckCardsDict is null)
+        // 2. Turn counter is 0 (no turns have been taken)
+        // 3. No center cards (centerCardsDict is null or empty)
+        bool noCardsDealt = deckCardsDict == null;
+        bool noTurnsTaken = turnCounter == 0;
+        bool noCenterCards = centerCardsDict == null || centerCardsDict.Count == 0;
+        
+        bool isPreGame = noCardsDealt && noTurnsTaken && noCenterCards;
+        
+        Debug.Log($"[Server] Pre-game check: CardsDealt={!noCardsDealt}, TurnsTaken={!noTurnsTaken}, CenterCards={!noCenterCards}, IsPreGame={isPreGame}");
+        
+        return isPreGame;
+    }
+
+    /// <summary>
+    /// Determines if the game is ready to start (all players connected)
+    /// This is used to disable the return button
+    /// </summary>
+    public bool IsGameReadyToStart()
+    {
+        // Game is ready to start when:
+        // 1. All required players are connected (or bot mode conditions are met)
+        // 2. Game hasn't actually started yet (no cards dealt)
+        bool allPlayersConnected = playerCount == connectedPlayerCount || 
+                                  (isBotModeEnabled && playerCount == 2 && connectedPlayerCount == 1);
+        bool gameNotStarted = deckCardsDict == null && turnCounter == 0;
+        
+        bool isReady = allPlayersConnected && gameNotStarted;
+        
+        Debug.Log($"[Server] Game ready check: AllPlayersConnected={allPlayersConnected}, GameNotStarted={gameNotStarted}, IsReady={isReady}");
+        
+        return isReady;
+    }
+
+    /// <summary>
+    /// Handles disconnections that occur before the game starts
+    /// Resets server state to allow fresh connections
+    /// </summary>
+    private void HandlePreGameDisconnection(ulong clientId)
+    {
+        Debug.LogWarning($"[Server] ===== HANDLING PRE-GAME DISCONNECTION =====");
+        Debug.LogWarning($"[Server] Client {clientId} disconnected before game started");
+        Debug.LogWarning($"[Server] Resetting server state for fresh connections");
+        
+        // Mark client as disconnected
+        disconnectedClients[clientId] = true;
+        clientHeartbeats.Remove(clientId);
+        
+        // Decrease connected player count
+        if (connectedPlayerCount > 0)
+        {
+            connectedPlayerCount--;
+            Debug.LogWarning($"[Server] Connected player count decreased to: {connectedPlayerCount}");
+        }
+        
+        // CRITICAL: Reset server state for fresh connections
+        // This prevents ghost players and ensures clean state for next game
+        Debug.LogWarning($"[Server] Resetting server state for fresh game start");
+        
+        // Reset connection tracking
+        dealCenterFinishedClients.Clear();
+        initialDealCoroutineCheckCounter = 0;
+        readyToEndTurnCounter = 0;
+        
+        // Reset game state variables
+        turnCounter = 0;
+        currentPlayer = 0;
+        lastPlayerToCapture = -1;
+        timer = 0f;
+        winnerPrintFlag = false;
+        
+        // Clear any existing game data
+        if (deckCardsDict != null) deckCardsDict.Clear();
+        if (centerCardsDict != null) centerCardsDict.Clear();
+        if (playersHandCardsIDs != null) playersHandCardsIDs.Clear();
+        if (playersPooledCardsIDs != null) playersPooledCardsIDs.Clear();
+        
+        // Reset bot system if active
+        if (botPlayerActive)
+        {
+            Debug.LogWarning($"[Server] Resetting bot system for fresh game");
+            botPlayerActive = false;
+            if (botMoveCoroutine != null)
+            {
+                StopCoroutine(botMoveCoroutine);
+                botMoveCoroutine = null;
+            }
+        }
+        
+        // Reset move chains
+        MoveChainIntegrator.ResetChains();
+        
+        // Clear reconnection tracking
+        reconnectingClients.Clear();
+        
+        Debug.LogWarning($"[Server] ===== PRE-GAME DISCONNECTION HANDLING COMPLETE =====");
+        Debug.LogWarning($"[Server] Server state reset - ready for fresh connections");
+        Debug.LogWarning($"[Server] Connected players: {connectedPlayerCount}, Expected: {playerCount}");
+    }
+
+    /// <summary>
+    /// Handles when a client disconnects before the game starts
+    /// Only removes the client, keeps host waiting for more players
+    /// </summary>
+    private void HandleClientPreGameDisconnection(ulong clientId)
+    {
+        Debug.LogWarning($"[Server] ===== HANDLING CLIENT PRE-GAME DISCONNECTION =====");
+        Debug.LogWarning($"[Server] Client {clientId} disconnected before game started");
+        Debug.LogWarning($"[Server] Removing client but keeping host waiting for more players");
+        
+        // Mark client as disconnected
+        disconnectedClients[clientId] = true;
+        clientHeartbeats.Remove(clientId);
+        
+        // Decrease connected player count
+        if (connectedPlayerCount > 0)
+        {
+            connectedPlayerCount--;
+            Debug.LogWarning($"[Server] Connected player count decreased to: {connectedPlayerCount}");
+        }
+        
+        // Remove only this client from tracking (don't reset everything)
+        dealCenterFinishedClients.Remove(clientId);
+        
+        // Remove from reconnection tracking if present
+        reconnectingClients.Remove(clientId);
+        
+        Debug.LogWarning($"[Server] ===== CLIENT PRE-GAME DISCONNECTION HANDLING COMPLETE =====");
+        Debug.LogWarning($"[Server] Client removed - host continues waiting for more players");
+        Debug.LogWarning($"[Server] Connected players: {connectedPlayerCount}, Expected: {playerCount}");
+    }
+
+    /// <summary>
+    /// Handles when the host disconnects (any time - pre-game or during game)
+    /// Performs complete server reset since host is gone
+    /// </summary>
+    private void HandleHostDisconnection()
+    {
+        Debug.LogWarning($"[Server] ===== HANDLING HOST DISCONNECTION =====");
+        Debug.LogWarning($"[Server] Host disconnected - performing complete server reset");
+        
+        // Perform complete server reset
+        ResetAllServerVariables();
+        
+        // Stop all keep-alive systems
+        StopRelayKeepAlive();
+        
+        // Clear all tracking
+        disconnectedClients.Clear();
+        clientHeartbeats.Clear();
+        reconnectingClients.Clear();
+        
+        // Reset connection count
+        connectedPlayerCount = 0;
+        
+        // Reset Server singleton for fresh game start
+        ResetServerSingletonForMainMenu();
+        
+        // Notify all clients that host has disconnected
+        if (networkRelay != null)
+        {
+            networkRelay.NotifyHostDisconnectedClientRPC();
+        }
+        
+        Debug.LogWarning($"[Server] ===== HOST DISCONNECTION HANDLING COMPLETE =====");
+        Debug.LogWarning($"[Server] Complete server reset performed - ready for fresh host");
+    }
+
+    /// <summary>
+    /// Handles when the host disconnects before the game starts
+    /// Performs complete server reset since host is gone
+    /// </summary>
+    private void HandleHostPreGameDisconnection()
+    {
+        Debug.LogWarning($"[Server] ===== HANDLING HOST PRE-GAME DISCONNECTION =====");
+        Debug.LogWarning($"[Server] Host disconnected before game started - performing complete reset");
+        
+        // Perform complete server reset
+        ResetAllServerVariables();
+        
+        // Stop all keep-alive systems
+        StopRelayKeepAlive();
+        
+        // Clear all tracking
+        disconnectedClients.Clear();
+        clientHeartbeats.Clear();
+        reconnectingClients.Clear();
+        
+        // Reset connection count
+        connectedPlayerCount = 0;
+        
+        Debug.LogWarning($"[Server] ===== HOST PRE-GAME DISCONNECTION HANDLING COMPLETE =====");
+        Debug.LogWarning($"[Server] Complete server reset performed - ready for fresh host");
+    }
+
+    /// <summary>
+    /// Starts coordinated disconnection process - host notifies all clients to disconnect
+    /// </summary>
+    public void StartCoordinatedDisconnection()
+    {
+        if (!IsServer)
+        {
+            Debug.LogWarning("[Server] StartCoordinatedDisconnection called on non-server instance");
+            return;
+        }
+
+        Debug.Log($"[Server] Starting coordinated disconnection - {connectedPlayerCount - 1} clients need to confirm disconnection");
+        
+        // Reset tracking
+        clientsConfirmedDisconnection.Clear();
+        isCoordinatedDisconnectionInProgress = true;
+        
+        // Notify all clients to disconnect
+        var networkRelay = FindObjectOfType<NetworkRelay>();
+        if (networkRelay != null)
+        {
+            networkRelay.NotifyClientsToDisconnectServerRPC();
+        }
+        else
+        {
+            Debug.LogError("[Server] NetworkRelay not found - cannot notify clients to disconnect");
+        }
+    }
+
+    /// <summary>
+    /// Called when a client confirms they have disconnected
+    /// </summary>
+    public void OnClientConfirmedDisconnection(ulong clientId)
+    {
+        if (!isCoordinatedDisconnectionInProgress)
+        {
+            Debug.LogWarning($"[Server] Client {clientId} confirmed disconnection but coordinated disconnection not in progress - ignoring");
+            return;
+        }
+
+        if (clientsConfirmedDisconnection.Contains(clientId))
+        {
+            Debug.LogWarning($"[Server] Client {clientId} already confirmed disconnection - ignoring duplicate");
+            return;
+        }
+
+        clientsConfirmedDisconnection.Add(clientId);
+        Debug.Log($"[Server] Client {clientId} confirmed disconnection - {clientsConfirmedDisconnection.Count}/{connectedPlayerCount - 1} clients confirmed");
+
+        // Check if all clients have confirmed disconnection
+        if (clientsConfirmedDisconnection.Count >= connectedPlayerCount - 1)
+        {
+            Debug.Log("[Server] All clients have confirmed disconnection - host can now disconnect");
+            OnAllClientsConfirmedDisconnection();
+        }
+    }
+
+    /// <summary>
+    /// Called when all clients have confirmed their disconnection
+    /// </summary>
+    private void OnAllClientsConfirmedDisconnection()
+    {
+        Debug.Log("[Server] All clients confirmed disconnection - notifying host to disconnect");
+        
+        // Reset tracking
+        isCoordinatedDisconnectionInProgress = false;
+        clientsConfirmedDisconnection.Clear();
+        
+        // Notify NetworkManagerUI that host can now disconnect
+        if (networkManagerUI != null)
+        {
+            networkManagerUI.OnAllClientsConfirmedDisconnection();
+        }
+        else
+        {
+            Debug.LogError("[Server] NetworkManagerUI not found - cannot notify host to disconnect");
+        }
+    }
+
+    /// <summary>
     /// Context menu method to clear saved game info from NetworkManagerUI (for testing/debugging)
     /// </summary>
     [ContextMenu("Clear Saved Game Info")]
@@ -1611,6 +1957,34 @@ public class Server : NetworkBehaviour
         {
             botModeToggle.onValueChanged.RemoveListener(OnBotModeToggleChanged);
             Debug.Log("[Server] Unsubscribed from bot mode toggle events");
+        }
+    }
+
+    /// <summary>
+    /// Called when the application is paused (mobile) or loses focus
+    /// This handles cases where the game is minimized or backgrounded
+    /// </summary>
+    void OnApplicationPause(bool pauseStatus)
+    {
+        if (pauseStatus && IsServer)
+        {
+            Debug.Log("[Server] Application paused while server is running - this will be detected as client disconnection");
+            // The NetworkManager will automatically detect this as a client disconnection
+            // and call OnClientDisconnected() for the appropriate client
+        }
+    }
+
+    /// <summary>
+    /// Called when the application is about to quit
+    /// This handles cases where the game is closed completely
+    /// </summary>
+    void OnApplicationQuit()
+    {
+        if (IsServer)
+        {
+            Debug.Log("[Server] Application quitting while server is running - this will be detected as host disconnection");
+            // The NetworkManager will automatically detect this as a host disconnection
+            // and call OnClientDisconnected() for the host
         }
     }
     
@@ -2317,6 +2691,9 @@ public class Server : NetworkBehaviour
                 // Send heartbeat to maintain relay connection
                 SendRelayHeartbeat();
                 
+                // Send host heartbeat to all clients for timeout detection
+                SendHostHeartbeatToClients();
+                
                 // Update lobby with heartbeat timestamp
                 UpdateLobbyHeartbeat();
             }
@@ -2370,6 +2747,30 @@ public class Server : NetworkBehaviour
         catch (System.Exception e)
         {
             Debug.LogWarning($"[Server] Error sending relay heartbeat: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Sends host heartbeat to all clients for timeout detection
+    /// </summary>
+    private void SendHostHeartbeatToClients()
+    {
+        try
+        {
+            if (networkRelay != null)
+            {
+                // Send host heartbeat to all clients
+                networkRelay.SendHostHeartbeatClientRPC();
+                Debug.Log($"[Server] Host heartbeat sent to all clients at {DateTime.UtcNow:HH:mm:ss}");
+            }
+            else
+            {
+                Debug.LogWarning("[Server] NetworkRelay is null - cannot send host heartbeat to clients");
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[Server] Error sending host heartbeat to clients: {e.Message}");
         }
     }
 

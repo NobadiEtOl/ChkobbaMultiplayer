@@ -689,8 +689,11 @@ public class DeckController : MonoBehaviour
 
     public void UpdateCurrentPlayerHandLayout()
     {
+        Debug.Log($"[Showcase] DeckController: UpdateCurrentPlayerHandLayout() called - isShowcaseAllActive = {isShowcaseAllActive}");
+        
         if (isShowcaseAllActive)
         {
+            Debug.Log("[Showcase] DeckController: isShowcaseAllActive is true, calling ShowcaseAllOtherHandsLayout()");
             ShowcaseAllOtherHandsLayout();
             return;
         }
@@ -731,14 +734,26 @@ public class DeckController : MonoBehaviour
     [ContextMenu("ShowcaseAllOtherHands")]
     private void ShowcaseAllOtherHandsLayout()
     {
+        Debug.Log("[Showcase] DeckController: ShowcaseAllOtherHandsLayout() called");
+        Debug.Log($"[Showcase] DeckController: isShowcaseAllActive = {isShowcaseAllActive}");
+        Debug.Log($"[Showcase] DeckController: playerHandTransforms.Count = {playerHandTransforms.Count}");
+        
         float spacing = 500f;
         int handCount = playerHandTransforms.Count;
         int startIdx = 0; // Include your own hand
 
         // Layout for all hands (showcase)
+        Debug.Log($"[Showcase] DeckController: Processing {handCount} hands for showcase");
         for (int handIdx = startIdx; handIdx < handCount; handIdx++)
         {
             Transform hand = playerHandTransforms[handIdx];
+            if (hand == null)
+            {
+                Debug.LogError($"[Showcase] DeckController: ERROR - Hand at index {handIdx} is null!");
+                continue;
+            }
+            
+            Debug.Log($"[Showcase] DeckController: Processing hand {handIdx}: {hand.name}");
             var playerCards = new List<GameObject>();
             int counter = 0;
             foreach (Transform child in hand)
@@ -747,6 +762,7 @@ public class DeckController : MonoBehaviour
                 counter++;
             }
             int totalCards = playerCards.Count;
+            Debug.Log($"[Showcase] DeckController: Hand {handIdx} has {totalCards} cards to showcase");
             if (totalCards == 0) continue;
 
             float offsetMult = (totalCards - 1) / 2f;
@@ -756,12 +772,29 @@ public class DeckController : MonoBehaviour
             for (int i = 0; i < totalCards; i++)
             {
                 GameObject card = playerCards[i];
+                if (card == null)
+                {
+                    Debug.LogError($"[Showcase] DeckController: ERROR - Card at index {i} in hand {handIdx} is null!");
+                    continue;
+                }
+                
                 var ci = card.GetComponent<CardInteraction>();
-                if (ci == null) continue;
+                if (ci == null)
+                {
+                    Debug.LogWarning($"[Showcase] DeckController: No CardInteraction found on {card.name} in hand {handIdx}");
+                    continue;
+                }
 
                 // Store original transform and flags if not already stored
                 if (!showcaseOriginalTransforms.ContainsKey(card))
+                {
+                    Debug.Log($"[Showcase] DeckController: Storing original transform for {card.name} at position {card.transform.position}");
                     showcaseOriginalTransforms[card] = (card.transform.position, card.transform.rotation, card.transform.localScale, ci.isAutoRotating);
+                }
+                else
+                {
+                    Debug.Log($"[Showcase] DeckController: {card.name} already has stored transform, skipping");
+                }
 
                 Vector3 offset = Vector3.zero;
                 Quaternion rotation = card.transform.rotation; // Default to current rotation
@@ -783,6 +816,7 @@ public class DeckController : MonoBehaviour
                         offset = new Vector3(0, i * 10, spacing * 3f * (i - offsetMult));
                         rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + 90, centerRotation.z);
                         targetPosition = basePos + offset;
+                        Debug.Log($"[Showcase] DeckController: Moving {card.name} to position {targetPosition} (hand {handIdx}, card {i})");
                         MoveCard(targetPosition, card, 10, rotation, scale);
                         break;
                         
@@ -790,6 +824,7 @@ public class DeckController : MonoBehaviour
                         offset = new Vector3(spacing * 3f * (i - offsetMult), i * 10, 0);
                         rotation = Quaternion.Euler(centerRotation.x, centerRotation.y, centerRotation.z);
                         targetPosition = basePos + offset;
+                        Debug.Log($"[Showcase] DeckController: Moving {card.name} to position {targetPosition} (hand {handIdx}, card {i})");
                         MoveCard(targetPosition, card, 10, rotation, scale);
                         break;
                         
@@ -797,6 +832,7 @@ public class DeckController : MonoBehaviour
                         offset = new Vector3(spacing * 3f * (i - offsetMult), i * 10, 0);
                         rotation = Quaternion.Euler(centerRotation.x, centerRotation.y, centerRotation.z);
                         targetPosition = basePos + offset;
+                        Debug.Log($"[Showcase] DeckController: Moving {card.name} to position {targetPosition} (hand {handIdx}, card {i})");
                         MoveCard(targetPosition, card, 10, rotation, scale);
                         break;
                 }
@@ -831,30 +867,56 @@ public class DeckController : MonoBehaviour
     }
 
 
-    private bool isShowcaseAllActive = false;
+    public bool isShowcaseAllActive = false;
     public Dictionary<GameObject, (Vector3 pos, Quaternion rot, Vector3 scale, bool autoRotateFlag)> showcaseOriginalTransforms = new Dictionary<GameObject, (Vector3, Quaternion, Vector3, bool)>();
 
     [ContextMenu("ExitShowcaseAllOtherHands")]
     public void ExitShowcaseAllOtherHands()
     {
+        Debug.Log("[Showcase] DeckController: ExitShowcaseAllOtherHands() called");
+        Debug.Log($"[Showcase] DeckController: Current isShowcaseAllActive state: {isShowcaseAllActive}");
+        Debug.Log($"[Showcase] DeckController: Cards in showcaseOriginalTransforms: {showcaseOriginalTransforms.Count}");
+        
         isShowcaseAllActive = false;
+        Debug.Log("[Showcase] DeckController: Set isShowcaseAllActive = false");
+        
         // Restore all cards to their stored transforms and flags
+        Debug.Log($"[Showcase] DeckController: Starting to restore {showcaseOriginalTransforms.Count} cards");
+        int restoredCount = 0;
         foreach (var kvp in showcaseOriginalTransforms)
         {
             GameObject card = kvp.Key;
             var (pos, rot, scale, autoRotateFlag) = kvp.Value;
+            
+            if (card == null)
+            {
+                Debug.LogError($"[Showcase] DeckController: ERROR - Card is null in showcaseOriginalTransforms at index {restoredCount}");
+                continue;
+            }
+            
+            Debug.Log($"[Showcase] DeckController: Restoring card {card.name} to position {pos}");
             MoveCard(pos, card, 10, rot, scale);
+            restoredCount++;
 
             var ci = card.GetComponent<CardInteraction>();
             if (ci != null)
             {
                 ci.StopAutoRotate();
+                Debug.Log($"[Showcase] DeckController: Stopped auto rotate for {card.name}");
+            }
+            else
+            {
+                Debug.LogWarning($"[Showcase] DeckController: No CardInteraction found on {card.name}");
             }
         }
+        
+        Debug.Log($"[Showcase] DeckController: Restored {restoredCount} cards, clearing showcaseOriginalTransforms");
         showcaseOriginalTransforms.Clear();
 
         // After restoring, update layout to ensure flags are correct for your hand
+        Debug.Log("[Showcase] DeckController: Calling UpdateCurrentPlayerHandLayout() after restore");
         UpdateCurrentPlayerHandLayout();
+        Debug.Log("[Showcase] DeckController: UpdateCurrentPlayerHandLayout() completed");
     }
 
     public void UpdateShowcaseOriginalsAfterSwap(GameObject card)
@@ -869,8 +931,14 @@ public class DeckController : MonoBehaviour
 
     public void ShowcaseAllOtherHands()
     {
+        Debug.Log("[Showcase] DeckController: ShowcaseAllOtherHands() called");
+        Debug.Log($"[Showcase] DeckController: Current isShowcaseAllActive state: {isShowcaseAllActive}");
+        
         isShowcaseAllActive = true;
+        Debug.Log("[Showcase] DeckController: Set isShowcaseAllActive = true");
+        
         ShowcaseAllOtherHandsLayout();
+        Debug.Log("[Showcase] DeckController: ShowcaseAllOtherHandsLayout() called");
     }
 
 

@@ -18,6 +18,15 @@ public class SuperPowerToken : MonoBehaviour
     public void OnTokenClicked()
     {
         Debug.Log("SuperPowerToken clicked: " + power.name);
+        
+        // Check if it's the player's turn before activating
+        if (GameManager.LocalInstance != null && !GameManager.LocalInstance.IsLocalPlayerTurn())
+        {
+            Debug.LogWarning($"Cannot activate {power.name} - it's not your turn!");
+            ShowOutOfTurnFeedback();
+            return;
+        }
+        
         power.ActivatePower();
         
         SuperPowerSpawner.LocalInstance.RemoveSpawnedSuperPower(gameObject);
@@ -26,6 +35,42 @@ public class SuperPowerToken : MonoBehaviour
         // FIXED: Start the close coroutine instead of calling CloseInfoBox directly
         StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
         StartCoroutine(FadeOutSprite()); // Destroy the token after activation
+    }
+    
+    /// <summary>
+    /// Show visual feedback when player tries to activate power out of turn
+    /// </summary>
+    private void ShowOutOfTurnFeedback()
+    {
+        // Flash the token red briefly to indicate it's not their turn
+        StartCoroutine(FlashRedFeedback());
+        
+        // Show error message in InfoBox if it's open
+        if (SuperPowerSpawner.LocalInstance != null && SuperPowerSpawner.LocalInstance.isInfoBoxOpen)
+        {
+            SuperPowerSpawner.LocalInstance.ShowOutOfTurnErrorMessage();
+        }
+    }
+    
+    /// <summary>
+    /// Flash the token red to indicate invalid action
+    /// </summary>
+    private IEnumerator FlashRedFeedback()
+    {
+        SpriteRenderer sr = GetComponent<SpriteRenderer>();
+        if (sr == null) yield break;
+
+        Color originalColor = sr.color;
+        Color redColor = Color.red;
+        
+        // Flash red 3 times
+        for (int i = 0; i < 3; i++)
+        {
+            sr.color = redColor;
+            yield return new WaitForSeconds(0.1f);
+            sr.color = originalColor;
+            yield return new WaitForSeconds(0.1f);
+        }
     }
 
     public IEnumerator FadeOutSprite(float duration = 0.5f)

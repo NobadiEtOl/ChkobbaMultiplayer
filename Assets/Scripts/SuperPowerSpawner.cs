@@ -153,6 +153,13 @@ public class SuperPowerSpawner : MonoBehaviour
         
         // Initialize gold system
         InitializeGoldSystem();
+        
+        // Get DeckController reference
+        deckController = FindObjectOfType<DeckController>();
+        if (deckController == null)
+        {
+            Debug.LogError("[SuperPowerSpawner] DeckController not found! Hand showcasing will not work.");
+        }
     }
 
     void Update()
@@ -351,7 +358,50 @@ public class SuperPowerSpawner : MonoBehaviour
     private void OnTokenClicked()
     {
         Debug.Log("Activate button clicked for " + SuperPowerToken.ActiveInstance?.power.name);
+        
+        // Check if it's the player's turn before activating
+        if (GameManager.LocalInstance != null && !GameManager.LocalInstance.IsLocalPlayerTurn())
+        {
+            Debug.LogWarning($"Cannot activate {SuperPowerToken.ActiveInstance?.power.name} - it's not your turn!");
+            ShowOutOfTurnErrorMessage();
+            return;
+        }
+        
         SuperPowerToken.ActiveInstance.OnTokenClicked();
+    }
+    
+    /// <summary>
+    /// Show error message when player tries to activate power out of turn
+    /// </summary>
+    public void ShowOutOfTurnErrorMessage()
+    {
+        if (nameText != null && descriptionText != null)
+        {
+            // Store original text
+            string originalName = nameText.text;
+            string originalDescription = descriptionText.text;
+            
+            // Show error message
+            nameText.text = "Not Your Turn!";
+            descriptionText.text = "You can only activate superpowers during your turn.";
+            
+            // Start coroutine to restore original text after delay
+            StartCoroutine(RestoreOriginalTextAfterDelay(originalName, originalDescription, 2f));
+        }
+    }
+    
+    /// <summary>
+    /// Restore original text after showing error message
+    /// </summary>
+    private IEnumerator RestoreOriginalTextAfterDelay(string originalName, string originalDescription, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        
+        if (nameText != null && descriptionText != null)
+        {
+            nameText.text = originalName;
+            descriptionText.text = originalDescription;
+        }
     }
 
     /// <summary>
@@ -728,6 +778,28 @@ public class SuperPowerSpawner : MonoBehaviour
         activateButton.gameObject.SetActive(canActivate);
         falseActivateButton.gameObject.SetActive(!canActivate);
         closeButton.gameObject.SetActive(true);
+        
+        // Handle hand showcasing based on power type
+        if (deckController != null)
+        {
+            if (PowerRequiresHandShowcase(superPowerToken.power.name))
+            {
+                Debug.Log($"[Showcase] InfoBox: Starting hand showcase for {superPowerToken.power.name}");
+                deckController.ShowcaseAllOtherHands();
+                Debug.Log($"[Showcase] InfoBox: ShowcaseAllOtherHands() called for {superPowerToken.power.name}");
+            }
+            else
+            {
+                // Stop showcasing if switching to a power that doesn't require card selection
+                Debug.Log($"[Showcase] InfoBox: Stopping hand showcase - switching to {superPowerToken.power.name}");
+                deckController.ExitShowcaseAllOtherHands();
+                Debug.Log($"[Showcase] InfoBox: ExitShowcaseAllOtherHands() called for {superPowerToken.power.name}");
+            }
+        }
+        else
+        {
+            Debug.LogError($"[Showcase] ERROR: DeckController is null in OpenInfoBox for {superPowerToken.power.name}");
+        }
 
         currentNameText = superPowerToken.power.name;
         currentDescriptionText = superPowerToken.power.description;
@@ -740,6 +812,9 @@ public class SuperPowerSpawner : MonoBehaviour
             StopCoroutine(errorMessageCoroutine);
             errorMessageCoroutine = null;
         }
+        
+        // Update button state based on turn
+        UpdateActivateButtonForTurn();
 
         Debug.Log($"Info updated for: {superPowerToken.power.name}");
     }
@@ -845,6 +920,28 @@ public class SuperPowerSpawner : MonoBehaviour
         // Clear InfoBox content to ensure clean state when closed
         ClearInfoBoxContent();
         
+        // Stop hand showcasing when InfoBox is closed (but only if no dual selection is active)
+        if (deckController != null)
+        {
+            // Check if any dual selection powers are active
+            bool isDualSelectionActive = GameManager.LocalInstance != null && 
+                (GameManager.LocalInstance.isKopyalaActive || GameManager.LocalInstance.isSunuDegisTokusActive || GameManager.LocalInstance.isSunuDegisBunuTokusActive);
+            
+            if (isDualSelectionActive)
+            {
+                Debug.Log("[Showcase] InfoBox: Dual selection is active, NOT stopping showcase - InfoBox closed");
+            }
+            else
+            {
+                Debug.Log("[Showcase] InfoBox: No dual selection active, force stopping hand showcase - InfoBox closed");
+                ForceStopHandShowcase();
+            }
+        }
+        else
+        {
+            Debug.LogError("[Showcase] ERROR: DeckController is null in CloseInfoBox");
+        }
+        
         // Stop idle animation
         UIFrameAnimator frameAnimator = backgroundPanel.GetComponent<UIFrameAnimator>();
         if (frameAnimator != null)
@@ -885,6 +982,28 @@ public class SuperPowerSpawner : MonoBehaviour
         
         // Clear InfoBox content to ensure clean state when closed
         ClearInfoBoxContent();
+        
+        // Stop hand showcasing when InfoBox is closed (but only if no dual selection is active)
+        if (deckController != null)
+        {
+            // Check if any dual selection powers are active
+            bool isDualSelectionActive = GameManager.LocalInstance != null && 
+                (GameManager.LocalInstance.isKopyalaActive || GameManager.LocalInstance.isSunuDegisTokusActive || GameManager.LocalInstance.isSunuDegisBunuTokusActive);
+            
+            if (isDualSelectionActive)
+            {
+                Debug.Log("[Showcase] InfoBox: Dual selection is active, NOT stopping showcase - InfoBox closed immediately");
+            }
+            else
+            {
+                Debug.Log("[Showcase] InfoBox: No dual selection active, force stopping hand showcase - InfoBox closed immediately");
+                ForceStopHandShowcase();
+            }
+        }
+        else
+        {
+            Debug.LogError("[Showcase] ERROR: DeckController is null in CloseInfoBoxImmediate");
+        }
         
         // Stop idle animation
         UIFrameAnimator frameAnimator = backgroundPanel.GetComponent<UIFrameAnimator>();
@@ -942,8 +1061,17 @@ public class SuperPowerSpawner : MonoBehaviour
     }
 
     // Rest of your existing code remains the same...
-    private List<string> restirictedPowersName_CardNeedToBeSelected = new List<string> { "Bu Daha İyi", "Şunu Değiş Tokuş", "Kopyala Yapıştır"};
+    private List<string> restirictedPowersName_CardNeedToBeSelected = new List<string> { "Bu Daha İyi", "Şunu Değiş Tokuş", "Kopyala Yapıştır", "Kapkaç", "Yandım Anam"};
     private List<string> restirictedPowersName_CenterNotEmpty = new List<string> { "Bu Daha İyi", "Bomba" };
+    
+    // Powers that require automatic hand showcasing when opened
+    private List<string> powersRequiringHandShowcase = new List<string> { "Kapkaç", "Yandım Anam", "Kopyala Yapıştır" };
+    
+    // Powers that require hand showcasing after activation (for dual selection)
+    private List<string> powersRequiringHandShowcaseAfterActivation = new List<string> { "Şunu Değiş Tokuş", "Kopyala Yapıştır", "Şunu Değiş Bunu Tokuş" };
+    
+    // Reference to DeckController for showcasing hands
+    private DeckController deckController;
     
     private bool CheckIfCardShouldBeSelected(string superPowerTokenName)
     {
@@ -975,6 +1103,82 @@ public class SuperPowerSpawner : MonoBehaviour
         }
         return true;
     }
+    
+    /// <summary>
+    /// Check if a power requires hand showcasing (only specific powers that need to select from any player's hand)
+    /// </summary>
+    private bool PowerRequiresHandShowcase(string superPowerTokenName)
+    {
+        return powersRequiringHandShowcase.Contains(superPowerTokenName);
+    }
+    
+    /// <summary>
+    /// Check if a power requires hand showcasing after activation (for dual selection powers)
+    /// </summary>
+    private bool PowerRequiresHandShowcaseAfterActivation(string superPowerTokenName)
+    {
+        return powersRequiringHandShowcaseAfterActivation.Contains(superPowerTokenName);
+    }
+    
+    /// <summary>
+    /// Start hand showcasing for dual selection powers (called from GameManager)
+    /// </summary>
+    public void StartHandShowcaseForDualSelection(string powerName)
+    {
+        Debug.Log($"[Showcase] StartHandShowcaseForDualSelection called for: {powerName}");
+        
+        if (deckController == null)
+        {
+            Debug.LogError($"[Showcase] ERROR: DeckController is null! Cannot start showcase for {powerName}");
+            return;
+        }
+        
+        if (!PowerRequiresHandShowcaseAfterActivation(powerName))
+        {
+            Debug.Log($"[Showcase] Power {powerName} does not require hand showcase after activation");
+            return;
+        }
+        
+        Debug.Log($"[Showcase] Starting hand showcase for dual selection: {powerName}");
+        deckController.ShowcaseAllOtherHands();
+        Debug.Log($"[Showcase] ShowcaseAllOtherHands() called successfully for {powerName}");
+    }
+    
+    /// <summary>
+    /// Stop hand showcasing (called from GameManager when dual selection is complete)
+    /// </summary>
+    public void StopHandShowcase()
+    {
+        Debug.Log("[Showcase] StopHandShowcase called");
+        
+        if (deckController == null)
+        {
+            Debug.LogError("[Showcase] ERROR: DeckController is null! Cannot stop showcase");
+            return;
+        }
+        
+        Debug.Log("[Showcase] Stopping hand showcase - dual selection complete");
+        deckController.ExitShowcaseAllOtherHands();
+        Debug.Log("[Showcase] ExitShowcaseAllOtherHands() called successfully");
+    }
+    
+    /// <summary>
+    /// Force stop hand showcasing (used when InfoBox closes and no dual selection is active)
+    /// </summary>
+    public void ForceStopHandShowcase()
+    {
+        Debug.Log("[Showcase] ForceStopHandShowcase called");
+        
+        if (deckController == null)
+        {
+            Debug.LogError("[Showcase] ERROR: DeckController is null! Cannot force stop showcase");
+            return;
+        }
+        
+        Debug.Log("[Showcase] Force stopping hand showcase");
+        deckController.ExitShowcaseAllOtherHands();
+        Debug.Log("[Showcase] Force stop - ExitShowcaseAllOtherHands() called successfully");
+    }
 
     public void SetActiveActivateButtonTrue()
     {
@@ -984,6 +1188,37 @@ public class SuperPowerSpawner : MonoBehaviour
             activateButton.gameObject.SetActive(true);
             ResetInfoBoxText();
         }
+        
+        // Update button state based on turn
+        UpdateActivateButtonForTurn();
+    }
+    
+    /// <summary>
+    /// Update the activate button state based on whether it's the player's turn
+    /// </summary>
+    public void UpdateActivateButtonForTurn()
+    {
+        if (activateButton == null) return;
+        
+        bool isMyTurn = GameManager.LocalInstance != null && GameManager.LocalInstance.IsLocalPlayerTurn();
+        
+        // Enable/disable button based on turn
+        activateButton.interactable = isMyTurn;
+        
+        // Visual feedback - change button color
+        if (activateButton.targetGraphic != null)
+        {
+            if (isMyTurn)
+            {
+                activateButton.targetGraphic.color = Color.white;
+            }
+            else
+            {
+                activateButton.targetGraphic.color = Color.gray;
+            }
+        }
+        
+        Debug.Log($"[SuperPowerSpawner] Activate button updated - isMyTurn: {isMyTurn}, interactable: {activateButton.interactable}");
     }
 
     public void InitializeSuperPowers()

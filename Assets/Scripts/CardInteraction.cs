@@ -133,6 +133,15 @@ public class CardInteraction : MonoBehaviour
     private bool stopPower = false;
     public void OnCardTouched(Vector3 touchPosition)
     {
+        Debug.Log($"[CardSelection] OnCardTouched called for card: {gameObject.name}, parent: {gameObject.transform.parent?.name}");
+        
+        // Check if this card can be selected
+        if (!CanBeSelected())
+        {
+            Debug.Log($"[CardSelection] Card {gameObject.name} cannot be selected, ignoring touch");
+            return;
+        }
+        
         stopPower = AreSwapPowersActive();
         //Debug.Log("OnCardTouched called for card: " + gameObject.name);
         // Ensure only one card is selected at a time
@@ -641,6 +650,87 @@ public class CardInteraction : MonoBehaviour
         allowOwnHand = allowOwnHandCards;
         allowedSelections = maxSelections;
         currentSelections = 0;
+    }
+    
+    /// <summary>
+    /// Check if this card can be selected based on current restrictions and game state
+    /// </summary>
+    public bool CanBeSelected()
+    {
+        // Check if it's the player's turn
+        if (GameManager.LocalInstance != null && !GameManager.LocalInstance.IsLocalPlayerTurn())
+        {
+            Debug.Log($"[CardSelection] Cannot select {gameObject.name} - not player's turn");
+            return false;
+        }
+        
+        // Check if card is null or destroyed
+        if (gameObject == null)
+        {
+            Debug.Log($"[CardSelection] Cannot select - card is null");
+            return false;
+        }
+        
+        string parentName = gameObject.transform.parent != null ? gameObject.transform.parent.name : "";
+        Transform localPlayerHand = GetLocalPlayerHandTransform();
+        bool isOwnHand = transform.parent == localPlayerHand;
+        
+        // Check if it's a center or pool card (never selectable)
+        if (parentName == "Center" || parentName.Contains("Pool") || parentName.Contains("Pişti"))
+        {
+            Debug.Log($"[CardSelection] Cannot select {gameObject.name} - center/pool card");
+            return false;
+        }
+        
+        // Check if showcase is active (allows selection from all player hands)
+        bool isShowcaseActive = DeckController.LocalInstance != null && DeckController.LocalInstance.isShowcaseAllActive;
+        
+        // Also check if any multi-swap powers are active (they also need showcase-like selection)
+        bool isMultiSwapActive = GameManager.LocalInstance != null && GameManager.LocalInstance.isSunuDegisBunuTokusActive;
+        
+        if (isShowcaseActive || isMultiSwapActive)
+        {
+            // During showcase or multi-swap, allow selection from any player hand
+            if (parentName.StartsWith("PlayerHand"))
+            {
+                string reason = isShowcaseActive ? "showcase active" : "multi-swap active";
+                Debug.Log($"[CardSelection] Can select {gameObject.name} - {reason}, player hand card");
+                return true;
+            }
+            else
+            {
+                string reason = isShowcaseActive ? "showcase active" : "multi-swap active";
+                Debug.Log($"[CardSelection] Cannot select {gameObject.name} - {reason} but not player hand");
+                return false;
+            }
+        }
+        else
+        {
+            // Normal state - only allow own hand
+            if (isOwnHand)
+            {
+                Debug.Log($"[CardSelection] Can select {gameObject.name} - own hand card");
+                return true;
+            }
+            else
+            {
+                Debug.Log($"[CardSelection] Cannot select {gameObject.name} - not own hand and no showcase/multi-swap");
+                return false;
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Reset card selection state (called when turn ends)
+    /// </summary>
+    public static void ResetCardSelection()
+    {
+        Debug.Log("[CardSelection] Resetting card selection state");
+        currentlySelectedCard = null;
+        isOneCardSelected = false;
+        
+        // Reset selection restrictions to default
+        RestrictSelectionToOwnHand();
     }
 
     public void KillAllTweens()

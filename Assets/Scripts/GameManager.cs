@@ -1096,6 +1096,18 @@ public class GameManager : MonoBehaviour
             // Send swap request to server
             networkRelay.UseSunuDegisTokusServerRPC(deckController.thisPlayerNumber, sunuDegisTokusFirstCard, cardID);
 
+            // Stop hand showcasing
+            Debug.Log("[Showcase] GameManager: Stopping Şunu Değiş Tokuş dual selection showcase");
+            if (SuperPowerSpawner.LocalInstance != null)
+            {
+                SuperPowerSpawner.LocalInstance.StopHandShowcase();
+                Debug.Log("[Showcase] GameManager: Called StopHandShowcase for Şunu Değiş Tokuş");
+            }
+            else
+            {
+                Debug.LogError("[Showcase] GameManager: ERROR - SuperPowerSpawner.LocalInstance is null!");
+            }
+
             isSunuDegisTokusActive = false;
             sunuDegisTokusFirstCard = null;
             return;
@@ -1129,11 +1141,23 @@ public class GameManager : MonoBehaviour
 
             {
 
-                AddToDebugLogWarning("No more cards to swap for ŞunuDeğişBunuTokuş.");
+            AddToDebugLogWarning("No more cards to swap for ŞunuDeğişBunuTokuş.");
 
-                isSunuDegisBunuTokusActive = false;
+            // Stop hand showcasing
+            Debug.Log("[Showcase] GameManager: Stopping Şunu Değiş Bunu Tokuş multi-swap showcase - no more cards");
+            if (SuperPowerSpawner.LocalInstance != null)
+            {
+                SuperPowerSpawner.LocalInstance.StopHandShowcase();
+                Debug.Log("[Showcase] GameManager: Called StopHandShowcase for Şunu Değiş Bunu Tokuş - no more cards");
+            }
+            else
+            {
+                Debug.LogError("[Showcase] GameManager: ERROR - SuperPowerSpawner.LocalInstance is null!");
+            }
 
-                return;
+            isSunuDegisBunuTokusActive = false;
+
+            return;
 
             }
 
@@ -1165,6 +1189,18 @@ public class GameManager : MonoBehaviour
                     var tempPower = ScriptableObject.CreateInstance<SunuDegisBunuTokus>();
                     tempPower.PowerActivated();
                     DestroyImmediate(tempPower);
+                }
+
+                // Stop hand showcasing
+                Debug.Log("[Showcase] GameManager: Stopping Şunu Değiş Bunu Tokuş multi-swap showcase");
+                if (SuperPowerSpawner.LocalInstance != null)
+                {
+                    SuperPowerSpawner.LocalInstance.StopHandShowcase();
+                    Debug.Log("[Showcase] GameManager: Called StopHandShowcase for Şunu Değiş Bunu Tokuş");
+                }
+                else
+                {
+                    Debug.LogError("[Showcase] GameManager: ERROR - SuperPowerSpawner.LocalInstance is null!");
                 }
 
                 isSunuDegisBunuTokusActive = false;
@@ -1916,6 +1952,9 @@ public class GameManager : MonoBehaviour
 
 
 
+        // Reset card selection when turn changes
+        bool wasMyTurn = IsLocalPlayerTurn();
+        
         // Then update the current player
 
         currentPlayerNo = playerNumber;
@@ -1923,7 +1962,37 @@ public class GameManager : MonoBehaviour
         AddToDebugLog($"[GameManager] Updated currentPlayerNo to: {currentPlayerNo}");
 
         turnCounter = turnC;
+        
+        // Reset card selection if it was my turn before but isn't now
+        if (wasMyTurn && !IsLocalPlayerTurn())
+        {
+            Debug.Log("[CardSelection] Turn changed away from local player, resetting card selection");
+            CardInteraction.ResetCardSelection();
+        }
+        
+        // Update superpower activate button state based on turn
+        if (SuperPowerSpawner.LocalInstance != null)
+        {
+            SuperPowerSpawner.LocalInstance.UpdateActivateButtonForTurn();
+        }
 
+    }
+
+    /// <summary>
+    /// Check if it's currently the local player's turn
+    /// </summary>
+    /// <returns>True if it's the local player's turn, false otherwise</returns>
+    public bool IsLocalPlayerTurn()
+    {
+        if (deckController == null)
+        {
+            Debug.LogWarning("[GameManager] IsLocalPlayerTurn: deckController is null");
+            return false;
+        }
+        
+        bool isMyTurn = currentPlayerNo == deckController.thisPlayerNumber;
+        AddToDebugLog($"[GameManager] IsLocalPlayerTurn: currentPlayerNo={currentPlayerNo}, thisPlayerNumber={deckController.thisPlayerNumber}, isMyTurn={isMyTurn}");
+        return isMyTurn;
     }
 
 
@@ -2950,6 +3019,18 @@ public class GameManager : MonoBehaviour
             maxSelections: 1
         );
         
+        // Start hand showcasing for dual selection
+        Debug.Log("[Showcase] GameManager: Starting Kopyala Yapıştır dual selection showcase");
+        if (SuperPowerSpawner.LocalInstance != null)
+        {
+            SuperPowerSpawner.LocalInstance.StartHandShowcaseForDualSelection("Kopyala Yapıştır");
+            Debug.Log("[Showcase] GameManager: Called StartHandShowcaseForDualSelection for Kopyala Yapıştır");
+        }
+        else
+        {
+            Debug.LogError("[Showcase] GameManager: ERROR - SuperPowerSpawner.LocalInstance is null!");
+        }
+        
         Debug.Log("[GameManager] Dual selection mode active - select target card to complete power");
     }
     
@@ -2990,6 +3071,18 @@ public class GameManager : MonoBehaviour
         // Network the change to server and all clients
         networkRelay.KopyalaYapistirServerRPC(targetCard.uniqueCardInstanceID, kopyalaSourceCard.uniqueCardInstanceID);
 
+        // Stop hand showcasing
+        Debug.Log("[Showcase] GameManager: Stopping Kopyala Yapıştır dual selection showcase");
+        if (SuperPowerSpawner.LocalInstance != null)
+        {
+            SuperPowerSpawner.LocalInstance.StopHandShowcase();
+            Debug.Log("[Showcase] GameManager: Called StopHandShowcase for Kopyala Yapıştır");
+        }
+        else
+        {
+            Debug.LogError("[Showcase] GameManager: ERROR - SuperPowerSpawner.LocalInstance is null!");
+        }
+        
         // Reset state
         isKopyalaActive = false;
         kopyalaSourceCard = null;
@@ -3906,8 +3999,19 @@ public class GameManager : MonoBehaviour
         isSunuDegisTokusActive = true;
         sunuDegisTokusFirstCard = myHandCard;
         
+        // Start hand showcasing for dual selection
+        Debug.Log("[Showcase] GameManager: Starting Şunu Değiş Tokuş dual selection showcase");
+        if (SuperPowerSpawner.LocalInstance != null)
+        {
+            SuperPowerSpawner.LocalInstance.StartHandShowcaseForDualSelection("Şunu Değiş Tokuş");
+            Debug.Log("[Showcase] GameManager: Called StartHandShowcaseForDualSelection for Şunu Değiş Tokuş");
+        }
+        else
+        {
+            Debug.LogError("[Showcase] GameManager: ERROR - SuperPowerSpawner.LocalInstance is null!");
+        }
+        
         Debug.Log("[GameManager] ŞunuDeğişTokuş: Select a card from another player's hand to swap with.");
-        DeckController.LocalInstance.ShowcaseAllOtherHands();
     }
     
     public void ActivateSunuDegisTokusPower()
@@ -3993,7 +4097,17 @@ public class GameManager : MonoBehaviour
 
         Debug.Log("ŞunuDeğişBunuTokuş: Select a card from another player's hand to swap with your first card.");
 
-        DeckController.LocalInstance.ShowcaseAllOtherHands();
+        // Start hand showcasing for multi-swap selection
+        Debug.Log("[Showcase] GameManager: Starting Şunu Değiş Bunu Tokuş multi-swap showcase");
+        if (SuperPowerSpawner.LocalInstance != null)
+        {
+            SuperPowerSpawner.LocalInstance.StartHandShowcaseForDualSelection("Şunu Değiş Bunu Tokuş");
+            Debug.Log("[Showcase] GameManager: Called StartHandShowcaseForDualSelection for Şunu Değiş Bunu Tokuş");
+        }
+        else
+        {
+            Debug.LogError("[Showcase] GameManager: ERROR - SuperPowerSpawner.LocalInstance is null!");
+        }
 
     }
 

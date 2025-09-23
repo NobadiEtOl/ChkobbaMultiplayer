@@ -28,6 +28,7 @@ public class NetworkManagerUI : MonoBehaviour
     [SerializeField] private Button quickPlayFourPlayerButton;
     [SerializeField] private InputField inputField;
     [SerializeField] private Text joinCodeText;
+    [SerializeField] private Button returnToMainMenuButton; // Return button for waiting screen
     private string joinCodeVar;
 
     // === DISCONNECT DETECTION & RECONNECTION ===
@@ -123,7 +124,37 @@ public class NetworkManagerUI : MonoBehaviour
         StopClientRelayKeepAlive();
     }
 
+    /// <summary>
+    /// Called when the application is paused (mobile) or loses focus
+    /// This handles cases where the game is minimized or backgrounded
+    /// </summary>
+    void OnApplicationPause(bool pauseStatus)
+    {
+        if (pauseStatus && isInGame)
+        {
+            Debug.Log("[NetworkManagerUI] Application paused while in game - checking if host needs coordinated disconnection");
+            
+            // Check if this is a host - if so, coordinate client disconnections first
+            bool isHost = NetworkManager.Singleton != null && NetworkManager.Singleton.IsHost;
+            if (isHost)
+            {
+                Debug.Log("[NetworkManagerUI] Host application paused - starting coordinated disconnection");
+                StartCoroutine(CoordinateHostDisconnectionOnPause());
+            }
+            else
+            {
+                Debug.Log("[NetworkManagerUI] Client application paused - treating as normal disconnection");
+                OnDisconnectDetected("Application paused");
+            }
+        }
+    }
+
+
     // === DISCONNECT DETECTION & HEARTBEAT ===
+    
+    // Host heartbeat tracking for client-side detection
+    private float lastHostHeartbeat = 0f;
+    private const float HOST_HEARTBEAT_TIMEOUT = 10f; // 10 seconds timeout
     
     /// <summary>
     /// Starts the disconnect detection system
@@ -164,6 +195,15 @@ public class NetworkManagerUI : MonoBehaviour
     }
 
     /// <summary>
+    /// Updates the last host heartbeat time (called by clients when they receive host messages)
+    /// </summary>
+    public void UpdateHostHeartbeat()
+    {
+        lastHostHeartbeat = Time.time;
+        Debug.Log($"[NetworkManagerUI] Host heartbeat updated at {Time.time:F2}");
+    }
+
+    /// <summary>
     /// Coroutine that sends periodic heartbeats to the server
     /// </summary>
     private IEnumerator HeartbeatCoroutine()
@@ -190,8 +230,21 @@ public class NetworkManagerUI : MonoBehaviour
             if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient && !NetworkManager.Singleton.IsHost)
             {
                 CheckHeartbeatTimeout();
+                CheckHostTimeout();
             }
             yield return new WaitForSeconds(1f); // Check every second
+        }
+    }
+
+    /// <summary>
+    /// Checks if the host has timed out (for client-side host disconnection detection)
+    /// </summary>
+    private void CheckHostTimeout()
+    {
+        if (lastHostHeartbeat > 0f && Time.time - lastHostHeartbeat > HOST_HEARTBEAT_TIMEOUT)
+        {
+            Debug.LogWarning($"[NetworkManagerUI] Host heartbeat timeout detected - last heartbeat was {Time.time - lastHostHeartbeat:F2} seconds ago");
+            OnDisconnectDetected("Host timeout - host may have closed the game");
         }
     }
 
@@ -249,11 +302,26 @@ public class NetworkManagerUI : MonoBehaviour
         }
         else if (isHost)
         {
-            // Debug.Log("[NetworkManagerUI] Host detected disconnect - waiting for client to reconnect");
-            // Host should just return to main page, not try to reconnect
-            if (mainUIScript != null)
+            // Debug.Log("[NetworkManagerUI] Host detected disconnect - checking if this is a client disconnect or host disconnect");
+            
+            // CRITICAL FIX: Only return host to main page if the HOST disconnected
+            // If a CLIENT disconnected, the host should stay on waiting screen
+            bool isHostDisconnected = !NetworkManager.Singleton.IsHost && !NetworkManager.Singleton.IsServer;
+            
+            if (isHostDisconnected)
             {
-                mainUIScript.OnDisconnectDetected();
+                // Host actually disconnected - return to main page
+                Debug.Log("[NetworkManagerUI] Host disconnected - returning to main page");
+                if (mainUIScript != null)
+                {
+                    mainUIScript.OnDisconnectDetected();
+                }
+            }
+            else
+            {
+                // Client disconnected but host is still connected - stay on waiting screen
+                Debug.Log("[NetworkManagerUI] Client disconnected but host still connected - staying on waiting screen");
+                // Do nothing - let the host continue waiting for more players
             }
         }
         else
@@ -835,12 +903,29 @@ public class NetworkManagerUI : MonoBehaviour
         }
         catch (Exception e)
         {
-            AddDebugStep($"EXCEPTION: RELAY RECONNECTION FAILED: {e.Message}");
-            AddDebugStep($"Exception Type: {e.GetType().Name}");
-            AddDebugStep($"Stack Trace: {e.StackTrace}");
-            PrintDebugChain($"FAILED - Exception: {e.Message}");
-            // DON'T disconnect - keep in lobby for debugging
-            return false;
+            // Check if this is a "join code not found" error (relay allocation expired)
+            if (e.Message.Contains("Not Found: join code not found") || e.Message.Contains("404"))
+            {
+                AddDebugStep($"RELAY ALLOCATION EXPIRED: {e.Message}");
+                AddDebugStep("Attempting to retry with fresh connection...");
+                
+                // Clear the expired relay join code and retry
+                PlayerPrefs.DeleteKey("roomJoinCode");
+                AddDebugStep("Cleared expired relay join code from PlayerPrefs");
+                
+                // Try to reconnect again with fresh allocation
+                AddDebugStep("Retrying reconnection with fresh relay allocation...");
+                return await AttemptReconnectionToGame(lobbyJoinCode);
+            }
+            else
+            {
+                AddDebugStep($"EXCEPTION: RELAY RECONNECTION FAILED: {e.Message}");
+                AddDebugStep($"Exception Type: {e.GetType().Name}");
+                AddDebugStep($"Stack Trace: {e.StackTrace}");
+                PrintDebugChain($"FAILED - Exception: {e.Message}");
+                // DON'T disconnect - keep in lobby for debugging
+                return false;
+            }
         }
     }
 
@@ -904,6 +989,111 @@ public class NetworkManagerUI : MonoBehaviour
     public string GetLastGameJoinCode()
     {
         return lastGameJoined;
+    }
+
+    /// <summary>
+    /// Handles the return to main menu button click from waiting screen
+    /// Properly disconnects from lobby while keeping Unity Services connected
+    /// </summary>
+    public void OnReturnToMainMenuButtonClicked()
+    {
+        Debug.Log("[NetworkManagerUI] Return to main menu button clicked - checking if game is ready to start...");
+        
+        // CRITICAL FIX: Check if game is ready to start - if so, disable return button
+        if (Server.Singleton != null && Server.Singleton.IsGameReadyToStart())
+        {
+            Debug.LogWarning("[NetworkManagerUI] Game is ready to start - return button is disabled to prevent missing players");
+            return; // Exit early - don't allow disconnection
+        }
+        
+        Debug.Log("[NetworkManagerUI] Game not ready to start - allowing return to main menu");
+        
+        // Check if this is a host - if so, coordinate client disconnections first
+        bool isHost = NetworkManager.Singleton != null && NetworkManager.Singleton.IsHost;
+        if (isHost)
+        {
+            Debug.Log("[NetworkManagerUI] Host return button clicked - coordinating client disconnections first");
+            StartCoroutine(CoordinateHostDisconnection());
+        }
+        else
+        {
+            // Client disconnection - proceed normally
+            PerformClientDisconnection();
+        }
+    }
+
+    /// <summary>
+    /// Coordinates host disconnection by first disconnecting all clients, then disconnecting host
+    /// </summary>
+    private IEnumerator CoordinateHostDisconnection()
+    {
+        Debug.Log("[NetworkManagerUI] Starting coordinated host disconnection...");
+        
+        // STEP 1: Start coordinated disconnection process
+        if (Server.Singleton != null)
+        {
+            Debug.Log("[NetworkManagerUI] Starting coordinated disconnection via Server...");
+            Server.Singleton.StartCoordinatedDisconnection();
+            
+            // The host will be notified when all clients have confirmed disconnection
+            // via OnAllClientsConfirmedDisconnection() method
+        }
+        else
+        {
+            Debug.LogError("[NetworkManagerUI] Server.Singleton is null - cannot start coordinated disconnection");
+            // Fallback to immediate disconnection
+            PerformHostDisconnection();
+        }
+        
+        yield return null; // This coroutine will be replaced by the callback system
+    }
+
+    /// <summary>
+    /// Performs client disconnection (normal flow)
+    /// </summary>
+    public void PerformClientDisconnection()
+    {
+        Debug.Log("[NetworkManagerUI] Performing client disconnection...");
+        
+        // STEP 1: Clear saved game info to prevent auto-reconnection
+        ClearSavedGameInfo();
+        
+        // STEP 2: Perform complete disconnection
+        DisconnectCompletelyFromLobbyAndRelay();
+        
+        // STEP 3: Return to main page via MainUIScript
+        if (mainUIScript != null)
+        {
+            mainUIScript.OnReturnFromWaitingScreen();
+        }
+        else
+        {
+            Debug.LogError("[NetworkManagerUI] MainUIScript is null - cannot return to main page");
+        }
+    }
+
+    /// <summary>
+    /// Performs host disconnection (after clients have been notified)
+    /// </summary>
+    private void PerformHostDisconnection()
+    {
+        Debug.Log("[NetworkManagerUI] Performing host disconnection...");
+        
+        // STEP 1: Clear saved game info to prevent auto-reconnection
+        ClearSavedGameInfo();
+        
+        // STEP 2: Perform complete disconnection
+        DisconnectCompletelyFromLobbyAndRelay();
+        
+        // STEP 3: Return to main page via MainUIScript
+        if (mainUIScript != null)
+        {
+            mainUIScript.OnReturnFromWaitingScreen();
+        }
+        else
+        {
+            Debug.LogError("[NetworkManagerUI] MainUIScript is null - cannot return to main page");
+        }
     }
 
     /// <summary>
@@ -974,6 +1164,12 @@ public class NetworkManagerUI : MonoBehaviour
         hostFourPlayerButton.onClick.AddListener(async () => { ClearGamePlayerPrefs(); await StartHostWithRelay(4,true); });
         quickPlayTwoPlayerButton.onClick.AddListener(async () => { ClearGamePlayerPrefs(); await FindLobbiesAndStartHostIfNoneExist(2); });
         quickPlayFourPlayerButton.onClick.AddListener(async () => { ClearGamePlayerPrefs(); await FindLobbiesAndStartHostIfNoneExist(4); });
+        
+        // Return button for waiting screen
+        if (returnToMainMenuButton != null)
+        {
+            returnToMainMenuButton.onClick.AddListener(OnReturnToMainMenuButtonClicked);
+        }
 
         //FindLobbiesAndStartHostIfNoneExist(4);
     }
@@ -1162,7 +1358,23 @@ public class NetworkManagerUI : MonoBehaviour
         }
         catch (Exception e)
         {
-            Debug.LogError($"[NetworkManagerUI] LOBBY-FIRST CONNECTION FAILED: {e.Message}");
+            // Check if this is a "join code not found" error (relay allocation expired)
+            if (e.Message.Contains("Not Found: join code not found") || e.Message.Contains("404"))
+            {
+                Debug.LogWarning($"[NetworkManagerUI] Relay join code not found (allocation expired) - clearing and retrying: {e.Message}");
+                
+                // Clear the expired relay join code and retry
+                PlayerPrefs.DeleteKey("roomJoinCode");
+                Debug.Log("[NetworkManagerUI] Cleared expired relay join code from PlayerPrefs");
+                
+                // Try to reconnect again with fresh allocation
+                Debug.Log("[NetworkManagerUI] Retrying connection with fresh relay allocation...");
+                return await StartClientWithRelay();
+            }
+            else
+            {
+                Debug.LogError($"[NetworkManagerUI] LOBBY-FIRST CONNECTION FAILED: {e.Message}");
+            }
             
             // FALLBACK: Try to find lobby by searching (for backward compatibility)
             Debug.Log("[NetworkManagerUI] FALLBACK: Searching for lobby with matching join code...");
@@ -1305,7 +1517,53 @@ public class NetworkManagerUI : MonoBehaviour
         }
         catch (Exception e)
         {
-            Debug.LogError($"[NetworkManagerUI] Error joining lobby by ID: {e}");
+            // Check if this is a "join code not found" error (relay allocation expired)
+            if (e.Message.Contains("Not Found: join code not found") || e.Message.Contains("404"))
+            {
+                Debug.LogWarning($"[NetworkManagerUI] Relay join code not found (allocation expired) - retrying with fresh connection: {e.Message}");
+                
+                // Clear the expired join code and retry with fresh connection
+                await RetryWithFreshConnection(lobbyId);
+            }
+            else
+            {
+                Debug.LogError($"[NetworkManagerUI] Error joining lobby by ID: {e}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Retries connection with fresh relay allocation when the old one has expired
+    /// </summary>
+    private async Task RetryWithFreshConnection(string lobbyId)
+    {
+        try
+        {
+            Debug.Log("[NetworkManagerUI] RETRY: Starting fresh connection after relay allocation expired");
+            
+            // Clear the expired relay join code from PlayerPrefs
+            PlayerPrefs.DeleteKey("roomJoinCode");
+            Debug.Log("[NetworkManagerUI] RETRY: Cleared expired relay join code from PlayerPrefs");
+            
+            // Wait a moment for cleanup
+            await Task.Delay(1000);
+            
+            // Try to join the lobby again (this will create a fresh relay allocation)
+            Debug.Log("[NetworkManagerUI] RETRY: Attempting to join lobby again with fresh relay allocation");
+            await JoinLobbyById(lobbyId);
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[NetworkManagerUI] RETRY FAILED: Could not retry with fresh connection: {e}");
+            
+            // If retry also fails, clear all saved data and return to main menu
+            Debug.Log("[NetworkManagerUI] RETRY: Clearing all saved data and returning to main menu");
+            ClearSavedGameInfo();
+            
+            if (mainUIScript != null)
+            {
+                mainUIScript.OnReturnFromWaitingScreen();
+            }
         }
     }
 
@@ -1368,9 +1626,296 @@ public class NetworkManagerUI : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Completely disconnects from lobby and relay services for return to main menu
+    /// Returns player to initial state: Unity Services connected, no lobby/relay connections
+    /// </summary>
+    public async void DisconnectCompletelyFromLobbyAndRelay()
+    {
+        Debug.Log("[NetworkManagerUI] Performing complete disconnection from lobby and relay...");
+        
+        try
+        {
+            // STEP 1: Check if this is a pre-game disconnection and notify server
+            bool isPreGameDisconnection = IsPreGameDisconnection();
+            if (isPreGameDisconnection)
+            {
+                Debug.Log("[NetworkManagerUI] Pre-game disconnection detected - notifying server for state reset");
+                // The server will handle the state reset when it detects the disconnection
+            }
+            
+            // STEP 2: Remove player from lobby completely
+            if (currentLobby != null && AuthenticationService.Instance.IsSignedIn)
+            {
+                Debug.Log($"[NetworkManagerUI] Removing player from lobby: {currentLobby.Name}");
+                try
+                {
+                    await Lobbies.Instance.RemovePlayerAsync(currentLobby.Id, AuthenticationService.Instance.PlayerId);
+                    Debug.Log("[NetworkManagerUI] Successfully removed player from lobby");
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning($"[NetworkManagerUI] Error removing player from lobby: {e.Message}");
+                }
+                currentLobby = null; // Clear lobby reference
+            }
+            
+            // STEP 2: Shutdown NetworkManager completely to disconnect from relay
+            if (NetworkManager.Singleton != null)
+            {
+                if (NetworkManager.Singleton.IsListening)
+                {
+                    Debug.Log("[NetworkManagerUI] Shutting down NetworkManager to disconnect from relay...");
+                    
+                    if (NetworkManager.Singleton.IsHost)
+                    {
+                        Debug.Log("[NetworkManagerUI] Shutting down as Host...");
+                        NetworkManager.Singleton.Shutdown();
+                    }
+                    else if (NetworkManager.Singleton.IsClient)
+                    {
+                        Debug.Log("[NetworkManagerUI] Shutting down as Client...");
+                        NetworkManager.Singleton.Shutdown();
+                    }
+                    else if (NetworkManager.Singleton.IsServer)
+                    {
+                        Debug.Log("[NetworkManagerUI] Shutting down as Server...");
+                        NetworkManager.Singleton.Shutdown();
+                    }
+                    
+                    Debug.Log("[NetworkManagerUI] NetworkManager shutdown complete");
+                }
+                else
+                {
+                    Debug.Log("[NetworkManagerUI] NetworkManager is not listening, no need to shutdown");
+                }
+            }
+            else
+            {
+                Debug.Log("[NetworkManagerUI] NetworkManager.Singleton is null");
+            }
+            
+            // STEP 3: Stop all keep-alive systems
+            StopDisconnectDetection();
+            StopClientRelayKeepAlive();
+            
+            // STEP 4: Reset internal state
+            isInGame = false;
+            lastGameJoined = "";
+            
+            // STEP 5: Reset Server singleton for fresh game start
+            Debug.Log("[NetworkManagerUI] Resetting Server singleton for fresh game start");
+            Server.ResetServerSingletonForMainMenu();
+            
+            // STEP 6: KEEP Unity Services connected (don't sign out)
+            // This allows for immediate reconnection to new lobbies
+            Debug.Log("[NetworkManagerUI] Keeping Unity Services connected for new connections");
+            
+            Debug.Log("[NetworkManagerUI] Complete disconnection successful - player returned to initial state");
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[NetworkManagerUI] Error during complete disconnection: {e.Message}");
+            // Continue with cleanup even if there's an error
+        }
+    }
+
+    /// <summary>
+    /// Determines if this is a disconnection before the game has started
+    /// </summary>
+    private bool IsPreGameDisconnection()
+    {
+        // Check if we're connected to a game that hasn't started yet
+        // This is determined by checking if we have a lobby but no active game state
+        bool hasLobby = currentLobby != null;
+        bool isInGame = this.isInGame;
+        bool hasNetworkConnection = NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient;
+        
+        // Pre-game means we have lobby/network connection but game hasn't started
+        bool isPreGame = hasLobby && hasNetworkConnection && !isInGame;
+        
+        Debug.Log($"[NetworkManagerUI] Pre-game check: HasLobby={hasLobby}, IsInGame={isInGame}, HasNetwork={hasNetworkConnection}, IsPreGame={isPreGame}");
+        
+        return isPreGame;
+    }
+
+    /// <summary>
+    /// Updates the return button's interactability based on game state
+    /// Should be called when game state changes
+    /// </summary>
+    public void UpdateReturnButtonState()
+    {
+        if (returnToMainMenuButton != null)
+        {
+            bool isGameReadyToStart = Server.Singleton != null && Server.Singleton.IsGameReadyToStart();
+            returnToMainMenuButton.interactable = !isGameReadyToStart;
+            
+            if (isGameReadyToStart)
+            {
+                Debug.Log("[NetworkManagerUI] Game is ready to start - return button disabled");
+            }
+            else
+            {
+                Debug.Log("[NetworkManagerUI] Game not ready to start - return button enabled");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Called when the host disconnects - clients should return to main page
+    /// </summary>
+    public void OnHostDisconnected()
+    {
+        Debug.Log("[NetworkManagerUI] Host disconnected - returning to main page");
+        
+        // Clear saved game info to prevent auto-reconnection
+        ClearSavedGameInfo();
+        
+        // Return to main page
+        if (mainUIScript != null)
+        {
+            mainUIScript.OnReturnFromWaitingScreen();
+        }
+        else
+        {
+            Debug.LogError("[NetworkManagerUI] MainUIScript is null - cannot return to main page");
+        }
+    }
+
+    /// <summary>
+    /// Called when host requests client to disconnect (coordinated disconnection)
+    /// </summary>
+    public void OnClientRequestedToDisconnect()
+    {
+        Debug.Log("[NetworkManagerUI] Host requested client to disconnect - performing coordinated disconnection");
+        
+        // Use the same logic as normal client disconnection
+        PerformClientDisconnection();
+        
+        // After disconnection is complete, confirm to the host
+        ConfirmDisconnectionToHost();
+    }
+
+    /// <summary>
+    /// Confirms to the host that this client has completed disconnection
+    /// </summary>
+    private void ConfirmDisconnectionToHost()
+    {
+        Debug.Log("[NetworkManagerUI] Confirming disconnection to host...");
+        
+        // Send confirmation to server
+        var networkRelay = FindObjectOfType<NetworkRelay>();
+        if (networkRelay != null && NetworkManager.Singleton != null)
+        {
+            ulong clientId = NetworkManager.Singleton.LocalClientId;
+            networkRelay.ConfirmClientDisconnectionServerRPC(clientId);
+            Debug.Log($"[NetworkManagerUI] Confirmed disconnection to host for client {clientId}");
+        }
+        else
+        {
+            Debug.LogError("[NetworkManagerUI] Cannot confirm disconnection - NetworkRelay or NetworkManager not found");
+        }
+    }
+
+    /// <summary>
+    /// Called when all clients have confirmed their disconnection (host only)
+    /// </summary>
+    public void OnAllClientsConfirmedDisconnection()
+    {
+        Debug.Log("[NetworkManagerUI] All clients have confirmed disconnection - host can now disconnect");
+        
+        // Now the host can safely disconnect
+        PerformHostDisconnection();
+    }
+
+    /// <summary>
+    /// Coordinates host disconnection on application quit by first disconnecting all clients
+    /// </summary>
+    private IEnumerator CoordinateHostDisconnectionOnQuit()
+    {
+        Debug.Log("[NetworkManagerUI] Starting coordinated host disconnection on application quit...");
+        
+        // STEP 1: Start coordinated disconnection process
+        if (Server.Singleton != null)
+        {
+            Debug.Log("[NetworkManagerUI] Starting coordinated disconnection via Server for application quit...");
+            Server.Singleton.StartCoordinatedDisconnection();
+            
+            // Wait a short time for the coordinated disconnection to complete
+            // Since this is application quit, we can't wait indefinitely
+            yield return new WaitForSeconds(2f);
+            
+            // Check if coordinated disconnection completed
+            if (Server.Singleton != null && Server.Singleton.IsCoordinatedDisconnectionInProgress)
+            {
+                Debug.LogWarning("[NetworkManagerUI] Coordinated disconnection not completed in time - proceeding with host disconnection");
+            }
+        }
+        else
+        {
+            Debug.LogError("[NetworkManagerUI] Server.Singleton is null - cannot start coordinated disconnection for application quit");
+        }
+        
+        // STEP 2: Proceed with host disconnection (either after coordination or as fallback)
+        Debug.Log("[NetworkManagerUI] Proceeding with host disconnection for application quit");
+        PerformHostDisconnection();
+    }
+
+    /// <summary>
+    /// Coordinates host disconnection on application pause by first disconnecting all clients
+    /// </summary>
+    private IEnumerator CoordinateHostDisconnectionOnPause()
+    {
+        Debug.Log("[NetworkManagerUI] Starting coordinated host disconnection on application pause...");
+        
+        // STEP 1: Start coordinated disconnection process
+        if (Server.Singleton != null)
+        {
+            Debug.Log("[NetworkManagerUI] Starting coordinated disconnection via Server for application pause...");
+            Server.Singleton.StartCoordinatedDisconnection();
+            
+            // Wait a short time for the coordinated disconnection to complete
+            // Since this is application pause, we can't wait indefinitely
+            yield return new WaitForSeconds(2f);
+            
+            // Check if coordinated disconnection completed
+            if (Server.Singleton != null && Server.Singleton.IsCoordinatedDisconnectionInProgress)
+            {
+                Debug.LogWarning("[NetworkManagerUI] Coordinated disconnection not completed in time - proceeding with host disconnection");
+            }
+        }
+        else
+        {
+            Debug.LogError("[NetworkManagerUI] Server.Singleton is null - cannot start coordinated disconnection for application pause");
+        }
+        
+        // STEP 2: Proceed with host disconnection (either after coordination or as fallback)
+        Debug.Log("[NetworkManagerUI] Proceeding with host disconnection for application pause");
+        PerformHostDisconnection();
+    }
+
     private async void OnApplicationQuit()
     {
-        // Only remove player from lobby when application is actually quitting
+        // Handle disconnection logic first
+        if (isInGame)
+        {
+            Debug.Log("[NetworkManagerUI] Application quitting while in game - checking if host needs coordinated disconnection");
+            
+            // Check if this is a host - if so, coordinate client disconnections first
+            bool isHost = NetworkManager.Singleton != null && NetworkManager.Singleton.IsHost;
+            if (isHost)
+            {
+                Debug.Log("[NetworkManagerUI] Host application quitting - starting coordinated disconnection");
+                StartCoroutine(CoordinateHostDisconnectionOnQuit());
+            }
+            else
+            {
+                Debug.Log("[NetworkManagerUI] Client application quitting - treating as normal disconnection");
+                OnDisconnectDetected("Application quit");
+            }
+        }
+        
+        // Then remove player from lobby when application is actually quitting
         if (currentLobby != null && AuthenticationService.Instance.IsSignedIn)
         {
             try
