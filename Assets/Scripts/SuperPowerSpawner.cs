@@ -1162,23 +1162,40 @@ public class SuperPowerSpawner : MonoBehaviour
         Debug.Log("[Showcase] ExitShowcaseAllOtherHands() called successfully");
     }
     
-    /// <summary>
-    /// Force stop hand showcasing (used when InfoBox closes and no dual selection is active)
-    /// </summary>
-    public void ForceStopHandShowcase()
-    {
-        Debug.Log("[Showcase] ForceStopHandShowcase called");
-        
-        if (deckController == null)
-        {
-            Debug.LogError("[Showcase] ERROR: DeckController is null! Cannot force stop showcase");
-            return;
-        }
-        
-        Debug.Log("[Showcase] Force stopping hand showcase");
-        deckController.ExitShowcaseAllOtherHands();
-        Debug.Log("[Showcase] Force stop - ExitShowcaseAllOtherHands() called successfully");
-    }
+     /// <summary>
+     /// Force stop hand showcasing (used when InfoBox closes and no dual selection is active)
+     /// </summary>
+     public void ForceStopHandShowcase()
+     {
+         Debug.Log("[Showcase] ForceStopHandShowcase called");
+         
+         if (deckController == null)
+         {
+             Debug.LogError("[Showcase] ERROR: DeckController is null! Cannot force stop showcase");
+             return;
+         }
+         
+         Debug.Log("[Showcase] Force stopping hand showcase");
+         deckController.ExitShowcaseAllOtherHands();
+         Debug.Log("[Showcase] Force stop - ExitShowcaseAllOtherHands() called successfully");
+     }
+     
+     /// <summary>
+     /// Check if a card selection power is currently shown in the InfoBox
+     /// </summary>
+     public bool IsCardSelectionPowerInInfoBox()
+     {
+         if (!isInfoBoxOpen || nameText == null)
+         {
+             return false;
+         }
+         
+         string currentPowerName = nameText.text;
+         bool isCardSelectionPower = powersRequiringHandShowcase.Contains(currentPowerName);
+         
+         Debug.Log($"[CardSelection] IsCardSelectionPowerInInfoBox: {currentPowerName} -> {isCardSelectionPower}");
+         return isCardSelectionPower;
+     }
 
     public void SetActiveActivateButtonTrue()
     {

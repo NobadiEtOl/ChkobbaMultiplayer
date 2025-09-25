@@ -309,11 +309,11 @@ public class CardInteraction : MonoBehaviour
     private static Transform GetLocalPlayerHandTransform()
     {
         if (DeckController.LocalInstance == null) return null;
-        int myNo = DeckController.LocalInstance.thisPlayerNumber;
+        // In the relativistic view, each player sees their own cards in PlayerHand1
         if (DeckController.LocalInstance.playerHandTransforms == null || DeckController.LocalInstance.playerHandTransforms.Count == 0)
             return null;
-        // In your setup, playerHandTransforms[0] is always the local player's hand
-        return DeckController.LocalInstance.playerHandTransforms[myNo]; // Get the local player's hand transform
+        // Each player's own hand is always at index 0 (PlayerHand1)
+        return DeckController.LocalInstance.playerHandTransforms[0];
     }
 
 
@@ -378,17 +378,49 @@ public class CardInteraction : MonoBehaviour
 
             if (transform.parent.name.Contains("PlayerHand") && isOneCardSelected)
             {
-                // Invoke OnCardsPlayed
-                Debug.Log("[CardInteraction] Invoking OnCardsPlayed for hand card");
-                StopAutoRotate(); // Stop auto-rotation when the card is played
-
-                //yield return new WaitForSeconds(1f);
+                // Check if this is the player's own hand and it's their turn (relativistic view)
+                Transform localPlayerHand = GetLocalPlayerHandTransform();
+                bool isOwnHand = transform.parent == localPlayerHand;
+                bool isMyTurn = GameManager.LocalInstance != null && GameManager.LocalInstance.IsLocalPlayerTurn();
                 
-                OnCardsPlayed?.Invoke(this.uniqueCardInstanceID, this.gameObject, GameManager.currentPlayerNo);
-
-                if (activeCardIndicator != null)
+                Debug.Log($"[CardInteraction] Card play attempt - isOwnHand: {isOwnHand}, isMyTurn: {isMyTurn}");
+                
+                if (isOwnHand && isMyTurn)
                 {
-                    activeCardIndicator.SetActive(false); // Deactivate the previous card indicator
+                    // Player's own card and their turn - allow play
+                    Debug.Log("[CardInteraction] Invoking OnCardsPlayed for hand card - valid turn");
+                    StopAutoRotate(); // Stop auto-rotation when the card is played
+                    
+                    OnCardsPlayed?.Invoke(this.uniqueCardInstanceID, this.gameObject, GameManager.currentPlayerNo);
+                    
+                    if (activeCardIndicator != null)
+                    {
+                        activeCardIndicator.SetActive(false); // Deactivate the previous card indicator
+                    }
+                }
+                else if (isOwnHand && !isMyTurn)
+                {
+                    // Player's own card but not their turn - snap back
+                    Debug.Log("[CardInteraction] Not player's turn - snapping card back to hand");
+                    transform.position = Camera.main.ScreenToWorldPoint(originalScreenPosition);
+                    
+                    // Reset selection
+                    isOneCardSelected = false;
+                    if (activeCardIndicator != null)
+                    {
+                        activeCardIndicator.SetActive(false);
+                    }
+                }
+                else if (!isOwnHand)
+                {
+                    // Not player's own card - this might be a power selection, let OnCardsPlayed handle it
+                    Debug.Log("[CardInteraction] Not own hand - might be power selection, invoking OnCardsPlayed");
+                    OnCardsPlayed?.Invoke(this.uniqueCardInstanceID, this.gameObject, GameManager.currentPlayerNo);
+                    
+                    if (activeCardIndicator != null)
+                    {
+                        activeCardIndicator.SetActive(false);
+                    }
                 }
             }
             else if (transform.parent.name == "Center" && isOneCardSelected)
@@ -657,12 +689,7 @@ public class CardInteraction : MonoBehaviour
     /// </summary>
     public bool CanBeSelected()
     {
-        // Check if it's the player's turn
-        if (GameManager.LocalInstance != null && !GameManager.LocalInstance.IsLocalPlayerTurn())
-        {
-            Debug.Log($"[CardSelection] Cannot select {gameObject.name} - not player's turn");
-            return false;
-        }
+        Debug.Log($"[CardSelection] CanBeSelected called for card: {gameObject.name}, parent: {gameObject.transform.parent?.name}");
         
         // Check if card is null or destroyed
         if (gameObject == null)
@@ -672,51 +699,64 @@ public class CardInteraction : MonoBehaviour
         }
         
         string parentName = gameObject.transform.parent != null ? gameObject.transform.parent.name : "";
-        Transform localPlayerHand = GetLocalPlayerHandTransform();
-        bool isOwnHand = transform.parent == localPlayerHand;
         
-        // Check if it's a center or pool card (never selectable)
-        if (parentName == "Center" || parentName.Contains("Pool") || parentName.Contains("Pişti"))
+        // Check if it's a center or pool card (center cards can be selected for showcasing, but pools cannot)
+        if (parentName.Contains("Pool") || parentName.Contains("Pişti"))
         {
-            Debug.Log($"[CardSelection] Cannot select {gameObject.name} - center/pool card");
+            Debug.Log($"[CardSelection] Cannot select {gameObject.name} - pool card");
+            return false;
+        }
+        
+        // Allow center cards for showcasing purposes
+        if (parentName == "Center")
+        {
+            Debug.Log($"[CardSelection] Can select {gameObject.name} - center card (for showcasing)");
+            return true;
+        }
+        
+        // Check if this is a player hand card
+        if (!parentName.StartsWith("PlayerHand"))
+        {
+            Debug.Log($"[CardSelection] Cannot select {gameObject.name} - not a player hand card");
             return false;
         }
         
         // Check if showcase is active (allows selection from all player hands)
         bool isShowcaseActive = DeckController.LocalInstance != null && DeckController.LocalInstance.isShowcaseAllActive;
         
-        // Also check if any multi-swap powers are active (they also need showcase-like selection)
-        bool isMultiSwapActive = GameManager.LocalInstance != null && GameManager.LocalInstance.isSunuDegisBunuTokusActive;
+        // Check if any dual selection powers are active
+        bool isDualSelectionActive = GameManager.LocalInstance != null && 
+            (GameManager.LocalInstance.isKopyalaActive || 
+             GameManager.LocalInstance.isSunuDegisTokusActive || 
+             GameManager.LocalInstance.isSunuDegisBunuTokusActive);
         
-        if (isShowcaseActive || isMultiSwapActive)
+        // Check if InfoBox power requires card selection (Kapkaç, Yandım Anam need any player card)
+        bool isCardSelectionPowerActive = SuperPowerSpawner.LocalInstance != null && 
+                                         SuperPowerSpawner.LocalInstance.isInfoBoxOpen &&
+                                         SuperPowerSpawner.LocalInstance.IsCardSelectionPowerInInfoBox();
+        
+        if (isShowcaseActive || isDualSelectionActive || isCardSelectionPowerActive)
         {
-            // During showcase or multi-swap, allow selection from any player hand
-            if (parentName.StartsWith("PlayerHand"))
-            {
-                string reason = isShowcaseActive ? "showcase active" : "multi-swap active";
-                Debug.Log($"[CardSelection] Can select {gameObject.name} - {reason}, player hand card");
-                return true;
-            }
-            else
-            {
-                string reason = isShowcaseActive ? "showcase active" : "multi-swap active";
-                Debug.Log($"[CardSelection] Cannot select {gameObject.name} - {reason} but not player hand");
-                return false;
-            }
+            // During showcase, dual selection, or card selection powers - allow selection from any player hand
+            string reason = isShowcaseActive ? "showcase active" : 
+                           isDualSelectionActive ? "dual selection active" : "card selection power active";
+            Debug.Log($"[CardSelection] Can select {gameObject.name} - {reason}, player hand card");
+            return true;
+        }
+        
+        // Normal state - check if it's own hand using relativistic view
+        Transform localPlayerHand = GetLocalPlayerHandTransform();
+        bool isOwnHand = transform.parent == localPlayerHand;
+        
+        if (isOwnHand)
+        {
+            Debug.Log($"[CardSelection] Can select {gameObject.name} - own hand card (PlayerHand1)");
+            return true;
         }
         else
         {
-            // Normal state - only allow own hand
-            if (isOwnHand)
-            {
-                Debug.Log($"[CardSelection] Can select {gameObject.name} - own hand card");
-                return true;
-            }
-            else
-            {
-                Debug.Log($"[CardSelection] Cannot select {gameObject.name} - not own hand and no showcase/multi-swap");
-                return false;
-            }
+            Debug.Log($"[CardSelection] Cannot select {gameObject.name} - not own hand and no special powers active");
+            return false;
         }
     }
     
