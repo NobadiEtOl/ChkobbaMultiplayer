@@ -1714,6 +1714,27 @@ public class SuperPowerSpawner : MonoBehaviour
     }
     
     /// <summary>
+    /// Calculates gold using the new formula: [capturing card value] + [n(n+1)/2] where n = number of center cards
+    /// </summary>
+    public int CalculateNewGoldValue(int capturingCardValue, int centerCardCount)
+    {
+        // Formula: capturing card value + n(n+1)/2 where n = center card count
+        int centerBonus = (centerCardCount * (centerCardCount + 1)) / 2;
+        int totalGold = capturingCardValue + centerBonus;
+        
+        Debug.Log($"[SuperPowerSpawner] New gold calculation: Card value {capturingCardValue} + Center bonus {centerBonus} (n={centerCardCount}) = {totalGold}");
+        return totalGold;
+    }
+    
+    /// <summary>
+    /// Calculates the center cards bonus using the formula n(n+1)/2
+    /// </summary>
+    public int CalculateCenterCardsBonus(int centerCardCount)
+    {
+        return (centerCardCount * (centerCardCount + 1)) / 2;
+    }
+    
+    /// <summary>
     /// Gets the value of a card based on its ID
     /// </summary>
     private int GetCardValue(int[] cardID)
@@ -1728,30 +1749,48 @@ public class SuperPowerSpawner : MonoBehaviour
     
     /// <summary>
     /// Called when a capture happens locally
-    /// Note: Gold is now added individually per card in the new system.
-    /// For 2v2 mode, teammate sharing is handled by sending the appropriate amount to teammate.
+    /// Uses the new gold calculation formula: [capturing card value] + [n(n+1)/2] where n = center card count
     /// </summary>
     public void OnLocalCapture(string playedCard)
     {
+        if (CardInteraction.cardLookup == null || !CardInteraction.cardLookup.ContainsKey(playedCard))
+        {
+            Debug.LogError($"[SuperPowerSpawner] Card {playedCard} not found in cardLookup!");
+            return;
+        }
+        
+        // Get the capturing card value
+        int capturingCardValue = CardInteraction.cardLookup[playedCard].GetCardID()[1];
+        
+        // Get the number of center cards (including the capturing card)
+        int centerCardCount = GameManager.LocalInstance.centerCards.Count;
+        
+        // Calculate gold using new formula
+        int totalGold = CalculateNewGoldValue(capturingCardValue, centerCardCount);
+        int centerBonus = CalculateCenterCardsBonus(centerCardCount);
+        
+        Debug.Log($"[SuperPowerSpawner] Capture: Card value {capturingCardValue}, Center count {centerCardCount}, Center bonus {centerBonus}, Total gold {totalGold}");
+        
         // In 2v2 mode, we need to share gold with teammate
         if (Is2v2Mode())
         {
-            int captureValue = CalculateCenterCardsValue();
-            captureValue += CardInteraction.cardLookup[playedCard].GetCardID()[1];
-            
             // Share gold with teammate (50/50 split)
-            int sharedGold = captureValue / 2;
+            int sharedGold = totalGold / 2;
             
             // Send gold share to teammate via network
             int teammateNumber = GetTeammateNumber();
             GameManager.LocalInstance.networkRelay.ShareGoldWithTeammateServerRPC(teammateNumber, sharedGold);
             
-            Debug.Log($"[SuperPowerSpawner] Local capture in 2v2! Total value: {captureValue}, Shared with teammate: {sharedGold}");
+            Debug.Log($"[SuperPowerSpawner] Local capture in 2v2! Total value: {totalGold}, Shared with teammate: {sharedGold}");
         }
-        else
-        {
-            Debug.Log($"[SuperPowerSpawner] Local capture in 1v1! Gold will be added individually per card.");
-        }
+        
+        // Add gold to local player
+        AddGold(totalGold);
+        
+        // Show two-stage popup animation
+        ShowTwoStageGoldPopup(capturingCardValue, centerCardCount);
+        
+        Debug.Log($"[SuperPowerSpawner] Added {totalGold} gold to local player using new formula");
     }
     
     /// <summary>
@@ -2086,6 +2125,20 @@ public class SuperPowerSpawner : MonoBehaviour
     }
     
     /// <summary>
+    /// Shows a two-stage gold popup: first the capturing card value, then the center cards bonus
+    /// </summary>
+    public void ShowTwoStageGoldPopup(int capturingCardValue, int centerCardCount)
+    {
+        if (goldPopupLocation == null && goldDisplayText == null)
+        {
+            Debug.LogWarning("[SuperPowerSpawner] No goldPopupLocation or goldDisplayText assigned. Cannot show gold popup.");
+            return;
+        }
+        
+        StartCoroutine(ShowTwoStageGoldPopupCoroutine(capturingCardValue, centerCardCount));
+    }
+    
+    /// <summary>
     /// Coroutine that handles the gold popup animation
     /// </summary>
     /// <summary>
@@ -2095,6 +2148,92 @@ public class SuperPowerSpawner : MonoBehaviour
     {
         // Create popup text object
         GameObject popupObject = CreateGoldPopupObject(goldAmount);
+        if (popupObject == null) yield break;
+
+        TextMeshProUGUI popupText = popupObject.GetComponent<TextMeshProUGUI>();
+        CanvasGroup popupCanvasGroup = GetOrAddCanvasGroup(popupObject);
+
+        // Set initial state
+        popupCanvasGroup.alpha = 0f;
+        popupObject.transform.localScale = Vector3.one * popupStartScale;
+
+        Vector3 startPosition = popupObject.transform.position;
+        Vector3 endPosition = startPosition + new Vector3(0, popupMoveDistance, 0);
+
+        // Phase 1: Fade in and scale up (from start to end scale)
+        float elapsed = 0f;
+        while (elapsed < popupFadeDuration)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / popupFadeDuration);
+
+            popupCanvasGroup.alpha = Mathf.Lerp(0f, 1f, progress);
+            popupObject.transform.localScale = Vector3.one * Mathf.Lerp(popupStartScale, popupEndScale, progress);
+
+            yield return null;
+        }
+        popupCanvasGroup.alpha = 1f;
+        popupObject.transform.localScale = Vector3.one * popupEndScale;
+
+        // Phase 2: Move upward while visible (no scale shrink)
+        elapsed = 0f;
+        while (elapsed < popupMoveDuration)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / popupMoveDuration);
+
+            popupObject.transform.position = Vector3.Lerp(startPosition, endPosition, progress);
+
+            yield return null;
+        }
+        popupObject.transform.position = endPosition;
+
+        // Phase 3: Fade out (keep at end scale)
+        elapsed = 0f;
+        while (elapsed < popupFadeDuration)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / popupFadeDuration);
+
+            popupCanvasGroup.alpha = Mathf.Lerp(1f, 0f, progress);
+
+            yield return null;
+        }
+        popupCanvasGroup.alpha = 0f;
+
+        Destroy(popupObject);
+    }
+    
+    /// <summary>
+    /// Coroutine that handles the two-stage gold popup animation
+    /// </summary>
+    private IEnumerator ShowTwoStageGoldPopupCoroutine(int capturingCardValue, int centerCardCount)
+    {
+        int centerBonus = CalculateCenterCardsBonus(centerCardCount);
+        
+        // Stage 1: Show capturing card value
+        GameObject popupObject1 = CreateGoldPopupObject(capturingCardValue);
+        if (popupObject1 != null)
+        {
+            yield return StartCoroutine(AnimateSingleGoldPopup(popupObject1));
+        }
+        
+        // Small delay between stages
+        yield return new WaitForSeconds(0.3f);
+        
+        // Stage 2: Show center cards bonus
+        GameObject popupObject2 = CreateGoldPopupObject(centerBonus);
+        if (popupObject2 != null)
+        {
+            yield return StartCoroutine(AnimateSingleGoldPopup(popupObject2));
+        }
+    }
+    
+    /// <summary>
+    /// Animates a single gold popup object
+    /// </summary>
+    private IEnumerator AnimateSingleGoldPopup(GameObject popupObject)
+    {
         if (popupObject == null) yield break;
 
         TextMeshProUGUI popupText = popupObject.GetComponent<TextMeshProUGUI>();
@@ -2759,6 +2898,43 @@ public class SuperPowerSpawner : MonoBehaviour
     {
         AddGold(50);
         Debug.Log($"[SuperPowerSpawner] Added 50 gold. Current total: {currentGold}");
+    }
+    
+    [ContextMenu("Test New Gold Calculation")]
+    public void TestNewGoldCalculation()
+    {
+        Debug.Log("=== Testing New Gold Calculation Formula ===");
+        
+        // Test cases: [capturing card value, center card count, expected total]
+        int[][] testCases = {
+            new int[] {5, 1, 6},    // 5 + 1(2)/2 = 5 + 1 = 6
+            new int[] {3, 2, 6},    // 3 + 2(3)/2 = 3 + 3 = 6  
+            new int[] {7, 3, 13},   // 7 + 3(4)/2 = 7 + 6 = 13
+            new int[] {2, 4, 12},   // 2 + 4(5)/2 = 2 + 10 = 12
+            new int[] {10, 5, 25}   // 10 + 5(6)/2 = 10 + 15 = 25
+        };
+        
+        foreach (var testCase in testCases)
+        {
+            int cardValue = testCase[0];
+            int centerCount = testCase[1];
+            int expected = testCase[2];
+            
+            int calculated = CalculateNewGoldValue(cardValue, centerCount);
+            int centerBonus = CalculateCenterCardsBonus(centerCount);
+            
+            Debug.Log($"Card Value: {cardValue}, Center Count: {centerCount}");
+            Debug.Log($"Center Bonus: {centerBonus}, Total: {calculated}, Expected: {expected}");
+            Debug.Log($"Result: {(calculated == expected ? "PASS" : "FAIL")}");
+            Debug.Log("---");
+        }
+    }
+    
+    [ContextMenu("Test Two-Stage Popup")]
+    public void TestTwoStagePopup()
+    {
+        Debug.Log("[SuperPowerSpawner] Testing two-stage popup animation");
+        ShowTwoStageGoldPopup(5, 3); // Card value 5, 3 center cards
     }
     
     /// <summary>

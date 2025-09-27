@@ -1905,36 +1905,15 @@ public class DeckController : MonoBehaviour
 
     /// <summary>
     /// Processes gold values for local player (NO card movement - only gold calculation and queuing)
+    /// NOTE: Gold calculation is now handled in SuperPowerSpawner.OnLocalCapture() using the new formula
     /// </summary>
     private IEnumerator MoveCardsToLocalPlayerPoolWithGold(List<GameObject> cardObjects, int relativePoolIndex)
     {
-        // Only process gold - NO card movement here
-        foreach (var card in cardObjects)
-        {
-            // Get card value for gold calculation
-            CardInteraction cardInteraction = card.GetComponent<CardInteraction>();
-            if (cardInteraction != null)
-            {
-                int[] cardID = cardInteraction.GetCardID();
-                if (cardID != null && cardID.Length >= 2)
-                {
-                    int cardValue = cardID[1]; // Card rank value (2-10)
-                    
-                    if (cardValue > 0 && SuperPowerSpawner.LocalInstance != null)
-                    {
-                        // Calculate actual gold to add (considering 2v2 mode sharing)
-                        int goldToAdd = cardValue;
-                        if (SuperPowerSpawner.LocalInstance.Is2v2Mode())
-                        {
-                            goldToAdd = cardValue / 2; // Half for 2v2 mode
-                        }
-                        
-                        // Add gold and queue popup immediately (no waiting)
-                        SuperPowerSpawner.LocalInstance.AddGoldWithPopupQueued(goldToAdd);
-                    }
-                }
-            }
-        }
+        // Gold calculation is now handled in SuperPowerSpawner.OnLocalCapture() 
+        // which uses the new formula: [capturing card value] + [n(n+1)/2]
+        // No need to process individual cards here anymore
+        
+        Debug.Log("[DeckController] Gold calculation now handled in OnLocalCapture() with new formula");
         
         // No card movement here - BuildPoolMoveListsAndMoveCards handles that
         yield return null;

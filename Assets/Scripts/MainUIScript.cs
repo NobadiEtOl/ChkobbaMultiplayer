@@ -14,6 +14,10 @@ public class MainUIScript : MonoBehaviour
     [SerializeField] private GameObject createRoomUI;
     [SerializeField] private GameObject findRoomUI;
     [SerializeField] private GameObject profileUI;
+    [SerializeField] private GameObject settingsPopup;
+    [SerializeField] private GameObject leaveGameButton;
+    [SerializeField] private Slider musicVolumeSlider;
+    [SerializeField] private Slider soundEffectsVolumeSlider;
     [SerializeField] private GameObject[] currentMode1v1;
     [SerializeField] private GameObject[] currentMode2v2;
     [SerializeField] private GameObject currentModeYellow;
@@ -21,7 +25,7 @@ public class MainUIScript : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        
+        InitializeVolumeSliders();
     }
 
     // Update is called once per frame
@@ -33,47 +37,93 @@ public class MainUIScript : MonoBehaviour
     public void OnQuickPlayButtonClicked()
     {
         quickPlayUI.SetActive(true);
+        startingScreenUI.SetActive(false);
     }
     public void OnCreateRoomButtonClicked()
     {
         createRoomUI.SetActive(true);
+        startingScreenUI.SetActive(false);
     }
     public void OnFindRoomButtonClicked()
     {
         findRoomUI.SetActive(true);
+        startingScreenUI.SetActive(false);
     }
 
     public void OnProfileButtonClicked()
     {
         profileUI.SetActive(true);
+        startingScreenUI.SetActive(false);
         gameObject.GetComponent<ProfileScript>().UpdateMatchCountText();
+    }
+
+    public void OnSettingsButtonClicked()
+    {
+        settingsPopup.SetActive(true);
+        startingScreenUI.SetActive(false);
+        UpdateLeaveGameButtonVisibility();
     }
 
     public void OnQuickPlayCloseButtonClicked()
     {
         Debug.Log("Quick Play Close Button Clicked");
         quickPlayUI.SetActive(false);
+        startingScreenUI.SetActive(true);
     }
     public void OnCreateRoomCloseButtonClicked()
     {
         createRoomUI.SetActive(false);
+        startingScreenUI.SetActive(true);
     }
     public void OnFindRoomCloseButtonClicked()
     {
         findRoomUI.SetActive(false);
+        startingScreenUI.SetActive(true);
     }
 
     public void OnProfileCloseButtonClicked()
     {
         profileUI.SetActive(false);
+        startingScreenUI.SetActive(true);
         profileScript.ResetCardBackShowcase();
         profileScript.ResetProfilePicShowcase();
+    }
+
+    public void OnSettingsCloseButtonClicked()
+    {
+        settingsPopup.SetActive(false);
+        startingScreenUI.SetActive(true);
+    }
+
+    public void OnLeaveGameButtonClicked()
+    {
+        Debug.Log("[MainUIScript] Leave Game button clicked - resetting player state before disconnection");
+        
+        // STEP 1: Reset player's game state before disconnection
+        ResetPlayerGameStateBeforeDisconnection();
+        
+        // STEP 2: Use the existing NetworkManagerUI disconnection system
+        NetworkManagerUI networkManagerUI = FindObjectOfType<NetworkManagerUI>();
+        
+        if (networkManagerUI != null)
+        {
+            Debug.Log("[MainUIScript] Using NetworkManagerUI.OnReturnToMainMenuButtonClicked() for proper disconnection");
+            networkManagerUI.OnReturnToMainMenuButtonClicked();
+        }
+        else
+        {
+            Debug.LogError("[MainUIScript] NetworkManagerUI not found - falling back to basic return to main page");
+            ReturnToMainPage();
+        }
     }
 
     public void OpenWaitingScreenUI(string color, string playerCount, string joinCode)
     {
         if(startingScreenUI.activeSelf)startingScreenUI.SetActive(false);
         waitingScreenUI.SetActive(true);
+        
+        // Update leave game button visibility since we're entering a game
+        UpdateLeaveGameButtonVisibility();
 
         if(color == "red")
         {
@@ -145,6 +195,7 @@ public class MainUIScript : MonoBehaviour
         createRoomUI.SetActive(false);
         findRoomUI.SetActive(false);
         profileUI.SetActive(false);
+        settingsPopup.SetActive(false);
         waitingScreenUI.SetActive(false);
         
         // Close all mode-specific UIs
@@ -238,6 +289,10 @@ public class MainUIScript : MonoBehaviour
         createRoomUI.SetActive(false);
         findRoomUI.SetActive(false);
         profileUI.SetActive(false);
+        settingsPopup.SetActive(false);
+        
+        // Update leave game button visibility since we're back to main screen
+        UpdateLeaveGameButtonVisibility();
         
         Debug.Log("[MainUIScript] UI reset to main page complete");
     }
@@ -337,4 +392,252 @@ public class MainUIScript : MonoBehaviour
             ResetToMainPage();
         }
     }
+
+    #region Volume Control Methods
+
+    /// <summary>
+    /// Initializes the volume sliders with current values and sets up event listeners
+    /// </summary>
+    private void InitializeVolumeSliders()
+    {
+        // Initialize music volume slider
+        if (musicVolumeSlider != null)
+        {
+            // Set initial value from PlayerPrefs or default to 0.5
+            float musicVolume = PlayerPrefs.GetFloat("MusicVolume", 0.5f);
+            musicVolumeSlider.value = musicVolume;
+            musicVolumeSlider.onValueChanged.AddListener(OnMusicVolumeChanged);
+            Debug.Log($"[MainUIScript] Music volume slider initialized with value: {musicVolume}");
+        }
+        else
+        {
+            Debug.LogWarning("[MainUIScript] Music volume slider is not assigned!");
+        }
+
+        // Initialize sound effects volume slider
+        if (soundEffectsVolumeSlider != null)
+        {
+            // Set initial value from PlayerPrefs or default to 0.5
+            float soundEffectsVolume = PlayerPrefs.GetFloat("SoundEffectsVolume", 0.5f);
+            soundEffectsVolumeSlider.value = soundEffectsVolume;
+            soundEffectsVolumeSlider.onValueChanged.AddListener(OnSoundEffectsVolumeChanged);
+            
+            // Apply the volume to the sound effects controller
+            ApplySoundEffectsVolume(soundEffectsVolume);
+            Debug.Log($"[MainUIScript] Sound effects volume slider initialized with value: {soundEffectsVolume}");
+        }
+        else
+        {
+            Debug.LogWarning("[MainUIScript] Sound effects volume slider is not assigned!");
+        }
+    }
+
+    /// <summary>
+    /// Called when music volume slider value changes
+    /// </summary>
+    /// <param name="volume">New volume value (0.0 to 1.0)</param>
+    public void OnMusicVolumeChanged(float volume)
+    {
+        // Save the volume setting
+        PlayerPrefs.SetFloat("MusicVolume", volume);
+        PlayerPrefs.Save();
+        
+        // Apply volume to music system (when implemented)
+        ApplyMusicVolume(volume);
+        
+        Debug.Log($"[MainUIScript] Music volume changed to: {volume}");
+    }
+
+    /// <summary>
+    /// Called when sound effects volume slider value changes
+    /// </summary>
+    /// <param name="volume">New volume value (0.0 to 1.0)</param>
+    public void OnSoundEffectsVolumeChanged(float volume)
+    {
+        // Save the volume setting
+        PlayerPrefs.SetFloat("SoundEffectsVolume", volume);
+        PlayerPrefs.Save();
+        
+        // Apply volume to sound effects system
+        ApplySoundEffectsVolume(volume);
+        
+        Debug.Log($"[MainUIScript] Sound effects volume changed to: {volume}");
+    }
+
+    /// <summary>
+    /// Applies the music volume to the music system
+    /// </summary>
+    /// <param name="volume">Volume value (0.0 to 1.0)</param>
+    private void ApplyMusicVolume(float volume)
+    {
+        // TODO: Implement music volume control when music system is added
+        // For now, this is a placeholder for future music implementation
+        Debug.Log($"[MainUIScript] Music volume applied: {volume} (music system not yet implemented)");
+    }
+
+    /// <summary>
+    /// Applies the sound effects volume to the sound effects system
+    /// </summary>
+    /// <param name="volume">Volume value (0.0 to 1.0)</param>
+    private void ApplySoundEffectsVolume(float volume)
+    {
+        // Use SoundMaster if available, otherwise fall back to direct control
+        if (SoundMaster.Instance != null)
+        {
+            SoundMaster.Instance.SetSoundEffectsVolume(volume);
+            Debug.Log($"[MainUIScript] Sound effects volume set via SoundMaster: {volume}");
+        }
+        else
+        {
+            // Fallback: Find and update all SoundEffectsController instances directly
+            SoundEffectsController[] soundControllers = FindObjectsOfType<SoundEffectsController>();
+            foreach (var controller in soundControllers)
+            {
+                if (controller != null)
+                {
+                    controller.SetVolume(volume);
+                }
+            }
+            Debug.Log($"[MainUIScript] Sound effects volume set directly to {soundControllers.Length} controllers: {volume}");
+        }
+    }
+
+    /// <summary>
+    /// Gets the current music volume from PlayerPrefs
+    /// </summary>
+    /// <returns>Current music volume (0.0 to 1.0)</returns>
+    public float GetMusicVolume()
+    {
+        return PlayerPrefs.GetFloat("MusicVolume", 0.5f);
+    }
+
+    /// <summary>
+    /// Gets the current sound effects volume from PlayerPrefs
+    /// </summary>
+    /// <returns>Current sound effects volume (0.0 to 1.0)</returns>
+    public float GetSoundEffectsVolume()
+    {
+        return PlayerPrefs.GetFloat("SoundEffectsVolume", 0.5f);
+    }
+
+    /// <summary>
+    /// Context menu to test card deal sound with current volume settings
+    /// </summary>
+    [ContextMenu("Test Card Deal Sound")]
+    public void TestCardDealSound()
+    {
+        // Find a SoundEffectsController in the scene
+        SoundEffectsController soundController = FindObjectOfType<SoundEffectsController>();
+        
+        if (soundController != null)
+        {
+            Debug.Log("[MainUIScript] Playing 10 card deal sounds for volume testing...");
+            
+            // Print current volume settings for debugging
+            if (SoundMaster.Instance != null)
+            {
+                SoundMaster.Instance.PrintVolumeSettings();
+            }
+            else
+            {
+                Debug.Log($"[MainUIScript] No SoundMaster found. Using direct volume control.");
+            }
+            
+            StartCoroutine(PlayMultipleCardDealSounds(soundController, 10));
+        }
+        else
+        {
+            Debug.LogWarning("[MainUIScript] No SoundEffectsController found in the scene! Make sure you have one in your game.");
+        }
+    }
+
+    /// <summary>
+    /// Coroutine to play multiple card deal sounds with delays
+    /// </summary>
+    /// <param name="soundController">The SoundEffectsController to use</param>
+    /// <param name="count">Number of sounds to play</param>
+    private System.Collections.IEnumerator PlayMultipleCardDealSounds(SoundEffectsController soundController, int count)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            soundController.PlayCardDealSound();
+            Debug.Log($"[MainUIScript] Playing card deal sound {i + 1}/{count}");
+            
+            // Wait 0.3 seconds between each sound
+            yield return new WaitForSeconds(0.3f);
+        }
+        
+        Debug.Log("[MainUIScript] Finished playing all test sounds");
+    }
+
+    /// <summary>
+    /// Updates the leave game button visibility based on whether main screen is active
+    /// </summary>
+    private void UpdateLeaveGameButtonVisibility()
+    {
+        if (leaveGameButton != null)
+        {
+            // Leave game button is active when main screen is NOT active (i.e., when in game)
+            bool shouldShowLeaveGameButton = !startingScreenUI.activeSelf;
+            leaveGameButton.SetActive(shouldShowLeaveGameButton);
+            
+            Debug.Log($"[MainUIScript] Leave game button {(shouldShowLeaveGameButton ? "shown" : "hidden")} - Main screen active: {startingScreenUI.activeSelf}");
+        }
+        else
+        {
+            Debug.LogWarning("[MainUIScript] Leave game button is not assigned!");
+        }
+    }
+
+    /// <summary>
+    /// Resets the player's game state before disconnection (gold and superpower tokens)
+    /// </summary>
+    private void ResetPlayerGameStateBeforeDisconnection()
+    {
+        Debug.Log("[MainUIScript] Resetting player game state before disconnection...");
+        
+        // STEP 1: Reset gold to starting amount
+        ResetPlayerGoldToStarting();
+        
+        // STEP 2: Remove and destroy all superpower tokens
+        RemoveAllSuperpowerTokens();
+        
+        Debug.Log("[MainUIScript] Player game state reset complete - ready for disconnection");
+    }
+
+    /// <summary>
+    /// Resets the player's gold to the starting amount
+    /// </summary>
+    private void ResetPlayerGoldToStarting()
+    {
+        SuperPowerSpawner spawner = FindObjectOfType<SuperPowerSpawner>();
+        if (spawner != null)
+        {
+            Debug.Log("[MainUIScript] Resetting gold to starting amount before disconnection");
+            spawner.ResetGoldToStarting();
+        }
+        else
+        {
+            Debug.LogWarning("[MainUIScript] SuperPowerSpawner not found - cannot reset gold");
+        }
+    }
+
+    /// <summary>
+    /// Removes and destroys all superpower tokens
+    /// </summary>
+    private void RemoveAllSuperpowerTokens()
+    {
+        SuperPowerSpawner spawner = FindObjectOfType<SuperPowerSpawner>();
+        if (spawner != null)
+        {
+            Debug.Log("[MainUIScript] Removing all superpower tokens before disconnection");
+            spawner.ClearAllSpawnedPowers();
+        }
+        else
+        {
+            Debug.LogWarning("[MainUIScript] SuperPowerSpawner not found - cannot clear superpower tokens");
+        }
+    }
+
+    #endregion
 }

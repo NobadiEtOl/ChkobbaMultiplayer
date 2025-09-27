@@ -54,6 +54,9 @@ public class NetworkManagerUI : MonoBehaviour
     public Lobby currentLobby; // Store the current lobby when you join/create it
     public Lobby CurrentLobby { get { return currentLobby; } } // Public access for Server
 
+    // === UI REFERENCES ===
+    private GameObject mainScreen; // Reference to the main screen GameObject
+
     // === PLAYER PREFERENCES KEYS ===
     private string LAST_JOIN_CODE_KEY;
     private string LAST_PLAYER_COUNT_KEY;
@@ -84,8 +87,29 @@ public class NetworkManagerUI : MonoBehaviour
         // Debug.Log($"[NetworkManagerUI] Initialized PlayerPrefs keys with unique ID: {uniqueId}");
     }
 
+    /// <summary>
+    /// Initializes the main screen reference at startup
+    /// </summary>
+    private void InitializeMainScreenReference()
+    {
+        // Find the main screen GameObject by name at startup
+        mainScreen = GameObject.Find("MainScreen");
+        
+        if (mainScreen != null)
+        {
+            Debug.Log("[NetworkManagerUI] Main screen reference initialized successfully");
+        }
+        else
+        {
+            Debug.LogError("[NetworkManagerUI] Main screen GameObject not found! Please ensure there's a GameObject named 'MainScreen' in the scene.");
+        }
+    }
+
     void Start()
     {
+        // Find and store reference to main screen GameObject
+        InitializeMainScreenReference();
+        
         // Subscribe to network events
         if (NetworkManager.Singleton != null)
         {
@@ -1008,6 +1032,12 @@ public class NetworkManagerUI : MonoBehaviour
         
         Debug.Log("[NetworkManagerUI] Game not ready to start - allowing return to main menu");
         
+        // STEP 1: Reset player's game state before disconnection (if in active game)
+        ResetPlayerGameStateBeforeDisconnection();
+        
+        // STEP 2: Ensure main screen is activated first (regardless of current state)
+        EnsureMainScreenIsActive();
+        
         // Check if this is a host - if so, coordinate client disconnections first
         bool isHost = NetworkManager.Singleton != null && NetworkManager.Singleton.IsHost;
         if (isHost)
@@ -1019,6 +1049,100 @@ public class NetworkManagerUI : MonoBehaviour
         {
             // Client disconnection - proceed normally
             PerformClientDisconnection();
+        }
+    }
+
+    /// <summary>
+    /// Ensures the main screen is active and properly configured
+    /// </summary>
+    private void EnsureMainScreenIsActive()
+    {
+        Debug.Log("[NetworkManagerUI] Ensuring main screen is active...");
+        
+        // Use the stored reference to main screen GameObject
+        if (mainScreen != null)
+        {
+            if (!mainScreen.activeSelf)
+            {
+                Debug.Log("[NetworkManagerUI] Main screen was inactive - activating it now");
+                mainScreen.SetActive(true);
+            }
+            else
+            {
+                Debug.Log("[NetworkManagerUI] Main screen was already active");
+            }
+        }
+        else
+        {
+            Debug.LogError("[NetworkManagerUI] Main screen reference is null! This should have been initialized in Start().");
+        }
+        
+        // Also ensure MainUIScript's startingScreenUI is active
+        if (mainUIScript != null)
+        {
+            // Use reflection or direct access to ensure startingScreenUI is active
+            var startingScreenField = mainUIScript.GetType().GetField("startingScreenUI", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            if (startingScreenField != null)
+            {
+                GameObject startingScreenUI = startingScreenField.GetValue(mainUIScript) as GameObject;
+                if (startingScreenUI != null && !startingScreenUI.activeSelf)
+                {
+                    Debug.Log("[NetworkManagerUI] Starting screen UI was inactive - activating it now");
+                    startingScreenUI.SetActive(true);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Resets the player's game state before disconnection (gold and superpower tokens)
+    /// </summary>
+    private void ResetPlayerGameStateBeforeDisconnection()
+    {
+        Debug.Log("[NetworkManagerUI] Resetting player game state before disconnection...");
+        
+        // STEP 1: Reset gold to starting amount
+        ResetPlayerGoldToStarting();
+        
+        // STEP 2: Remove and destroy all superpower tokens
+        RemoveAllSuperpowerTokens();
+        
+        Debug.Log("[NetworkManagerUI] Player game state reset complete - ready for disconnection");
+    }
+
+    /// <summary>
+    /// Resets the player's gold to the starting amount
+    /// </summary>
+    private void ResetPlayerGoldToStarting()
+    {
+        SuperPowerSpawner spawner = FindObjectOfType<SuperPowerSpawner>();
+        if (spawner != null)
+        {
+            Debug.Log("[NetworkManagerUI] Resetting gold to starting amount before disconnection");
+            spawner.ResetGoldToStarting();
+        }
+        else
+        {
+            Debug.LogWarning("[NetworkManagerUI] SuperPowerSpawner not found - cannot reset gold");
+        }
+    }
+
+    /// <summary>
+    /// Removes and destroys all superpower tokens
+    /// </summary>
+    private void RemoveAllSuperpowerTokens()
+    {
+        SuperPowerSpawner spawner = FindObjectOfType<SuperPowerSpawner>();
+        if (spawner != null)
+        {
+            Debug.Log("[NetworkManagerUI] Removing all superpower tokens before disconnection");
+            spawner.ClearAllSpawnedPowers();
+        }
+        else
+        {
+            Debug.LogWarning("[NetworkManagerUI] SuperPowerSpawner not found - cannot clear superpower tokens");
         }
     }
 
