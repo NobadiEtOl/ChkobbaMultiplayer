@@ -883,5 +883,123 @@ public class NetworkRelay : NetworkBehaviour
         }
     }
 
+    // ===== REDO SYSTEM RPCs =====
+    
+    /// <summary>
+    /// Client RPC to apply a reverted game state to all clients
+    /// </summary>
+    [ClientRpc(RequireOwnership = false)]
+    public void RedoRevertToStateClientRPC(SerializableGameState snapshot, string revertType)
+    {
+        Debug.Log($"[NetworkRelay] Received redo revert to {revertType} - snapshot v{snapshot.snapshotVersion}");
+        
+        // Apply the reverted state using existing game state system
+        if (GameManager.LocalInstance != null)
+        {
+            GameManager.LocalInstance.OnRedoRevertToState(snapshot, revertType);
+        }
+        else
+        {
+            Debug.LogError("[NetworkRelay] GameManager.LocalInstance is null - cannot apply redo state");
+        }
+    }
+    
+    /// <summary>
+    /// Server RPC for clients to request redo to previous state
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void RequestRedoToPreviousStateServerRPC()
+    {
+        ulong clientId = OwnerClientId;
+        Debug.Log($"[NetworkRelay] Client {clientId} requested redo to previous state");
+        
+        if (server != null)
+        {
+            server.RevertToPreviousState();
+        }
+        else
+        {
+            Debug.LogError("[NetworkRelay] Server reference is null - cannot process redo request");
+        }
+    }
+    
+    /// <summary>
+    /// Server RPC for clients to request redo to pre-previous state
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void RequestRedoToPrePreviousStateServerRPC()
+    {
+        ulong clientId = OwnerClientId;
+        Debug.Log($"[NetworkRelay] Client {clientId} requested redo to pre-previous state");
+        
+        if (server != null)
+        {
+            server.RevertToPrePreviousState();
+        }
+        else
+        {
+            Debug.LogError("[NetworkRelay] Server reference is null - cannot process redo request");
+        }
+    }
+    
+    /// <summary>
+    /// Server RPC for clients to get redo state status
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void RequestRedoStateStatusServerRPC()
+    {
+        ulong clientId = OwnerClientId;
+        
+        if (server != null)
+        {
+            string status = server.GetRedoStateStatus();
+            Debug.Log($"[NetworkRelay] Redo status requested by client {clientId}: {status}");
+            
+            // Send status back to requesting client
+            SendRedoStateStatusClientRPC(status, clientId);
+        }
+        else
+        {
+            Debug.LogError("[NetworkRelay] Server reference is null - cannot get redo status");
+        }
+    }
+    
+    /// <summary>
+    /// Client RPC to send redo state status to specific client
+    /// </summary>
+    [ClientRpc(RequireOwnership = false)]
+    public void SendRedoStateStatusClientRPC(string status, ulong targetClientId)
+    {
+        // Only process if this is the target client
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.LocalClientId == targetClientId)
+        {
+            Debug.Log($"[NetworkRelay] Redo state status: {status}");
+            
+            if (GameManager.LocalInstance != null)
+            {
+                GameManager.LocalInstance.OnRedoStateStatusReceived(status);
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Server RPC for clients to confirm they've finished redo scene reconstruction
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void ConfirmRedoSceneReconstructionFinishedServerRPC()
+    {
+        ulong clientId = OwnerClientId;
+        Debug.Log($"[NetworkRelay] Client {clientId} confirmed redo scene reconstruction finished");
+        
+        if (server != null)
+        {
+            server.OnClientRedoSceneReconstructionFinished(clientId);
+        }
+        else
+        {
+            Debug.LogError("[NetworkRelay] Server reference is null - cannot confirm redo reconstruction");
+        }
+    }
+
 
 }

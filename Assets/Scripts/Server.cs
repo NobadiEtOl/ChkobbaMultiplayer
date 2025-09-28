@@ -37,8 +37,7 @@ public class Server : NetworkBehaviour
     public bool winnerPrintFlag = false;
     
     // Bot system for 1v1 games
-    [SerializeField] private bool isBotModeEnabled = false; // Toggle bot mode on/off in inspector
-    [SerializeField] private Toggle botModeToggle; // UI Toggle component for bot mode
+    [SerializeField] private bool isBotModeEnabled = false; // Bot mode setting controlled by button presses
     [SerializeField] private float botMoveDelay = 2.0f; // Delay before bot makes a move (inspector editable)
     private bool botPlayerActive = false; // Tracks if bot is playing as player 1
     private int botPlayerNumber = 1; // Bot plays as player 1 (opponent)
@@ -60,6 +59,18 @@ public class Server : NetworkBehaviour
     private SerializableGameState manualSavedState;
     private bool hasManualSavedState = false;
     private int snapshotVersionCounter = 0;
+    
+    // REDO SYSTEM: Automatic game state tracking
+    private SerializableGameState currentGameState;
+    private SerializableGameState previousGameState;
+    private SerializableGameState prePreviousGameState;
+    private bool hasCurrentState = false;
+    private bool hasPreviousState = false;
+    private bool hasPrePreviousState = false;
+    
+    // REDO SYSTEM: Client confirmation tracking
+    private HashSet<ulong> redoSceneReconstructionClients = new HashSet<ulong>();
+    private bool isWaitingForRedoConfirmations = false;
     
     // RECONNECTION TRACKING: Track which clients are reconnecting
     private HashSet<ulong> reconnectingClients = new HashSet<ulong>();
@@ -105,6 +116,9 @@ public class Server : NetworkBehaviour
         copiedCardMap.Clear();
         zaferPuaniPoints.Clear();
         bombedCards.Clear();
+        
+        // REDO SYSTEM: Reset redo states for new game
+        ResetRedoStates();
         
         // Reset bot system
         botPlayerActive = false;
@@ -193,117 +207,7 @@ public class Server : NetworkBehaviour
         botPlayer = BotPlayer.Instance;
         // Note: BotPlayer manages its own delays, don't override them
         
-        // Initialize bot mode toggle
-        InitializeBotModeToggle();
-        
         //StartCoroutine(ServerSubsciribe());
-    }
-    
-    /// <summary>
-    /// Initializes the bot mode toggle UI component
-    /// </summary>
-    private void InitializeBotModeToggle()
-    {
-        if (botModeToggle != null)
-        {
-            // Set initial state
-            botModeToggle.isOn = isBotModeEnabled;
-            
-            // Subscribe to toggle changes
-            botModeToggle.onValueChanged.AddListener(OnBotModeToggleChanged);
-            
-            Debug.Log($"[Server] Bot mode toggle initialized: {isBotModeEnabled}");
-        }
-        else
-        {
-            Debug.LogWarning("[Server] Bot mode toggle not assigned in inspector");
-        }
-    }
-    
-    /// <summary>
-    /// Called when the bot mode toggle value changes
-    /// </summary>
-    private void OnBotModeToggleChanged(bool isOn)
-    {
-        isBotModeEnabled = isOn;
-        Debug.Log($"[Server] Bot mode toggle changed to: {isBotModeEnabled}");
-        
-        // Handle bot mode change
-        UpdateBotModeFromToggle();
-    }
-    
-    /// <summary>
-    /// Updates bot mode state when toggle changes
-    /// </summary>
-    private void UpdateBotModeFromToggle()
-    {
-        // If disabling bot mode during an active bot game, deactivate the bot
-        if (!isBotModeEnabled && botPlayerActive)
-        {
-            botPlayerActive = false;
-            if (botMoveCoroutine != null)
-            {
-                StopCoroutine(botMoveCoroutine);
-                botMoveCoroutine = null;
-            }
-            
-            // Deactivate the BotPlayer
-            if (botPlayer != null)
-            {
-                botPlayer.DeactivateBot();
-            }
-            
-            Debug.Log("[Server] Bot deactivated due to toggle being turned off");
-        }
-        
-        // Note: BotPlayer manages its own delays, don't override them
-    }
-
-    /// <summary>
-    /// Called when values change in the inspector
-    /// </summary>
-    private void OnValidate()
-    {
-        // Update bot mode when toggle changes in inspector
-        if (Application.isPlaying)
-        {
-            UpdateBotModeFromInspector();
-        }
-    }
-    
-    /// <summary>
-    /// Updates bot mode state when inspector value changes
-    /// </summary>
-    private void UpdateBotModeFromInspector()
-    {
-        Debug.Log($"[Server] Bot mode updated from inspector: {isBotModeEnabled}");
-        
-        // Sync toggle with inspector value
-        if (botModeToggle != null)
-        {
-            botModeToggle.isOn = isBotModeEnabled;
-        }
-        
-        // If disabling bot mode during an active bot game, deactivate the bot
-        if (!isBotModeEnabled && botPlayerActive)
-        {
-            botPlayerActive = false;
-            if (botMoveCoroutine != null)
-            {
-                StopCoroutine(botMoveCoroutine);
-                botMoveCoroutine = null;
-            }
-            
-            // Deactivate the BotPlayer
-            if (botPlayer != null)
-            {
-                botPlayer.DeactivateBot();
-            }
-            
-            Debug.Log("[Server] Bot deactivated due to bot mode being disabled from inspector");
-        }
-        
-        // Note: BotPlayer manages its own delays, don't override them
     }
 
     /// <summary>
@@ -426,6 +330,9 @@ public class Server : NetworkBehaviour
             Invoke("CallUpdateCurrentPlayer", 1);
             networkRelay.InitializeCardPrefabsClientRPC(false); // false = not reconnection
         }
+        
+        // REDO SYSTEM: Save initial game state after cards are dealt
+        Invoke("SaveInitialGameStateForRedo", 4f); // After cards are dealt
     }
 
     public void CallUpdateCurrentPlayer()
@@ -765,6 +672,9 @@ public class Server : NetworkBehaviour
 
     private void NextTurn()
     {
+        // REDO SYSTEM: Save current state before advancing turn
+        SaveCurrentGameStateForRedo();
+        
         int oldTurnCounter = turnCounter;
         turnCounter++;
 
@@ -1139,6 +1049,9 @@ public class Server : NetworkBehaviour
             return;
         }
         
+        // REDO SYSTEM: Save state before processing move
+        SaveCurrentGameStateForRedo();
+        
         // === MOVE CHAIN TRACKING ===
         // Initialize variables needed for both hybrid power activation and regular card play
         int[] selectedHandCard = allCardLookup[selectedHandCardUniqueID];
@@ -1403,6 +1316,7 @@ public class Server : NetworkBehaviour
             // This is a fresh game start
             // Normal case: All players connected
             // Bot case: 1 human player + bot mode enabled for 1v1
+            
             if (isBotModeEnabled && playerCount == 2 && connectedPlayerCount == 1)
             {
                 connectionLog.AppendLine($"SERVER MESSAGE: Bot mode enabled - starting 1v1 game with bot");
@@ -1485,6 +1399,16 @@ public class Server : NetworkBehaviour
         
         // Remove from heartbeat tracking
         clientHeartbeats.Remove(clientId);
+        
+        // REDO SYSTEM: Remove disconnected client from redo confirmation tracking
+        if (isWaitingForRedoConfirmations)
+        {
+            redoSceneReconstructionClients.Remove(clientId);
+            Debug.Log($"[Server] Removed disconnected client {clientId} from redo confirmation tracking");
+            
+            // Re-check if all remaining clients are ready
+            CheckAllClientsReadyForRedoCurrentPlayerUpdate();
+        }
         
         // Decrease the connected player count (only once per client)
         if (connectedPlayerCount > 0) // Always decrement, but never go below 0
@@ -1673,7 +1597,7 @@ public class Server : NetworkBehaviour
         
         bool isReady = allPlayersConnected && gameNotStarted;
         
-        Debug.Log($"[Server] Game ready check: AllPlayersConnected={allPlayersConnected}, GameNotStarted={gameNotStarted}, IsReady={isReady}");
+        Debug.Log($"[Server] Game ready check: AllPlayersConnected={allPlayersConnected}, GameNotStarted={gameNotStarted}, IsReady={isReady}, BotMode={isBotModeEnabled}");
         
         return isReady;
     }
@@ -1952,12 +1876,6 @@ public class Server : NetworkBehaviour
             Debug.Log("[Server] Unsubscribed from NetworkManager disconnect events");
         }
         
-        // Unsubscribe from bot mode toggle
-        if (botModeToggle != null)
-        {
-            botModeToggle.onValueChanged.RemoveListener(OnBotModeToggleChanged);
-            Debug.Log("[Server] Unsubscribed from bot mode toggle events");
-        }
     }
 
     /// <summary>
@@ -2593,6 +2511,302 @@ public class Server : NetworkBehaviour
 
     // Note: Automatic or request-based broadcasting removed per user request. Only manual Save/Load remains.
 
+    // ===== REDO SYSTEM: AUTOMATIC GAME STATE TRACKING =====
+
+    /// <summary>
+    /// Automatically saves the current game state for redo functionality
+    /// This should be called at strategic points (before turn changes, before major actions)
+    /// </summary>
+    public void SaveCurrentGameStateForRedo()
+    {
+        // Shift the states: current -> previous -> pre-previous
+        if (hasCurrentState)
+        {
+            if (hasPreviousState)
+            {
+                prePreviousGameState = previousGameState;
+                hasPrePreviousState = true;
+            }
+            
+            previousGameState = currentGameState;
+            hasPreviousState = true;
+        }
+        
+        // Save new current state
+        currentGameState = BuildGameStateSnapshot();
+        hasCurrentState = true;
+        
+        Debug.Log($"[Server] Automatically saved game state v{currentGameState.snapshotVersion} for redo system");
+        Debug.Log($"[Server] Redo states available: Previous={hasPreviousState}, PrePrevious={hasPrePreviousState}");
+    }
+
+    /// <summary>
+    /// Reverts to the previous game state (1 turn back)
+    /// </summary>
+    [ContextMenu("Redo: Revert to Previous State")]
+    public void RevertToPreviousState()
+    {
+        if (!hasPreviousState)
+        {
+            Debug.LogWarning("[Server] No previous game state available for redo!");
+            return;
+        }
+
+        Debug.Log($"[Server] Reverting to previous game state v{previousGameState.snapshotVersion}");
+        Debug.Log($"[Server] Redo Bot Status - botPlayerActive: {botPlayerActive}, botPlayerNumber: {botPlayerNumber}, currentPlayer: {currentPlayer}");
+        
+        // Apply the previous state to server
+        ApplyGameStateToServer(previousGameState);
+        
+        // Initialize client confirmation tracking for redo
+        redoSceneReconstructionClients.Clear();
+        isWaitingForRedoConfirmations = true;
+        
+        // Broadcast to all clients and wait for their confirmation
+        networkRelay.RedoRevertToStateClientRPC(previousGameState, "Previous State");
+        
+        // Safety timeout: if no clients respond within 5 seconds, proceed anyway
+        Invoke("ForceRedoCurrentPlayerUpdate", 5.0f);
+        
+        Debug.Log($"[Server] Redo: Waiting for all clients to confirm scene reconstruction before sending current player update");
+        
+        // Shift states: previous becomes current, pre-previous becomes previous
+        currentGameState = previousGameState;
+        hasCurrentState = true;
+        
+        if (hasPrePreviousState)
+        {
+            previousGameState = prePreviousGameState;
+            hasPreviousState = true;
+            hasPrePreviousState = false;
+        }
+        else
+        {
+            hasPreviousState = false;
+        }
+        
+        Debug.Log($"[Server] Redo complete - states updated");
+    }
+
+    /// <summary>
+    /// Reverts to the pre-previous game state (2 turns back)
+    /// </summary>
+    [ContextMenu("Redo: Revert to Pre-Previous State")]
+    public void RevertToPrePreviousState()
+    {
+        if (!hasPrePreviousState)
+        {
+            Debug.LogWarning("[Server] No pre-previous game state available for redo!");
+            return;
+        }
+
+        Debug.Log($"[Server] Reverting to pre-previous game state v{prePreviousGameState.snapshotVersion}");
+        Debug.Log($"[Server] Redo Bot Status - botPlayerActive: {botPlayerActive}, botPlayerNumber: {botPlayerNumber}, currentPlayer: {currentPlayer}");
+        
+        // Apply the pre-previous state to server
+        ApplyGameStateToServer(prePreviousGameState);
+        
+        // Initialize client confirmation tracking for redo
+        redoSceneReconstructionClients.Clear();
+        isWaitingForRedoConfirmations = true;
+        
+        // Broadcast to all clients and wait for their confirmation
+        networkRelay.RedoRevertToStateClientRPC(prePreviousGameState, "Pre-Previous State");
+        
+        // Safety timeout: if no clients respond within 5 seconds, proceed anyway
+        Invoke("ForceRedoCurrentPlayerUpdate", 5.0f);
+        
+        Debug.Log($"[Server] Redo: Waiting for all clients to confirm scene reconstruction before sending current player update");
+        
+        // Shift states: pre-previous becomes current, clear others
+        currentGameState = prePreviousGameState;
+        hasCurrentState = true;
+        hasPreviousState = false;
+        hasPrePreviousState = false;
+        
+        Debug.Log($"[Server] Redo to pre-previous state complete - states updated");
+    }
+
+    /// <summary>
+    /// Gets the status of available redo states
+    /// </summary>
+    public string GetRedoStateStatus()
+    {
+        return $"Redo States - Current: {hasCurrentState}, Previous: {hasPreviousState}, PrePrevious: {hasPrePreviousState}";
+    }
+
+    /// <summary>
+    /// Context menu to show redo state status
+    /// </summary>
+    [ContextMenu("Show Redo State Status")]
+    public void ShowRedoStateStatus()
+    {
+        string status = GetRedoStateStatus();
+        Debug.Log($"[Server] {status}");
+        
+        if (hasCurrentState)
+            Debug.Log($"[Server] Current state: v{currentGameState.snapshotVersion}, turn {currentGameState.turnCounter}");
+        if (hasPreviousState)
+            Debug.Log($"[Server] Previous state: v{previousGameState.snapshotVersion}, turn {previousGameState.turnCounter}");
+        if (hasPrePreviousState)
+            Debug.Log($"[Server] Pre-previous state: v{prePreviousGameState.snapshotVersion}, turn {prePreviousGameState.turnCounter}");
+    }
+
+    /// <summary>
+    /// Resets all redo states (called when starting new game)
+    /// </summary>
+    public void ResetRedoStates()
+    {
+        hasCurrentState = false;
+        hasPreviousState = false;
+        hasPrePreviousState = false;
+        Debug.Log("[Server] Redo states reset for new game");
+    }
+
+    /// <summary>
+    /// Saves the initial game state after cards are dealt (called via Invoke)
+    /// </summary>
+    public void SaveInitialGameStateForRedo()
+    {
+        // Save the initial state after game setup is complete
+        SaveCurrentGameStateForRedo();
+        Debug.Log("[Server] Initial game state saved for redo system");
+    }
+
+    /// <summary>
+    /// Sends current player update after redo (called via Invoke with delay)
+    /// </summary>
+    public void SendCurrentPlayerUpdateAfterRedo()
+    {
+        Debug.Log($"[Server] Sending delayed current player update after redo - currentPlayer: {currentPlayer}, turnCounter: {turnCounter}");
+        networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer, turnCounter);
+        
+        // REDO BOT FIX: Check if it's bot's turn after redo and trigger bot move
+        if (botPlayerActive && currentPlayer == botPlayerNumber)
+        {
+            Debug.Log($"[Server] Redo: It's bot's turn after redo (player {botPlayerNumber}), triggering bot move");
+            if (botPlayer != null)
+            {
+                // Small delay to ensure client state is fully updated
+                Invoke("TriggerBotMoveAfterRedo", 1.0f);
+            }
+            else
+            {
+                Debug.LogError($"[Server] BotPlayer is null - cannot trigger bot move after redo");
+            }
+        }
+        else
+        {
+            Debug.Log($"[Server] Redo: Not bot's turn after redo - currentPlayer: {currentPlayer}, botPlayerNumber: {botPlayerNumber}, botPlayerActive: {botPlayerActive}");
+        }
+    }
+
+    /// <summary>
+    /// Triggers bot move after redo completion (called via Invoke with delay)
+    /// </summary>
+    public void TriggerBotMoveAfterRedo()
+    {
+        Debug.Log($"[Server] Triggering bot move after redo completion");
+        
+        if (botPlayerActive && currentPlayer == botPlayerNumber && botPlayer != null)
+        {
+            Debug.Log($"[Server] Bot is active and it's bot's turn - calling OnBotTurn()");
+            botPlayer.OnBotTurn();
+        }
+        else
+        {
+            Debug.LogWarning($"[Server] Cannot trigger bot move - botPlayerActive: {botPlayerActive}, currentPlayer: {currentPlayer}, botPlayerNumber: {botPlayerNumber}, botPlayer null: {botPlayer == null}");
+        }
+    }
+
+    /// <summary>
+    /// Context menu for testing bot trigger after redo
+    /// </summary>
+    [ContextMenu("Test Bot Trigger After Redo")]
+    public void TestBotTriggerAfterRedo()
+    {
+        Debug.Log($"[Server] Testing bot trigger after redo - botPlayerActive: {botPlayerActive}, currentPlayer: {currentPlayer}, botPlayerNumber: {botPlayerNumber}");
+        TriggerBotMoveAfterRedo();
+    }
+
+    /// <summary>
+    /// Forces current player update after redo timeout (safety mechanism)
+    /// </summary>
+    public void ForceRedoCurrentPlayerUpdate()
+    {
+        if (isWaitingForRedoConfirmations)
+        {
+            Debug.LogWarning($"[Server] Redo timeout reached - forcing current player update despite incomplete client confirmations");
+            
+            // Reset confirmation tracking
+            isWaitingForRedoConfirmations = false;
+            redoSceneReconstructionClients.Clear();
+            
+            // Send current player update anyway (this will also trigger bot if needed)
+            SendCurrentPlayerUpdateAfterRedo();
+        }
+    }
+
+    /// <summary>
+    /// Handles client confirmation that they've finished redo scene reconstruction
+    /// </summary>
+    public void OnClientRedoSceneReconstructionFinished(ulong clientId)
+    {
+        if (!isWaitingForRedoConfirmations)
+        {
+            Debug.LogWarning($"[Server] Received unexpected redo confirmation from client {clientId} - not waiting for confirmations");
+            return;
+        }
+
+        Debug.Log($"[Server] Client {clientId} confirmed redo scene reconstruction finished");
+        redoSceneReconstructionClients.Add(clientId);
+
+        // Check if all clients have confirmed
+        CheckAllClientsReadyForRedoCurrentPlayerUpdate();
+    }
+
+    /// <summary>
+    /// Checks if all connected clients have confirmed redo scene reconstruction
+    /// </summary>
+    private void CheckAllClientsReadyForRedoCurrentPlayerUpdate()
+    {
+        if (!isWaitingForRedoConfirmations)
+            return;
+
+        // Count connected clients (excluding server/host)
+        int expectedClients = 0;
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+        {
+            expectedClients = NetworkManager.Singleton.ConnectedClients.Count - 1; // -1 for host
+        }
+
+        Debug.Log($"[Server] Redo confirmation check: {redoSceneReconstructionClients.Count}/{expectedClients} clients confirmed");
+
+        if (redoSceneReconstructionClients.Count >= expectedClients)
+        {
+            Debug.Log($"[Server] All clients confirmed redo scene reconstruction - sending current player update");
+            
+            // Reset confirmation tracking
+            isWaitingForRedoConfirmations = false;
+            redoSceneReconstructionClients.Clear();
+            
+            // Now send the current player update
+            SendCurrentPlayerUpdateAfterRedo();
+        }
+        else if (expectedClients == 0)
+        {
+            // No clients connected (bot mode or single player)
+            Debug.Log($"[Server] No clients to wait for - proceeding with current player update");
+            
+            // Reset confirmation tracking
+            isWaitingForRedoConfirmations = false;
+            redoSceneReconstructionClients.Clear();
+            
+            // Send current player update immediately (this will also trigger bot if needed)
+            SendCurrentPlayerUpdateAfterRedo();
+        }
+    }
+
     // ===== RELAY KEEP-ALIVE SYSTEM =====
 
     /// <summary>
@@ -2974,6 +3188,7 @@ public class Server : NetworkBehaviour
             Debug.Log("[Server] Bot deactivated due to bot mode being disabled");
         }
     }
+    
 
     // OLD BOT METHODS - NO LONGER USED (BotPlayer handles this now)
     /*

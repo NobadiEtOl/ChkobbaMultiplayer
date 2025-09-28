@@ -66,6 +66,7 @@ public class DeckController : MonoBehaviour
 
     void Start()
     {
+        thisPlayerNumber = 0;
         InitialDeckSetUp();
         
         // Store deck starting position

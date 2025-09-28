@@ -16,11 +16,13 @@ public class MainUIScript : MonoBehaviour
     [SerializeField] private GameObject profileUI;
     [SerializeField] private GameObject settingsPopup;
     [SerializeField] private GameObject leaveGameButton;
+    [SerializeField] private GameObject undoButton;
     [SerializeField] private Slider musicVolumeSlider;
     [SerializeField] private Slider soundEffectsVolumeSlider;
     [SerializeField] private GameObject[] currentMode1v1;
     [SerializeField] private GameObject[] currentMode2v2;
     [SerializeField] private GameObject currentModeYellow;
+    [SerializeField] private GameObject mainScreen;
     
     // Start is called before the first frame update
     void Start()
@@ -62,6 +64,7 @@ public class MainUIScript : MonoBehaviour
         settingsPopup.SetActive(true);
         startingScreenUI.SetActive(false);
         UpdateLeaveGameButtonVisibility();
+        UpdateUndoButtonVisibility();
     }
 
     public void OnQuickPlayCloseButtonClicked()
@@ -93,6 +96,7 @@ public class MainUIScript : MonoBehaviour
     {
         settingsPopup.SetActive(false);
         startingScreenUI.SetActive(true);
+        //UpdateUndoButtonVisibility(); // Deactivate undo button when settings popup is closed
     }
 
     public void OnLeaveGameButtonClicked()
@@ -121,6 +125,11 @@ public class MainUIScript : MonoBehaviour
     {
         if(startingScreenUI.activeSelf)startingScreenUI.SetActive(false);
         waitingScreenUI.SetActive(true);
+        
+        // Deactivate quick play, create room, and find room UIs when opening waiting screen
+        quickPlayUI.SetActive(false);
+        createRoomUI.SetActive(false);
+        findRoomUI.SetActive(false);
         
         // Update leave game button visibility since we're entering a game
         UpdateLeaveGameButtonVisibility();
@@ -211,6 +220,9 @@ public class MainUIScript : MonoBehaviour
         
         if (currentModeYellow != null) currentModeYellow.SetActive(false);
         
+        // Update button visibility after closing all pages
+        UpdateLeaveGameButtonVisibility();
+        
         Debug.Log("[MainUIScript] All UI pages closed");
     }
 
@@ -291,7 +303,7 @@ public class MainUIScript : MonoBehaviour
         profileUI.SetActive(false);
         settingsPopup.SetActive(false);
         
-        // Update leave game button visibility since we're back to main screen
+        // Update button visibility since we're back to main screen
         UpdateLeaveGameButtonVisibility();
         
         Debug.Log("[MainUIScript] UI reset to main page complete");
@@ -578,7 +590,7 @@ public class MainUIScript : MonoBehaviour
         if (leaveGameButton != null)
         {
             // Leave game button is active when main screen is NOT active (i.e., when in game)
-            bool shouldShowLeaveGameButton = !startingScreenUI.activeSelf;
+            bool shouldShowLeaveGameButton = !mainScreen.activeSelf;
             leaveGameButton.SetActive(shouldShowLeaveGameButton);
             
             Debug.Log($"[MainUIScript] Leave game button {(shouldShowLeaveGameButton ? "shown" : "hidden")} - Main screen active: {startingScreenUI.activeSelf}");
@@ -586,6 +598,30 @@ public class MainUIScript : MonoBehaviour
         else
         {
             Debug.LogWarning("[MainUIScript] Leave game button is not assigned!");
+        }
+    }
+
+    /// <summary>
+    /// Updates the undo button visibility based on main screen state and host status
+    /// </summary>
+    private void UpdateUndoButtonVisibility()
+    {
+        if (undoButton != null)
+        {
+            // Undo button is active when:
+            // 1. Main screen is NOT active (i.e., when in game)
+            // 2. It's the host's game scene
+            bool isInGame = !mainScreen.activeSelf;
+            bool isHost = DeckController.LocalInstance.thisPlayerNumber == 0;
+            bool shouldShowUndoButton = isInGame && isHost;
+            
+            undoButton.SetActive(shouldShowUndoButton);
+            
+            Debug.Log($"[MainUIScript] Undo button {(shouldShowUndoButton ? "shown" : "hidden")} - In game: {isInGame}, Is host: {isHost}");
+        }
+        else
+        {
+            Debug.LogWarning("[MainUIScript] Undo button is not assigned!");
         }
     }
 

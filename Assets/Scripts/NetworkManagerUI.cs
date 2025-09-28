@@ -61,6 +61,26 @@ public class NetworkManagerUI : MonoBehaviour
     private string LAST_JOIN_CODE_KEY;
     private string LAST_PLAYER_COUNT_KEY;
     private string LAST_GAME_TIMESTAMP_KEY;
+    
+    // === BOT MODE CONTROL ===
+    // Bot mode is now directly controlled by button presses - no toggle logic needed
+    
+    /// <summary>
+    /// Sets the Server's bot mode directly based on button pressed
+    /// </summary>
+    /// <param name="enableBot">True to enable bot mode, false to disable</param>
+    private void SetServerBotMode(bool enableBot)
+    {
+        if (Server.Singleton != null)
+        {
+            Server.Singleton.SetBotModeEnabled(enableBot);
+            Debug.Log($"[NetworkManagerUI] Server bot mode set to {(enableBot ? "ENABLED" : "DISABLED")} via button press");
+        }
+        else
+        {
+            Debug.LogWarning("[NetworkManagerUI] Server.Singleton is null - cannot set bot mode");
+        }
+    }
 
     void Awake()
     {
@@ -1283,11 +1303,34 @@ public class NetworkManagerUI : MonoBehaviour
 
     void SetupButtonListeners()
     {
-        clientButton.onClick.AddListener(async () => { ClearGamePlayerPrefs(); await StartClientWithRelay(); });
-        hostTwoPlayerButton.onClick.AddListener(async () => { ClearGamePlayerPrefs(); await StartHostWithRelay(2,true); });
-        hostFourPlayerButton.onClick.AddListener(async () => { ClearGamePlayerPrefs(); await StartHostWithRelay(4,true); });
-        quickPlayTwoPlayerButton.onClick.AddListener(async () => { ClearGamePlayerPrefs(); await FindLobbiesAndStartHostIfNoneExist(2); });
-        quickPlayFourPlayerButton.onClick.AddListener(async () => { ClearGamePlayerPrefs(); await FindLobbiesAndStartHostIfNoneExist(4); });
+        // Create Room buttons (private lobbies) - DISABLE BOT MODE
+        clientButton.onClick.AddListener(async () => { 
+            SetServerBotMode(false); // Disable bot mode for join room
+            ClearGamePlayerPrefs(); 
+            await StartClientWithRelay(); 
+        });
+        hostTwoPlayerButton.onClick.AddListener(async () => { 
+            SetServerBotMode(false); // Disable bot mode for create room
+            ClearGamePlayerPrefs(); 
+            await StartHostWithRelay(2,true); 
+        });
+        hostFourPlayerButton.onClick.AddListener(async () => { 
+            SetServerBotMode(false); // Disable bot mode for create room
+            ClearGamePlayerPrefs(); 
+            await StartHostWithRelay(4,true); 
+        });
+        
+        // Quick Play buttons - ENABLE BOT MODE
+        quickPlayTwoPlayerButton.onClick.AddListener(async () => { 
+            SetServerBotMode(true); // Enable bot mode for quick play
+            ClearGamePlayerPrefs(); 
+            await FindLobbiesAndStartHostIfNoneExist(2); 
+        });
+        quickPlayFourPlayerButton.onClick.AddListener(async () => { 
+            SetServerBotMode(true); // Enable bot mode for quick play
+            ClearGamePlayerPrefs(); 
+            await FindLobbiesAndStartHostIfNoneExist(4); 
+        });
         
         // Return button for waiting screen
         if (returnToMainMenuButton != null)

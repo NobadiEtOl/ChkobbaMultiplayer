@@ -6319,5 +6319,131 @@ public class GameManager : MonoBehaviour
         return keys.ToArray();
     }
 
+    // ===== REDO SYSTEM =====
+
+    /// <summary>
+    /// Called when a redo revert state is received from server
+    /// </summary>
+    public void OnRedoRevertToState(SerializableGameState snapshot, string revertType)
+    {
+        Debug.Log($"[GameManager] Redo: Reverting to {revertType} - applying snapshot v{snapshot.snapshotVersion}");
+        Debug.Log($"[GameManager] Redo: State contains currentPlayer={snapshot.currentPlayer}, turnCounter={snapshot.turnCounter}");
+        
+        // CRITICAL FIX: Explicitly apply current player and turn counter after redo
+        // This ensures the UI reflects the correct turn immediately
+        currentPlayerNo = snapshot.currentPlayer;
+        turnCounter = snapshot.turnCounter;
+        
+        Debug.Log($"[GameManager] Redo: Applied currentPlayer={currentPlayerNo}, turnCounter={turnCounter}");
+        
+        // Show a message to the user about the revert
+        ShowcaseSuperPower($"Reverted to {revertType}", 0.5f, 3f);
+        
+        // CRITICAL FIX: Start coroutine that waits for scene reconstruction to complete
+        // This ensures the server waits for all clients before sending current player update
+        StartCoroutine(WaitForSceneReconstructionAndConfirm(snapshot, revertType));
+        
+        Debug.Log($"[GameManager] Redo revert to {revertType} initiated");
+    }
+
+    /// <summary>
+    /// Waits for scene reconstruction to complete and then confirms to server
+    /// </summary>
+    private IEnumerator WaitForSceneReconstructionAndConfirm(SerializableGameState snapshot, string revertType)
+    {
+        Debug.Log($"[GameManager] Starting scene reconstruction for {revertType}");
+        
+        // Use existing game state application system and wait for it to complete
+        if (deckController != null)
+        {
+            Debug.Log($"[GameManager] Waiting for scene reconstruction coroutines to complete");
+            yield return StartCoroutine(ApplyGameStateWithReset(snapshot));
+            Debug.Log($"[GameManager] Scene reconstruction coroutines completed");
+        }
+        else
+        {
+            Debug.LogError("[GameManager] deckController is null - falling back to ApplyGameState");
+            ApplyGameState(snapshot);
+            // Wait a bit as fallback
+            yield return new WaitForSeconds(2.0f);
+        }
+        
+        // Additional safety wait to ensure all visual updates are complete
+        yield return new WaitForSeconds(1.0f);
+        
+        Debug.Log($"[GameManager] Confirming redo scene reconstruction is complete for {revertType}");
+        
+        if (networkRelay != null)
+        {
+            networkRelay.ConfirmRedoSceneReconstructionFinishedServerRPC();
+        }
+        else
+        {
+            Debug.LogError("[GameManager] NetworkRelay is null - cannot confirm redo completion");
+        }
+        
+        Debug.Log($"[GameManager] Redo scene reconstruction confirmation sent for {revertType}");
+    }
+
+    /// <summary>
+    /// Called when redo state status is received from server
+    /// </summary>
+    public void OnRedoStateStatusReceived(string status)
+    {
+        Debug.Log($"[GameManager] Redo state status: {status}");
+        // You could display this in UI if needed
+    }
+
+    /// <summary>
+    /// Request redo to previous state (1 turn back)
+    /// </summary>
+    [ContextMenu("Redo: Request Previous State")]
+    public void RequestRedoToPreviousState()
+    {
+        if (networkRelay != null)
+        {
+            Debug.Log("[GameManager] Requesting redo to previous state");
+            networkRelay.RequestRedoToPreviousStateServerRPC();
+        }
+        else
+        {
+            Debug.LogError("[GameManager] NetworkRelay is null - cannot request redo");
+        }
+    }
+
+    /// <summary>
+    /// Request redo to pre-previous state (2 turns back)
+    /// </summary>
+    [ContextMenu("Redo: Request Pre-Previous State")]
+    public void RequestRedoToPrePreviousState()
+    {
+        if (networkRelay != null)
+        {
+            Debug.Log("[GameManager] Requesting redo to pre-previous state");
+            networkRelay.RequestRedoToPrePreviousStateServerRPC();
+        }
+        else
+        {
+            Debug.LogError("[GameManager] NetworkRelay is null - cannot request redo");
+        }
+    }
+
+    /// <summary>
+    /// Request redo state status from server
+    /// </summary>
+    [ContextMenu("Redo: Check State Status")]
+    public void RequestRedoStateStatus()
+    {
+        if (networkRelay != null)
+        {
+            Debug.Log("[GameManager] Requesting redo state status");
+            networkRelay.RequestRedoStateStatusServerRPC();
+        }
+        else
+        {
+            Debug.LogError("[GameManager] NetworkRelay is null - cannot request redo status");
+        }
+    }
+
 }
 
