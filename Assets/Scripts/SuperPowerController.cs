@@ -87,7 +87,7 @@ public class Kapkaç : SuperPower
     private void OnEnable()
     {
         name = "Kapkaç";
-        description = "Bir sonraki seçtiğin kartını Sahte Vale'ye dönüştür";
+        description = "Çoktan seçili kartı Sahte Vale'ye dönüştür";
         rarityMultiplier = 15;
     }
     public override void ActivatePower()
@@ -106,7 +106,8 @@ public class Kapkaç : SuperPower
         PowerActivated();
         
         Debug.Log($"[Kapkaç] Calling ActivateKapkacOnCardServerRPC directly with selected card");
-        GameManager.LocalInstance.networkRelay.ActivateKapkacOnCardServerRPC(CardInteraction.currentlySelectedCard.uniqueCardInstanceID);
+        int playerNumber = DeckController.LocalInstance.thisPlayerNumber;
+        GameManager.LocalInstance.networkRelay.ActivateKapkacOnCardServerRPC(CardInteraction.currentlySelectedCard.uniqueCardInstanceID, playerNumber);
         
         // Reset selection state
         CardInteraction.currentlySelectedCard = null;
@@ -123,7 +124,7 @@ public class ValeArar : SuperPower
     {
         name = "Vale Arar";
         description = "Tur boyunca Valeleri görmeni sağlar";
-        rarityMultiplier = 30;
+        rarityMultiplier = 100;
     }
     [ContextMenu("Vale Arar")]
     public override void ActivatePower()
@@ -142,7 +143,7 @@ public class KopyalaYapistir : SuperPower
     private void OnEnable()
     {
         name = "Kopyala Yapıştır";
-        description = "Çoktan seçili kartı kopyalar, bir sonraki seçilen kartın üzerine kopyalar";
+        description = "Çoktan seçili kartı kopyalar, bir sonraki seçilen kartın üzerine yapıştırır";
         rarityMultiplier = 20;
     }
     public override void ActivatePower()
@@ -231,7 +232,7 @@ public class VerZehri : SuperPower
     private void OnEnable()
     {
         name = "Ver Zehri";
-        description = "Ortayı zehirle. Zehirli desteyi alan taraf ortadaki kart sayısı kadar puan kaybeder";
+        description = "Ortayı zehirle. Zehirli desteyi kapatan taraf ortadaki kart sayısı kadar puan kaybeder";
         rarityMultiplier = 25;
     }
     public override void ActivatePower()
@@ -252,7 +253,7 @@ public class KutsalDeste : SuperPower
     private void OnEnable()
     {
         name = "Kutsal Deste";
-        description = "Ortayı kutsa. Zehirli desteyi alan taraf ortadaki kart sayısı kadar puan kazanır";
+        description = "Ortayı kutsa. Zehirli desteyi kapatan taraf ortadaki kart sayısı kadar puan kazanır";
         rarityMultiplier = 25;
     }
     public override void ActivatePower()
@@ -311,7 +312,7 @@ public class SunuDegisTokus : SuperPower
     private void OnEnable()
     {
         name = "Şunu Değiş Tokuş";
-        description = "Çoktan seçilmiş kartınla rakibin istediğin kartını değiş tokuş";
+        description = "Çoktan seçilmiş kartınla, istediğin kartı değiş tokuş";
         rarityMultiplier = 14;
     }
     public override void ActivatePower()
@@ -362,12 +363,12 @@ public class SunuDegisBunuTokus : SuperPower
 [CreateAssetMenu(menuName = "SuperPower/ZaferPuani")]
 public class ZaferPuani : SuperPower
 {
-    [SerializeField] public int points = 5; // Adjustable in Inspector
+    [SerializeField] public int points = 1; // Adjustable in Inspector
 
     private void OnEnable()
     {
         name = "Zafer Puanı";
-        description = "Tur sonunda elinde bulunan her Zafer Puanı için 5'er puan kazan";
+        description = "Kullanınca 1 puan kazan";
         rarityMultiplier = 27;
     }
 
@@ -385,7 +386,7 @@ public class YandımAnam : SuperPower
     private void OnEnable()
     {
         name = "Yandım Anam";
-        description = "Seçilen bir kartı yak.";
+        description = "Seçilen bir kartı yak. Yanık karları sadece başka yanık kartlar kapatabilir.";
         rarityMultiplier = 19;
     }
     public override void ActivatePower()

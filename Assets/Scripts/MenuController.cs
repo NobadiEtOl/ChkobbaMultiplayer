@@ -209,6 +209,7 @@ public class MenuController : MonoBehaviour
     public void ShowTokenMenu()
     {
         Debug.Log("[MenuController] ShowTokenMenu called - toggle functionality");
+        SuperPowerSpawner.LocalInstance.SetNameText("Menu");
         
         if (SuperPowerSpawner.LocalInstance == null)
         {
@@ -659,7 +660,7 @@ public class MenuController : MonoBehaviour
         // Mouse scroll wheel (invert direction to feel natural)
         if (Input.mouseScrollDelta.y != 0)
         {
-            float scrollAmount = -Input.mouseScrollDelta.y * scrollSensitivity; // Inverted
+            float scrollAmount = -Input.mouseScrollDelta.y; // Inverted (sensitivity applied in ScrollContent3D)
             ScrollContent3D(scrollAmount);
         }
         
@@ -733,7 +734,7 @@ public class MenuController : MonoBehaviour
     {
         if (scrollContainer == null) return;
         
-        currentScrollOffset -= deltaY * 0.01f; // Scale down for smoother scrolling
+        currentScrollOffset -= deltaY * 0.01f * scrollSensitivity; // Scale with sensitivity
         
         // Calculate dynamic scroll limits based on number of tokens and display area
         float minScroll, maxScroll;

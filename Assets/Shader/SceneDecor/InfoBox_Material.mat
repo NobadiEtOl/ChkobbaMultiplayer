@@ -88,7 +88,7 @@ Material:
     - _BandColor: {r: 0.7, g: 0.7, b: 0.7, a: 1}
     - _BandColorA: {r: 0.12499998, g: 0, b: 0.09399996, a: 1}
     - _BandColorB: {r: 0, g: 0, b: 0, a: 1}
-    - _BandEdgeColor: {r: 1, g: 1, b: 1, a: 1}
+    - _BandEdgeColor: {r: 0.2509804, g: 0.654902, b: 0.5647059, a: 1}
     - _CircleColor: {r: 1, g: 1, b: 1, a: 1}
     - _ColorA: {r: 0.19999996, g: 0.39999998, b: 0.7, a: 1}
     - _ColorB: {r: 1, g: 0.9, b: 0.7, a: 1}
@@ -107,9 +107,9 @@ Material:
     - _DropColors: {r: 1, g: 1, b: 1, a: 1}
     - _DropPositions: {r: 0, g: 0, b: 0, a: 0}
     - _LineColor: {r: 0.11999995, g: 0.049999982, b: 0.03, a: 1}
-    - _MainBandColor: {r: 0, g: 0.67058825, b: 0.90588236, a: 1}
+    - _MainBandColor: {r: 0.043137256, g: 0.5019608, b: 0.21568629, a: 1}
     - _MainColor: {r: 0.8, g: 0.6, b: 0.39999998, a: 1}
-    - _SecondaryBandColor: {r: 1, g: 0.9411765, b: 0.3529412, a: 1}
+    - _SecondaryBandColor: {r: 0.07450981, g: 0.7137255, b: 0.4784314, a: 1}
     - _StarColor: {r: 1, g: 0.9, b: 0.19999996, a: 1}
     - _VelvetColor: {r: 1, g: 0.9, b: 0.8, a: 1}
     - _VelvetDirection: {r: 0, g: 1, b: 0, a: 0}

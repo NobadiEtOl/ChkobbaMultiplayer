@@ -1199,6 +1199,12 @@ public class NetworkManagerUI : MonoBehaviour
     {
         Debug.Log("[NetworkManagerUI] Performing client disconnection...");
         
+        // STEP 0: Destroy all card GameObjects for clean slate
+        if (DeckController.LocalInstance != null)
+        {
+            DeckController.LocalInstance.DestroyAllCards();
+        }
+        
         // STEP 1: Clear saved game info to prevent auto-reconnection
         ClearSavedGameInfo();
         
@@ -1222,6 +1228,12 @@ public class NetworkManagerUI : MonoBehaviour
     private void PerformHostDisconnection()
     {
         Debug.Log("[NetworkManagerUI] Performing host disconnection...");
+        
+        // STEP 0: Destroy all card GameObjects for clean slate
+        if (DeckController.LocalInstance != null)
+        {
+            DeckController.LocalInstance.DestroyAllCards();
+        }
         
         // STEP 1: Clear saved game info to prevent auto-reconnection
         ClearSavedGameInfo();
@@ -1377,6 +1389,21 @@ public class NetworkManagerUI : MonoBehaviour
 
     public async Task<string> StartHostWithRelay(int playerCount,bool privateFlag)
     {
+        // CRITICAL: Reset server and client for NEW GAME before creating relay
+        Debug.LogWarning("[NetworkManagerUI] ===== STARTING NEW GAME - RESETTING SERVER AND CLIENT =====");
+        
+        // Reset server (if it exists)
+        if (Server.Singleton != null)
+        {
+            Server.Singleton.ResetAllServerVariables();
+        }
+        
+        // Reset client GameManager (if it exists)
+        if (GameManager.LocalInstance != null)
+        {
+            GameManager.LocalInstance.ResetForNewGame();
+        }
+        
         // Use existing Unity Services connection (initialized at startup)
         if (!IsUnityServicesInitialized())
         {

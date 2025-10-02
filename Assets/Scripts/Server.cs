@@ -93,10 +93,21 @@ public class Server : NetworkBehaviour
 
     public void ResetAllServerVariables()
     {
+        Debug.LogWarning("[Server] ===== RESETTING ALL SERVER VARIABLES FOR NEW GAME =====");
+        
         deckCardsDict = null;
         centerCardsDict = null;
         playersHandCardsIDs = null;
         playersPooledCardsIDs = null;
+        
+        // CRITICAL: Reset allCardLookup for NEW GAME - this clears all power effects!
+        if (allCardLookup != null)
+        {
+            Debug.LogWarning($"[Server] Clearing allCardLookup ({allCardLookup.Count} cards) - all power effects will be reset for NEW GAME");
+            allCardLookup.Clear();
+            allCardLookup = new Dictionary<string, int[]>();
+        }
+        
         seed = 0;
         turnCounter = 0;
         currentPlayer = 0;
@@ -109,7 +120,7 @@ public class Server : NetworkBehaviour
         timer = 0f;
         turnTime = 15f;
         connectedPlayerCount = 0; // FIXED: Reset connection count (host will make it 1)
-        roundCount = 0;
+        roundCount = 0; // CRITICAL: Reset round count so SaveAllCards creates fresh cards
         readyToEndTurnCounter = 0;
         singleDebuggingMode = false;
         winnerPrintFlag = false;
@@ -139,6 +150,8 @@ public class Server : NetworkBehaviour
         // StopRelayKeepAlive(); // COMMENTED OUT - keep relay alive for reconnection
         // hostAllocationId = null; // COMMENTED OUT - keep allocation ID for reconnection
         // clientAllocationIds.Clear(); // COMMENTED OUT - keep client tracking for reconnection
+        
+        Debug.LogWarning("[Server] Server reset complete - ready for NEW GAME with fresh cards");
     }
 
     public void ResetForNewRound()
@@ -269,13 +282,21 @@ public class Server : NetworkBehaviour
         if (connectedPlayerCount == 1) singleDebuggingMode = true;
         else singleDebuggingMode = false;
 
-        // Bot system: Activate bot for 1v1 games if bot mode is enabled
-        // Bot activates when we have a 1v1 game and bot mode is enabled
-        if (isBotModeEnabled && playerCount == 2)
+        // Bot system: Activate bot for 1v1 or 2v2 games if bot mode is enabled
+        // Bot activates when we have a 1v1 game (bot plays as player 1) or 2v2 game (bot plays as players 1, 2, 3)
+        if (isBotModeEnabled && (playerCount == 2 || playerCount == 4))
         {
             botPlayerActive = true;
-            Debug.Log($"[Server] Bot mode activated! Bot will play as player {botPlayerNumber}");
-            Debug.Log($"[Server] Connected players: {connectedPlayerCount}, Bot will fill the second slot");
+            if (playerCount == 2)
+            {
+                Debug.Log($"[Server] Bot mode activated for 1v1! Bot will play as player 1");
+                Debug.Log($"[Server] Connected players: {connectedPlayerCount}, Bot will fill the second slot");
+            }
+            else if (playerCount == 4)
+            {
+                Debug.Log($"[Server] Bot mode activated for 2v2! Bot will play as players 1, 2, and 3");
+                Debug.Log($"[Server] Connected players: {connectedPlayerCount}, Bot will fill slots 2, 3, and 4");
+            }
             
             // Activate the BotPlayer
             if (botPlayer != null)
@@ -340,12 +361,15 @@ public class Server : NetworkBehaviour
         networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer, turnCounter);
         
         // Bot system: Check if it's the bot's turn at game start
-        if (botPlayerActive && currentPlayer == botPlayerNumber)
+        // In 1v1 mode: bot is player 1
+        // In 2v2 mode: bot plays for players 1, 2, and 3 (host is player 0)
+        bool isBotTurn = botPlayerActive && ((playerCount == 2 && currentPlayer == 1) || (playerCount == 4 && currentPlayer != 0));
+        if (isBotTurn)
         {
-            Debug.Log($"[Server] It's bot's turn at game start (player {botPlayerNumber}), notifying BotPlayer");
+            Debug.Log($"[Server] It's bot's turn at game start (player {currentPlayer}), notifying BotPlayer");
             if (botPlayer != null)
             {
-                botPlayer.OnBotTurn();
+                botPlayer.OnBotTurn(currentPlayer);
             }
         }
     }
@@ -371,12 +395,21 @@ public class Server : NetworkBehaviour
         initialDealCoroutineCheckCounter++;
         
         // Bot mode: Start deal when we have 1 human player + bot mode enabled
+        // 1v1 bot mode: 1 human player + 1 bot
+        // 2v2 bot mode: 1 human player + 3 bots
         // Normal mode: Start deal when all players are connected
         bool shouldStartDeal = false;
-        if (isBotModeEnabled && botPlayerActive && playerCount == 2 && initialDealCoroutineCheckCounter == 1)
+        if (isBotModeEnabled && botPlayerActive && ((playerCount == 2 && initialDealCoroutineCheckCounter == 1) || (playerCount == 4 && initialDealCoroutineCheckCounter == 1)))
         {
             shouldStartDeal = true;
-            Debug.Log($"[Server] Bot mode: Starting deal with 1 human player + bot");
+            if (playerCount == 2)
+            {
+                Debug.Log($"[Server] Bot mode 1v1: Starting deal with 1 human player + 1 bot");
+            }
+            else if (playerCount == 4)
+            {
+                Debug.Log($"[Server] Bot mode 2v2: Starting deal with 1 human player + 3 bots");
+            }
         }
         else if (initialDealCoroutineCheckCounter == connectedPlayerCount)
         {
@@ -440,34 +473,56 @@ public class Server : NetworkBehaviour
     //Add all cards to the deckCardIDs by creating all necessary IDs.
     private void SaveAllCards()
     {
-        deckCardsDict = new Dictionary<string, int[]>();
-        int cardIndex = 0;
-        // Club cards (kind=1, value=1 to 13)
-        for (int value = 1; value <= 13; value++)
+        // CRITICAL: Only create fresh cards on the FIRST round (roundCount == 0)
+        // After that, preserve power-modified values from allCardLookup
+        if (roundCount == 0)
         {
-            string uniqueID = "card_" + cardIndex++;
-            deckCardsDict.Add(uniqueID, new int[] { 1, value });
+            Debug.LogWarning("[Server] FIRST ROUND: Creating fresh deck with original values");
+            deckCardsDict = new Dictionary<string, int[]>();
+            int cardIndex = 0;
+            // Club cards (kind=1, value=1 to 13)
+            for (int value = 1; value <= 13; value++)
+            {
+                string uniqueID = "card_" + cardIndex++;
+                deckCardsDict.Add(uniqueID, new int[] { 1, value });
+            }
+            // Diamond cards (kind=2, value=1 to 13)
+            for (int value = 1; value <= 13; value++)
+            {
+                string uniqueID = "card_" + cardIndex++;
+                deckCardsDict.Add(uniqueID, new int[] { 2, value });
+            }
+            // Heart cards (kind=3, value=1 to 13)
+            for (int value = 1; value <= 13; value++)
+            {
+                string uniqueID = "card_" + cardIndex++;
+                deckCardsDict.Add(uniqueID, new int[] { 3, value });
+            }
+            // Spade cards (kind=4, value=1 to 13)
+            for (int value = 1; value <= 13; value++)
+            {
+                string uniqueID = "card_" + cardIndex++;
+                deckCardsDict.Add(uniqueID, new int[] { 4, value });
+            }
+
+            // Initialize allCardLookup with fresh values (ONLY on first round)
+            allCardLookup = new Dictionary<string, int[]>(deckCardsDict);
+            Debug.LogWarning($"[Server] allCardLookup initialized with {allCardLookup.Count} cards");
         }
-        // Diamond cards (kind=2, value=1 to 13)
-        for (int value = 1; value <= 13; value++)
+        else
         {
-            string uniqueID = "card_" + cardIndex++;
-            deckCardsDict.Add(uniqueID, new int[] { 2, value });
-        }
-        // Heart cards (kind=3, value=1 to 13)
-        for (int value = 1; value <= 13; value++)
-        {
-            string uniqueID = "card_" + cardIndex++;
-            deckCardsDict.Add(uniqueID, new int[] { 3, value });
-        }
-        // Spade cards (kind=4, value=1 to 13)
-        for (int value = 1; value <= 13; value++)
-        {
-            string uniqueID = "card_" + cardIndex++;
-            deckCardsDict.Add(uniqueID, new int[] { 4, value });
+            Debug.LogWarning("[Server] SUBSEQUENT ROUND: Preserving power-modified values from allCardLookup");
+            // Copy allCardLookup (which has power modifications) back to deckCardsDict
+            // This preserves Kapkaç, Yandım Anam, Kopyala Yapıştır changes
+            deckCardsDict = new Dictionary<string, int[]>();
+            foreach (var kvp in allCardLookup)
+            {
+                // Clone the array to prevent reference issues
+                deckCardsDict[kvp.Key] = new int[] { kvp.Value[0], kvp.Value[1] };
+            }
+            Debug.LogWarning($"[Server] deckCardsDict restored from allCardLookup with {deckCardsDict.Count} cards (preserving power effects)");
         }
 
-        allCardLookup = new Dictionary<string, int[]>(deckCardsDict);
     }
 
     //Suffle the deck according to the seed
@@ -685,12 +740,15 @@ public class Server : NetworkBehaviour
         networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer, turnCounter);
 
         // Bot system: Check if it's the bot's turn
-        if (botPlayerActive && currentPlayer == botPlayerNumber)
+        // In 1v1 mode: bot is player 1
+        // In 2v2 mode: bot plays for players 1, 2, and 3 (host is player 0)
+        bool isBotTurn = botPlayerActive && ((playerCount == 2 && currentPlayer == 1) || (playerCount == 4 && currentPlayer != 0));
+        if (isBotTurn)
         {
-            Debug.Log($"[Server] It's bot's turn (player {botPlayerNumber}), notifying BotPlayer");
+            Debug.Log($"[Server] It's bot's turn (player {currentPlayer}), notifying BotPlayer");
             if (botPlayer != null)
             {
-                botPlayer.OnBotTurn();
+                botPlayer.OnBotTurn(currentPlayer);
             }
         }
     }
@@ -1311,15 +1369,20 @@ public class Server : NetworkBehaviour
                 Debug.LogError($"[Server] NetworkRelay is null - cannot initialize card prefabs for reconnected client");
             }
         }
-        else if (playerCount == connectedPlayerCount || (isBotModeEnabled && playerCount == 2 && connectedPlayerCount == 1))
+        else if (playerCount == connectedPlayerCount || (isBotModeEnabled && playerCount == 2 && connectedPlayerCount == 1) || (isBotModeEnabled && playerCount == 4 && connectedPlayerCount == 1))
         {
             // This is a fresh game start
             // Normal case: All players connected
-            // Bot case: 1 human player + bot mode enabled for 1v1
+            // Bot case 1v1: 1 human player + bot mode enabled
+            // Bot case 2v2: 1 human player + bot mode enabled (bots play as players 1, 2, 3)
             
             if (isBotModeEnabled && playerCount == 2 && connectedPlayerCount == 1)
             {
                 connectionLog.AppendLine($"SERVER MESSAGE: Bot mode enabled - starting 1v1 game with bot");
+            }
+            else if (isBotModeEnabled && playerCount == 4 && connectedPlayerCount == 1)
+            {
+                connectionLog.AppendLine($"SERVER MESSAGE: Bot mode enabled - starting 2v2 game with 3 bots");
             }
             else
             {
@@ -1592,7 +1655,8 @@ public class Server : NetworkBehaviour
         // 1. All required players are connected (or bot mode conditions are met)
         // 2. Game hasn't actually started yet (no cards dealt)
         bool allPlayersConnected = playerCount == connectedPlayerCount || 
-                                  (isBotModeEnabled && playerCount == 2 && connectedPlayerCount == 1);
+                                  (isBotModeEnabled && playerCount == 2 && connectedPlayerCount == 1) ||
+                                  (isBotModeEnabled && playerCount == 4 && connectedPlayerCount == 1);
         bool gameNotStarted = deckCardsDict == null && turnCounter == 0;
         
         bool isReady = allPlayersConnected && gameNotStarted;
@@ -1929,6 +1993,15 @@ public class Server : NetworkBehaviour
     {
         playerCount = playerCountVar;
     }
+    
+    /// <summary>
+    /// Gets the current player count for the game
+    /// </summary>
+    /// <returns>The number of players in the current game (2 for 1v1, 4 for 2v2)</returns>
+    public int GetPlayerCount()
+    {
+        return playerCount;
+    }
 
     [ContextMenu("PrintPlayerPools")]
     public void CallPrintPlayerPools()
@@ -2205,6 +2278,29 @@ public class Server : NetworkBehaviour
         {
             ApplyZaferPuaniPoints();
             DecideWinner();
+        }
+    }
+
+    /// <summary>
+    /// Simplified method to add Zafer Puanı points directly (for Kapkaç power)
+    /// </summary>
+    public void AddZaferPuaniPoint(int playerNo, int pointValue)
+    {
+        Debug.LogWarning($"SIMPLIFIED ZAFER PUANI: Adding {pointValue} point(s) to player/team {playerNo}");
+        
+        // Handle team-based scoring for 2v2 mode
+        if (playerCount == 4)
+        {
+            // In 2v2, players 0,2 are team 0, players 1,3 are team 1
+            int teamNo = playerNo % 2;
+            points[teamNo] += pointValue;
+            Debug.LogWarning($"Team {teamNo} now has {points[teamNo]} points (added {pointValue} from Kapkaç)");
+        }
+        else
+        {
+            // In 1v1, direct player scoring
+            points[playerNo] += pointValue;
+            Debug.LogWarning($"Player {playerNo} now has {points[playerNo]} points (added {pointValue} from Kapkaç)");
         }
     }
 
@@ -2682,9 +2778,12 @@ public class Server : NetworkBehaviour
         networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer, turnCounter);
         
         // REDO BOT FIX: Check if it's bot's turn after redo and trigger bot move
-        if (botPlayerActive && currentPlayer == botPlayerNumber)
+        // In 1v1 mode: bot is player 1
+        // In 2v2 mode: bot plays for players 1, 2, and 3 (host is player 0)
+        bool isBotTurn = botPlayerActive && ((playerCount == 2 && currentPlayer == 1) || (playerCount == 4 && currentPlayer != 0));
+        if (isBotTurn)
         {
-            Debug.Log($"[Server] Redo: It's bot's turn after redo (player {botPlayerNumber}), triggering bot move");
+            Debug.Log($"[Server] Redo: It's bot's turn after redo (player {currentPlayer}), triggering bot move");
             if (botPlayer != null)
             {
                 // Small delay to ensure client state is fully updated
@@ -2697,7 +2796,7 @@ public class Server : NetworkBehaviour
         }
         else
         {
-            Debug.Log($"[Server] Redo: Not bot's turn after redo - currentPlayer: {currentPlayer}, botPlayerNumber: {botPlayerNumber}, botPlayerActive: {botPlayerActive}");
+            Debug.Log($"[Server] Redo: Not bot's turn after redo - currentPlayer: {currentPlayer}, botPlayerActive: {botPlayerActive}");
         }
     }
 
@@ -2708,14 +2807,17 @@ public class Server : NetworkBehaviour
     {
         Debug.Log($"[Server] Triggering bot move after redo completion");
         
-        if (botPlayerActive && currentPlayer == botPlayerNumber && botPlayer != null)
+        // In 1v1 mode: bot is player 1
+        // In 2v2 mode: bot plays for players 1, 2, and 3 (host is player 0)
+        bool isBotTurn = botPlayerActive && ((playerCount == 2 && currentPlayer == 1) || (playerCount == 4 && currentPlayer != 0));
+        if (isBotTurn && botPlayer != null)
         {
-            Debug.Log($"[Server] Bot is active and it's bot's turn - calling OnBotTurn()");
-            botPlayer.OnBotTurn();
+            Debug.Log($"[Server] Bot is active and it's bot's turn - calling OnBotTurn() for player {currentPlayer}");
+            botPlayer.OnBotTurn(currentPlayer);
         }
         else
         {
-            Debug.LogWarning($"[Server] Cannot trigger bot move - botPlayerActive: {botPlayerActive}, currentPlayer: {currentPlayer}, botPlayerNumber: {botPlayerNumber}, botPlayer null: {botPlayer == null}");
+            Debug.LogWarning($"[Server] Cannot trigger bot move - botPlayerActive: {botPlayerActive}, currentPlayer: {currentPlayer}, isBotTurn: {isBotTurn}, botPlayer null: {botPlayer == null}");
         }
     }
 

@@ -216,12 +216,12 @@ public class HesapMakinesiController : MonoBehaviour
         // Setup operator buttons
         if (multiplyButton != null)
         {
-            multiplyButton.onClick.AddListener(OnMultiplyPressed);
+            multiplyButton.onClick.AddListener(OnClearPressed);
             allCalculatorButtons.Add(multiplyButton);
         }
         if (addButton != null)
         {
-            addButton.onClick.AddListener(OnAddPressed);
+            addButton.onClick.AddListener(OnClearPressed);
             allCalculatorButtons.Add(addButton);
         }
         if (clearButton != null)
@@ -306,7 +306,7 @@ public class HesapMakinesiController : MonoBehaviour
     /// <summary>
     /// Called when clear (C) button is pressed
     /// </summary>
-    private void OnClearPressed()
+    public void OnClearPressed()
     {
         Debug.Log("HesapMakinesiController: Clear (C) button pressed");
         

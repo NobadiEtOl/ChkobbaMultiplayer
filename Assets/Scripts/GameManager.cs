@@ -331,7 +331,7 @@ public class GameManager : MonoBehaviour
     // Track cards that have been changed by powers (for save/load persistence)
     private Dictionary<string, string> cardPowerEffects = new Dictionary<string, string>();
 
-    [SerializeField] private GameObject kapkacEffectPrefab; // Prefab with your PNG as a SpriteRenderers
+    [SerializeField] public GameObject kapkacEffectPrefab; // Prefab with your PNG as a SpriteRenderers
 
     [SerializeField] private GameObject kapkacAnimEffectPrefab; // The animation prefab for Kapkaç
 
@@ -361,25 +361,23 @@ public class GameManager : MonoBehaviour
 
     {
 
-        AddToDebugLog("[GameManager] ResetForNewRound called");
+        //AddToDebugLog("[GameManager] ResetForNewRound called");
 
-        AddToDebugLog($"[GameManager] currentSelectedHandCard before reset: {currentSelectedHandCard}");
+        //AddToDebugLog($"[GameManager] currentSelectedHandCard before reset: {currentSelectedHandCard}");
 
-        AddToDebugLog($"[GameManager] CardInteraction.currentlySelectedCard before reset: {CardInteraction.currentlySelectedCard?.gameObject.name}");
+        //AddToDebugLog($"[GameManager] CardInteraction.currentlySelectedCard before reset: {CardInteraction.currentlySelectedCard?.gameObject.name}");
 
         
 
-        foreach (var cardScript in cardInteractionsScripts)
-
-            cardScript.ResetToOriginalCard();
+        // CRITICAL: Don't try to reset destroyed cards - they'll be recreated fresh
+        // Clear the list since all card objects have been destroyed
+        if (cardInteractionsScripts != null) cardInteractionsScripts.Clear();
 
         currentSelectedHandCard = null;
 
         centerCards.Clear();
 
         centerCardsObjects.Clear();
-
-        //if (cardInteractionsScripts != null) cardInteractionsScripts.Clear();
 
         cardObjectsToBeDiscarted.Clear();
 
@@ -389,7 +387,7 @@ public class GameManager : MonoBehaviour
 
         turnTimer = 0f;
 
-        AddToDebugLog($"[GameManager] ResetForNewRound: Setting movePlayedLocally to false");
+        //AddToDebugLog($"[GameManager] ResetForNewRound: Setting movePlayedLocally to false");
 
         movePlayedLocally = false;
 
@@ -401,11 +399,9 @@ public class GameManager : MonoBehaviour
 
 
 
-        AddToDebugLog($"[GameManager] currentSelectedHandCard after reset: {currentSelectedHandCard}");
+        //AddToDebugLog($"[GameManager] currentSelectedHandCard after reset: {currentSelectedHandCard}");
 
-        AddToDebugLog($"[GameManager] CardInteraction.currentlySelectedCard after reset: {CardInteraction.currentlySelectedCard?.gameObject.name}");
-
-
+        //AddToDebugLog($"[GameManager] CardInteraction.currentlySelectedCard after reset: {CardInteraction.currentlySelectedCard?.gameObject.name}");
 
         if (roundCount != 0)
 
@@ -443,6 +439,57 @@ public class GameManager : MonoBehaviour
         // Player numbers and join codes should persist across rounds within the same game
         // Only clear PlayerPrefs when starting a completely new game (different lobby/relay)
 
+    }
+
+    /// <summary>
+    /// Reset GameManager for a completely NEW GAME (not a new round).
+    /// This resets all card values and power effects to original state.
+    /// </summary>
+    public void ResetForNewGame()
+    {
+        Debug.LogWarning("[GameManager] ===== RESETTING FOR NEW GAME =====");
+        
+        // CRITICAL: Destroy all card GameObjects first for clean slate
+        if (deckController != null)
+        {
+            deckController.DestroyAllCards();
+        }
+        
+        // Clear all tracking lists (cards are already destroyed)
+        if (cardInteractionsScripts != null) cardInteractionsScripts.Clear();
+        if (kapkacCardsToBeReset != null) kapkacCardsToBeReset.Clear();
+        if (cardPowerEffects != null) cardPowerEffects.Clear();
+        
+        // CRITICAL: Reset event subscription flag so new cards can subscribe to events!
+        alreadySubbed = false;
+        
+        // Reset essential game state only
+        currentSelectedHandCard = null;
+        if (centerCards != null) centerCards.Clear();
+        if (centerCardsObjects != null) centerCardsObjects.Clear();
+        if (cardObjectsToBeDiscarted != null) cardObjectsToBeDiscarted.Clear();
+        if (centerCardIDList != null) centerCardIDList.Clear();
+        if (myCards != null) myCards.Clear();
+        turnTimer = 0f;
+        movePlayedLocally = false;
+        hasAlreadySentRPC = false;
+        isProcessingCapture = false;
+        
+        // Reset power states
+        verZehriActive = false;
+        kutsalDesteActive = false;
+        valeArarActive = false;
+        isKopyalaActive = false;
+        isSunuDegisTokusActive = false;
+        isSunuDegisBunuTokusActive = false;
+        kopyalaSourceCard = null;
+        sunuDegisTokusFirstCard = null;
+        sunuDegisBunuTokusMyHandSnapshot = null;
+        sunuDegisBunuTokusSwapIndex = 0;
+        isKapkacPending = false;
+        isYandimAnamPending = false;
+        
+        Debug.LogWarning("[GameManager] GameManager reset complete - All cards destroyed, ready for NEW GAME");
     }
 
 
@@ -985,7 +1032,7 @@ public class GameManager : MonoBehaviour
             Debug.Log("[GameManager] Vale Arar indicators refreshed on new cards");
         }
 
-        SuperPowerSpawner.LocalInstance.ReadyToSpawnSuperPowers();
+        SuperPowerSpawner.LocalInstance.ReadyToSpawnSuperPowers(1);
         
         // Notify bot that dealing is complete
         NotifyBotDealingComplete();
@@ -1524,7 +1571,7 @@ public class GameManager : MonoBehaviour
 
             effect = Instantiate(kapkacEffectPrefab, cardObj.transform);
 
-            effect.transform.localPosition = new Vector3(0, 0, -0.03f); // Below the animation
+            effect.transform.localPosition = new Vector3(0, 0, -0.001f); // Below the animation
 
             kapkacCardsToBeReset.Add(cardObj);
 
@@ -2939,7 +2986,7 @@ public class GameManager : MonoBehaviour
                     if (indicator != null)
                     {
                         indicator.gameObject.SetActive(true);
-                        indicator.GetComponent<SpriteRenderer>().color = Color.red; // Set the sprite to card back
+                        indicator.GetComponent<SpriteRenderer>().color = new Color(1f, 0f, 0f, 0.5f); // Red with 50% transparency
                     }
                 }
             }
@@ -2987,7 +3034,7 @@ public class GameManager : MonoBehaviour
                     if (indicator != null)
                     {
                         indicator.gameObject.SetActive(true);
-                        indicator.GetComponent<SpriteRenderer>().color = Color.red; // Set the sprite to card back
+                        indicator.GetComponent<SpriteRenderer>().color = new Color(1f, 0f, 0f, 0.5f); // Red with 50% transparency
                     }
                 }
             }

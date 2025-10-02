@@ -13,8 +13,8 @@ public class SuperPowerSpawner : MonoBehaviour
     [SerializeField] private List<GameObject> superPowerTokens = new List<GameObject>();
     private Dictionary<SuperPower, GameObject> superPowerPrefabs = new Dictionary<SuperPower, GameObject>();
     private List<SuperPower> superPowerList = new List<SuperPower>(); // Now contains unique powers only (no pre-pooling)
-    [SerializeField] private int maxSuperPowers = 5;
-    private int numberOfSuperPowersToSpawn = 3;
+    [SerializeField] private int maxSuperPowers = 3;
+    private int numberOfSuperPowersToSpawn = 1;
     private List<GameObject> spawnedSuperPowers = new List<GameObject>();
     private Transform playerPowerPoolTransform;
     [SerializeField] private List<Transform> spawnPositions = new List<Transform>();
@@ -927,13 +927,23 @@ public class SuperPowerSpawner : MonoBehaviour
             bool isDualSelectionActive = GameManager.LocalInstance != null && 
                 (GameManager.LocalInstance.isKopyalaActive || GameManager.LocalInstance.isSunuDegisTokusActive || GameManager.LocalInstance.isSunuDegisBunuTokusActive);
             
+            // Check if peek powers are active (these should not stop showcase immediately)
+            bool isPeekPowerActive = SuperPowerToken.ActiveInstance != null && 
+                (SuperPowerToken.ActiveInstance.superPowerClassName == "UcundanGözAt" || 
+                 SuperPowerToken.ActiveInstance.superPowerClassName == "BayaBayaBak");
+            
             if (isDualSelectionActive)
             {
                 Debug.Log("[Showcase] InfoBox: Dual selection is active, NOT stopping showcase - InfoBox closed");
             }
+            else if (isPeekPowerActive)
+            {
+                Debug.Log("[Showcase] InfoBox: Peek power is active, NOT stopping showcase immediately - InfoBox closed");
+                // Don't stop showcase immediately for peek powers - let the animation handle it
+            }
             else
             {
-                Debug.Log("[Showcase] InfoBox: No dual selection active, force stopping hand showcase - InfoBox closed");
+                Debug.Log("[Showcase] InfoBox: No dual selection or peek power active, force stopping hand showcase - InfoBox closed");
                 ForceStopHandShowcase();
             }
         }
@@ -990,13 +1000,23 @@ public class SuperPowerSpawner : MonoBehaviour
             bool isDualSelectionActive = GameManager.LocalInstance != null && 
                 (GameManager.LocalInstance.isKopyalaActive || GameManager.LocalInstance.isSunuDegisTokusActive || GameManager.LocalInstance.isSunuDegisBunuTokusActive);
             
+            // Check if peek powers are active (these should not stop showcase immediately)
+            bool isPeekPowerActive = SuperPowerToken.ActiveInstance != null && 
+                (SuperPowerToken.ActiveInstance.superPowerClassName == "UcundanGözAt" || 
+                 SuperPowerToken.ActiveInstance.superPowerClassName == "BayaBayaBak");
+            
             if (isDualSelectionActive)
             {
                 Debug.Log("[Showcase] InfoBox: Dual selection is active, NOT stopping showcase - InfoBox closed immediately");
             }
+            else if (isPeekPowerActive)
+            {
+                Debug.Log("[Showcase] InfoBox: Peek power is active, NOT stopping showcase immediately - InfoBox closed immediately");
+                // Don't stop showcase immediately for peek powers - let the animation handle it
+            }
             else
             {
-                Debug.Log("[Showcase] InfoBox: No dual selection active, force stopping hand showcase - InfoBox closed immediately");
+                Debug.Log("[Showcase] InfoBox: No dual selection or peek power active, force stopping hand showcase - InfoBox closed immediately");
                 ForceStopHandShowcase();
             }
         }
@@ -1181,6 +1201,29 @@ public class SuperPowerSpawner : MonoBehaviour
      }
      
      /// <summary>
+     /// Called when peek animation completes - ensures InfoBox closes properly
+     /// </summary>
+     public void OnPeekAnimationComplete()
+     {
+         Debug.Log("[SuperPowerSpawner] OnPeekAnimationComplete called");
+         
+         // Check if we have a peek power active and InfoBox is still open
+         if (SuperPowerToken.ActiveInstance != null && 
+             (SuperPowerToken.ActiveInstance.superPowerClassName == "UcundanGözAt" || 
+              SuperPowerToken.ActiveInstance.superPowerClassName == "BayaBayaBak") &&
+             isInfoBoxOpen)
+         {
+             Debug.Log("[SuperPowerSpawner] Peek animation complete - closing InfoBox now");
+             
+             // Clear the active instance
+             SuperPowerToken.ActiveInstance = null;
+             
+             // Close InfoBox immediately
+             StartCoroutine(CloseInfoBox());
+         }
+     }
+     
+     /// <summary>
      /// Check if a card selection power is currently shown in the InfoBox
      /// </summary>
      public bool IsCardSelectionPowerInInfoBox()
@@ -1323,44 +1366,37 @@ public class SuperPowerSpawner : MonoBehaviour
         if (coinAmount < 0)
             return GetRandomSuperPower();
 
-        // Use unique powers from superPowerPrefabs.Keys - no pool depletion affects this
-        List<SuperPower> powers = new List<SuperPower>(superPowerPrefabs.Keys);
-        List<float> weights = new List<float>();
-        float totalWeight = 0f;
+        // Use unique powers from superPowerPrefabs.Keys
+        List<SuperPower> allPowers = new List<SuperPower>(superPowerPrefabs.Keys);
+        List<SuperPower> matchingPowers = new List<SuperPower>();
 
-        Debug.Log($"[SuperPowerSpawner] Calculating weights for coinAmount={coinAmount}:");
-        for (int i = 0; i < powers.Count; i++)
+        Debug.Log($"[SuperPowerSpawner] Searching for powers with rarity multiplier matching coinAmount={coinAmount}:");
+        
+        // Find all powers where rarity multiplier exactly matches the coin amount
+        for (int i = 0; i < allPowers.Count; i++)
         {
-            var power = powers[i];
+            var power = allPowers[i];
             int rarity = power.rarityMultiplier;
-            float weight = 1f / (1f + Mathf.Abs(rarity - coinAmount));
-            weights.Add(weight);
-            totalWeight += weight;
-            Debug.Log($"  Power: {power.name}, Rarity: {rarity}, Weight: {weight:F4}");
-        }
-
-        // Print normalized probabilities
-        Debug.Log("[SuperPowerSpawner] Normalized probabilities:");
-        for (int i = 0; i < powers.Count; i++)
-        {
-            float prob = weights[i] / totalWeight;
-            Debug.Log($"  {powers[i].name}: {prob:P2}");
-        }
-
-        float rand = Random.value * totalWeight;
-        Debug.Log($"[SuperPowerSpawner] Random value: {rand:F4} (totalWeight={totalWeight:F4})");
-        float cumulative = 0f;
-        for (int i = 0; i < powers.Count; i++)
-        {
-            cumulative += weights[i];
-            if (rand <= cumulative)
+            Debug.Log($"  Power: {power.name}, Rarity: {rarity}, Match: {rarity == coinAmount}");
+            
+            if (rarity == coinAmount)
             {
-                Debug.Log($"[SuperPowerSpawner] Selected: {powers[i].name}");
-                return powers[i];
+                matchingPowers.Add(power);
             }
         }
-        Debug.LogWarning("[SuperPowerSpawner] Fallback: selected last power.");
-        return powers[powers.Count - 1]; // fallback
+
+        // If we found matching powers, randomly select one
+        if (matchingPowers.Count > 0)
+        {
+            int randomIndex = Random.Range(0, matchingPowers.Count);
+            SuperPower selectedPower = matchingPowers[randomIndex];
+            Debug.Log($"[SuperPowerSpawner] Found {matchingPowers.Count} matching power(s). Selected: {selectedPower.name}");
+            return selectedPower;
+        }
+        
+        // No exact match found - fallback to random power
+        Debug.LogWarning($"[SuperPowerSpawner] No power found with rarity multiplier matching coinAmount={coinAmount}. Selecting random power as fallback.");
+        return GetRandomSuperPower();
     }
 
     private SuperPower GetRandomSuperPower()
@@ -3063,5 +3099,15 @@ public class SuperPowerSpawner : MonoBehaviour
         {
             Debug.LogWarning("[SuperPowerSpawner] No superpowers available to spawn randomly.");
         }
+    }
+
+    public void SetNameText(string name)
+    {
+        nameText.text = name;
+    }
+
+    public void SetDescriptionText(string description)
+    {
+        descriptionText.text = description;
     }
 }

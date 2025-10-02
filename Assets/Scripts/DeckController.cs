@@ -194,7 +194,25 @@ public class DeckController : MonoBehaviour
             //deckTransform.rotation = Quaternion.Euler(90, 0, 0);
         }
 
-        else yield return StartCoroutine(ResetCards());
+        else 
+        {
+            yield return StartCoroutine(ResetCards());
+            
+            // CRITICAL: Repopulate cardInteractionList even when using existing cards
+            cardInteractionList.Clear();
+            foreach (var card in cardObjectList)
+            {
+                if (card != null)
+                {
+                    CardInteraction cardInteraction = card.GetComponent<CardInteraction>();
+                    if (cardInteraction != null)
+                    {
+                        cardInteractionList.Add(cardInteraction);
+                    }
+                }
+            }
+            Debug.LogWarning($"[DeckController] Repopulated cardInteractionList with {cardInteractionList.Count} cards");
+        }
 
         // CRITICAL: Send card interactions to GameManager for reconnection
         // Debug.Log($"[DeckController] Sending {cardInteractionList.Count} card interactions to GameManager for reconnection");
@@ -373,12 +391,12 @@ public class DeckController : MonoBehaviour
                 {
                     case 0: // Bottom (Player 0)
                         offset = new Vector3(randomOffset1 * randomOffset2, j * 5, randomOffset1 * randomOffset2);
-                        rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + (randomOffset1 * 3), centerRotation.z);
+                        rotation = Quaternion.Euler(centerRotation.x, 0 + (randomOffset1 * 3), centerRotation.z);
                         //scales.Add(new Vector3(800, 800, 800));
                         break;
                     case 1: // Top (Player 2)
                         offset = new Vector3(randomOffset1 * randomOffset2, j * 5, randomOffset1 * randomOffset2);
-                        rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + (randomOffset1 * 3), centerRotation.z);
+                        rotation = Quaternion.Euler(centerRotation.x, 180 + (randomOffset1 * 3), centerRotation.z);
                         //scales.Add(new Vector3(600, 600, 600));
                         break;
                 }
@@ -472,19 +490,19 @@ public class DeckController : MonoBehaviour
                 {
                     case 0: // Bottom (Player 0)
                         offset = new Vector3(randomOffset1 * randomOffset2, j * 5, randomOffset1 * randomOffset2);
-                        rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + (randomOffset1 * 3), centerRotation.z);
+                        rotation = Quaternion.Euler(centerRotation.x, 0 + (randomOffset1 * 3), centerRotation.z);
                         break;
                     case 1: // Right (Player 1)
                         offset = new Vector3(randomOffset1 * randomOffset2, j * 5, randomOffset1 * randomOffset2);
-                        rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + 90 + (randomOffset1 * 3), centerRotation.z);
+                        rotation = Quaternion.Euler(centerRotation.x, 90 + (randomOffset1 * 3), centerRotation.z);
                         break;
                     case 2: // Top (Player 2)
                         offset = new Vector3(randomOffset1 * randomOffset2, j * 5, randomOffset1 * randomOffset2);
-                        rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + (randomOffset1 * 3), centerRotation.z);
+                        rotation = Quaternion.Euler(centerRotation.x, 180 + (randomOffset1 * 3), centerRotation.z);
                         break;
                     case 3: // Left (Player 3)
                         offset = new Vector3(randomOffset1 * randomOffset2, j * 5, randomOffset1 * randomOffset2);
-                        rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + 90 + (randomOffset1 * 3), centerRotation.z);
+                        rotation = Quaternion.Euler(centerRotation.x, 270 + (randomOffset1 * 3), centerRotation.z);
                         break;
                 }
 
@@ -825,9 +843,16 @@ public class DeckController : MonoBehaviour
                         StartCoroutine(MoveCardPositionAndScaleOnly(card, targetPosition, scale));
                         break;
                         
-                    case 1: // Right
-                    case 3: // Left
-                        offset = new Vector3(0, i * 10, spacing * 3f * (i - offsetMult));
+                    case 1: // Right (PlayerHand2) - shift +1000 on x-axis
+                        offset = new Vector3(1000, i * 10, spacing * 3f * (i - offsetMult));
+                        rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + 90, centerRotation.z);
+                        targetPosition = basePos + offset;
+                        Debug.Log($"[Showcase] DeckController: Moving {card.name} to position {targetPosition} (hand {handIdx}, card {i})");
+                        MoveCard(targetPosition, card, 10, rotation, scale);
+                        break;
+                        
+                    case 3: // Left (PlayerHand4) - shift -1000 on x-axis
+                        offset = new Vector3(-1000, i * 10, spacing * 3f * (i - offsetMult));
                         rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + 90, centerRotation.z);
                         targetPosition = basePos + offset;
                         Debug.Log($"[Showcase] DeckController: Moving {card.name} to position {targetPosition} (hand {handIdx}, card {i})");
@@ -894,8 +919,72 @@ public class DeckController : MonoBehaviour
         isShowcaseAllActive = false;
         Debug.Log("[Showcase] DeckController: Set isShowcaseAllActive = false");
         
+        // CRITICAL FIX: Don't restore cards immediately if peek animations are active
+        // This prevents the twitching conflict between showcase restoration and peek animations
+        if (IsPeekAnimationActive())
+        {
+            Debug.Log("[Showcase] DeckController: Peek animation is active - delaying showcase restoration");
+            StartCoroutine(DelayedShowcaseRestoration());
+            return;
+        }
+        
         // Restore all cards to their stored transforms and flags
         Debug.Log($"[Showcase] DeckController: Starting to restore {showcaseOriginalTransforms.Count} cards");
+        RestoreShowcaseCards();
+    }
+    
+    /// <summary>
+    /// Check if any peek animations are currently active
+    /// </summary>
+    private bool IsPeekAnimationActive()
+    {
+        // Check if SuperPowerToken has a peek power active
+        if (SuperPowerToken.ActiveInstance != null && 
+            (SuperPowerToken.ActiveInstance.superPowerClassName == "UcundanGözAt" || 
+             SuperPowerToken.ActiveInstance.superPowerClassName == "BayaBayaBak"))
+        {
+            return true;
+        }
+        
+        // Additional check: Look for cards that are currently being peeked
+        // (This is a backup check in case the SuperPowerToken check fails)
+        foreach (var kvp in showcaseOriginalTransforms)
+        {
+            GameObject card = kvp.Key;
+            if (card != null)
+            {
+                // Check if card is currently animating (being peeked)
+                if (DOTween.IsTweening(card.transform))
+                {
+                    Debug.Log($"[Showcase] DeckController: Found animating card {card.name} - peek animation active");
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+    
+    /// <summary>
+    /// Delayed showcase restoration for when peek animations are active
+    /// </summary>
+    private IEnumerator DelayedShowcaseRestoration()
+    {
+        Debug.Log("[Showcase] DeckController: Starting delayed showcase restoration");
+        
+        // Wait a bit longer than the peek animations to ensure they complete
+        float waitTime = 5.0f; // Safe buffer time
+        yield return new WaitForSeconds(waitTime);
+        
+        Debug.Log("[Showcase] DeckController: Delayed restoration - now restoring cards");
+        RestoreShowcaseCards();
+    }
+    
+    /// <summary>
+    /// Actually restore the showcase cards to their original positions
+    /// </summary>
+    private void RestoreShowcaseCards()
+    {
         int restoredCount = 0;
         foreach (var kvp in showcaseOriginalTransforms)
         {
@@ -930,7 +1019,6 @@ public class DeckController : MonoBehaviour
         // After restoring, update layout to ensure flags are correct for your hand
         Debug.Log("[Showcase] DeckController: Calling UpdateCurrentPlayerHandLayout() after restore");
         UpdateCurrentPlayerHandLayout();
-        Debug.Log("[Showcase] DeckController: UpdateCurrentPlayerHandLayout() completed");
     }
 
     public void UpdateShowcaseOriginalsAfterSwap(GameObject card)
@@ -1743,7 +1831,10 @@ public class DeckController : MonoBehaviour
             positions.Add(position);
             Quaternion rotation = Quaternion.Euler(tempRotation.x - 90, tempRotation.y, tempRotation.z + UnityEngine.Random.Range(170f, 190f));
             rotations.Add(rotation);
-            scales.Add(new Vector3(initialScale, initialScale, initialScale)); // Set scale for all cards
+            // CRITICAL FIX: Use smaller scale for captured cards moving to pools of players other than player 1
+            // Player 1 (local player) cards should remain at normal size, others should be smaller
+            int targetScale = (poolIndex == 0) ? initialScale : normalScale; // Use initialScale for player 1, normalScale for others
+            scales.Add(new Vector3(targetScale, targetScale, targetScale));
 
             if (piştiFlag)
             {
@@ -2103,6 +2194,11 @@ public class DeckController : MonoBehaviour
         yield return TweenMoveTransform(card.transform, originalPos, originalRot, originalScale, moveDuration);
 
         if (isMine) card.GetComponent<CardInteraction>().StartAutoRotate();
+
+        if (SuperPowerSpawner.LocalInstance != null && SuperPowerSpawner.LocalInstance.isInfoBoxOpen)
+        {
+            SuperPowerSpawner.LocalInstance.StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
+        }
     }
 
 
@@ -2136,7 +2232,19 @@ public class DeckController : MonoBehaviour
             float offset = (i - (cards.Count - 1) / 2f) * spread;
             Vector3 peekPos = originalPoss[i] + new Vector3(offset, yOffset, isMine ? 0 : (playerCount == 2 ? -500 : 0));
             peekPoss.Add(peekPos);
-            peekRots.Add(isMine ? Quaternion.Euler(-90, 0, 0) : Quaternion.Euler(90, 0, 0));
+            
+            // CRITICAL FIX: Use the same rotation logic as Ucundan Göz At for consistency
+            if (isMine)
+            {
+                // My cards: rotate to show back to me (same as Ucundan Göz At)
+                peekRots.Add(Quaternion.Euler(-90, 0, 0));
+            }
+            else
+            {
+                // Opponent cards: rotate to show their faces (same as Ucundan Göz At)
+                peekRots.Add(Quaternion.Euler(90, 0, 0));
+            }
+            
             peekScales.Add(isMine ? originalScales[i] : originalScales[i] * 2.0f);
         }
 
@@ -2171,6 +2279,22 @@ public class DeckController : MonoBehaviour
 
         for (int i = 0; i < cards.Count; i++)
             if (isMine) cards[i].GetComponent<CardInteraction>().StartAutoRotate();
+            
+        // CRITICAL FIX: Notify that Baya Baya Bak animation is complete
+        if (!isMine) // Only for opponent cards (Baya Baya Bak)
+        {
+            Debug.Log("[DeckController] Baya Baya Bak animation complete - notifying SuperPowerSpawner");
+            if (SuperPowerSpawner.LocalInstance != null)
+            {
+                SuperPowerSpawner.LocalInstance.OnPeekAnimationComplete();
+            }
+        }
+
+        // After the Baya Baya Bak animation is complete, close the InfoBox if needed
+        if (SuperPowerSpawner.LocalInstance != null && SuperPowerSpawner.LocalInstance.isInfoBoxOpen)
+        {
+            SuperPowerSpawner.LocalInstance.StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
+        }
     }
 
 
@@ -2748,6 +2872,61 @@ public class DeckController : MonoBehaviour
     public void TriggerMoveDeckToStartingPosition()
     {
         MoveDeckToStartingPosition();
+    }
+    
+    /// <summary>
+    /// Destroy all 52 card GameObjects to ensure clean slate for new game.
+    /// Call this when leaving game or disconnecting.
+    /// </summary>
+    public void DestroyAllCards()
+    {
+        Debug.LogWarning("[DeckController] ===== DESTROYING ALL CARD OBJECTS =====");
+        
+        int destroyedCount = 0;
+        
+        // Destroy all card GameObjects from cardObjectList
+        if (cardObjectList != null)
+        {
+            foreach (var cardObject in cardObjectList)
+            {
+                if (cardObject != null)
+                {
+                    Destroy(cardObject);
+                    destroyedCount++;
+                }
+            }
+            cardObjectList.Clear();
+            Debug.LogWarning($"[DeckController] Destroyed {destroyedCount} card objects from cardObjectList");
+        }
+        
+        // Clear all references
+        if (cardInteractionList != null)
+        {
+            cardInteractionList.Clear();
+        }
+        
+        if (activeCards != null)
+        {
+            activeCards.Clear();
+        }
+        
+        if (deckPool != null)
+        {
+            deckPool.Clear();
+        }
+        
+        if (orderedCardObjectList != null)
+        {
+            orderedCardObjectList.Clear();
+        }
+        
+        // Clear CardInteraction static lookup
+        if (CardInteraction.cardLookup != null)
+        {
+            CardInteraction.cardLookup.Clear();
+        }
+        
+        Debug.LogWarning($"[DeckController] All card objects destroyed and references cleared. Total destroyed: {destroyedCount}");
     }
     
     void OnDestroy()

@@ -192,7 +192,8 @@ public class CardInteraction : MonoBehaviour
                     CardInteraction.isOneCardSelected = false;
                 }
                 
-                GameManager.LocalInstance.networkRelay.ActivateKapkacOnCardServerRPC(this.uniqueCardInstanceID);
+                int playerNumber = DeckController.LocalInstance.thisPlayerNumber;
+                GameManager.LocalInstance.networkRelay.ActivateKapkacOnCardServerRPC(this.uniqueCardInstanceID, playerNumber);
                 Debug.Log($"[CardInteraction] KAPKAÇ POWER - Returning early, should NOT continue to normal selection");
                 return;
             }
@@ -558,17 +559,29 @@ public class CardInteraction : MonoBehaviour
     // Call this to reset the card to its original state:
     public void ResetToOriginalCard()
     {
-        if (originalCardID != null)
-        {
-            cardID = (int[])originalCardID.Clone();
-            gameObject.tag = cardID[0] + "_" + cardID[1];
-        }
-        if (originalSprite != null)
-            GetComponent<SpriteRenderer>().sprite = originalSprite;
+        // CRITICAL CHANGE: Do NOT reset card values or power effects!
+        // Power effects (Kapkaç, Yandım Anam, Kopyala Yapıştır) should persist across rounds
+        // Only reset sprite if there's no active power effect
         
-        // Reset power effect
-        activePowerEffect = "none";
+        Debug.Log($"[CardInteraction] ResetToOriginalCard called for {gameObject.name} - Power effect: {activePowerEffect}");
+        
+        // DO NOT reset cardID - it should maintain power-modified values
+        // DO NOT reset activePowerEffect - it should persist across rounds
+        
+        // Only reset the sprite if there's no power effect active
+        // This ensures visual effects remain while not interfering with cards that don't have effects
+        if (activePowerEffect == "none" && originalSprite != null)
+        {
+            GetComponent<SpriteRenderer>().sprite = originalSprite;
+        }
+        
+        Debug.Log($"[CardInteraction] Card values preserved - Current value: {cardID[1]}, Power effect: {activePowerEffect}");
     }
+    
+    /// <summary>
+    /// Completely reset card to original state for a NEW GAME (not a new round).
+    /// This resets card values AND power effects.
+    /// </summary>
 
     public void SetCardIDAndSprite(int[] newCardID, Sprite newSprite)
     {
@@ -700,11 +713,21 @@ public class CardInteraction : MonoBehaviour
         
         string parentName = gameObject.transform.parent != null ? gameObject.transform.parent.name : "";
         
-        // Check if it's a center or pool card (center cards can be selected for showcasing, but pools cannot)
+        // Check if it's a pool/pişti card - allow local player's pool cards for showcasing
         if (parentName.Contains("Pool") || parentName.Contains("Pişti"))
         {
-            Debug.Log($"[CardSelection] Cannot select {gameObject.name} - pool card");
-            return false;
+            // Check if this is the local player's pool/pişti (Player 1)
+            // Pool1 and Pişti1 are the local player's pools
+            if (parentName.Contains("Pool1") || parentName.Contains("Pişti1"))
+            {
+                Debug.Log($"[CardSelection] Can select {gameObject.name} - local player pool/pişti card (for showcasing)");
+                return true;
+            }
+            else
+            {
+                Debug.Log($"[CardSelection] Cannot select {gameObject.name} - other player's pool/pişti card");
+                return false;
+            }
         }
         
         // Allow center cards for showcasing purposes

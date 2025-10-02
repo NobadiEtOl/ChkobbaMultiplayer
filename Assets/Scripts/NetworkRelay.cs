@@ -351,7 +351,7 @@ public class NetworkRelay : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void ActivateKapkacOnCardServerRPC(string cardUniqueID)
+    public void ActivateKapkacOnCardServerRPC(string cardUniqueID, int playerNumber)
     {
         // Update the server's authoritative card data
         if (Server.Singleton != null && Server.Singleton.allCardLookup.ContainsKey(cardUniqueID))
@@ -363,6 +363,12 @@ public class NetworkRelay : NetworkBehaviour
         if (CardInteraction.cardLookup.ContainsKey(cardUniqueID))
         {
             CardInteraction.cardLookup[cardUniqueID].SetCardValue(11);
+        }
+
+        // SIMPLIFIED ZAFER PUANI: Add 1 point to the player/team who activated Kapkaç
+        if (Server.Singleton != null)
+        {
+            Server.Singleton.AddZaferPuaniPoint(playerNumber, 1);
         }
 
         KapkacCardChangedClientRPC(cardUniqueID);

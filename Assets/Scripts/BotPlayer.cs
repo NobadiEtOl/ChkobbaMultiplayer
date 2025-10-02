@@ -140,10 +140,11 @@ public class BotPlayer : MonoBehaviour
     /// <summary>
     /// Called by Server when it's the bot's turn
     /// </summary>
-    public void OnBotTurn()
+    /// <param name="playerNumber">The player number whose turn it is (1 for 1v1, or 1/2/3 for 2v2)</param>
+    public void OnBotTurn(int playerNumber)
     {
         BotLog($"[Bot] ===== BOT TURN NOTIFICATION =====");
-        BotLog($"[Bot] OnBotTurn called for player {botPlayerNumber}");
+        BotLog($"[Bot] OnBotTurn called for player {playerNumber}");
         
         if (!isActive)
         {
@@ -152,10 +153,13 @@ public class BotPlayer : MonoBehaviour
             return;
         }
         
+        // Store the player number for this move
+        botPlayerNumber = playerNumber;
+        
         // Check if bot's hand is empty (needs dealing)
-        if (IsBotHandEmpty())
+        if (IsBotHandEmpty(playerNumber))
         {
-            BotLog($"[Bot] Bot hand is empty - waiting for dealing to complete...");
+            BotLog($"[Bot] Bot hand (player {playerNumber}) is empty - waiting for dealing to complete...");
             isWaitingForDealing = true;
             hasQueuedMove = true;
             
@@ -164,7 +168,7 @@ public class BotPlayer : MonoBehaviour
             {
                 StopCoroutine(waitingForDealingCoroutine);
             }
-            waitingForDealingCoroutine = StartCoroutine(WaitForDealingComplete());
+            waitingForDealingCoroutine = StartCoroutine(WaitForDealingComplete(playerNumber));
             
             BotLog($"[Bot] ===== BOT TURN NOTIFICATION COMPLETE (WAITING FOR DEALING) =====");
             return;
@@ -228,14 +232,18 @@ public class BotPlayer : MonoBehaviour
         BotLog($"[Bot] ===== EXECUTE BOT MOVE START =====");
         BotLog($"[Bot] ExecuteBotMove called for bot player {botPlayerNumber}");
         
-        // Get the first card from PlayerHand3 (skipping non-card children)
-        BotLog($"[Bot] Getting first card from PlayerHand3...");
-        CardInteraction selectedCard = GetFirstCardFromPlayerHand3();
+        // Get the first card from the appropriate player hand
+        // The GetFirstCardFromPlayerHand method will determine the correct hand based on game mode
+        BotLog($"[Bot] Getting first card for bot player {botPlayerNumber}...");
+        CardInteraction selectedCard = GetFirstCardFromPlayerHand(botPlayerNumber);
         
         if (selectedCard == null)
         {
-            Debug.LogError($"[Bot] ERROR: No card found in PlayerHand3 for bot player {botPlayerNumber}");
-            AddBotLog($"[Bot] ERROR: No card found in PlayerHand3 for bot player {botPlayerNumber}");
+            // Get the game mode to show the correct hand name in error message
+            int gamePlayerCount = server != null ? server.GetPlayerCount() : 2;
+            string expectedHandName = gamePlayerCount == 2 ? $"PlayerHand{botPlayerNumber + 2}" : $"PlayerHand{botPlayerNumber + 1}";
+            Debug.LogError($"[Bot] ERROR: No card found in {expectedHandName} for bot player {botPlayerNumber}");
+            AddBotLog($"[Bot] ERROR: No card found in {expectedHandName} for bot player {botPlayerNumber}");
             return;
         }
         
@@ -285,42 +293,67 @@ public class BotPlayer : MonoBehaviour
     }
     
     /// <summary>
-    /// Checks if the bot's hand (PlayerHand3) is empty
+    /// Checks if the bot's hand is empty
     /// </summary>
+    /// <param name="playerNumber">The player number to check (1 for player 1, 2 for player 2, etc.)</param>
     /// <returns>True if the bot has no cards in its hand</returns>
-    private bool IsBotHandEmpty()
+    private bool IsBotHandEmpty(int playerNumber)
     {
-        BotLog($"[Bot] IsBotHandEmpty called");
+        BotLog($"[Bot] IsBotHandEmpty called for player {playerNumber}");
         
-        GameObject playerHand3 = GameObject.Find("PlayerHand3");
-        if (playerHand3 == null)
+        // Get the game mode (player count) to determine correct hand mapping
+        int gamePlayerCount = server != null ? server.GetPlayerCount() : 2; // Default to 1v1 if server not available
+        
+        string handName;
+        if (gamePlayerCount == 2)
         {
-            BotLog($"[Bot] ERROR: PlayerHand3 not found - assuming hand is empty");
+            // 1v1 mode: player 1 -> PlayerHand3
+            handName = $"PlayerHand{playerNumber + 2}";
+            BotLog($"[Bot] 1v1 mode detected: player {playerNumber} -> {handName}");
+        }
+        else if (gamePlayerCount == 4)
+        {
+            // 2v2 mode: player 1 -> PlayerHand2, player 2 -> PlayerHand3, player 3 -> PlayerHand4
+            handName = $"PlayerHand{playerNumber + 1}";
+            BotLog($"[Bot] 2v2 mode detected: player {playerNumber} -> {handName}");
+        }
+        else
+        {
+            // Fallback to 1v1 mapping
+            handName = $"PlayerHand{playerNumber + 2}";
+            BotLog($"[Bot] Unknown game mode (playerCount: {gamePlayerCount}), using 1v1 mapping: player {playerNumber} -> {handName}");
+        }
+        
+        GameObject playerHand = GameObject.Find(handName);
+        if (playerHand == null)
+        {
+            BotLog($"[Bot] ERROR: {handName} not found - assuming hand is empty");
             return true;
         }
         
         // Count actual cards (skip first 2 non-card children)
         int cardCount = 0;
-        for (int i = 2; i < playerHand3.transform.childCount; i++)
+        for (int i = 2; i < playerHand.transform.childCount; i++)
         {
-            Transform child = playerHand3.transform.GetChild(i);
+            Transform child = playerHand.transform.GetChild(i);
             if (child.GetComponent<CardInteraction>() != null)
             {
                 cardCount++;
             }
         }
         
-        BotLog($"[Bot] PlayerHand3 has {cardCount} cards (total children: {playerHand3.transform.childCount})");
+        BotLog($"[Bot] {handName} has {cardCount} cards (total children: {playerHand.transform.childCount})");
         return cardCount == 0;
     }
     
     /// <summary>
     /// Waits for dealing to complete, then plays the queued move
     /// </summary>
-    private IEnumerator WaitForDealingComplete()
+    /// <param name="playerNumber">The player number whose hand to check</param>
+    private IEnumerator WaitForDealingComplete(int playerNumber)
     {
         BotLog($"[Bot] ===== WAITING FOR DEALING COMPLETE =====");
-        BotLog($"[Bot] WaitForDealingComplete coroutine started");
+        BotLog($"[Bot] WaitForDealingComplete coroutine started for player {playerNumber}");
         
         float maxWaitTime = 10f; // Maximum wait time in seconds
         float checkInterval = 0.1f; // Check every 0.1 seconds (faster response)
@@ -331,7 +364,7 @@ public class BotPlayer : MonoBehaviour
             BotLog($"[Bot] Checking if dealing is complete... (elapsed: {elapsedTime:F1}s)");
             
             // Check if bot now has cards
-            if (!IsBotHandEmpty())
+            if (!IsBotHandEmpty(playerNumber))
             {
                 BotLog($"[Bot] ✓ Dealing complete! Bot now has cards");
                 break;
@@ -414,32 +447,65 @@ public class BotPlayer : MonoBehaviour
     }
     
     /// <summary>
-    /// Gets the first card from PlayerHand3, skipping non-card children
+    /// Gets the first card from PlayerHand3, skipping non-card children (legacy method for backward compatibility)
     /// </summary>
     /// <returns>The CardInteraction component of the first card, or null if no card found</returns>
     public CardInteraction GetFirstCardFromPlayerHand3()
     {
-        BotLog($"[Bot] GetFirstCardFromPlayerHand3 called");
+        return GetFirstCardFromPlayerHand(1); // Player 1 uses PlayerHand3
+    }
+    
+    /// <summary>
+    /// Gets the first card from any player hand, skipping non-card children
+    /// </summary>
+    /// <param name="playerNumber">The player number (0-3)</param>
+    /// <returns>The CardInteraction component of the first card, or null if no card found</returns>
+    public CardInteraction GetFirstCardFromPlayerHand(int playerNumber)
+    {
+        BotLog($"[Bot] GetFirstCardFromPlayerHand called for player {playerNumber}");
         
-        // Find PlayerHand3 GameObject
-        BotLog($"[Bot] Looking for PlayerHand3 GameObject...");
-        GameObject playerHand3 = GameObject.Find("PlayerHand3");
-        if (playerHand3 == null)
+        // Get the game mode (player count) to determine correct hand mapping
+        int gamePlayerCount = server != null ? server.GetPlayerCount() : 2; // Default to 1v1 if server not available
+        
+        string handName;
+        if (gamePlayerCount == 2)
         {
-            Debug.LogError("[Bot] ERROR: PlayerHand3 GameObject not found!");
-            AddBotLog("[Bot] ERROR: PlayerHand3 GameObject not found!");
+            // 1v1 mode: player 1 -> PlayerHand3
+            handName = $"PlayerHand{playerNumber + 2}";
+            BotLog($"[Bot] 1v1 mode detected: player {playerNumber} -> {handName}");
+        }
+        else if (gamePlayerCount == 4)
+        {
+            // 2v2 mode: player 1 -> PlayerHand2, player 2 -> PlayerHand3, player 3 -> PlayerHand4
+            handName = $"PlayerHand{playerNumber + 1}";
+            BotLog($"[Bot] 2v2 mode detected: player {playerNumber} -> {handName}");
+        }
+        else
+        {
+            // Fallback to 1v1 mapping
+            handName = $"PlayerHand{playerNumber + 2}";
+            BotLog($"[Bot] Unknown game mode (playerCount: {gamePlayerCount}), using 1v1 mapping: player {playerNumber} -> {handName}");
+        }
+        
+        // Find the appropriate PlayerHand GameObject
+        BotLog($"[Bot] Looking for {handName} GameObject...");
+        GameObject playerHand = GameObject.Find(handName);
+        if (playerHand == null)
+        {
+            Debug.LogError($"[Bot] ERROR: {handName} GameObject not found!");
+            AddBotLog($"[Bot] ERROR: {handName} GameObject not found!");
             return null;
         }
         
-        // PlayerHand3 structure: first 2 children are non-cards, rest are cards
+        // PlayerHand structure: first 2 children are non-cards, rest are cards
         // Skip the first 2 children and get the first actual card
-        int childCount = playerHand3.transform.childCount;
-        BotLog($"[Bot] ✓ PlayerHand3 found, total children: {childCount}");
+        int childCount = playerHand.transform.childCount;
+        BotLog($"[Bot] ✓ {handName} found, total children: {childCount}");
         
         BotLog($"[Bot] Searching for first card (skipping first 2 children)...");
         for (int i = 2; i < childCount; i++) // Start from index 2 to skip first 2 non-card children
         {
-            Transform child = playerHand3.transform.GetChild(i);
+            Transform child = playerHand.transform.GetChild(i);
             CardInteraction cardInteraction = child.GetComponent<CardInteraction>();
             
             if (cardInteraction != null)
@@ -453,8 +519,8 @@ public class BotPlayer : MonoBehaviour
             }
         }
         
-        Debug.LogWarning("[Bot] WARNING: No cards found in PlayerHand3");
-        AddBotLog("[Bot] WARNING: No cards found in PlayerHand3");
+        Debug.LogWarning($"[Bot] WARNING: No cards found in {handName}");
+        AddBotLog($"[Bot] WARNING: No cards found in {handName}");
         return null;
     }
     

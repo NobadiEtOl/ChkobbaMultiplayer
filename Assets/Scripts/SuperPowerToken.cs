@@ -27,13 +27,26 @@ public class SuperPowerToken : MonoBehaviour
             return;
         }
         
+        // Set active instance for peek power detection
+        SuperPowerToken.ActiveInstance = this;
+        
         power.ActivatePower();
         
         SuperPowerSpawner.LocalInstance.RemoveSpawnedSuperPower(gameObject);
         SuperPowerSpawner.LocalInstance.UpdateTokenPositions();
         
-        // FIXED: Start the close coroutine instead of calling CloseInfoBox directly
-        StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
+        // CRITICAL FIX: For peek powers, delay InfoBox closure to allow animation to complete
+        if (superPowerClassName == "UcundanGözAt" || superPowerClassName == "BayaBayaBak")
+        {
+            Debug.Log($"[SuperPowerToken] Peek power detected ({superPowerClassName}) - delaying InfoBox closure");
+            StartCoroutine(DelayedCloseInfoBoxForPeekPower());
+        }
+        else
+        {
+            // FIXED: Start the close coroutine instead of calling CloseInfoBox directly
+            StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
+        }
+        
         StartCoroutine(FadeOutSprite()); // Destroy the token after activation
     }
     
@@ -50,6 +63,29 @@ public class SuperPowerToken : MonoBehaviour
         {
             SuperPowerSpawner.LocalInstance.ShowOutOfTurnErrorMessage();
         }
+    }
+    
+    /// <summary>
+    /// Delayed InfoBox closure for peek powers to allow animations to complete
+    /// </summary>
+    private IEnumerator DelayedCloseInfoBoxForPeekPower()
+    {
+        Debug.Log($"[SuperPowerToken] Starting delayed closure for peek power: {superPowerClassName}");
+        
+        // Wait for peek animation to complete
+        // Ucundan Göz At: ~2.0 seconds (0.4 move + 1.2 pause + 0.4 move)
+        // Baya Baya Bak: ~3.8 seconds (0.4 move + 3.0 pause + 0.4 move)
+        // Add extra buffer time to ensure animation completes
+        float delayTime = superPowerClassName == "UcundanGözAt" ? 3.0f : 5.0f;
+        
+        Debug.Log($"[SuperPowerToken] Waiting {delayTime} seconds before closing InfoBox");
+        yield return new WaitForSeconds(delayTime);
+        
+        // Clear the active instance before closing
+        SuperPowerToken.ActiveInstance = null;
+        
+        Debug.Log($"[SuperPowerToken] Delayed closure complete - closing InfoBox now");
+        StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
     }
     
     /// <summary>
