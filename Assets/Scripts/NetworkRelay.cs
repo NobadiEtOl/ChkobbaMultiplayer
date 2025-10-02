@@ -381,6 +381,16 @@ public class NetworkRelay : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
+    public void ActivateZaferPuaniServerRPC(int playerNumber, int points)
+    {
+        // DIRECT POINT ADDITION: Add points immediately to the player/team
+        if (Server.Singleton != null)
+        {
+            Server.Singleton.AddZaferPuaniPoint(playerNumber, points);
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
     public void UseSunuDegisTokusServerRPC(int myPlayerNo, string myHandCardID, string otherHandCardID)
     {
         // Find the owner of the otherHandCardID

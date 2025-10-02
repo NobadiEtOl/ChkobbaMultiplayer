@@ -363,20 +363,27 @@ public class SunuDegisBunuTokus : SuperPower
 [CreateAssetMenu(menuName = "SuperPower/ZaferPuani")]
 public class ZaferPuani : SuperPower
 {
-    [SerializeField] public int points = 1; // Adjustable in Inspector
+    [SerializeField] public int points = 5; // Adjustable in Inspector
 
     private void OnEnable()
     {
         name = "Zafer Puanı";
-        description = "Kullanınca 1 puan kazan";
-        rarityMultiplier = 27;
+        description = "Kullanınca 5 puan kazan";
+        rarityMultiplier = 67;
     }
 
     public override void ActivatePower()
     {
-        // No active effect
-        // Debug.Log("Zafer Puanı has no active effect.");
+        Debug.Log($"[ZaferPuani] POWER ACTIVATION START - Player: {DeckController.LocalInstance?.thisPlayerNumber}, Points: {points}, Time: {Time.time}");
+        
+        // Call PowerActivated() first for visual effects
         PowerActivated();
+        
+        // DIRECT POINT ADDITION: Add points immediately to the player/team
+        int playerNumber = DeckController.LocalInstance.thisPlayerNumber;
+        GameManager.LocalInstance.networkRelay.ActivateZaferPuaniServerRPC(playerNumber, points);
+        
+        Debug.Log($"[ZaferPuani] POWER ACTIVATION COMPLETE - Added {points} points immediately to player {playerNumber}");
     }
 }
 
