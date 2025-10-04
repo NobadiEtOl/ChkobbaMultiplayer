@@ -2362,98 +2362,100 @@ public class DeckController : MonoBehaviour
         return null;
     }
 
-    public void SwapHandCardWithCenterCard(string handCardID, string centerCardID, int playerNo)
+    public IEnumerator SwapHandCardWithCenterCard(string handCardID, string centerCardID, int playerNo)
     {
-        // Track card movement in move chain
-        MoveChainIntegrator.TrackCardMovement(playerNo, handCardID, "Hand", "Center", "Bu Daha İyi power");
-        MoveChainIntegrator.TrackCardMovement(playerNo, centerCardID, "Center", "Hand", "Bu Daha İyi power");
-        
-        GameObject handCardObj = CardInteraction.cardLookup[handCardID].gameObject;
-        GameObject centerCardObj = CardInteraction.cardLookup[centerCardID].gameObject;
-
-        int relativeIndex = (playerNo - thisPlayerNumber + playerCount) % playerCount;
-        Transform handTransform = playerHandTransforms[GetPoolIndex(relativeIndex)];
-
-        // Find the index of the hand card in the hand
-        int handCardIndex = -1;
-        int idx = 0;
-        foreach (Transform child in handTransform)
         {
-            if (child.gameObject == handCardObj)
+            // Track card movement in move chain
+            MoveChainIntegrator.TrackCardMovement(playerNo, handCardID, "Hand", "Center", "Bu Daha İyi power");
+            MoveChainIntegrator.TrackCardMovement(playerNo, centerCardID, "Center", "Hand", "Bu Daha İyi power");
+
+            GameObject handCardObj = CardInteraction.cardLookup[handCardID].gameObject;
+            GameObject centerCardObj = CardInteraction.cardLookup[centerCardID].gameObject;
+
+            int relativeIndex = (playerNo - thisPlayerNumber + playerCount) % playerCount;
+            Transform handTransform = playerHandTransforms[GetPoolIndex(relativeIndex)];
+
+            // Find the index of the hand card in the hand
+            int handCardIndex = -1;
+            int idx = 0;
+            foreach (Transform child in handTransform)
             {
-                handCardIndex = idx;
-                break;
+                if (child.gameObject == handCardObj)
+                {
+                    handCardIndex = idx;
+                    break;
+                }
+                idx++;
             }
-            idx++;
-        }
 
-        // Find the index of the center card in the center
-        int centerCardIndex = -1;
-        idx = 0;
-        foreach (Transform child in centerTransform)
-        {
-            if (child.gameObject == centerCardObj)
+            // Find the index of the center card in the center
+            int centerCardIndex = -1;
+            idx = 0;
+            foreach (Transform child in centerTransform)
             {
-                centerCardIndex = idx;
-                break;
+                if (child.gameObject == centerCardObj)
+                {
+                    centerCardIndex = idx;
+                    break;
+                }
+                idx++;
             }
-            idx++;
+
+            // Store world positions before changing parents
+            Vector3 handCardOldPos = handCardObj.transform.position;
+            Quaternion handCardOldRot = handCardObj.transform.rotation;
+            Vector3 handCardOldScale = handCardObj.transform.localScale;
+
+            Vector3 centerCardOldPos = centerCardObj.transform.position;
+            Quaternion centerCardOldRot = centerCardObj.transform.rotation;
+            Vector3 centerCardOldScale = centerCardObj.transform.localScale;
+
+            // Change parents but keep world positions for animation
+            handCardObj.transform.SetParent(centerTransform, true);
+            centerCardObj.transform.SetParent(handTransform, true);
+
+            // Animate hand card to center card's old position
+            yield return StartCoroutine(MoveCardCoroutine(centerCardOldPos, handCardObj, 1, centerCardOldRot, new Vector3(centerScale, centerScale, centerScale)));
+
+            // Animate center card to hand card's old position
+            yield return StartCoroutine(MoveCardCoroutine(handCardOldPos, centerCardObj, 1, handCardOldRot, new Vector3(myCardsScale, myCardsScale, myCardsScale)));
+
+            // Insert centerCardObj at the same index in the hand as handCardObj was
+            List<Transform> handChildren = new List<Transform>();
+            foreach (Transform child in handTransform) handChildren.Add(child);
+
+            handChildren.Remove(centerCardObj.transform);
+            if (handCardIndex >= 0 && handCardIndex <= handChildren.Count)
+                handChildren.Insert(handCardIndex, centerCardObj.transform);
+            else
+                handChildren.Add(centerCardObj.transform);
+
+            // Reorder children
+            for (int i = 0; i < handChildren.Count; i++)
+                handChildren[i].SetSiblingIndex(i);
+
+            // Insert handCardObj at the same index in the center as centerCardObj was (optional, for visual consistency)
+            List<Transform> centerChildren = new List<Transform>();
+            foreach (Transform child in centerTransform) centerChildren.Add(child);
+
+            centerChildren.Remove(handCardObj.transform);
+            if (centerCardIndex >= 0 && centerCardIndex <= centerChildren.Count)
+                centerChildren.Insert(centerCardIndex, handCardObj.transform);
+            else
+                centerChildren.Add(handCardObj.transform);
+
+            for (int i = 0; i < centerChildren.Count; i++)
+                centerChildren[i].SetSiblingIndex(i);
+
+            // Set auto-rotate flags
+            handCardObj.GetComponent<CardInteraction>().StopAutoRotate();
+            centerCardObj.GetComponent<CardInteraction>().StartAutoRotate();
+            //centerCardObj.GetComponent<CardInteraction>().OnCardTouched(Input.mousePosition);
+
+            //UpdateCurrentPlayerHandLayout();
+            CardInteraction.currentlySelectedCard = null;
+            GameManager.LocalInstance.SetCurrentSelectedHandCardNull();
         }
-
-        // Store world positions before changing parents
-        Vector3 handCardOldPos = handCardObj.transform.position;
-        Quaternion handCardOldRot = handCardObj.transform.rotation;
-        Vector3 handCardOldScale = handCardObj.transform.localScale;
-
-        Vector3 centerCardOldPos = centerCardObj.transform.position;
-        Quaternion centerCardOldRot = centerCardObj.transform.rotation;
-        Vector3 centerCardOldScale = centerCardObj.transform.localScale;
-
-        // Change parents but keep world positions for animation
-        handCardObj.transform.SetParent(centerTransform, true);
-        centerCardObj.transform.SetParent(handTransform, true);
-
-        // Animate hand card to center card's old position
-        MoveCard(centerCardOldPos, handCardObj, 1, centerCardOldRot, new Vector3(centerScale, centerScale, centerScale));
-
-        // Animate center card to hand card's old position
-        MoveCard(handCardOldPos, centerCardObj, 1, handCardOldRot, new Vector3(myCardsScale, myCardsScale, myCardsScale));
-
-        // Insert centerCardObj at the same index in the hand as handCardObj was
-        List<Transform> handChildren = new List<Transform>();
-        foreach (Transform child in handTransform) handChildren.Add(child);
-
-        handChildren.Remove(centerCardObj.transform);
-        if (handCardIndex >= 0 && handCardIndex <= handChildren.Count)
-            handChildren.Insert(handCardIndex, centerCardObj.transform);
-        else
-            handChildren.Add(centerCardObj.transform);
-
-        // Reorder children
-        for (int i = 0; i < handChildren.Count; i++)
-            handChildren[i].SetSiblingIndex(i);
-
-        // Insert handCardObj at the same index in the center as centerCardObj was (optional, for visual consistency)
-        List<Transform> centerChildren = new List<Transform>();
-        foreach (Transform child in centerTransform) centerChildren.Add(child);
-
-        centerChildren.Remove(handCardObj.transform);
-        if (centerCardIndex >= 0 && centerCardIndex <= centerChildren.Count)
-            centerChildren.Insert(centerCardIndex, handCardObj.transform);
-        else
-            centerChildren.Add(handCardObj.transform);
-
-        for (int i = 0; i < centerChildren.Count; i++)
-            centerChildren[i].SetSiblingIndex(i);
-
-        // Set auto-rotate flags
-        handCardObj.GetComponent<CardInteraction>().StopAutoRotate();
-        centerCardObj.GetComponent<CardInteraction>().StartAutoRotate();
-        //centerCardObj.GetComponent<CardInteraction>().OnCardTouched(Input.mousePosition);
-
-        //UpdateCurrentPlayerHandLayout();
-        CardInteraction.currentlySelectedCard = null;
-        GameManager.LocalInstance.SetCurrentSelectedHandCardNull();
     }
 
 

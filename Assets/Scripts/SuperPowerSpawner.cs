@@ -1086,7 +1086,7 @@ public class SuperPowerSpawner : MonoBehaviour
     // Rest of your existing code remains the same...
     public List<string> restirictedPowersName_CardNeedToBeSelected = new List<string> { "Bu Daha İyi", "Şunu Değiş Tokuş", "Kopyala Yapıştır", "Kapkaç", "Yandım Anam"};
     private List<string> restirictedPowersName_CenterNotEmpty = new List<string> { "Bu Daha İyi", "Bomba" };
-    
+    public List<string> restirictedPowersName_WaitForSwap = new List<string> { "Bu Daha İyi", "Şunu Değiş Tokuş", "Şunu Değiş Bunu Tokuş", "Değiş Tokuş"};
     // Powers that require automatic hand showcasing when opened
     private List<string> powersRequiringHandShowcase = new List<string> { "Kapkaç", "Yandım Anam", "Kopyala Yapıştır" };
     

@@ -235,11 +235,33 @@ public class SuperPowerToken : MonoBehaviour
             }
         }
 
+
         // If a card is detected, set it as the currently selected card
         if (detectedCard != null)
         {
             CardInteraction.currentlySelectedCard = detectedCard;
             Debug.Log($"[SuperPowerToken] Set currentlySelectedCard to {detectedCard.gameObject.name}");
+
+            // Special logic for Bu Daha İyi: set GameManager.currentSelectedHandCard to this card's unique ID
+            if (power != null && power.name == "Bu Daha İyi")
+            {
+                if (GameManager.LocalInstance != null)
+                {
+                    GameManager.LocalInstance.currentSelectedHandCard = detectedCard.uniqueCardInstanceID;
+                    Debug.Log($"[SuperPowerToken] Bu Daha İyi: Set currentSelectedHandCard to {detectedCard.uniqueCardInstanceID}");
+                }
+            }
+        }
+
+        if (power.name == "Şunu Değiş Bunu Tokuş")
+        {
+            DeckController.LocalInstance.ShowcaseAllOtherHands();
+        }
+
+        if (power == null || SuperPowerSpawner.LocalInstance.restirictedPowersName_WaitForSwap.Contains(power.name) == false)
+        {
+            Debug.Log($"[SuperPowerToken] Exiting showcase for other hands - power: {(power != null ? power.name : "null")}");
+            DeckController.LocalInstance.ExitShowcaseAllOtherHands();
         }
 
         if (distance >= activationDistanceThreshold)
@@ -251,11 +273,6 @@ public class SuperPowerToken : MonoBehaviour
         {
             // Snap back to original position
             transform.position = originalPosition;
-        }
-        
-        // Only exit showcase for other hands if NOT Şunu Değiş Tokuş
-        if (power == null || power.name != "Şunu Değiş Tokuş")
-        {
             DeckController.LocalInstance.ExitShowcaseAllOtherHands();
         }
     }

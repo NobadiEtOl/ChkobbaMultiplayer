@@ -4038,7 +4038,7 @@ public class GameManager : MonoBehaviour
 
         // Track power completion
         MoveChainIntegrator.ReportPowerCompletion("Bu Daha İyi", playerNo, $"Swapped hand card {handCardID} with center card {centerCardID}");
-        
+
         // CRITICAL FIX: Force game state save after power completion to ensure reconnection sync
         if (Server.Singleton != null)
         {
@@ -4049,7 +4049,23 @@ public class GameManager : MonoBehaviour
         // Swap card objects visually
 
         deckController.SwapHandCardWithCenterCard(handCardID, centerCardID, playerNo);
+        
+        StartCoroutine(AnimateBuDahaIyiSwap(handCardID, centerCardID, playerNo));
 
+    }
+
+    private IEnumerator AnimateBuDahaIyiSwap(string handCardID, string centerCardID, int playerNo)
+    {
+    // Animate swap
+    yield return StartCoroutine(deckController.SwapHandCardWithCenterCard(handCardID, centerCardID, playerNo));
+
+    // Update showcase originals for both swapped cards
+    deckController.UpdateShowcaseOriginalsAfterSwap(CardInteraction.cardLookup[handCardID].gameObject);
+    deckController.UpdateShowcaseOriginalsAfterSwap(CardInteraction.cardLookup[centerCardID].gameObject);
+
+    // Now exit showcase
+    deckController.ExitShowcaseAllOtherHands();
+    deckController.TryStopShowcaseCenterCards();
     }
 
 
@@ -4232,11 +4248,11 @@ public class GameManager : MonoBehaviour
 
         yield return StartCoroutine(deckController.SwapCardsBetweenPlayersByID(myPlayerNo, myHandCardID, otherPlayerNo, otherHandCardID, true));
 
-        if(readyToExit) 
+        if (readyToExit)
         {
-            //deckController.ExitShowcaseAllOtherHands();
+            deckController.ExitShowcaseAllOtherHands();
             deckController.TryStopShowcaseCenterCards();
-            
+
             // CRITICAL FIX: Force game state save after power completion to ensure reconnection sync
             if (Server.Singleton != null)
             {
