@@ -318,18 +318,15 @@ public class SunuDegisTokus : SuperPower
     public override void ActivatePower()
     {
         Debug.Log($"[ŞunuDeğişTokuş] POWER ACTIVATION START - Player: {DeckController.LocalInstance?.thisPlayerNumber}, Time: {Time.time}");
-        Debug.Log($"[ŞunuDeğişTokuş] Currently selected card: {(CardInteraction.currentlySelectedCard != null ? CardInteraction.currentlySelectedCard.uniqueCardInstanceID : "NULL")}");
-        
-        // Check if a hand card is pre-selected
-        if (GameManager.LocalInstance.GetCurrentSelectedHandCard() == null)
+        // Instead of requiring a pre-selected card, enter selection mode after activation
+        GameManager.LocalInstance.isSunuDegisTokusActive = true;
+        GameManager.LocalInstance.sunuDegisTokusFirstCard = null;
+        Debug.Log("[ŞunuDeğişTokuş] Selection mode started. Please select two cards to swap.");
+        // Optionally, trigger hand showcase UI here
+        if (SuperPowerSpawner.LocalInstance != null)
         {
-            Debug.LogWarning("[ŞunuDeğişTokuş] No hand card selected! Please select a card from your hand first, then activate this power to select opponent's card.");
-            return;
+            SuperPowerSpawner.LocalInstance.StartHandShowcaseForDualSelection("Şunu Değiş Tokuş");
         }
-        
-        // Start dual selection mode - store own card and wait for opponent card selection
-        Debug.Log($"[ŞunuDeğişTokuş] Starting dual selection mode - own card: {GameManager.LocalInstance.GetCurrentSelectedHandCard()}");
-        GameManager.LocalInstance.StartSunuDegisTokusDualSelection(GameManager.LocalInstance.GetCurrentSelectedHandCard());
     }
 }
 

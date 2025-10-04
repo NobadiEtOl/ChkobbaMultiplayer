@@ -5,7 +5,7 @@ using UnityEngine;
 
 public class NetworkRelay : NetworkBehaviour
 {
-    [SerializeField] private Server server;
+    [SerializeField] public Server server;
     public static NetworkRelay Instance { get; private set; }
 
     private NetworkManagerUI networkManagerUI;

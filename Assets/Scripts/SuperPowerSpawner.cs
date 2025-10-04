@@ -64,6 +64,9 @@ public class SuperPowerSpawner : MonoBehaviour
     public bool isMenuPageOpen = false; // Track if menu page is currently open in InfoBox
     private Coroutine currentAnimationCoroutine; // Track current animation to prevent overlaps
 
+    private Queue<IEnumerator> infoBoxAnimationQueue = new Queue<IEnumerator>();
+    private bool isInfoBoxAnimationRunning = false;
+
     void Awake()
     {
         if (LocalInstance != null && LocalInstance != this)
@@ -206,7 +209,7 @@ public class SuperPowerSpawner : MonoBehaviour
             SuperPowerToken superPowerToken = hit.collider.GetComponent<SuperPowerToken>();
             if (superPowerToken != null)
             {
-                StartCoroutine(OpenInfoBox(superPowerToken));
+                //StartCoroutine(OpenInfoBox(superPowerToken));
                 return;
             }
         }
@@ -785,14 +788,14 @@ public class SuperPowerSpawner : MonoBehaviour
             if (PowerRequiresHandShowcase(superPowerToken.power.name))
             {
                 Debug.Log($"[Showcase] InfoBox: Starting hand showcase for {superPowerToken.power.name}");
-                deckController.ShowcaseAllOtherHands();
+                //deckController.ShowcaseAllOtherHands();
                 Debug.Log($"[Showcase] InfoBox: ShowcaseAllOtherHands() called for {superPowerToken.power.name}");
             }
             else
             {
                 // Stop showcasing if switching to a power that doesn't require card selection
                 Debug.Log($"[Showcase] InfoBox: Stopping hand showcase - switching to {superPowerToken.power.name}");
-                deckController.ExitShowcaseAllOtherHands();
+                //deckController.ExitShowcaseAllOtherHands();
                 Debug.Log($"[Showcase] InfoBox: ExitShowcaseAllOtherHands() called for {superPowerToken.power.name}");
             }
         }
@@ -1081,7 +1084,7 @@ public class SuperPowerSpawner : MonoBehaviour
     }
 
     // Rest of your existing code remains the same...
-    private List<string> restirictedPowersName_CardNeedToBeSelected = new List<string> { "Bu Daha İyi", "Şunu Değiş Tokuş", "Kopyala Yapıştır", "Kapkaç", "Yandım Anam"};
+    public List<string> restirictedPowersName_CardNeedToBeSelected = new List<string> { "Bu Daha İyi", "Şunu Değiş Tokuş", "Kopyala Yapıştır", "Kapkaç", "Yandım Anam"};
     private List<string> restirictedPowersName_CenterNotEmpty = new List<string> { "Bu Daha İyi", "Bomba" };
     
     // Powers that require automatic hand showcasing when opened
@@ -1160,7 +1163,7 @@ public class SuperPowerSpawner : MonoBehaviour
         }
         
         Debug.Log($"[Showcase] Starting hand showcase for dual selection: {powerName}");
-        deckController.ShowcaseAllOtherHands();
+        //deckController.ShowcaseAllOtherHands();
         Debug.Log($"[Showcase] ShowcaseAllOtherHands() called successfully for {powerName}");
     }
     
@@ -1178,7 +1181,7 @@ public class SuperPowerSpawner : MonoBehaviour
         }
         
         Debug.Log("[Showcase] Stopping hand showcase - dual selection complete");
-        deckController.ExitShowcaseAllOtherHands();
+        //deckController.ExitShowcaseAllOtherHands();
         Debug.Log("[Showcase] ExitShowcaseAllOtherHands() called successfully");
     }
     
@@ -1196,7 +1199,7 @@ public class SuperPowerSpawner : MonoBehaviour
          }
          
          Debug.Log("[Showcase] Force stopping hand showcase");
-         deckController.ExitShowcaseAllOtherHands();
+         //deckController.ExitShowcaseAllOtherHands();
          Debug.Log("[Showcase] Force stop - ExitShowcaseAllOtherHands() called successfully");
      }
      
@@ -1638,7 +1641,7 @@ public class SuperPowerSpawner : MonoBehaviour
         {
             if (SuperPowerToken.ActiveInstance != null)
             {
-                StartCoroutine(OpenInfoBox(SuperPowerToken.ActiveInstance));
+                //StartCoroutine(OpenInfoBox(SuperPowerToken.ActiveInstance));
             }
             else
             {
@@ -2497,7 +2500,7 @@ public class SuperPowerSpawner : MonoBehaviour
     }
     
     [ContextMenu("Spawn Değiş Tokuş")]
-    public void SpawnDegisTokus()
+    public void SpawnDegisTokuş()
     {
         SpawnSpecificPower("Değiş Tokuş");
     }
@@ -2551,13 +2554,13 @@ public class SuperPowerSpawner : MonoBehaviour
     }
     
     [ContextMenu("Spawn Şunu Değiş Tokuş")]
-    public void SpawnSunuDegisTokus()
+    public void SpawnSunuDegisTokuş()
     {
         SpawnSpecificPower("Şunu Değiş Tokuş");
     }
     
     [ContextMenu("Spawn Şunu Değiş Bunu Tokuş")]
-    public void SpawnSunuDegisBunuTokus()
+    public void SpawnSunuDegisBunuTokuş()
     {
         SpawnSpecificPower("Şunu Değiş Bunu Tokuş");
     }
@@ -3109,5 +3112,37 @@ public class SuperPowerSpawner : MonoBehaviour
     public void SetDescriptionText(string description)
     {
         descriptionText.text = description;
+    }
+
+    public void EnqueueOpenInfoBox(SuperPowerToken token)
+    {
+        infoBoxAnimationQueue.Enqueue(OpenInfoBox(token));
+        TryRunNextInfoBoxAnimation();
+    }
+
+    public void EnqueueCloseInfoBox()
+    {
+        infoBoxAnimationQueue.Enqueue(CloseInfoBox());
+        TryRunNextInfoBoxAnimation();
+    }
+
+    private void TryRunNextInfoBoxAnimation()
+    {
+        if (!isInfoBoxAnimationRunning && infoBoxAnimationQueue.Count > 0)
+        {
+            StartCoroutine(RunNextInfoBoxAnimation());
+        }
+    }
+
+    private IEnumerator RunNextInfoBoxAnimation()
+    {
+        isInfoBoxAnimationRunning = true;
+        while (infoBoxAnimationQueue.Count > 0)
+        {
+            IEnumerator anim = infoBoxAnimationQueue.Dequeue();
+            yield return StartCoroutine(anim);
+            yield return null; // Wait a frame before next animation
+        }
+        isInfoBoxAnimationRunning = false;
     }
 }

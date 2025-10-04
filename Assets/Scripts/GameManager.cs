@@ -746,7 +746,7 @@ public class GameManager : MonoBehaviour
 
                     AddToDebugLog($"[GameManager] Touch - No card found, calling TryStopAllShowcases");
 
-                    deckController.TryStopAllShowcases();
+                    //deckController.TryStopAllShowcases();
 
                 }
 
@@ -1121,29 +1121,55 @@ public class GameManager : MonoBehaviour
 
         if (isSunuDegisTokusActive)
         {
-            AddToDebugLog($"[GameManager] ŞunuDeğişTokuş is active, checking if card is from own hand");
+            AddToDebugLog($"[GameManager] ŞunuDeğişTokuş is active, card selection unrestricted");
 
-            // Only allow selecting a card outside your own hand for the second selection
-            if (myCards.Contains(cardID))
+            // If first card not selected, set it
+            if (string.IsNullOrEmpty(sunuDegisTokusFirstCard))
             {
-                AddToDebugLogWarning("You must select a card from another player's hand for ŞunuDeğişTokuş.");
+                sunuDegisTokusFirstCard = cardID;
+                AddToDebugLog($"[GameManager] ŞunuDeğişTokuş: First card selected: {cardID}");
                 return;
             }
 
-            // NOW call PowerActivated() since both cards are selected and we're executing the power
+            // If second card is same as first, ignore
+            if (sunuDegisTokusFirstCard == cardID)
+            {
+                AddToDebugLogWarning("ŞunuDeğişTokuş: Cannot select the same card twice.");
+                return;
+            }
+
+            // 1. Call PowerActivated for local effects
             if (DeckController.LocalInstance != null)
             {
                 Debug.Log("[GameManager] Calling PowerActivated() for Şunu Değiş Tokuş since both cards are now selected");
-                // Create a temporary power instance to call PowerActivated
                 var tempPower = ScriptableObject.CreateInstance<SunuDegisTokus>();
                 tempPower.PowerActivated();
                 DestroyImmediate(tempPower);
             }
 
-            // Send swap request to server
-            networkRelay.UseSunuDegisTokusServerRPC(deckController.thisPlayerNumber, sunuDegisTokusFirstCard, cardID);
+            // 2. Perform local swap and showcase exit immediately for power player
+            int myPlayerNo = deckController.thisPlayerNumber;
+            int otherPlayerNo = -1;
+            // Try to find owner of second card, but allow swap regardless
+            if (Server.Singleton != null)
+            {
+                otherPlayerNo = Server.Singleton.FindOwnerOfCard(cardID);
+            }
+            else if (NetworkRelay.Instance != null && NetworkRelay.Instance.server != null)
+            {
+                otherPlayerNo = NetworkRelay.Instance.server.FindOwnerOfCard(cardID);
+            }
+            if (otherPlayerNo == -1)
+            {
+                Debug.LogWarning($"[GameManager] Could not find owner for cardID {cardID}, proceeding with swap anyway.");
+            }
+            Debug.Log($"[GameManager] Performing local swap for Şunu Değiş Tokuş: {myPlayerNo} <-> {otherPlayerNo}, {sunuDegisTokusFirstCard} <-> {cardID}");
+            StartCoroutine(OnSunuDegisTokusSynced(myPlayerNo, otherPlayerNo, sunuDegisTokusFirstCard, cardID));
 
-            // Stop hand showcasing
+            // 3. Send swap request to server for other clients
+            networkRelay.UseSunuDegisTokusServerRPC(myPlayerNo, sunuDegisTokusFirstCard, cardID);
+
+            // 4. Stop hand showcasing
             Debug.Log("[Showcase] GameManager: Stopping Şunu Değiş Tokuş dual selection showcase");
             if (SuperPowerSpawner.LocalInstance != null)
             {
@@ -4208,7 +4234,7 @@ public class GameManager : MonoBehaviour
 
         if(readyToExit) 
         {
-            deckController.ExitShowcaseAllOtherHands();
+            //deckController.ExitShowcaseAllOtherHands();
             deckController.TryStopShowcaseCenterCards();
             
             // CRITICAL FIX: Force game state save after power completion to ensure reconnection sync

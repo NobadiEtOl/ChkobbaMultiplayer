@@ -1,0 +1,11 @@
+- Keep everything simple and readable.
+- Use existing functions and flows whenever possible.
+- If new functions are needed, keep them small, single-responsibility, and well-named.
+- Avoid deep nesting and overly clever logic — clarity beats cleverness.
+- Do not guess missing information — ask or leave a TODO comment.
+- Reason only from facts in the codebase or prompt.
+- Avoid speculative logic or placeholder values unless explicitly requested.
+- Always consider synchronization and latency — avoid blocking operations.
+- Use server-authoritative logic for game state and validation.
+- Keep client-side logic focused on UI, feedback, and prediction (if needed).
+- Avoid hardcoding player counts or roles — make systems flexible

@@ -726,7 +726,7 @@ public class DeckController : MonoBehaviour
         if (isShowcaseAllActive)
         {
             Debug.Log("[Showcase] DeckController: isShowcaseAllActive is true, calling ShowcaseAllOtherHandsLayout()");
-            ShowcaseAllOtherHandsLayout();
+            //ShowcaseAllOtherHandsLayout();
             return;
         }
 
@@ -836,7 +836,7 @@ public class DeckController : MonoBehaviour
                 switch (handIdx)
                 {
                     case 0: // Bottom (Your hand - Player 0)
-                        offset = new Vector3(spacing * 3f * (i - offsetMult), i * 10, 0);
+                        offset = new Vector3(spacing * 3f * (i - offsetMult), (i * 10)+1000, 0);
                         targetPosition = basePos + offset;
                         
                         // For your cards: Only change position and scale, keep current rotation
@@ -844,7 +844,7 @@ public class DeckController : MonoBehaviour
                         break;
                         
                     case 1: // Right (PlayerHand2) - shift +1000 on x-axis
-                        offset = new Vector3(1000, i * 10, spacing * 3f * (i - offsetMult));
+                        offset = new Vector3(1000, (i * 10) + 1000, spacing * 3f * (i - offsetMult));
                         rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + 90, centerRotation.z);
                         targetPosition = basePos + offset;
                         Debug.Log($"[Showcase] DeckController: Moving {card.name} to position {targetPosition} (hand {handIdx}, card {i})");
@@ -852,7 +852,7 @@ public class DeckController : MonoBehaviour
                         break;
                         
                     case 3: // Left (PlayerHand4) - shift -1000 on x-axis
-                        offset = new Vector3(-1000, i * 10, spacing * 3f * (i - offsetMult));
+                        offset = new Vector3(-1000, (i * 10) + 1000, spacing * 3f * (i - offsetMult));
                         rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + 90, centerRotation.z);
                         targetPosition = basePos + offset;
                         Debug.Log($"[Showcase] DeckController: Moving {card.name} to position {targetPosition} (hand {handIdx}, card {i})");
@@ -860,7 +860,7 @@ public class DeckController : MonoBehaviour
                         break;
                         
                     case 2: // Top
-                        offset = new Vector3(spacing * 3f * (i - offsetMult), i * 10, 0);
+                        offset = new Vector3(spacing * 3f * (i - offsetMult), (i * 10) + 1000, 0);
                         rotation = Quaternion.Euler(centerRotation.x, centerRotation.y, centerRotation.z);
                         targetPosition = basePos + offset;
                         Debug.Log($"[Showcase] DeckController: Moving {card.name} to position {targetPosition} (hand {handIdx}, card {i})");
@@ -1782,7 +1782,7 @@ public class DeckController : MonoBehaviour
         TryStopShowcasePlayerPoolCards();
         if (isShowcaseAllActive)
         {
-            ExitShowcaseAllOtherHands();
+            //ExitShowcaseAllOtherHands();
         }
     }
 

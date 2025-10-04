@@ -182,7 +182,7 @@ public class CardInteraction : MonoBehaviour
                 Debug.Log($"[CardInteraction] KAPKAÇ POWER ACTIVATED on card: {this.uniqueCardInstanceID}");
                 GameManager.LocalInstance.isKapkacPending = false;
                 CardInteraction.RestrictSelectionToOwnHand();
-                DeckController.LocalInstance.ExitShowcaseAllOtherHands();
+                //DeckController.LocalInstance.ExitShowcaseAllOtherHands();
                 
                 // IMPORTANT: Clear any existing selection state before applying Kapkaç
                 if (CardInteraction.currentlySelectedCard != null)
@@ -203,7 +203,7 @@ public class CardInteraction : MonoBehaviour
                 Debug.Log($"[CardInteraction] YANDIM ANAM POWER ACTIVATED on card: {this.uniqueCardInstanceID}");
                 GameManager.LocalInstance.isYandimAnamPending = false;
                 CardInteraction.RestrictSelectionToOwnHand();
-                DeckController.LocalInstance.ExitShowcaseAllOtherHands();
+                //DeckController.LocalInstance.ExitShowcaseAllOtherHands();
                 
                 // IMPORTANT: Clear any existing selection state before applying Yandım Anam
                 if (CardInteraction.currentlySelectedCard != null)
@@ -249,7 +249,7 @@ public class CardInteraction : MonoBehaviour
                 {
                     Debug.Log("[CardInteraction] Starting center showcase");
                     DeckController.LocalInstance.StopShowcasePlayerPoolCards();
-                    DeckController.LocalInstance.ExitShowcaseAllOtherHands();
+                    //DeckController.LocalInstance.ExitShowcaseAllOtherHands();
                     DeckController.LocalInstance.ShowcaseCenterCards();
                 }
             }

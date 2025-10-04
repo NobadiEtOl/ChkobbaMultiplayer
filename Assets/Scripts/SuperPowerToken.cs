@@ -9,6 +9,12 @@ public class SuperPowerToken : MonoBehaviour
     public SuperPower power; // Assign this in the Inspector
     public string superPowerClassName;
 
+    private float activationDistanceThreshold = 1000f; // Distance to trigger activation
+
+    private Vector3 originalPosition;
+    private bool isDragging = false;
+    private Vector3 offset;
+
     void Awake()
     {
 
@@ -142,6 +148,15 @@ public class SuperPowerToken : MonoBehaviour
             Debug.LogError("SuperPowerToken: Power is not assigned for " + gameObject.name);
         }
 
+        // Ensure a Collider2D is present for drag detection
+        if (GetComponent<Collider2D>() == null)
+        {
+            gameObject.AddComponent<BoxCollider2D>();
+        }
+
+        // Store the original position for snap-back
+        originalPosition = transform.position;
+
         // Fade in the token sprite
         StartCoroutine(FadeInSprite());
 
@@ -167,6 +182,91 @@ public class SuperPowerToken : MonoBehaviour
             Debug.LogWarning("No child object found to play animation.");
         }
     }
+
+    void OnMouseDown()
+    {
+        isDragging = true;
+        originalPosition = transform.position; // Update original position on drag start
+        offset = transform.position - GetMouseWorldPosition();
+        // Open InfoBox for this token when dragging starts using queue system
+        if (SuperPowerSpawner.LocalInstance != null)
+        {
+            SuperPowerSpawner.LocalInstance.EnqueueOpenInfoBox(this);
+        }
+
+        if(SuperPowerSpawner.LocalInstance != null && SuperPowerSpawner.LocalInstance.restirictedPowersName_CardNeedToBeSelected.Contains(power.name))
+        {
+            DeckController.LocalInstance.ShowcaseAllOtherHands();
+        }
+    }
+
+    void OnMouseDrag()
+    {
+        if (isDragging)
+        {
+            transform.position = GetMouseWorldPosition() + offset;
+        }
+    }
+
+    void OnMouseUp()
+    {
+        isDragging = false;
+        float distance = Vector3.Distance(transform.position, originalPosition);
+        // Always close InfoBox when dragging ends using queue system
+        if (SuperPowerSpawner.LocalInstance != null)
+        {
+            SuperPowerSpawner.LocalInstance.EnqueueCloseInfoBox();
+        }
+
+        // Detect cards directly beneath the token using a box
+        Vector3 boxCenter = transform.position + Vector3.down * 250f; // Move box down from token
+        Vector3 boxHalfExtents = new Vector3(250f, 10f, 250f); // Wide and shallow box
+        Quaternion boxOrientation = Quaternion.identity;
+        Collider[] colliders = Physics.OverlapBox(boxCenter, boxHalfExtents, boxOrientation);
+        CardInteraction detectedCard = null;
+        foreach (var collider in colliders)
+        {
+            CardInteraction card = collider.GetComponent<CardInteraction>();
+            if (card != null)
+            {
+                Debug.Log($"[Card] {card.gameObject.name}");
+                detectedCard = card;
+                break; // Only select the first detected card
+            }
+        }
+
+        // If a card is detected, set it as the currently selected card
+        if (detectedCard != null)
+        {
+            CardInteraction.currentlySelectedCard = detectedCard;
+            Debug.Log($"[SuperPowerToken] Set currentlySelectedCard to {detectedCard.gameObject.name}");
+        }
+
+        if (distance >= activationDistanceThreshold)
+        {
+            // Activate power if moved far enough
+            OnTokenClicked();
+        }
+        else
+        {
+            // Snap back to original position
+            transform.position = originalPosition;
+        }
+        
+        // Only exit showcase for other hands if NOT Şunu Değiş Tokuş
+        if (power == null || power.name != "Şunu Değiş Tokuş")
+        {
+            DeckController.LocalInstance.ExitShowcaseAllOtherHands();
+        }
+    }
+
+    private Vector3 GetMouseWorldPosition()
+    {
+        Vector3 mouseScreenPos = Input.mousePosition;
+        mouseScreenPos.z = Camera.main.WorldToScreenPoint(transform.position).z;
+        return Camera.main.ScreenToWorldPoint(mouseScreenPos);
+    }
+
     private IEnumerator FadeInSprite(float duration = 0.5f)
     {
         SpriteRenderer sr = GetComponent<SpriteRenderer>();
@@ -187,5 +287,14 @@ public class SuperPowerToken : MonoBehaviour
             yield return null;
         }
         sr.color = endColor;
+    }
+
+    void OnDrawGizmosSelected()
+    {
+    // Draw detection box for card detection in blue
+    Vector3 boxCenter = transform.position + Vector3.down * 250f;
+    Vector3 boxSize = new Vector3(500f, 20f, 500f); // Full size (2x half extents)
+    Gizmos.color = Color.blue;
+    Gizmos.DrawWireCube(boxCenter, boxSize);
     }
 }

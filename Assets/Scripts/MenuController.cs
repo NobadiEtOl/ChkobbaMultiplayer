@@ -841,24 +841,7 @@ public class MenuController : MonoBehaviour
     {
         Debug.Log($"[MenuController] Token clicked: {tokenData.tokenName}");
         SetMenuActive(false);
-        
-        if (instantiatedToken != null && SuperPowerSpawner.LocalInstance != null)
-        {
-            SuperPowerToken tokenScript = instantiatedToken.GetComponent<SuperPowerToken>();
-            if (tokenScript != null && tokenScript.power != null)
-            {
-                Debug.Log($"[MenuController] Opening InfoBox for instantiated token with power: {tokenScript.power.name}");
-                StartCoroutine(SuperPowerSpawner.LocalInstance.OpenInfoBox(tokenScript));
-            }
-            else
-            {
-                Debug.LogError($"[MenuController] TokenScript or power is null - tokenScript: {tokenScript != null}, power: {tokenScript?.power != null}");
-            }
-        }
-        else
-        {
-            Debug.LogError($"[MenuController] InstantiatedToken or SuperPowerSpawner.LocalInstance is null");
-        }
+        // InfoBox opening removed from here; now handled by SuperPowerToken drag logic only
     }
 
     private IEnumerator EnforceTransformNextFrame(GameObject tokenInstance)
@@ -1171,7 +1154,7 @@ public class MenuController : MonoBehaviour
         SuperPowerToken.ActiveInstance = menuToken;
         
         // Open InfoBox with proper animation (same as token behavior)
-        yield return StartCoroutine(SuperPowerSpawner.LocalInstance.OpenInfoBox(menuToken));
+        //yield return StartCoroutine(SuperPowerSpawner.LocalInstance.OpenInfoBox(menuToken));
         
         // Now show our menu
         SetMenuActive(true);
