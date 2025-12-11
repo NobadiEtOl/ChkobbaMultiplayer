@@ -260,6 +260,10 @@ namespace CRTFilter
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
+            // CRT Filter disabled - return early to show normal camera view
+            return;
+
+            /*
             if (shaderMaterial == null || crtRenderPass == null)
                 return;
 
@@ -295,6 +299,7 @@ namespace CRTFilter
 
             crtRenderPass.ConfigureInput(ScriptableRenderPassInput.Color);
             renderer.EnqueuePass(crtRenderPass);
+            */
         }
 
         class CRTRenderPass : ScriptableRenderPass

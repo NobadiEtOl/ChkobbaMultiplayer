@@ -49,8 +49,8 @@ Material:
     - _FadeOut: 2
     - _FadeStart: 0.8
     - _GlowIntensity: 0.5
-    - _GlowRadius: 0.8
-    - _InnerRadius: 0.4
+    - _GlowRadius: 1.436
+    - _InnerRadius: 0.49
     - _LargeStarSize: 0.15
     - _LineThickness: 0.1
     - _LineVariation: 0.3
@@ -59,7 +59,7 @@ Material:
     - _MediumStarSize: 0.08
     - _OutlineIntensity: 2
     - _OutlineWidth: 0.05
-    - _PointSharpness: 0.5
+    - _PointSharpness: 0.26
     - _PulseAmplitude: 0.1
     - _PulseSpeed: 1
     - _RandomSeed: 100
@@ -84,7 +84,7 @@ Material:
     - _SparkleIntensity: 0.5
     - _SparkleSize: 0.8
     - _SparkleSpeed: 1
-    - _StarBrightness: 3
+    - _StarBrightness: 3.32
     - _StarDelay: 0.3
     - _StarDensity: 20
     - _StarInterval: 0.5

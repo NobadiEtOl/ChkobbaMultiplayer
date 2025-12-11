@@ -621,180 +621,54 @@ public class GameManager : MonoBehaviour
 
 
 
-        // ...existing code...
+        // Handle mouse input (WebGL)
+        Vector3 mousePosition = Input.mousePosition;
+        Ray ray = Camera.main.ScreenPointToRay(mousePosition);
 
-        // Handle touch input (mobile)
-
-        /*if (Input.touchCount > 0)
-
+        // Mouse button down
+        if (Input.GetMouseButtonDown(0))
         {
-
-            Touch touch = Input.GetTouch(0);
-
-            Vector3 touchPosition = touch.position;
-
-
-
-            Ray ray = Camera.main.ScreenPointToRay(touchPosition);
-
-            if (Physics.Raycast(ray, out RaycastHit hit))
-
-            {
-
-                CardInteraction card = hit.collider.GetComponent<CardInteraction>();
-
-                if (card != null)
-
-                {
-
-                    switch (touch.phase)
-
-                    {
-
-                        case TouchPhase.Began:
-
-                            card.OnCardTouched(touchPosition);
-
-                            break;
-
-                        case TouchPhase.Moved:
-
-                            if (CardInteraction.currentlySelectedCard == card)
-
-                            {
-
-                                card.OnTouchDrag(touchPosition); // If you have this method/event
-
-                            }
-
-                            break;
-
-                        case TouchPhase.Ended:
-
-                        case TouchPhase.Canceled:
-
-                            if (CardInteraction.currentlySelectedCard == card)
-
-                            {
-
-                                card.OnTouchUp(); // If you have this method/event
-
-                                CardInteraction.currentlySelectedCard = null; // Reset the currently selected card
-
-                            }
-
-                            break;
-
-                    }
-
-                }
-
-            }
-
-        }*/
-
-        
-
-
-
-        if (Input.touchCount > 0)
-
-        {
-
-            Touch touch = Input.GetTouch(0);
-
-            AddToDebugLog($"[GameManager] Touch detected - Phase: {touch.phase}, Position: {touch.position}");
-
+            AddToDebugLog($"[GameManager] Mouse down detected - Position: {mousePosition}");
             
-
-            if (touch.phase == TouchPhase.Began)
-
-            {
-
-                //if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject(touch.fingerId))
-
-                    //return; // Don't raycast or close anything if over UI
-
-            }
-
-            Vector3 touchPosition = touch.position;
-
-            Ray ray = Camera.main.ScreenPointToRay(touchPosition);
-
             if (Physics.Raycast(ray, out RaycastHit hit))
-
             {
-
                 CardInteraction card = hit.collider.GetComponent<CardInteraction>();
                 AddToDebugLog($"[GameManager] Found CardInteraction: {card?.gameObject?.name}, parent: {card?.gameObject?.transform?.parent?.name}");
 
-                if (touch.phase == TouchPhase.Began && card != null)
-
+                if (card != null)
                 {
-
-                    AddToDebugLog($"[GameManager] Touch OnCardTouched called for card: {card.gameObject.name}, parent: {card.gameObject.transform.parent?.name}");
-
-                    card.OnCardTouched(touchPosition);
-
+                    AddToDebugLog($"[GameManager] Mouse OnCardTouched called for card: {card.gameObject.name}, parent: {card.gameObject.transform.parent?.name}");
+                    card.OnCardTouched(mousePosition);
                     tempCard = card; // Store the card for later use
-
                 }
-
-                else if (card == null && touch.phase == TouchPhase.Began)
-
+                else
                 {
-
-                    AddToDebugLog($"[GameManager] Touch - No card found, calling TryStopAllShowcases");
-
+                    AddToDebugLog($"[GameManager] Mouse - No card found, calling TryStopAllShowcases");
                     //deckController.TryStopAllShowcases();
-
                 }
-
-                else if (touch.phase == TouchPhase.Moved && tempCard != null)
-
-                {
-
-                    if (CardInteraction.currentlySelectedCard == tempCard)
-
-                    {
-
-                        AddToDebugLog($"[GameManager] Touch OnTouchDrag called for card: {tempCard.gameObject.name}");
-
-                        tempCard.OnTouchDrag(touchPosition);
-
-                    }
-
-                }
-
             }
-
-            // Handle touch up/cancel outside the raycast hit
-
-            if ((touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled) && tempCard != null)
-
-            {
-
-                if (CardInteraction.currentlySelectedCard == tempCard)
-
-                {
-
-                    AddToDebugLog($"[GameManager] Touch OnTouchUp called for card: {tempCard.gameObject.name}");
-
-                    tempCard.OnTouchUp();
-
-                }
-
-                tempCard = null;
-
-            }
-
         }
-
         
-
-        // Mouse input handling removed - touch system handles both mobile and mouse input
-
-        // This prevents double processing of the same interaction
+        // Mouse drag (while button held)
+        else if (Input.GetMouseButton(0) && tempCard != null)
+        {
+            if (CardInteraction.currentlySelectedCard == tempCard)
+            {
+                AddToDebugLog($"[GameManager] Mouse OnTouchDrag called for card: {tempCard.gameObject.name}");
+                tempCard.OnTouchDrag(mousePosition);
+            }
+        }
+        
+        // Mouse button up
+        else if (Input.GetMouseButtonUp(0) && tempCard != null)
+        {
+            if (CardInteraction.currentlySelectedCard == tempCard)
+            {
+                AddToDebugLog($"[GameManager] Mouse OnTouchUp called for card: {tempCard.gameObject.name}");
+                tempCard.OnTouchUp();
+            }
+            tempCard = null;
+        }
 
     }
 

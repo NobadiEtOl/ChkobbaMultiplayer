@@ -167,6 +167,7 @@ public class SuperPowerSpawner : MonoBehaviour
 
     void Update()
     {
+        // Handle mouse input for WebGL
         if (Input.GetMouseButtonDown(0))
         {
             if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
@@ -177,23 +178,6 @@ public class SuperPowerSpawner : MonoBehaviour
             if (Physics.Raycast(ray, out RaycastHit hit))
             {
                 HandleTokenRaycast(hit);
-            }
-        }
-
-        if (Input.touchCount > 0)
-        {
-            Touch touch = Input.GetTouch(0);
-
-            if (touch.phase == TouchPhase.Ended)
-            {
-                if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject(touch.fingerId))
-                    return;
-
-                Ray ray = Camera.main.ScreenPointToRay(touch.position);
-                if (Physics.Raycast(ray, out RaycastHit hit))
-                {
-                    HandleTokenRaycast(hit);
-                }
             }
         }
     }

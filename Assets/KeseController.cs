@@ -147,11 +147,8 @@ public class KeseController : MonoBehaviour
 
         PlayIdleAnimation_Internal();
 
-#if UNITY_EDITOR || UNITY_STANDALONE
+        // Use mouse input for WebGL
         HandleMouseInput();
-#elif UNITY_ANDROID || UNITY_IOS
-        HandleTouchInput();
-#endif
 
         // Check for hesap makinesi and kese timer logic
         CheckHesapMakinesiAndKeseTimer();
