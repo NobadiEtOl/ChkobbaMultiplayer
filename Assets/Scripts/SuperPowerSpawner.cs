@@ -376,10 +376,49 @@ public class SuperPowerSpawner : MonoBehaviour
             StartCoroutine(RestoreOriginalTextAfterDelay(originalName, originalDescription, 2f));
         }
     }
+
+    /// <summary>
+    /// Shows a floating "wait for your turn" message after tapping a token repeatedly out of turn.
+    /// </summary>
+    public void ShowWaitForTurnMessage()
+    {
+        if (nameText != null && descriptionText != null)
+        {
+            string originalName = nameText.text;
+            string originalDescription = descriptionText.text;
+
+            nameText.text = "Sıranı Bekle!";
+            descriptionText.text = "Tokeni kullanmak için sıranı bekle.";
+
+            StartCoroutine(RestoreOriginalTextAfterDelay(originalName, originalDescription, 2.5f));
+        }
+    }
     
     /// <summary>
     /// Restore original text after showing error message
     /// </summary>
+    /// <summary>
+    /// Plays the page-change animation and updates the description text after a short delay.
+    /// Used to guide players through dual-selection power steps (e.g. Şunu Değiş Tokuş).
+    /// </summary>
+    public void ShowDualSelectionStepText(string description)
+    {
+        if (!isInfoBoxOpen || backgroundPanel == null) return;
+        StartCoroutine(ShowDualSelectionStepTextCoroutine(description));
+    }
+
+    private IEnumerator ShowDualSelectionStepTextCoroutine(string description)
+    {
+        UIFrameAnimator frameAnimator = backgroundPanel.GetComponent<UIFrameAnimator>();
+        if (frameAnimator != null)
+            frameAnimator.PlayPageChangeAnimation();
+
+        yield return new WaitForSeconds(infoChangeDelay);
+
+        if (descriptionText != null)
+            descriptionText.text = description;
+    }
+
     private IEnumerator RestoreOriginalTextAfterDelay(string originalName, string originalDescription, float delay)
     {
         yield return new WaitForSeconds(delay);

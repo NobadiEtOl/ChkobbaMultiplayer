@@ -119,6 +119,10 @@ Shader "Unlit/StarShader_Mobile"
             float _EnableEmission;
             float _EnableSmoke;
 
+            // Global throttled time (set by ShaderTimeManager.cs)
+            float _GlobalShaderTime;
+            float _TimePhase;
+
             v2f vert (appdata v)
             {
                 v2f o;
@@ -152,7 +156,7 @@ Shader "Unlit/StarShader_Mobile"
                 pos = rotate2D(pos, _StarRotation);
                 
                 // Simple pulse effect
-                float pulseTime = _Time.y * _PulseSpeed;
+                float pulseTime = (_GlobalShaderTime + _TimePhase) * _PulseSpeed;
                 float pulse = sin(pulseTime + layerIndex * 0.5) * _PulseAmplitude;
                 size *= (1.0 + pulse);
                 
@@ -169,7 +173,7 @@ Shader "Unlit/StarShader_Mobile"
                 float currentRadius = size * lerp(1.0, _InnerRadius, pointFactor);
                 
                 // Single wave effect only
-                float waveTime = _Time.y * _WaveSpeed;
+                float waveTime = (_GlobalShaderTime + _TimePhase) * _WaveSpeed;
                 float wave = sin(angle * _WaveFrequency + waveTime) * _WaveAmplitude * size;
                 currentRadius += wave;
                 
@@ -209,7 +213,7 @@ Shader "Unlit/StarShader_Mobile"
                 float currentRadius = size * lerp(1.0, _InnerRadius, pointFactor);
                 
                 // Frame rate limited animation
-                float frameTime = floor(_Time.y * _AnimationFrameRate) / _AnimationFrameRate;
+                float frameTime = floor((_GlobalShaderTime + _TimePhase) * _AnimationFrameRate) / _AnimationFrameRate;
                 float time = frameTime;
                 
                 float totalEmission = 0.0;
@@ -249,7 +253,7 @@ Shader "Unlit/StarShader_Mobile"
                 float angle = atan2(pos.y, pos.x);
                 
                 // Frame rate limited animation
-                float frameTime = floor(_Time.y * _AnimationFrameRate) / _AnimationFrameRate;
+                float frameTime = floor((_GlobalShaderTime + _TimePhase) * _AnimationFrameRate) / _AnimationFrameRate;
                 float time = frameTime * _SmokeSpeed;
                 
                 // Single simple smoke calculation
@@ -281,7 +285,7 @@ Shader "Unlit/StarShader_Mobile"
                 float totalEmission = 0.0;
                 
                 // Frame rate limited time
-                float frameTime = floor(_Time.y * _AnimationFrameRate) / _AnimationFrameRate;
+                float frameTime = floor((_GlobalShaderTime + _TimePhase) * _AnimationFrameRate) / _AnimationFrameRate;
                 float time = frameTime * _ExpansionSpeed;
                 
                 // Minimal star layers for mobile

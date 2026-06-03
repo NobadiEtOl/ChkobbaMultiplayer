@@ -752,12 +752,61 @@ public class CardInteraction : MonoBehaviour
             (GameManager.LocalInstance.isKopyalaActive || 
              GameManager.LocalInstance.isSunuDegisTokusActive || 
              GameManager.LocalInstance.isSunuDegisBunuTokusActive);
+
+        bool isSunuDegisTokusFirstPhase = GameManager.LocalInstance != null &&
+                                         GameManager.LocalInstance.isSunuDegisTokusActive &&
+                                         !GameManager.LocalInstance.IsSunuDegisTokusSelectingOpponent();
+
+        bool isSunuDegisTokusSecondPhase = GameManager.LocalInstance != null &&
+                                          GameManager.LocalInstance.isSunuDegisTokusActive &&
+                                          GameManager.LocalInstance.IsSunuDegisTokusSelectingOpponent();
+
+        bool isSunuDegisBunuTokusActive = GameManager.LocalInstance != null &&
+                                         GameManager.LocalInstance.isSunuDegisBunuTokusActive;
         
         // Check if InfoBox power requires card selection (Kapkaç, Yandım Anam need any player card)
         bool isCardSelectionPowerActive = SuperPowerSpawner.LocalInstance != null && 
                                          SuperPowerSpawner.LocalInstance.isInfoBoxOpen &&
                                          SuperPowerSpawner.LocalInstance.IsCardSelectionPowerInInfoBox();
         
+        Transform localPlayerHand = GetLocalPlayerHandTransform();
+        bool isOwnHand = transform.parent == localPlayerHand;
+
+        if (isSunuDegisBunuTokusActive)
+        {
+            if (!isOwnHand)
+            {
+                Debug.Log($"[CardSelection] Can select {gameObject.name} - SunuDegisBunuTokus (opponent hand)");
+                return true;
+            }
+            Debug.Log($"[CardSelection] Cannot select {gameObject.name} - SunuDegisBunuTokus requires opponent hand");
+            return false;
+        }
+
+        if (isSunuDegisTokusFirstPhase)
+        {
+            if (isOwnHand)
+            {
+                Debug.Log($"[CardSelection] Can select {gameObject.name} - DeğişTokuş phase 1 (own hand)");
+                return true;
+            }
+
+            Debug.Log($"[CardSelection] Cannot select {gameObject.name} - DeğişTokuş phase 1 requires own hand");
+            return false;
+        }
+
+        if (isSunuDegisTokusSecondPhase)
+        {
+            if (!isOwnHand)
+            {
+                Debug.Log($"[CardSelection] Can select {gameObject.name} - DeğişTokuş phase 2 (opponent hand)");
+                return true;
+            }
+
+            Debug.Log($"[CardSelection] Cannot select {gameObject.name} - DeğişTokuş phase 2 requires opponent hand");
+            return false;
+        }
+
         if (isShowcaseActive || isDualSelectionActive || isCardSelectionPowerActive)
         {
             // During showcase, dual selection, or card selection powers - allow selection from any player hand
@@ -768,9 +817,6 @@ public class CardInteraction : MonoBehaviour
         }
         
         // Normal state - check if it's own hand using relativistic view
-        Transform localPlayerHand = GetLocalPlayerHandTransform();
-        bool isOwnHand = transform.parent == localPlayerHand;
-        
         if (isOwnHand)
         {
             Debug.Log($"[CardSelection] Can select {gameObject.name} - own hand card (PlayerHand1)");

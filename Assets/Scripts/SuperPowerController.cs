@@ -70,17 +70,22 @@ public class DeğişTokuş : SuperPower
     private void OnEnable()
     {
         name = "Değiş Tokuş";
-        description = "Rakip ile rastgele bir kart değiş tokuş";
+        description = "Bir kartını rakibin elindeki rastgele bir kartla değiştir";
         rarityMultiplier = 7;
     }
     public override void ActivatePower()
     {
-        // Debug.Log("Değiş Tokuş activated!");
+        Debug.Log($"[DeğişTokuş] POWER ACTIVATION START - Player: {DeckController.LocalInstance?.thisPlayerNumber}, Time: {Time.time}");
         PowerActivated();
         GameManager.LocalInstance.UseSwapCardWithOpponentPower();
+        Debug.Log("[DeğişTokuş] Random swap initiated.");
     }
 }
 
+// TODO: PowerDurationTimer — Kapkaç requires a pre-selected hand card before activation.
+// Consider adding a card-selection phase timer: when the player activates the token without a card selected,
+// enter a "waiting for selection" state, pause the turn timer, and start a power duration timer.
+// Cancel the pending selection if time runs out.
 [CreateAssetMenu(menuName = "SuperPower/Kapkaç")]
 public class Kapkaç : SuperPower
 {
@@ -137,6 +142,9 @@ public class ValeArar : SuperPower
 
 }
 
+// TODO: PowerDurationTimer — KopyalaYapıştır uses dual card selection (source + target).
+// Add PauseTurnTimerForPowerServerRPC + StartPowerDurationTimerServerRPC inside StartKopyalaYapistirDualSelection()
+// and handle CancelDualSelectionPower() equivalent to reset state if the timer expires.
 [CreateAssetMenu(menuName = "SuperPower/KopyalaYapistir")]
 public class KopyalaYapistir : SuperPower
 {
@@ -312,24 +320,20 @@ public class SunuDegisTokus : SuperPower
     private void OnEnable()
     {
         name = "Şunu Değiş Tokuş";
-        description = "Çoktan seçilmiş kartınla, istediğin kartı değiş tokuş";
+        description = "Önce kendi elinden bir kart seç, sonra rakibin elinden bir kart seç. Seçtiğin kartları birbirleriyle değiş tokuş yap";
         rarityMultiplier = 14;
     }
     public override void ActivatePower()
     {
         Debug.Log($"[ŞunuDeğişTokuş] POWER ACTIVATION START - Player: {DeckController.LocalInstance?.thisPlayerNumber}, Time: {Time.time}");
-        // Instead of requiring a pre-selected card, enter selection mode after activation
-        GameManager.LocalInstance.isSunuDegisTokusActive = true;
-        GameManager.LocalInstance.sunuDegisTokusFirstCard = null;
-        Debug.Log("[ŞunuDeğişTokuş] Selection mode started. Please select two cards to swap.");
-        // Optionally, trigger hand showcase UI here
-        if (SuperPowerSpawner.LocalInstance != null)
-        {
-            SuperPowerSpawner.LocalInstance.StartHandShowcaseForDualSelection("Şunu Değiş Tokuş");
-        }
+        GameManager.LocalInstance.StartSunuDegisTokusDualSelection(null, "Şunu Değiş Tokuş");
+        Debug.Log("[ŞunuDeğişTokuş] Selection mode started. Select own card first, then opponent card.");
     }
 }
 
+// TODO: PowerDurationTimer — ŞunuDeğişBunuTokuş is a multi-step sequential swap (N cards).
+// When the swap loop starts in ActivateSunuDegisBunuTokusPower(), pause the turn timer and start a cumulative power duration timer.
+// On each individual swap complete, optionally reset the per-swap timer. Cancel all remaining swaps if the timer expires.
 [CreateAssetMenu(menuName = "SuperPower/SunuDegisBunuTokus")]
 public class SunuDegisBunuTokus : SuperPower
 {
@@ -384,6 +388,10 @@ public class ZaferPuani : SuperPower
     }
 }
 
+// TODO: PowerDurationTimer — Yandım Anam requires a pre-selected card before activation.
+// Consider adding a card-selection phase timer: when the player activates the token without a card selected,
+// enter a "waiting for selection" state, pause the turn timer, and start a power duration timer.
+// Cancel the pending selection if time runs out.
 [CreateAssetMenu(menuName = "SuperPower/YandımAnam")]
 public class YandımAnam : SuperPower
 {

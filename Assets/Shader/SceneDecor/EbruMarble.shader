@@ -65,6 +65,10 @@ Shader "Custom/EbruMarble_TwoColorBands_Velvet"
             float4 _BandColorA;
             float4 _BandColorB;
 
+            // Global throttled time (set by ShaderTimeManager.cs)
+            float _GlobalShaderTime;
+            float _TimePhase;
+
             struct appdata
             {
                 float4 vertex : POSITION;
@@ -95,7 +99,7 @@ Shader "Custom/EbruMarble_TwoColorBands_Velvet"
             fixed4 frag(v2f i) : SV_Target
             {
                 float2 uv = (i.uv * 2.0 - 1.0) * _Zoom;
-                float t = _Time.x * _TimeSpeed;
+                float t = (_GlobalShaderTime + _TimePhase) * 0.05 * _TimeSpeed;
 
                 float angle = radians(_Rotation);
                 uv = rotate2D(uv, angle);

@@ -168,6 +168,10 @@ Shader "Unlit/StarShader"
             float4 _SmokeTextureOffset;
             float _SmokeTextureScale;
 
+            // Global throttled time (set by ShaderTimeManager.cs)
+            float _GlobalShaderTime;
+            float _TimePhase;
+
             v2f vert (appdata v)
             {
                 v2f o;
@@ -203,12 +207,12 @@ Shader "Unlit/StarShader"
                 pos = rotate2D(pos, _StarRotation);
                 
                 // Add pulse effect
-                float pulseTime = _Time.y * _PulseSpeed;
+                float pulseTime = (_GlobalShaderTime + _TimePhase) * _PulseSpeed;
                 float pulse = sin(pulseTime + layerIndex * 0.5) * _PulseAmplitude;
                 size *= (1.0 + pulse);
                 
                 // Add twist effect
-                float twistTime = _Time.y * _TwistSpeed;
+                float twistTime = (_GlobalShaderTime + _TimePhase) * _TwistSpeed;
                 float twist = sin(twistTime + layerIndex * 0.3) * _TwistAmplitude;
                 float twistAngle = twist * length(pos);
                 pos = rotate2D(pos, twistAngle);
@@ -232,7 +236,7 @@ Shader "Unlit/StarShader"
                 float currentRadius = size * lerp(1.0, _InnerRadius, pointFactor);
                 
                 // Add smooth wavy distortion to the radius
-                float waveTime = _Time.y * _WaveSpeed;
+                float waveTime = (_GlobalShaderTime + _TimePhase) * _WaveSpeed;
                 
                 // Create smoother random phase offset for each layer
                 float randomPhase = hash(layerIndex) * 6.28318; // 0 to 2π
@@ -306,7 +310,7 @@ Shader "Unlit/StarShader"
                  float currentRadius = size * lerp(1.0, _InnerRadius, pointFactor);
                  
                  // Add smooth wavy distortion to the radius (same as star shape)
-                 float waveTime = _Time.y * _WaveSpeed;
+                 float waveTime = (_GlobalShaderTime + _TimePhase) * _WaveSpeed;
                  float randomPhase = hash(layerIndex) * 6.28318;
                  float primaryWave = sin(angle * _WaveFrequency + waveTime + randomPhase);
                  float secondaryPhase = hash(layerIndex + 100.0) * 6.28318;
@@ -320,7 +324,7 @@ Shader "Unlit/StarShader"
                  
                                    // Create multiple emission lines around the star
                   float totalEmission = 0.0;
-                  float time = _Time.y * _EmissionSpeed;
+                  float time = (_GlobalShaderTime + _TimePhase) * _EmissionSpeed;
                   
                   for (int i = 0; i < _EmissionCount; i++)
                   {
@@ -334,7 +338,7 @@ Shader "Unlit/StarShader"
                       float2 lineDir = float2(cos(emissionAngle), sin(emissionAngle));
                       
                       // Add waviness to the line direction
-                      float waveTime = _Time.y * _EmissionSpeed;
+                      float waveTime = (_GlobalShaderTime + _TimePhase) * _EmissionSpeed;
                       float waveOffset = sin(waveTime + i * 0.5) * _EmissionWaveAmplitude;
                       float waveAngle = sin(waveTime * _EmissionWaveFrequency + i * 0.3) * _EmissionWaveAmplitude;
                       
@@ -388,7 +392,7 @@ Shader "Unlit/StarShader"
                  flowUV += _SmokeTextureOffset.xy;
                  flowUV *= _SmokeTextureScale;
                  
-                 float time = _Time.y * _SmokeFlowSpeed;
+                 float time = (_GlobalShaderTime + _TimePhase) * _SmokeFlowSpeed;
                  
                  // Create turbulent flow lines
                  float smoke = 0.0;
@@ -466,7 +470,7 @@ Shader "Unlit/StarShader"
                  float totalEmission = 0.0;
                 
                 // Current time
-                float time = _Time.y * _ExpansionSpeed;
+                float time = (_GlobalShaderTime + _TimePhase) * _ExpansionSpeed;
                 
                 // Create infinite expanding star layers with smoother transitions
                 for (int layer = 0; layer < 15; layer++)

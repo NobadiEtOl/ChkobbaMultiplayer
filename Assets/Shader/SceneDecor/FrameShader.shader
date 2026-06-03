@@ -57,6 +57,10 @@ Shader "Custom/SimpleTwoColorLines"
             float _Color3LineCount;
             float _Color3AnimationSpeed;
 
+            // Global throttled time (set by ShaderTimeManager.cs)
+            float _GlobalShaderTime;
+            float _TimePhase;
+
             struct appdata
             {
                 float4 vertex : POSITION;
@@ -118,7 +122,7 @@ Shader "Custom/SimpleTwoColorLines"
                 uv = rotate2d(uv, angle);
                 
                 // Add simple animation
-                float time = _Time.y * _AnimationSpeed;
+                float time = (_GlobalShaderTime + _TimePhase) * _AnimationSpeed;
                 
                 // Create wavy, turbulent distortion
                 float2 distortedUV = uv;
@@ -146,7 +150,7 @@ Shader "Custom/SimpleTwoColorLines"
                 lineValue = pow(lineValue, _Sharpness);
                 
                 // Create accent pattern for third color (inspired by MasaShader)
-                float color3Time = _Time.y * _Color3AnimationSpeed;
+                float color3Time = (_GlobalShaderTime + _TimePhase) * _Color3AnimationSpeed;
                 float accentPattern = sin(distortedUV.x * _Color3Frequency * _Color3LineCount + color3Time * 0.7 + sin(distortedUV.y * _Color3Frequency * 1.25 * _Color3LineCount + color3Time * 1.3));
                 accentPattern = accentPattern * 0.5 + 0.5; // Map to 0-1
                 

@@ -51,7 +51,21 @@ public class Server : NetworkBehaviour
     private bool oynayamazsinPending = false;
     private int oynayamazsinActivatedBy = -1;
     private HashSet<ulong> dealCenterFinishedClients = new HashSet<ulong>();
-    
+
+    // CONFIRMATION SYSTEM: Wait for all clients to acknowledge before advancing
+    private HashSet<ulong> pendingTurnConfirmations = new HashSet<ulong>();
+    private HashSet<ulong> dealHandsFinishedClients = new HashSet<ulong>();
+
+    // PLAYER-CLIENT MAPPING: Map player numbers to client IDs for move validation
+    public Dictionary<int, ulong> playerClientIds = new Dictionary<int, ulong>();
+
+    // TURN TIMER: Coroutine-based timer to auto-skip turns
+    private Coroutine activeTurnTimerCoroutine;
+
+    // POWER DURATION TIMER: Tracks how long a player can take during interactive power selection
+    private Coroutine activePowerDurationCoroutine;
+    private float powerDurationTime = 15f;
+
     // Track cards outside normal game flow (e.g., bombed cards)
     private List<string> bombedCards = new List<string>();
 
@@ -121,7 +135,6 @@ public class Server : NetworkBehaviour
         turnTime = 15f;
         connectedPlayerCount = 0; // FIXED: Reset connection count (host will make it 1)
         roundCount = 0; // CRITICAL: Reset round count so SaveAllCards creates fresh cards
-        readyToEndTurnCounter = 0;
         singleDebuggingMode = false;
         winnerPrintFlag = false;
         copiedCardMap.Clear();
@@ -141,6 +154,11 @@ public class Server : NetworkBehaviour
         
         // Reset connection tracking
         dealCenterFinishedClients.Clear();
+        pendingTurnConfirmations.Clear();
+        dealHandsFinishedClients.Clear();
+        playerClientIds.Clear();
+        if (activeTurnTimerCoroutine != null) { StopCoroutine(activeTurnTimerCoroutine); activeTurnTimerCoroutine = null; }
+        if (activePowerDurationCoroutine != null) { StopCoroutine(activePowerDurationCoroutine); activePowerDurationCoroutine = null; }
         initialDealCoroutineCheckCounter = 0;
         
         // Note: No longer tracking client sync state - using desync detection instead
@@ -167,7 +185,6 @@ public class Server : NetworkBehaviour
         timer = 0f;
         turnTime = 15f;
         //connectedPlayerCount = 0; // FIXED: Reset connection count (host will make it 1) for new round
-        readyToEndTurnCounter = 0;
         singleDebuggingMode = false;
         winnerPrintFlag = false;
         copiedCardMap.Clear();
@@ -189,6 +206,10 @@ public class Server : NetworkBehaviour
         
         // Reset connection tracking
         dealCenterFinishedClients.Clear();
+        pendingTurnConfirmations.Clear();
+        dealHandsFinishedClients.Clear();
+        if (activeTurnTimerCoroutine != null) { StopCoroutine(activeTurnTimerCoroutine); activeTurnTimerCoroutine = null; }
+        if (activePowerDurationCoroutine != null) { StopCoroutine(activePowerDurationCoroutine); activePowerDurationCoroutine = null; }
         initialDealCoroutineCheckCounter = 0;
         
         // Reset move chains for new round
@@ -426,17 +447,21 @@ public class Server : NetworkBehaviour
     private IEnumerator InitialDealCoroutine()
     {
         Debug.LogWarning("InitialDealCoroutine started");
-        // Initialize cardObjects
-
-        //AudioManager.Instance.PlayAudio(0, 5, false);
 
         yield return new WaitForSeconds(3.5f);
 
-        DealCardsToCenter();
+        // DealPhase handles: deal center → wait for all clients → deal hands → wait for all clients
+        yield return StartCoroutine(DealPhase(dealCenter: true));
 
-        //yield return new WaitForSeconds(1.25f);
+        Debug.LogWarning("InitialDealCoroutine: DealPhase complete, starting turn timer");
 
-        //DealCardsToPlayerHands();
+        // Start turn timer for the first player if human
+        bool isBotTurn = botPlayerActive && ((playerCount == 2 && currentPlayer == 1) || (playerCount == 4 && currentPlayer != 0));
+        if (!isBotTurn)
+        {
+            if (activeTurnTimerCoroutine != null) StopCoroutine(activeTurnTimerCoroutine);
+            activeTurnTimerCoroutine = StartCoroutine(TurnTimerCoroutine(currentPlayer));
+        }
     }
     private void ServerStart()
     {
@@ -666,63 +691,180 @@ public class Server : NetworkBehaviour
         //networkRelay.PrintPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs), piştiPlayer);
     }
 
-    public void EndTurnCheck()
+    // ===== CONFIRMATION SYSTEM =====
+
+    private int ConnectedNonBotPlayerCount()
     {
-        //if(!singleDebuggingMode)
-        //{
-        readyToEndTurnCounter++;
-        Debug.LogError($"[END TURN CHECK] readyToEndTurnCounter: {readyToEndTurnCounter}, connectedPlayerCount: {connectedPlayerCount}, currentPlayer: {currentPlayer}, turnCounter: {turnCounter}");
-        if (readyToEndTurnCounter == connectedPlayerCount)
-        {
-            Debug.LogError($"[END TURN CHECK] All players ready, calling EndTurn() - turnCounter: {turnCounter}");
-            EndTurn();
-            readyToEndTurnCounter = 0;
-        }
-        //}
+        if (NetworkManager.Singleton == null) return connectedPlayerCount;
+        return NetworkManager.Singleton.ConnectedClients.Count;
     }
-    //Called at the end of each turn
-    public void EndTurn()
+
+    private IEnumerator WaitForConfirmations(HashSet<ulong> tracker, string label, float timeoutSeconds)
     {
-        // Debug.Log($"[Server] ===== END TURN CALLED =====\n" +
-        //          $"TurnCounter: {turnCounter}\n" +
-        //          $"PlayerCount: {playerCount}\n" +
-        //          $"ConnectedPlayerCount: {connectedPlayerCount}\n" +
-        //          $"ReconnectingClients: {reconnectingClients.Count}");
-        
-        //Debug.LogWarning("InsideEndTurn");
-        
+        float elapsed = 0f;
+        while (elapsed < timeoutSeconds)
+        {
+            int required = ConnectedNonBotPlayerCount();
+            if (tracker.Count >= required) break;
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+        int finalRequired = ConnectedNonBotPlayerCount();
+        if (elapsed >= timeoutSeconds)
+            Debug.LogWarning($"[Server] WaitForConfirmations({label}): timed out after {timeoutSeconds}s (got {tracker.Count}/{finalRequired})");
+        else
+            Debug.Log($"[Server] WaitForConfirmations({label}): all {tracker.Count} clients confirmed");
+    }
+
+    public void OnClientTurnProcessed(ulong clientId)
+    {
+        pendingTurnConfirmations.Add(clientId);
+        Debug.Log($"[Server] Client {clientId} confirmed turn processed. {pendingTurnConfirmations.Count}/{ConnectedNonBotPlayerCount()}");
+    }
+
+    public void OnClientDealHandsFinished(ulong clientId)
+    {
+        dealHandsFinishedClients.Add(clientId);
+        Debug.Log($"[Server] Client {clientId} confirmed deal hands finished. {dealHandsFinishedClients.Count}/{ConnectedNonBotPlayerCount()}");
+    }
+
+    // ===== POST-MOVE SEQUENCE =====
+
+    private IEnumerator PostMoveSequence()
+    {
+        pendingTurnConfirmations.Clear();
+        yield return StartCoroutine(WaitForConfirmations(pendingTurnConfirmations, "move", 8f));
+
+        if (activeTurnTimerCoroutine != null)
+        {
+            StopCoroutine(activeTurnTimerCoroutine);
+            activeTurnTimerCoroutine = null;
+        }
+
         int modulo = turnCounter % (playerCount * 4);
         int target = (playerCount * 4) - 1;
-        
-        Debug.LogError($"[DEALING CHECK] turnCounter: {turnCounter}, playerCount: {playerCount}, modulo: {modulo}, target: {target}, shouldDeal: {modulo == target}");
-        
+        Debug.LogError($"[DEALING CHECK] PostMoveSequence: turnCounter={turnCounter}, modulo={modulo}, target={target}, shouldDeal={modulo == target}");
+
         if (modulo == target)
         {
-            //If each player played their 4 cards, check if we can deal new cards
             if (deckCardsDict != null && deckCardsDict.Count >= (playerCount * 4))
             {
-                //If there are enough cards in the deck, deal new cards
-                Debug.LogError($"[DEALING] TIME TO DEAL NEW CARDS! turnCounter: {turnCounter}, calling DealCardsToPlayerHands in 1 second");
-                Invoke("DealCardsToPlayerHands", 1f);
+                Debug.LogError($"[DEALING] PostMoveSequence: Starting DealPhase");
+                yield return StartCoroutine(DealPhase(dealCenter: false));
             }
             else
             {
-                //If there are not enough cards in the deck, the round ends
-                Debug.LogError($"[ROUND END] Not enough cards to deal! turnCounter: {turnCounter}, deckCount: {deckCardsDict?.Count ?? 0}, calling DecideWinner");
+                Debug.LogError($"[ROUND END] PostMoveSequence: Not enough cards, calling DecideWinner");
                 DecideWinner();
+                yield break;
             }
         }
-        
-        // NOTE: Oynayamazsın pending logic moved to GetMove() to activate when next card is played
-        
-        // CRITICAL FIX: Increment turn counter AFTER checking if it's time to deal
-        // This ensures the dealing logic works correctly with the original design
-        NextTurn();
 
-        // NOTE: Ver Zehri and Kutsal Deste pending logic moved to GetMove() to activate when next card is played
-        
-        // Send game state snapshot after turn changes
-        // Disabled: only manual load should broadcast snapshots
+        NextTurn();
+    }
+
+    private IEnumerator DealPhase(bool dealCenter = false)
+    {
+        if (dealCenter)
+        {
+            dealCenterFinishedClients.Clear();
+            DealCardsToCenter();
+            yield return StartCoroutine(WaitForConfirmations(dealCenterFinishedClients, "centerDeal", 12f));
+        }
+
+        dealHandsFinishedClients.Clear();
+        DealCardsToPlayerHands();
+        yield return StartCoroutine(WaitForConfirmations(dealHandsFinishedClients, "handsDeal", 12f));
+    }
+
+    // --- Power Duration Timer Methods ---
+
+    /// <summary>Stops the current turn timer so it doesn't expire while a player is making a power selection.</summary>
+    public void PauseTurnTimerForPower()
+    {
+        if (activeTurnTimerCoroutine != null)
+        {
+            StopCoroutine(activeTurnTimerCoroutine);
+            activeTurnTimerCoroutine = null;
+            Debug.Log("[Server] Turn timer paused for power selection");
+        }
+    }
+
+    /// <summary>Starts a separate timeout coroutine for interactive power selection. If it expires the power is cancelled and the turn timer resumes.</summary>
+    public void StartPowerDurationTimer()
+    {
+        if (activePowerDurationCoroutine != null)
+        {
+            StopCoroutine(activePowerDurationCoroutine);
+            activePowerDurationCoroutine = null;
+        }
+        activePowerDurationCoroutine = StartCoroutine(PowerDurationTimerCoroutine(currentPlayer));
+        Debug.Log($"[Server] Power duration timer started for player {currentPlayer} ({powerDurationTime}s)");
+    }
+
+    /// <summary>Stops the power duration timer (called when the power is completed successfully) and restarts the turn timer after a short delay for animation.</summary>
+    public void StopPowerDurationTimerAndResumeTurn()
+    {
+        if (activePowerDurationCoroutine != null)
+        {
+            StopCoroutine(activePowerDurationCoroutine);
+            activePowerDurationCoroutine = null;
+            Debug.Log("[Server] Power duration timer stopped — power completed");
+        }
+        // Resume turn timer after a short delay to let the swap animation finish on clients
+        StartCoroutine(ResumeTurnTimerAfterDelay(currentPlayer, 1.5f));
+    }
+
+    private IEnumerator PowerDurationTimerCoroutine(int forPlayer)
+    {
+        yield return new WaitForSeconds(powerDurationTime);
+        if (currentPlayer != forPlayer) { activePowerDurationCoroutine = null; yield break; }
+
+        Debug.LogWarning($"[Server] Power selection timed out for player {forPlayer} — cancelling power");
+        activePowerDurationCoroutine = null;
+
+        // Tell all clients to cancel the power
+        if (networkRelay != null)
+            networkRelay.CancelPowerSelectionClientRPC();
+
+        // Resume the turn timer immediately so the player can still play a card
+        if (activeTurnTimerCoroutine != null) StopCoroutine(activeTurnTimerCoroutine);
+        activeTurnTimerCoroutine = StartCoroutine(TurnTimerCoroutine(currentPlayer));
+    }
+
+    private IEnumerator ResumeTurnTimerAfterDelay(int forPlayer, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (currentPlayer != forPlayer) yield break;
+        if (activeTurnTimerCoroutine != null) StopCoroutine(activeTurnTimerCoroutine);
+        activeTurnTimerCoroutine = StartCoroutine(TurnTimerCoroutine(currentPlayer));
+        Debug.Log($"[Server] Turn timer resumed for player {forPlayer} after power completion");
+    }
+
+    // --- End Power Duration Timer Methods ---
+
+    private IEnumerator TurnTimerCoroutine(int forPlayer)
+    {
+        yield return new WaitForSeconds(turnTime);
+        if (currentPlayer != forPlayer) yield break;
+
+        if (playersHandCardsIDs != null && playersHandCardsIDs.ContainsKey(forPlayer) && playersHandCardsIDs[forPlayer].Count > 0)
+        {
+            string autoCard = playersHandCardsIDs[forPlayer][0];
+            Debug.LogWarning($"[Server] Turn timer expired for player {forPlayer}, auto-playing card {autoCard}");
+            GetMove(autoCard, new SerializableCard(new Dictionary<string, int[]>()), forPlayer, 0);
+        }
+        else
+        {
+            Debug.LogWarning($"[Server] Turn timer expired for player {forPlayer}, no cards - skipping turn");
+            StartCoroutine(PostMoveSequence());
+        }
+    }
+
+    //Called at the end of each turn — now only used for external callers; normal flow uses PostMoveSequence
+    public void EndTurn()
+    {
+        StartCoroutine(PostMoveSequence());
     }
 
     private void NextTurn()
@@ -750,6 +892,12 @@ public class Server : NetworkBehaviour
             {
                 botPlayer.OnBotTurn(currentPlayer);
             }
+        }
+        else
+        {
+            // Start turn timer for human players
+            if (activeTurnTimerCoroutine != null) StopCoroutine(activeTurnTimerCoroutine);
+            activeTurnTimerCoroutine = StartCoroutine(TurnTimerCoroutine(currentPlayer));
         }
     }
 
@@ -1089,6 +1237,13 @@ public class Server : NetworkBehaviour
     public void GetMove(string selectedHandCardUniqueID, SerializableCard serializableCard, int playerNumber, int sumValue)
     {
         Debug.Log($"[Server] GetMove called with selectedHandCardUniqueID: {selectedHandCardUniqueID}, playerNumber: {playerNumber}, sumValue: {sumValue}");
+
+        // VALIDATION: Only accept moves from the current player
+        if (playerNumber != currentPlayer)
+        {
+            Debug.LogWarning($"[Server] GetMove rejected: player {playerNumber} tried to move but it's player {currentPlayer}'s turn");
+            return;
+        }
         Debug.Log($"[Server] allCardLookup contains key: {allCardLookup.ContainsKey(selectedHandCardUniqueID)}");
         Debug.Log($"[Server] allCardLookup count: {allCardLookup.Count}");
         Debug.Log($"[Server] selectedHandCardUniqueID is null: {selectedHandCardUniqueID == null}");
@@ -1240,7 +1395,14 @@ public class Server : NetworkBehaviour
                 Debug.Log($"[Server] ADD TO CENTER: Removed card {selectedHandCardUniqueID} from player {playerNumber} hand: {removed}");
             }
         }
-        //if(singleDebuggingMode)EndTurn();
+        // Cancel any running turn timer (valid move received)
+        if (activeTurnTimerCoroutine != null)
+        {
+            StopCoroutine(activeTurnTimerCoroutine);
+            activeTurnTimerCoroutine = null;
+        }
+        // Begin waiting for all clients to confirm they processed this move
+        StartCoroutine(PostMoveSequence());
     }
 
     public void AddCardIDToCenter(string uniqueID, int[] cardID)
@@ -1286,6 +1448,7 @@ public class Server : NetworkBehaviour
         if (!isReconnection)
         {
             networkRelay.GetPlayerNumberClientRPC(clientId, connectedPlayerCount);
+            playerClientIds[connectedPlayerCount] = clientId;
             Debug.LogError($"[PLAYER NUMBER] Assigned player number {connectedPlayerCount} to new client {clientId}");
         }
         else
@@ -1329,9 +1492,10 @@ public class Server : NetworkBehaviour
             // RECONNECTION: Track this client as reconnecting
             reconnectingClients.Add(clientId);
             
-            // RECONNECTION FIX: Reset turn counters to ensure proper turn processing
-            readyToEndTurnCounter = 0;
-            Debug.LogError($"[RECONNECTION] Reset readyToEndTurnCounter to 0 for reconnected client");
+            // RECONNECTION FIX: Clear pending confirmations to avoid blocking on the reconnecting client
+            pendingTurnConfirmations.Remove(clientId);
+            dealCenterFinishedClients.Remove(clientId);
+            dealHandsFinishedClients.Remove(clientId);
             
             // Single comprehensive log for reconnection start
             Debug.Log($"[Server] ===== ÖNEMLİ: RECONNECTION START =====\n" +
@@ -1339,8 +1503,7 @@ public class Server : NetworkBehaviour
                      $"Game state: turn {turnCounter}, players: {playerCount}, connected: {connectedPlayerCount}\n" +
                      $"Center cards: {centerCardsDict?.Count ?? 0}, Player hands: {playersHandCardsIDs?.Count ?? 0}\n" +
                      $"Keep-alive was inactive: {wasKeepAliveInactive}\n" +
-                     $"Client added to reconnecting set: {reconnectingClients.Count} clients reconnecting\n" +
-                     $"Reset readyToEndTurnCounter to 0 for proper turn processing");
+                     $"Client added to reconnecting set: {reconnectingClients.Count} clients reconnecting");
             
             // RECONNECTION: Follow the same initialization as StartGame() but with sync instead of deals
             // Step 1: Give player count (same as StartGame) - but only to reconnecting client
@@ -1349,18 +1512,15 @@ public class Server : NetworkBehaviour
             // Step 2: Initialize card system (same as StartGame but with reconnection flag)
             if (networkRelay != null)
             {
-                // Step 3: Call UpdateCurrentPlayer (same as StartGame)
-                Invoke("CallUpdateCurrentPlayer", 1);
-                
+                // Step 3: UpdateCurrentPlayer will be called when client signals ReconnectionReadyServerRPC
                 // Step 4: Initialize card prefabs (same as StartGame but with reconnection flag)
                 // CRITICAL FIX: Only send to the reconnecting client, not all clients
                 networkRelay.InitializeCardPrefabsForReconnectedClientClientRPC(true, clientId); // true = isReconnection
                 
-                // Single comprehensive log for reconnection initialization complete
                 Debug.Log($"[Server] ===== ÖNEMLİ: RECONNECTION INITIALIZATION COMPLETE =====\n" +
                          $"Client {clientId} scene and cards initialized\n" +
                          $"GivePlayerCount() called to set up UI screens\n" +
-                         $"CallUpdateCurrentPlayer() scheduled for 1 second\n" +
+                         $"UpdateCurrentPlayer will fire when client calls ReconnectionReadyServerRPC\n" +
                          $"InitializeCardPrefabsClientRPC(true) called for card objects\n" +
                          $"Will sync game state when client calls ReconnectingClientCardsReadyServerRPC()");
             }
@@ -1462,6 +1622,11 @@ public class Server : NetworkBehaviour
         
         // Remove from heartbeat tracking
         clientHeartbeats.Remove(clientId);
+
+        // CONFIRMATION SYSTEM: Remove disconnected client so waiting coroutines can proceed
+        pendingTurnConfirmations.Remove(clientId);
+        dealCenterFinishedClients.Remove(clientId);
+        dealHandsFinishedClients.Remove(clientId);
         
         // REDO SYSTEM: Remove disconnected client from redo confirmation tracking
         if (isWaitingForRedoConfirmations)
@@ -1584,8 +1749,9 @@ public class Server : NetworkBehaviour
         Debug.LogWarning($"[Server] Manually resetting connection count from {connectedPlayerCount} to 0 (host will make it 1)");
         connectedPlayerCount = 0; // Host will make it 1 when they start
         dealCenterFinishedClients.Clear();
+        pendingTurnConfirmations.Clear();
+        dealHandsFinishedClients.Clear();
         initialDealCoroutineCheckCounter = 0;
-        readyToEndTurnCounter = 0;
         Debug.LogWarning("[Server] Connection count reset complete");
     }
 
@@ -1693,9 +1859,11 @@ public class Server : NetworkBehaviour
         
         // Reset connection tracking
         dealCenterFinishedClients.Clear();
+        pendingTurnConfirmations.Clear();
+        dealHandsFinishedClients.Clear();
+        if (activeTurnTimerCoroutine != null) { StopCoroutine(activeTurnTimerCoroutine); activeTurnTimerCoroutine = null; }
         initialDealCoroutineCheckCounter = 0;
-        readyToEndTurnCounter = 0;
-        
+
         // Reset game state variables
         turnCounter = 0;
         currentPlayer = 0;
@@ -2361,17 +2529,8 @@ public class Server : NetworkBehaviour
     public void OnClientDealCenterFinished(ulong clientId)
     {
         dealCenterFinishedClients.Add(clientId);
-        Debug.Log($"Client {clientId} finished DealCenter. Count: {dealCenterFinishedClients.Count}/{connectedPlayerCount}");
-
-        if (dealCenterFinishedClients.Count == connectedPlayerCount)
-        {
-            // All clients finished DealCenter, now deal player hands
-            dealCenterFinishedClients.Clear(); // Reset for next round
-
-            // FIX: Make sure hands are dealt before sending them!
-            DealCardsToPlayerHands();
-            // Now Delayed_DealCardPrefabsToPlayers will be called inside DealCardsToPlayerHands
-        }
+        Debug.Log($"Client {clientId} finished DealCenter. Count: {dealCenterFinishedClients.Count}/{ConnectedNonBotPlayerCount()}");
+        // DealCardsToPlayerHands is now triggered by DealPhase coroutine after all confirmations arrive
     }
 
     // ===== GAME STATE MANAGEMENT =====
@@ -3229,6 +3388,13 @@ public class Server : NetworkBehaviour
             reconnectingClients.Remove(clientId);
             Debug.Log($"[Server] Removed client {clientId} from reconnecting set");
         }
+    }
+
+    public void OnReconnectionReady(ulong clientId)
+    {
+        RemoveReconnectingClient(clientId);
+        CallUpdateCurrentPlayer();
+        Debug.Log($"[Server] Reconnection ready for client {clientId}, sent UpdateCurrentPlayer");
     }
 
     // ===== BOT SYSTEM =====

@@ -320,6 +320,9 @@ public class DeckController : MonoBehaviour
         {
             yield return StartCoroutine(DealFourPlayers(playerHands));
         }
+
+        // Signal server that this client finished receiving/displaying player hands
+        NetworkRelay.Instance.NotifyDealHandsFinishedServerRPC(Unity.Netcode.NetworkManager.Singleton.LocalClientId);
     }
 
     private IEnumerator DealTwoPlayers(Dictionary<int, List<string>> playerHands)
@@ -772,11 +775,12 @@ public class DeckController : MonoBehaviour
         
         float spacing = 500f;
         int handCount = playerHandTransforms.Count;
-        int startIdx = 0; // Include your own hand
+        int startIdx = showcaseOnlyOwnHand ? 0 : (showcaseIncludeOwnHand ? 0 : 1);
+        int endExclusive = showcaseOnlyOwnHand ? Mathf.Min(1, handCount) : handCount;
 
         // Layout for all hands (showcase)
         Debug.Log($"[Showcase] DeckController: Processing {handCount} hands for showcase");
-        for (int handIdx = startIdx; handIdx < handCount; handIdx++)
+        for (int handIdx = startIdx; handIdx < endExclusive; handIdx++)
         {
             Transform hand = playerHandTransforms[handIdx];
             if (hand == null)
@@ -907,6 +911,8 @@ public class DeckController : MonoBehaviour
 
 
     public bool isShowcaseAllActive = false;
+    private bool showcaseIncludeOwnHand = true;
+    private bool showcaseOnlyOwnHand = false;
     public Dictionary<GameObject, (Vector3 pos, Quaternion rot, Vector3 scale, bool autoRotateFlag)> showcaseOriginalTransforms = new Dictionary<GameObject, (Vector3, Quaternion, Vector3, bool)>();
 
     [ContextMenu("ExitShowcaseAllOtherHands")]
@@ -917,6 +923,7 @@ public class DeckController : MonoBehaviour
         Debug.Log($"[Showcase] DeckController: Cards in showcaseOriginalTransforms: {showcaseOriginalTransforms.Count}");
         
         isShowcaseAllActive = false;
+        showcaseOnlyOwnHand = false;
         Debug.Log("[Showcase] DeckController: Set isShowcaseAllActive = false");
         
         // CRITICAL FIX: Don't restore cards immediately if peek animations are active
@@ -1031,16 +1038,68 @@ public class DeckController : MonoBehaviour
         }
     }
 
-    public void ShowcaseAllOtherHands()
+    public void ShowcaseAllOtherHands(bool includeOwnHand = true)
     {
         Debug.Log("[Showcase] DeckController: ShowcaseAllOtherHands() called");
         Debug.Log($"[Showcase] DeckController: Current isShowcaseAllActive state: {isShowcaseAllActive}");
+        Debug.Log($"[Showcase] DeckController: includeOwnHand = {includeOwnHand}");
         
         isShowcaseAllActive = true;
+        showcaseIncludeOwnHand = includeOwnHand;
+        showcaseOnlyOwnHand = false;
         Debug.Log("[Showcase] DeckController: Set isShowcaseAllActive = true");
         
         ShowcaseAllOtherHandsLayout();
         Debug.Log("[Showcase] DeckController: ShowcaseAllOtherHandsLayout() called");
+    }
+
+    public void ShowcaseOnlyOwnHand()
+    {
+        Debug.Log("[Showcase] DeckController: ShowcaseOnlyOwnHand() called");
+
+        isShowcaseAllActive = true;
+        showcaseIncludeOwnHand = true;
+        showcaseOnlyOwnHand = true;
+
+        ShowcaseAllOtherHandsLayout();
+        Debug.Log("[Showcase] DeckController: ShowcaseOnlyOwnHand layout applied");
+    }
+
+    /// <summary>
+    /// Temporarily de-emphasize local hand cards by scaling them to normalScale.
+    /// Used between dual-selection phases when own-card selection is completed.
+    /// </summary>
+    public void TemporarilySetOwnHandToNormalScale()
+    {
+        if (playerHandTransforms == null || playerHandTransforms.Count == 0)
+        {
+            return;
+        }
+
+        Transform ownHand = playerHandTransforms[0];
+        if (ownHand == null)
+        {
+            return;
+        }
+
+        Vector3 targetScale = new Vector3(normalScale, normalScale, normalScale);
+        int counter = 0;
+        foreach (Transform child in ownHand)
+        {
+            // First two children are helper pools, not hand cards.
+            if (counter <= 1)
+            {
+                counter++;
+                continue;
+            }
+
+            if (child != null)
+            {
+                StartCoroutine(MoveCardPositionAndScaleOnly(child.gameObject, child.position, targetScale));
+            }
+
+            counter++;
+        }
     }
 
 

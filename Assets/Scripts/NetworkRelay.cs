@@ -397,13 +397,41 @@ public class NetworkRelay : NetworkBehaviour
         int otherPlayerNo = server.FindOwnerOfCard(otherHandCardID);
         if (otherPlayerNo == -1 || otherPlayerNo == myPlayerNo) return;
 
+        // Stop the power selection timer and resume the turn timer after animation
+        server.StopPowerDurationTimerAndResumeTurn();
+
         server.SunuDegisTokusSwap(myPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID);
         UseSunuDegisTokusClientRPC(myPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID);
     }
 
+    // --- Power Duration Timer RPCs ---
+
+    /// <summary>Pauses the server turn timer so it doesn't expire during interactive power selection.</summary>
     [ServerRpc(RequireOwnership = false)]
-    public void UseBuDahaIyiServerRPC(int playerNo, string handCardID, string centerCardID)
+    public void PauseTurnTimerForPowerServerRPC()
     {
+        if (server != null) server.PauseTurnTimerForPower();
+    }
+
+    /// <summary>Starts the server-side power selection timeout for the current player.</summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void StartPowerDurationTimerServerRPC()
+    {
+        if (server != null) server.StartPowerDurationTimer();
+    }
+
+    /// <summary>Sent by server when the power selection timer expires — all clients cancel the active dual-selection power.</summary>
+    [ClientRpc(RequireOwnership = false)]
+    public void CancelPowerSelectionClientRPC()
+    {
+        if (GameManager.LocalInstance != null)
+            GameManager.LocalInstance.CancelDualSelectionPower();
+    }
+
+    // --- End Power Duration Timer RPCs ---
+
+    [ServerRpc(RequireOwnership = false)]
+    public void UseBuDahaIyiServerRPC(int playerNo, string handCardID, string centerCardID)    {
         Debug.Log($"[NetworkRelay] UseBuDahaIyiServerRPC called - Player: {playerNo}, HandCard: {handCardID}, CenterCard: {centerCardID}, Time: {Time.time}");
         
         if (!server.TryBlockPower())
@@ -551,13 +579,6 @@ public class NetworkRelay : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void NotifyTurnIsReadyToEndServerRPC()
-    {
-        Debug.Log($"[NetworkRelay] NotifyTurnIsReadyToEndServerRPC called by client {OwnerClientId}");
-        server.EndTurnCheck();
-    }
-
-    [ServerRpc(RequireOwnership = false)]
     public void DeckReadyServerRPC()
     {
         ulong clientId = OwnerClientId; // Use OwnerClientId to get the client that called this RPC
@@ -617,6 +638,32 @@ public class NetworkRelay : NetworkBehaviour
                  $"Client removed from reconnecting set\n" +
                  $"Current player updated and sync process finished\n" +
                  $"InitialDealCoroutineCheck() called to ensure normal game flow continues");
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void NotifyTurnIsReadyToEndServerRPC()
+    {
+        // Legacy — kept for compatibility. Use TurnProcessedServerRPC instead.
+        ulong clientId = NetworkManager.Singleton.LocalClientId;
+        server.OnClientTurnProcessed(clientId);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void TurnProcessedServerRPC(ulong clientId)
+    {
+        server.OnClientTurnProcessed(clientId);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void NotifyDealHandsFinishedServerRPC(ulong clientId)
+    {
+        server.OnClientDealHandsFinished(clientId);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void ReconnectionReadyServerRPC(ulong clientId)
+    {
+        server.OnReconnectionReady(clientId);
     }
 
     [ServerRpc(RequireOwnership = false)]

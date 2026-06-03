@@ -40,6 +40,10 @@ Shader "Unlit/PatternLinesNoise"
             float4 _BandColor;
             float _BandIntensity;
 
+            // Global throttled time (set by ShaderTimeManager.cs)
+            float _GlobalShaderTime;
+            float _TimePhase;
+
             struct appdata
             {
                 float4 vertex : POSITION;
@@ -123,7 +127,7 @@ Shader "Unlit/PatternLinesNoise"
 
                 float2 pos = st.yx * float2(_ScaleX, _ScaleY);
 
-                float t = _Time.y * _Speed;
+                float t = (_GlobalShaderTime + _TimePhase) * _Speed;
 
                 float n = noise(pos) * _NoiseStrength;
                 pos = rotate2d(pos, n);

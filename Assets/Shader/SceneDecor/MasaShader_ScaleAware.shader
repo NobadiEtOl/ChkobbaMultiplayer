@@ -64,6 +64,10 @@ Shader "Unlit/PatternLinesNoise_ScaleAware"
             float _Rotation270;
             float _AutoDetectRotation;
 
+            // Global throttled time (set by ShaderTimeManager.cs)
+            float _GlobalShaderTime;
+            float _TimePhase;
+
             struct appdata
             {
                 float4 vertex : POSITION;
@@ -219,7 +223,7 @@ Shader "Unlit/PatternLinesNoise_ScaleAware"
                     }
                 }
 
-                float t = _Time.y * _Speed;
+                float t = (_GlobalShaderTime + _TimePhase) * _Speed;
 
                 float n = noise(pos) * _NoiseStrength;
                 pos = rotate2d(pos, n);

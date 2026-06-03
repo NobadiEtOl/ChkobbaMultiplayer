@@ -15,6 +15,12 @@ public class SuperPowerToken : MonoBehaviour
     private bool isDragging = false;
     private Vector3 offset;
 
+    private int outOfTurnTapCount = 0; // Counts taps while it's not the player's turn
+    private Coroutine invalidFlashCoroutine;
+    private SpriteRenderer tokenSpriteRenderer;
+    private Color defaultTokenColor = Color.white;
+    private bool wasLocalPlayerTurn;
+
     void Awake()
     {
 
@@ -47,6 +53,17 @@ public class SuperPowerToken : MonoBehaviour
             Debug.Log($"[SuperPowerToken] Peek power detected ({superPowerClassName}) - delaying InfoBox closure");
             StartCoroutine(DelayedCloseInfoBoxForPeekPower());
         }
+        else if (power.name == "Şunu Değiş Tokuş")
+        {
+            // Dual selection power: keep InfoBox open and guide the player through selection steps
+            Debug.Log($"[SuperPowerToken] Dual selection power detected ({power.name}) - keeping InfoBox open for step guidance");
+            SuperPowerSpawner.LocalInstance.ShowDualSelectionStepText("Değişmek için kendi kartlarından birini seç");
+        }
+        else if (power.name == "Şunu Değiş Bunu Tokuş")
+        {
+            // Multi-swap power: keep InfoBox open — GameManager.ActivateSunuDegisBunuTokusPower handles the first prompt
+            Debug.Log($"[SuperPowerToken] Multi-swap power detected ({power.name}) - keeping InfoBox open for step guidance");
+        }
         else
         {
             // FIXED: Start the close coroutine instead of calling CloseInfoBox directly
@@ -62,7 +79,7 @@ public class SuperPowerToken : MonoBehaviour
     private void ShowOutOfTurnFeedback()
     {
         // Flash the token red briefly to indicate it's not their turn
-        StartCoroutine(FlashRedFeedback());
+        StartInvalidMoveFlash();
         
         // Show error message in InfoBox if it's open
         if (SuperPowerSpawner.LocalInstance != null && SuperPowerSpawner.LocalInstance.isInfoBoxOpen)
@@ -99,7 +116,7 @@ public class SuperPowerToken : MonoBehaviour
     /// </summary>
     private IEnumerator FlashRedFeedback()
     {
-        SpriteRenderer sr = GetComponent<SpriteRenderer>();
+        SpriteRenderer sr = tokenSpriteRenderer != null ? tokenSpriteRenderer : GetComponent<SpriteRenderer>();
         if (sr == null) yield break;
 
         Color originalColor = sr.color;
@@ -112,6 +129,40 @@ public class SuperPowerToken : MonoBehaviour
             yield return new WaitForSeconds(0.1f);
             sr.color = originalColor;
             yield return new WaitForSeconds(0.1f);
+        }
+
+        invalidFlashCoroutine = null;
+    }
+
+    private void StartInvalidMoveFlash()
+    {
+        if (invalidFlashCoroutine != null)
+        {
+            StopCoroutine(invalidFlashCoroutine);
+            invalidFlashCoroutine = null;
+        }
+
+        invalidFlashCoroutine = StartCoroutine(FlashRedFeedback());
+    }
+
+    private void ResetInvalidMoveState()
+    {
+        outOfTurnTapCount = 0;
+
+        if (invalidFlashCoroutine != null)
+        {
+            StopCoroutine(invalidFlashCoroutine);
+            invalidFlashCoroutine = null;
+        }
+
+        if (tokenSpriteRenderer == null)
+        {
+            tokenSpriteRenderer = GetComponent<SpriteRenderer>();
+        }
+
+        if (tokenSpriteRenderer != null)
+        {
+            tokenSpriteRenderer.color = defaultTokenColor;
         }
     }
 
@@ -143,6 +194,14 @@ public class SuperPowerToken : MonoBehaviour
 
     void Start()
     {
+        tokenSpriteRenderer = GetComponent<SpriteRenderer>();
+        if (tokenSpriteRenderer != null)
+        {
+            defaultTokenColor = tokenSpriteRenderer.color;
+        }
+
+        wasLocalPlayerTurn = GameManager.LocalInstance != null && GameManager.LocalInstance.IsLocalPlayerTurn();
+
         if (power == null)
         {
             Debug.LogError("SuperPowerToken: Power is not assigned for " + gameObject.name);
@@ -183,6 +242,19 @@ public class SuperPowerToken : MonoBehaviour
         }
     }
 
+    void Update()
+    {
+        bool isLocalPlayerTurn = GameManager.LocalInstance != null && GameManager.LocalInstance.IsLocalPlayerTurn();
+
+        // As soon as turn becomes local player's turn, stop invalid feedback and reset token visuals.
+        if (isLocalPlayerTurn && !wasLocalPlayerTurn)
+        {
+            ResetInvalidMoveState();
+        }
+
+        wasLocalPlayerTurn = isLocalPlayerTurn;
+    }
+
     void OnMouseDown()
     {
         isDragging = true;
@@ -194,15 +266,49 @@ public class SuperPowerToken : MonoBehaviour
             SuperPowerSpawner.LocalInstance.EnqueueOpenInfoBox(this);
         }
 
-        if(SuperPowerSpawner.LocalInstance != null && SuperPowerSpawner.LocalInstance.restirictedPowersName_CardNeedToBeSelected.Contains(power.name))
+        // Only showcase hands if it's actually the player's turn
+        bool isMyTurn = GameManager.LocalInstance != null && GameManager.LocalInstance.IsLocalPlayerTurn();
+        if (!isMyTurn)
         {
-            DeckController.LocalInstance.ShowcaseAllOtherHands();
+            // Flash token red to indicate it's not their turn
+            StartInvalidMoveFlash();
+
+            outOfTurnTapCount++;
+            if (outOfTurnTapCount >= 3)
+            {
+                outOfTurnTapCount = 0;
+                if (SuperPowerSpawner.LocalInstance != null)
+                    SuperPowerSpawner.LocalInstance.ShowWaitForTurnMessage();
+            }
+        }
+        else
+        {
+            outOfTurnTapCount = 0; // Reset when it's actually their turn
+            if (SuperPowerSpawner.LocalInstance != null)
+            {
+                // Dual-selection swap powers: enlarge other hands only, own hand stays at default size
+                if (power.name == "Şunu Değiş Tokuş" || power.name == "Değiş Tokuş")
+                {
+                    DeckController.LocalInstance.ShowcaseAllOtherHands(false);
+                }
+                else if (power.name == "Şunu Değiş Bunu Tokuş")
+                {
+                    // Show other hands at centerScale, bring own hand down to normalScale
+                    DeckController.LocalInstance.ShowcaseAllOtherHands(false);
+                    DeckController.LocalInstance.TemporarilySetOwnHandToNormalScale();
+                }
+                else if (SuperPowerSpawner.LocalInstance.restirictedPowersName_CardNeedToBeSelected.Contains(power.name))
+                {
+                    DeckController.LocalInstance.ShowcaseAllOtherHands();
+                }
+            }
         }
     }
 
     void OnMouseDrag()
     {
-        if (isDragging)
+        // Only allow moving the token when it's the local player's turn
+        if (isDragging && GameManager.LocalInstance != null && GameManager.LocalInstance.IsLocalPlayerTurn())
         {
             transform.position = GetMouseWorldPosition() + offset;
         }
@@ -211,12 +317,17 @@ public class SuperPowerToken : MonoBehaviour
     void OnMouseUp()
     {
         isDragging = false;
-        float distance = Vector3.Distance(transform.position, originalPosition);
-        // Always close InfoBox when dragging ends using queue system
-        if (SuperPowerSpawner.LocalInstance != null)
+
+        // If it's not the player's turn, just snap back — no card detection or power activation
+        if (GameManager.LocalInstance == null || !GameManager.LocalInstance.IsLocalPlayerTurn())
         {
-            SuperPowerSpawner.LocalInstance.EnqueueCloseInfoBox();
+            transform.position = originalPosition;
+            if (SuperPowerSpawner.LocalInstance != null)
+                SuperPowerSpawner.LocalInstance.EnqueueCloseInfoBox();
+            return;
         }
+
+        float distance = Vector3.Distance(transform.position, originalPosition);
 
         // Detect cards directly beneath the token using a box
         Vector3 boxCenter = transform.position + Vector3.down * 250f; // Move box down from token
@@ -255,7 +366,9 @@ public class SuperPowerToken : MonoBehaviour
 
         if (power.name == "Şunu Değiş Bunu Tokuş")
         {
-            DeckController.LocalInstance.ShowcaseAllOtherHands();
+            // Keep other hands at centerScale, own hand at normalScale
+            DeckController.LocalInstance.ShowcaseAllOtherHands(false);
+            DeckController.LocalInstance.TemporarilySetOwnHandToNormalScale();
         }
 
         if (power == null || SuperPowerSpawner.LocalInstance.restirictedPowersName_WaitForSwap.Contains(power.name) == false)
@@ -271,9 +384,11 @@ public class SuperPowerToken : MonoBehaviour
         }
         else
         {
-            // Snap back to original position
+            // Snap back to original position — power was not activated, close the InfoBox
             transform.position = originalPosition;
             DeckController.LocalInstance.ExitShowcaseAllOtherHands();
+            if (SuperPowerSpawner.LocalInstance != null)
+                SuperPowerSpawner.LocalInstance.EnqueueCloseInfoBox();
         }
     }
 

@@ -123,6 +123,10 @@ Shader "Unlit/StarShader_Optimized"
             float _MaxEmissionLines;
             float _AnimationFrameRate;
 
+            // Global throttled time (set by ShaderTimeManager.cs)
+            float _GlobalShaderTime;
+            float _TimePhase;
+
             v2f vert (appdata v)
             {
                 v2f o;
@@ -156,7 +160,7 @@ Shader "Unlit/StarShader_Optimized"
                 pos = rotate2D(pos, _StarRotation);
                 
                 // Simplified pulse effect
-                float pulseTime = _Time.y * _PulseSpeed;
+                float pulseTime = (_GlobalShaderTime + _TimePhase) * _PulseSpeed;
                 float pulse = sin(pulseTime + layerIndex * 0.5) * _PulseAmplitude;
                 size *= (1.0 + pulse);
                 
@@ -173,7 +177,7 @@ Shader "Unlit/StarShader_Optimized"
                 float currentRadius = size * lerp(1.0, _InnerRadius, pointFactor);
                 
                 // Simplified wave effect (single wave instead of multiple)
-                float waveTime = _Time.y * _WaveSpeed;
+                float waveTime = (_GlobalShaderTime + _TimePhase) * _WaveSpeed;
                 float randomPhase = hash(layerIndex) * 6.28318;
                 float wave = sin(angle * _WaveFrequency + waveTime + randomPhase);
                 currentRadius += wave * _WaveAmplitude * size;
@@ -215,7 +219,7 @@ Shader "Unlit/StarShader_Optimized"
                 float currentRadius = size * lerp(1.0, _InnerRadius, pointFactor);
                 
                 // Frame rate limited animation
-                float frameTime = floor(_Time.y * _AnimationFrameRate) / _AnimationFrameRate;
+                float frameTime = floor((_GlobalShaderTime + _TimePhase) * _AnimationFrameRate) / _AnimationFrameRate;
                 float time = frameTime * _EmissionSpeed;
                 
                 float totalEmission = 0.0;
@@ -254,7 +258,7 @@ Shader "Unlit/StarShader_Optimized"
                 float angle = atan2(pos.y, pos.x);
                 
                 // Frame rate limited animation
-                float frameTime = floor(_Time.y * _AnimationFrameRate) / _AnimationFrameRate;
+                float frameTime = floor((_GlobalShaderTime + _TimePhase) * _AnimationFrameRate) / _AnimationFrameRate;
                 float time = frameTime * _SmokeSpeed;
                 
                 // Single layer smoke calculation
@@ -287,7 +291,7 @@ Shader "Unlit/StarShader_Optimized"
                 float totalEmission = 0.0;
                 
                 // Frame rate limited time
-                float frameTime = floor(_Time.y * _AnimationFrameRate) / _AnimationFrameRate;
+                float frameTime = floor((_GlobalShaderTime + _TimePhase) * _AnimationFrameRate) / _AnimationFrameRate;
                 float time = frameTime * _ExpansionSpeed;
                 
                 // Reduced star layers

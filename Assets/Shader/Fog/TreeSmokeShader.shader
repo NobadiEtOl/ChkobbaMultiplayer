@@ -42,6 +42,10 @@ Shader "Unlit/WoodCutWithSmoke"
             float _SmokeStrength;
             float _SmokeSpread;
 
+            // Global throttled time (set by ShaderTimeManager.cs)
+            float _GlobalShaderTime;
+            float _TimePhase;
+
             // Simple 2D noise function (value noise)
             float hash(float2 p)
             {
@@ -76,7 +80,7 @@ Shader "Unlit/WoodCutWithSmoke"
                 float angle = atan2(uv.y, uv.x);
 
                 // Animate grains
-                float grainTime = _Time.y * _GrainSpeed;
+                float grainTime = (_GlobalShaderTime + _TimePhase) * _GrainSpeed;
                 float grainNoise = noise(float2(r * _GrainScale + grainTime, angle * 2.0 + grainTime));
                 float grain = sin(r * _GrainScale + grainNoise * 2.0 + grainTime);
 
@@ -87,7 +91,7 @@ Shader "Unlit/WoodCutWithSmoke"
                 float4 col = lerp(_BgColor, _GrainColor, grainMask);
 
                 // Smoke: outward from grains, animated
-                float smokeNoise = noise(float2(r * _GrainScale * 0.5 + _Time.y * 0.1, angle * 2.0 - _Time.y * 0.2));
+                float smokeNoise = noise(float2(r * _GrainScale * 0.5 + (_GlobalShaderTime + _TimePhase) * 0.1, angle * 2.0 - (_GlobalShaderTime + _TimePhase) * 0.2));
                 float smoke = smoothstep(0.45, 0.55, grain * 0.5 + 0.5 + smokeNoise * 0.2);
                 float smokeFade = exp(-r * _SmokeSpread); // fade outwards
                 float4 smokeCol = _SmokeColor * smoke * smokeFade * _SmokeStrength;
