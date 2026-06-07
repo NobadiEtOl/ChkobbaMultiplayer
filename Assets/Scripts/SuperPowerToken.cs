@@ -21,6 +21,17 @@ public class SuperPowerToken : MonoBehaviour
     private Color defaultTokenColor = Color.white;
     private bool wasLocalPlayerTurn;
 
+    // Powers that require follow-up user action after activation keep InfoBox open.
+    private static readonly HashSet<string> keepInfoBoxOpenAfterActivationPowers = new HashSet<string>
+    {
+        "Şunu Değiş Tokuş",
+        "Şunu Değiş Bunu Tokuş",
+        "Kopyala Yapıştır",
+        "Kapkaç",
+        "Yandım Anam",
+        "Bu Daha İyi"
+    };
+
     void Awake()
     {
 
@@ -30,17 +41,34 @@ public class SuperPowerToken : MonoBehaviour
     public void OnTokenClicked()
     {
         Debug.Log("SuperPowerToken clicked: " + power.name);
+
+        if (GameManager.LocalInstance != null && !GameManager.LocalInstance.TryBeginGameplayAction($"SuperPower:{power.name}"))
+        {
+            Debug.LogWarning($"Cannot activate {power.name} - another gameplay action is still running.");
+            ShowOutOfTurnFeedback();
+            return;
+        }
         
         // Check if it's the player's turn before activating
         if (GameManager.LocalInstance != null && !GameManager.LocalInstance.IsLocalPlayerTurn())
         {
             Debug.LogWarning($"Cannot activate {power.name} - it's not your turn!");
             ShowOutOfTurnFeedback();
+            GameManager.LocalInstance?.EndGameplayAction("Superpower denied: out of turn");
             return;
         }
         
         // Set active instance for peek power detection
         SuperPowerToken.ActiveInstance = this;
+
+        // Bomba uses its own flow: move token to center first, then activate and disappear.
+        if (power != null && power.name == "Bomba")
+        {
+            SuperPowerSpawner.LocalInstance.RemoveSpawnedSuperPower(gameObject);
+            SuperPowerSpawner.LocalInstance.UpdateTokenPositions();
+            StartCoroutine(ActivateBombaFromCenterSequence());
+            return;
+        }
         
         power.ActivatePower();
         
@@ -53,24 +81,89 @@ public class SuperPowerToken : MonoBehaviour
             Debug.Log($"[SuperPowerToken] Peek power detected ({superPowerClassName}) - delaying InfoBox closure");
             StartCoroutine(DelayedCloseInfoBoxForPeekPower());
         }
-        else if (power.name == "Şunu Değiş Tokuş")
+        else if (ShouldKeepInfoBoxOpenAfterActivation(power != null ? power.name : null))
         {
-            // Dual selection power: keep InfoBox open and guide the player through selection steps
-            Debug.Log($"[SuperPowerToken] Dual selection power detected ({power.name}) - keeping InfoBox open for step guidance");
-            SuperPowerSpawner.LocalInstance.ShowDualSelectionStepText("Değişmek için kendi kartlarından birini seç");
-        }
-        else if (power.name == "Şunu Değiş Bunu Tokuş")
-        {
-            // Multi-swap power: keep InfoBox open — GameManager.ActivateSunuDegisBunuTokusPower handles the first prompt
-            Debug.Log($"[SuperPowerToken] Multi-swap power detected ({power.name}) - keeping InfoBox open for step guidance");
+            Debug.Log($"[SuperPowerToken] {power.name} requires multi-step guidance - keeping InfoBox open");
+
+            GameManager.LocalInstance?.EndGameplayAction("Superpower entered selection phase");
+
+            if (power.name == "Şunu Değiş Tokuş")
+            {
+                SuperPowerSpawner.LocalInstance.ShowDualSelectionStepText("Değişmek için kendi kartlarından birini seç");
+            }
+            else if (power.name == "Şunu Değiş Bunu Tokuş")
+            {
+                SuperPowerSpawner.LocalInstance.ShowDualSelectionStepText("Önce kendi elinden bir kart seç");
+            }
+            else if (power.name == "Kopyala Yapıştır")
+            {
+                SuperPowerSpawner.LocalInstance.ShowDualSelectionStepText("Kopyalamak için bir kart seç");
+            }
+            else if (power.name == "Kapkaç" || power.name == "Yandım Anam" || power.name == "Bu Daha İyi")
+            {
+                SuperPowerSpawner.LocalInstance.ShowDualSelectionStepText("Değiştirmek için bir kart seç");
+            }
         }
         else
         {
-            // FIXED: Start the close coroutine instead of calling CloseInfoBox directly
-            StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
+            RequestInfoBoxCloseAfterActivation();
+            GameManager.LocalInstance?.EndGameplayAction("Superpower activation dispatched");
         }
         
         StartCoroutine(FadeOutSprite()); // Destroy the token after activation
+    }
+
+    private IEnumerator ActivateBombaFromCenterSequence()
+    {
+        // Close InfoBox immediately for Bomba so center animation is visible.
+        if (SuperPowerSpawner.LocalInstance != null)
+        {
+            SuperPowerSpawner.LocalInstance.EnqueueCloseInfoBox();
+        }
+
+        Collider2D tokenCollider = GetComponent<Collider2D>();
+        if (tokenCollider != null)
+        {
+            tokenCollider.enabled = false;
+        }
+
+        Vector3 startPos = transform.position;
+        Vector3 targetPos = startPos;
+
+        if (GameManager.LocalInstance != null && GameManager.LocalInstance.centerTransform != null)
+        {
+            targetPos = GameManager.LocalInstance.centerTransform.position;
+        }
+
+        float moveDuration = 0.18f;
+        float elapsed = 0f;
+
+        while (elapsed < moveDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / moveDuration);
+            transform.position = Vector3.Lerp(startPos, targetPos, t);
+            yield return null;
+        }
+
+        transform.position = targetPos;
+
+        power.ActivatePower();
+
+        // Start disappear immediately after activation and hide visuals at once.
+        StartCoroutine(HideImmediatelyThenDestroy(0.2f));
+    }
+
+    private IEnumerator HideImmediatelyThenDestroy(float destroyDelay)
+    {
+        foreach (var renderer in GetComponentsInChildren<Renderer>(true))
+        {
+            renderer.enabled = false;
+        }
+
+        yield return new WaitForSeconds(destroyDelay);
+        GameManager.LocalInstance?.EndGameplayAction("Bomba center sequence completed");
+        Destroy(gameObject);
     }
     
     /// <summary>
@@ -106,9 +199,32 @@ public class SuperPowerToken : MonoBehaviour
         
         // Clear the active instance before closing
         SuperPowerToken.ActiveInstance = null;
+
+        // Fallback unlock in case animation completion callback is missed.
+        GameManager.LocalInstance?.EndGameplayAction("Peek delayed close fallback");
         
         Debug.Log($"[SuperPowerToken] Delayed closure complete - closing InfoBox now");
-        StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
+        RequestInfoBoxCloseAfterActivation();
+    }
+
+    private bool ShouldKeepInfoBoxOpenAfterActivation(string powerName)
+    {
+        if (string.IsNullOrEmpty(powerName))
+        {
+            return false;
+        }
+
+        return keepInfoBoxOpenAfterActivationPowers.Contains(powerName);
+    }
+
+    private void RequestInfoBoxCloseAfterActivation()
+    {
+        if (SuperPowerSpawner.LocalInstance == null)
+        {
+            return;
+        }
+
+        SuperPowerSpawner.LocalInstance.EnqueueCloseInfoBox();
     }
     
     /// <summary>
@@ -287,15 +403,27 @@ public class SuperPowerToken : MonoBehaviour
             if (SuperPowerSpawner.LocalInstance != null)
             {
                 // Dual-selection swap powers: enlarge other hands only, own hand stays at default size
-                if (power.name == "Şunu Değiş Tokuş" || power.name == "Değiş Tokuş")
+                if (power.name == "Şunu Değiş Tokuş" || power.name == "Değiş Tokuş" || power.name == "Kopyala Yapıştır")
                 {
                     DeckController.LocalInstance.ShowcaseAllOtherHands(false);
+
+                    if ((power.name == "Değiş Tokuş" || power.name == "Şunu Değiş Tokuş") &&
+                        GameManager.LocalInstance != null &&
+                        GameManager.LocalInstance.IsDegisTokusDebugVisualEnabled())
+                    {
+                        DeckController.LocalInstance.ShowDegisTokusDebugCandidates();
+                    }
                 }
                 else if (power.name == "Şunu Değiş Bunu Tokuş")
                 {
                     // Show other hands at centerScale, bring own hand down to normalScale
                     DeckController.LocalInstance.ShowcaseAllOtherHands(false);
                     DeckController.LocalInstance.TemporarilySetOwnHandToNormalScale();
+                }
+                else if (power.name == "Kapkaç" || power.name == "Yandım Anam" || power.name == "Bu Daha İyi")
+                {
+                    // Keep own hand at normal size and enlarge all other hands while holding the token.
+                    DeckController.LocalInstance.ShowcaseAllOtherHands(false);
                 }
                 else if (SuperPowerSpawner.LocalInstance.restirictedPowersName_CardNeedToBeSelected.Contains(power.name))
                 {
@@ -317,6 +445,11 @@ public class SuperPowerToken : MonoBehaviour
     void OnMouseUp()
     {
         isDragging = false;
+
+        if (DeckController.LocalInstance != null)
+        {
+            DeckController.LocalInstance.ClearDegisTokusDebugCandidates();
+        }
 
         // If it's not the player's turn, just snap back — no card detection or power activation
         if (GameManager.LocalInstance == null || !GameManager.LocalInstance.IsLocalPlayerTurn())

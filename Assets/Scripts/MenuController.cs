@@ -208,34 +208,33 @@ public class MenuController : MonoBehaviour
     [ContextMenu("Test Token Menu")]
     public void ShowTokenMenu()
     {
-        Debug.Log("[MenuController] ShowTokenMenu called - toggle functionality");
-        SuperPowerSpawner.LocalInstance.SetNameText("Menu");
-        
         if (SuperPowerSpawner.LocalInstance == null)
         {
-            Debug.LogError("[MenuController] SuperPowerSpawner.LocalInstance is null, cannot toggle InfoBox");
+            Debug.LogError("[MenuController] SuperPowerSpawner.LocalInstance is null, cannot open menu InfoBox");
+            return;
+        }
+
+        Debug.Log("[MenuController] ShowTokenMenu called - open-only behavior");
+        SuperPowerSpawner.LocalInstance.SetNameText("Menu");
+
+        // If menu is already the active page, toggle it closed.
+        if (SuperPowerSpawner.LocalInstance.isInfoBoxOpen && SuperPowerSpawner.LocalInstance.isMenuPageOpen)
+        {
+            Debug.Log("[MenuController] Menu page is already open; closing it");
+            StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
             return;
         }
         
-        // Check if InfoBox is currently open (either menu or power information)
-        if (SuperPowerSpawner.LocalInstance.isInfoBoxOpen)
+        Debug.Log("[MenuController] Opening menu page in InfoBox");
+        
+        if (!menuInitialized)
         {
-            Debug.Log("[MenuController] InfoBox is open, closing it");
-            StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
+            Debug.LogWarning("[MenuController] Menu not initialized yet, trying to initialize now...");
+            InitializeMenu();
         }
-        else
-        {
-            Debug.Log("[MenuController] InfoBox is closed, opening menu");
-            
-            if (!menuInitialized)
-            {
-                Debug.LogWarning("[MenuController] Menu not initialized yet, trying to initialize now...");
-                InitializeMenu();
-            }
-            
-            // Open InfoBox with menu page
-            StartCoroutine(OpenMenuInInfoBox());
-        }
+        
+        // Always open/switch to menu page instead of toggling close.
+        StartCoroutine(OpenMenuInInfoBox());
     }
     
     
@@ -1132,6 +1131,14 @@ public class MenuController : MonoBehaviour
             Debug.LogError("[MenuController] SuperPowerSpawner.LocalInstance is null, cannot open menu in InfoBox");
             yield break;
         }
+
+        // If menu page is already open, keep it open and ensure menu visuals stay active.
+        if (SuperPowerSpawner.LocalInstance.isInfoBoxOpen && SuperPowerSpawner.LocalInstance.isMenuPageOpen)
+        {
+            SetMenuActive(true);
+            Debug.Log("[MenuController] Menu page already open in InfoBox, keeping it open");
+            yield break;
+        }
         
         // Check if we need to close any existing InfoBox content first
         if (SuperPowerToken.ActiveInstance != null)
@@ -1154,7 +1161,7 @@ public class MenuController : MonoBehaviour
         SuperPowerToken.ActiveInstance = menuToken;
         
         // Open InfoBox with proper animation (same as token behavior)
-        //yield return StartCoroutine(SuperPowerSpawner.LocalInstance.OpenInfoBox(menuToken));
+        yield return StartCoroutine(SuperPowerSpawner.LocalInstance.OpenInfoBox(menuToken));
         
         // Now show our menu
         SetMenuActive(true);
@@ -1163,7 +1170,7 @@ public class MenuController : MonoBehaviour
     }
     
     /// <summary>
-    /// Setup click handler for the open button to make it work as a toggle
+    /// Setup click handler for the open button to open/switch to the menu page
     /// </summary>
     private void SetupOpenButtonClickHandler()
     {
@@ -1187,7 +1194,7 @@ public class MenuController : MonoBehaviour
         // Clear existing listeners to avoid duplicates
         button.onClick.RemoveAllListeners();
         
-        // Add the toggle listener - now calls ShowTokenMenu which has toggle logic
+        // Add listener that always opens/switches to the menu page.
         button.onClick.AddListener(ShowTokenMenu);
         
         // Ensure the button has a collider for 3D interaction if needed

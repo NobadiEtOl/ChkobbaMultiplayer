@@ -598,6 +598,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 3972489628764809046, guid: 3e65db69abed7f3418c4736c8ead7c63, type: 3}
     - target: {fileID: 8858676597646837954, guid: 0547bdc6482fdb0479bfbf10d66e62ec, type: 3}
+      propertyPath: debugVisualsEnabled
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8858676597646837954, guid: 0547bdc6482fdb0479bfbf10d66e62ec, type: 3}
       propertyPath: kapkacAnimEffectPrefab
       value: 
       objectReference: {fileID: 6383212879747000401, guid: 81d89b16af668a043b72d3a8e3c609bf, type: 3}
@@ -613,6 +617,10 @@ PrefabInstance:
       propertyPath: oynayamazsinBlockPrefab
       value: 
       objectReference: {fileID: 6993060252410929291, guid: 937de98c04436ab479081c43aa140278, type: 3}
+    - target: {fileID: 8858676597646837954, guid: 0547bdc6482fdb0479bfbf10d66e62ec, type: 3}
+      propertyPath: isSunuDegisBunuTokusActive
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -3820,7 +3828,7 @@ MonoBehaviour:
   - {fileID: 4598371265184639164, guid: 971c4649c7eb49442864836621cae2f8, type: 3}
   - {fileID: 4598371265184639164, guid: ee34056b7e4e51943850b932376a5b25, type: 3}
   - {fileID: 4598371265184639164, guid: 25f51321b706e4c40b024659eba2936d, type: 3}
-  maxSuperPowers: 4
+  maxSuperPowers: 5
   spawnPositions:
   - {fileID: 1374377614}
   - {fileID: 1272084792}
@@ -3864,6 +3872,7 @@ MonoBehaviour:
   - "\u015Eunu De\u011Fi\u015F Toku\u015F"
   - "\u015Eunu De\u011Fi\u015F Bunu Toku\u015F"
   - "De\u011Fi\u015F Toku\u015F"
+  deckController: {fileID: 1154931854}
 --- !u!1 &284460424
 GameObject:
   m_ObjectHideFlags: 0
@@ -10492,15 +10501,15 @@ RectTransform:
   m_GameObject: {fileID: 715998368}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1.1999985, z: 1}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1984685819}
+  m_Father: {fileID: 1386298423}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 150, y: 150}
-  m_SizeDelta: {x: 300, y: 300}
+  m_AnchorMax: {x: 0.14228193, y: 0.33232188}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: -0.0000004172325, y: -0.0000104904175}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &715998370
 MonoBehaviour:
@@ -12673,7 +12682,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &907865066
 Transform:
   m_ObjectHideFlags: 0
@@ -18463,6 +18472,8 @@ RectTransform:
   m_LocalScale: {x: 10.5, y: 10.3, z: 1.4643922}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 1885630875}
+  - {fileID: 715998369}
   - {fileID: 1913642262}
   - {fileID: 876152405}
   - {fileID: 97196462}
@@ -25141,15 +25152,15 @@ RectTransform:
   m_GameObject: {fileID: 1885630874}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1.1999985, z: 1}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1984685819}
+  m_Father: {fileID: 1386298423}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 1, y: 0}
-  m_AnchorMax: {x: 1, y: 0}
-  m_AnchoredPosition: {x: -150, y: 150}
-  m_SizeDelta: {x: 300, y: 300}
+  m_AnchorMin: {x: 0.85800004, y: 0}
+  m_AnchorMax: {x: 1, y: 0.3366904}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1885630876
 MonoBehaviour:
@@ -26312,8 +26323,6 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1245925889}
-  - {fileID: 715998369}
-  - {fileID: 1885630875}
   - {fileID: 1544368134}
   m_Father: {fileID: 1386298423}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -29234,7 +29243,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3695849616693556576, guid: 3752278db6040c344b442891a1a3442e, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 3.22
+      value: -1.429
       objectReference: {fileID: 0}
     - target: {fileID: 3695849616693556576, guid: 3752278db6040c344b442891a1a3442e, type: 3}
       propertyPath: m_AnchoredPosition.y

@@ -44,6 +44,13 @@ public class NetworkManagerUI : MonoBehaviour
     private Coroutine heartbeatCoroutine;
     private Coroutine disconnectCheckCoroutine;
     
+    // Phase 2B: Survivor re-host tracking
+    private Coroutine survivorElectionCoroutine;
+    // Set true while host-loss recovery is in progress so normal disconnect/teardown paths are suppressed.
+    private bool isRecoveringHostLoss = false;
+    /// <summary>Public read-only access so MainUIScript and others can check recovery state.</summary>
+    public bool IsRecoveringHostLoss => isRecoveringHostLoss;
+    
     // === CLIENT RELAY KEEP-ALIVE ===
     private Coroutine clientRelayKeepAliveCoroutine;
     private bool isClientRelayKeepAliveActive = false;
@@ -327,6 +334,14 @@ public class NetworkManagerUI : MonoBehaviour
     /// </summary>
     private void OnDisconnectDetected(string reason)
     {
+        // Guard: suppress normal teardown while host-loss recovery is in progress.
+        // The survivor rehost coroutine manages its own cleanup and exit paths.
+        if (isRecoveringHostLoss)
+        {
+            Debug.Log($"[NetworkManagerUI] OnDisconnectDetected suppressed during host-loss recovery: {reason}");
+            return;
+        }
+
         // Debug.LogWarning($"[NetworkManagerUI] Disconnect detected: {reason}");
         
         // Stop disconnect detection
@@ -400,8 +415,42 @@ public class NetworkManagerUI : MonoBehaviour
     /// </summary>
     private void OnClientDisconnected(ulong clientId)
     {
-        // Debug.LogWarning($"[NetworkManagerUI] Client disconnected: {clientId}");
-        OnDisconnectDetected("Network disconnect event");
+        // Phase 2B: If the HOST disconnected while we are an in-game client, enter recovery.
+        bool weAreClient = NetworkManager.Singleton != null && !NetworkManager.Singleton.IsHost && !NetworkManager.Singleton.IsServer;
+        bool hostDisconnected = clientId == NetworkManager.ServerClientId;
+
+        if (weAreClient && hostDisconnected && isInGame)
+        {
+            // DETERMINISTIC ELECTION: decide using the precomputed chain instead of
+            // a first-reconnect race.  The guard is raised immediately to block teardown
+            // regardless of whether this client will attempt rehost or just wait.
+            isRecoveringHostLoss = true;
+
+            if (ShouldAttemptRehost(out int myRank, out int chainLength))
+            {
+                Debug.LogWarning($"[NetworkManagerUI] Host disconnected - I am primary candidate (rank {myRank}/{chainLength}), starting rehost");
+                if (survivorElectionCoroutine != null) StopCoroutine(survivorElectionCoroutine);
+                survivorElectionCoroutine = StartCoroutine(SurvivorElectionAndRehost(myRank, chainLength));
+            }
+            else if (myRank >= 0)
+            {
+                // I am a backup candidate — wait for the primary to rehost, then reconnect
+                Debug.Log($"[NetworkManagerUI] Host disconnected - I am backup candidate (rank {myRank}/{chainLength}), waiting for primary");
+                if (survivorElectionCoroutine != null) StopCoroutine(survivorElectionCoroutine);
+                survivorElectionCoroutine = StartCoroutine(SurvivorElectionAndRehost(myRank, chainLength));
+            }
+            else
+            {
+                // Not in the failover chain at all (bot session, unassigned slot, etc.)
+                Debug.LogWarning("[NetworkManagerUI] Host disconnected - not in failover chain, going to main menu");
+                isRecoveringHostLoss = false;
+                OnDisconnectDetected("Host disconnected - not a failover candidate");
+            }
+        }
+        else
+        {
+            OnDisconnectDetected("Network disconnect event");
+        }
     }
 
     /// <summary>
@@ -953,13 +1002,16 @@ public class NetworkManagerUI : MonoBehaviour
                 AddDebugStep($"RELAY ALLOCATION EXPIRED: {e.Message}");
                 AddDebugStep("Attempting to retry with fresh connection...");
                 
-                // Clear the expired relay join code and retry
+                // Clear the expired relay join code
                 PlayerPrefs.DeleteKey("roomJoinCode");
                 AddDebugStep("Cleared expired relay join code from PlayerPrefs");
-                
-                // Try to reconnect again with fresh allocation
-                AddDebugStep("Retrying reconnection with fresh relay allocation...");
-                return await AttemptReconnectionToGame(lobbyJoinCode);
+
+                // Relay allocation has expired - a recursive retry with the same lobby code won't help
+                // because we would get the same expired relay code from the lobby metadata.
+                // Return false so the caller can handle this gracefully (show reconnect-failed UI).
+                AddDebugStep("Relay allocation expired - returning false for graceful fallback");
+                PrintDebugChain("FAILED - Relay allocation expired");
+                return false;
             }
             else
             {
@@ -973,6 +1025,228 @@ public class NetworkManagerUI : MonoBehaviour
         }
     }
 
+
+    // === PHASE 2B: SURVIVOR ELECTION AND RE-HOST ===
+
+    /// <summary>
+    /// Returns true if this client is the PRIMARY candidate (rank 0) in the precomputed
+    /// failover chain. Also outputs the client's rank and total chain length so the caller
+    /// can start the cascade timer for backup candidates.
+    /// rank == -1 means not in chain at all.
+    /// </summary>
+    private bool ShouldAttemptRehost(out int rank, out int chainLength)
+    {
+        rank = -1;
+        chainLength = 0;
+
+        int myPlayerNo = PlayerPrefs.GetInt("PlayerNumber", -1);
+        if (myPlayerNo < 0)
+        {
+            Debug.LogWarning("[NetworkManagerUI] ShouldAttemptRehost: PlayerNumber not set - not a candidate");
+            return false;
+        }
+
+        if (!PlayerPrefs.HasKey("SurvivorChain"))
+        {
+            // Chain was never received - fall back: every client may attempt (old behaviour)
+            Debug.LogWarning("[NetworkManagerUI] ShouldAttemptRehost: no SurvivorChain in PlayerPrefs - fallback: attempt rehost");
+            rank = 0;
+            chainLength = 1;
+            return true;
+        }
+
+        try
+        {
+            var chain = JsonUtility.FromJson<SerializableIntList>(PlayerPrefs.GetString("SurvivorChain")).ToList();
+            chainLength = chain.Count;
+            rank = chain.IndexOf(myPlayerNo);
+
+            if (rank < 0)
+            {
+                Debug.Log($"[NetworkManagerUI] ShouldAttemptRehost: playerNo {myPlayerNo} not in chain [{string.Join(",", chain)}]");
+                return false;
+            }
+
+            Debug.Log($"[NetworkManagerUI] ShouldAttemptRehost: playerNo {myPlayerNo} is rank {rank} in chain [{string.Join(",", chain)}]");
+            return rank == 0; // only primary candidate returns true immediately
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[NetworkManagerUI] ShouldAttemptRehost parse error: {ex.Message} - fallback: attempt rehost");
+            rank = 0;
+            chainLength = 1;
+            return true;
+        }
+    }
+
+    private const float REHOST_CASCADE_TIMEOUT = 25f; // seconds primary must succeed before backup promotes
+
+    /// <summary>
+    /// Cascading election coroutine.
+    /// - rank 0 (primary): attempts rehost immediately.
+    /// - rank N>0 (backup): waits REHOST_CASCADE_TIMEOUT * rank, then attempts if no new host appeared.
+    /// </summary>
+    private IEnumerator SurvivorElectionAndRehost(int rank, int chainLength)
+    {
+        Debug.Log($"[NetworkManagerUI] SurvivorElectionAndRehost rank={rank}/{chainLength}: started");
+
+        // Backup candidates wait a window proportional to their rank before attempting
+        if (rank > 0)
+        {
+            float waitTime = REHOST_CASCADE_TIMEOUT * rank;
+            Debug.Log($"[NetworkManagerUI] SurvivorElectionAndRehost: waiting {waitTime}s for primary (rank 0) to rehost...");
+
+            float elapsed = 0f;
+            while (elapsed < waitTime)
+            {
+                yield return new WaitForSeconds(1f);
+                elapsed += 1f;
+
+                // If a new host appeared (we reconnected to it), we are done
+                if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient &&
+                    !NetworkManager.Singleton.IsHost)
+                {
+                    Debug.Log("[NetworkManagerUI] SurvivorElectionAndRehost: new host appeared, cancelling cascade");
+                    isRecoveringHostLoss = false;
+                    yield break;
+                }
+            }
+            Debug.Log($"[NetworkManagerUI] SurvivorElectionAndRehost rank={rank}: primary timeout, promoting to rehost");
+        }
+
+        // Brief transport-layer settle wait (primary: 1.5 s; backup: already waited above)
+        if (rank == 0) yield return new WaitForSeconds(1.5f);
+
+        // Read snapshot from PlayerPrefs
+        bool hasSnapshot = false;
+        SerializableGameState snapshot = default;
+        if (PlayerPrefs.HasKey("Chkobba_Snapshot_Current"))
+        {
+            try
+            {
+                snapshot = JsonUtility.FromJson<SerializableGameState>(PlayerPrefs.GetString("Chkobba_Snapshot_Current"));
+                hasSnapshot = snapshot.playerCount > 0;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[NetworkManagerUI] SurvivorElectionAndRehost: failed to parse snapshot: {ex.Message}");
+            }
+        }
+
+        if (!hasSnapshot)
+        {
+            Debug.LogWarning("[NetworkManagerUI] SurvivorElectionAndRehost: no valid snapshot - falling back to disconnect");
+            isRecoveringHostLoss = false;
+            OnDisconnectDetected("Host lost - no snapshot for re-host");
+            yield break;
+        }
+
+        Debug.Log($"[NetworkManagerUI] SurvivorElectionAndRehost rank={rank}: re-hosting from snapshot v{snapshot.snapshotVersion} (turn {snapshot.turnCounter}, {snapshot.playerCount}p)");
+
+        if (mainUIScript != null)
+            mainUIScript.OpenWaitingScreenUI("yellow", snapshot.playerCount.ToString(), "Re-hosting...");
+
+        var task = SurvivorRehost(snapshot);
+        while (!task.IsCompleted) yield return null;
+
+        if (task.Result)
+        {
+            isRecoveringHostLoss = false;
+            Debug.Log($"[NetworkManagerUI] SurvivorElectionAndRehost rank={rank}: re-host successful - waiting for other players");
+        }
+        else
+        {
+            isRecoveringHostLoss = false;
+            Debug.LogWarning($"[NetworkManagerUI] SurvivorElectionAndRehost rank={rank}: re-host failed - returning to main menu");
+            if (mainUIScript != null) mainUIScript.OnDisconnectDetected();
+        }
+    }
+
+    /// <summary>
+    /// Creates a fresh relay allocation, updates the existing lobby's RelayJoinCode metadata so the
+    /// original host can rejoin as a client, then starts as host and applies the snapshot.
+    /// </summary>
+    private async Task<bool> SurvivorRehost(SerializableGameState snapshot)
+    {
+        try
+        {
+            int targetPlayerCount = snapshot.playerCount;
+            Debug.Log($"[NetworkManagerUI] SurvivorRehost: creating relay for {targetPlayerCount} players");
+
+            // Step 1: Ensure clean network state before starting a fresh host
+            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+                NetworkManager.Singleton.Shutdown();
+            await Task.Delay(500);
+
+            // Step 2: Create a new relay allocation
+            var allocation = await RelayService.Instance.CreateAllocationAsync(targetPlayerCount - 1);
+            string newRelayJoinCode = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
+            Debug.Log($"[NetworkManagerUI] SurvivorRehost: new relay join code = {newRelayJoinCode}");
+
+            // Step 3: Update existing lobby metadata so the disconnected host can rejoin as a client
+            if (currentLobby != null)
+            {
+                try
+                {
+                    var updateOptions = new UpdateLobbyOptions
+                    {
+                        Data = new Dictionary<string, DataObject>
+                        {
+                            { "RelayJoinCode", new DataObject(DataObject.VisibilityOptions.Public, newRelayJoinCode) },
+                            { "HostAllocationId", new DataObject(DataObject.VisibilityOptions.Public, allocation.AllocationId.ToString()) }
+                        }
+                    };
+                    currentLobby = await Lobbies.Instance.UpdateLobbyAsync(currentLobby.Id, updateOptions);
+                    Debug.Log($"[NetworkManagerUI] SurvivorRehost: updated lobby {currentLobby.Id} with new relay code");
+                }
+                catch (Exception lobbyEx)
+                {
+                    // Non-fatal: the reconnecting player will not be able to use the lobby code,
+                    // but the game can still run with the players that are already present.
+                    Debug.LogWarning($"[NetworkManagerUI] SurvivorRehost: lobby update failed (non-fatal): {lobbyEx.Message}");
+                }
+            }
+
+            // Step 4: Configure transport with new relay data
+            NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(new RelayServerData(allocation, "wss"));
+
+            // Step 5: Start as host
+            bool hostStarted = NetworkManager.Singleton.StartHost();
+            if (!hostStarted)
+            {
+                Debug.LogError("[NetworkManagerUI] SurvivorRehost: StartHost() returned false");
+                return false;
+            }
+
+            // Step 6: Wait for Server.Singleton to become available
+            float waited = 0f;
+            while (Server.Singleton == null && waited < 10f)
+            {
+                await Task.Delay(100);
+                waited += 0.1f;
+            }
+            if (Server.Singleton == null)
+            {
+                Debug.LogError("[NetworkManagerUI] SurvivorRehost: Server.Singleton never appeared after StartHost");
+                return false;
+            }
+
+            // Step 7: Restore game state from snapshot
+            Server.Singleton.ApplyRestoredSnapshotOnRehost(snapshot);
+
+            // Step 8: Start relay keep-alive for the new allocation
+            StartCoroutine(StartRelayKeepAliveAfterHostStart(allocation.AllocationId.ToString()));
+
+            isInGame = true;
+            Debug.Log("[NetworkManagerUI] SurvivorRehost: complete - waiting for other player(s) to reconnect");
+            return true;
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[NetworkManagerUI] SurvivorRehost exception: {e.Message}\n{e.StackTrace}");
+            return false;
+        }
+    }
 
     /// <summary>
     /// Handles successful reconnection by closing waiting screen and requesting game state sync

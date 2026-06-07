@@ -61,6 +61,99 @@ public class Server : NetworkBehaviour
 
     // TURN TIMER: Coroutine-based timer to auto-skip turns
     private Coroutine activeTurnTimerCoroutine;
+    private bool isProcessingMove = false;
+
+    public bool IsProcessingMove => isProcessingMove;
+
+    /// <summary>Returns the player number for a given clientId, or -1 if not found.</summary>
+    public int GetPlayerNoForClient(ulong clientId)
+    {
+        foreach (var kvp in playerClientIds)
+        {
+            if (kvp.Value == clientId)
+                return kvp.Key;
+        }
+        return -1;
+    }
+
+    /// <summary>
+    /// Rebinds a player slot to a new client ID after reconnection.
+    /// Called when a reconnecting client announces their player number via ServerRPC.
+    /// </summary>
+    public void RebindPlayerClientId(int playerNo, ulong newClientId)
+    {
+        if (playerNo < 0 || playerNo >= playerCount)
+        {
+            Debug.LogWarning($"[Server] RebindPlayerClientId: invalid playerNo {playerNo} (playerCount={playerCount})");
+            return;
+        }
+        playerClientIds[playerNo] = newClientId;
+        Debug.Log($"[Server] RebindPlayerClientId: playerClientIds[{playerNo}] = {newClientId}");
+    }
+
+    /// <summary>
+    /// Called by the survivor client after it re-hosts following original host loss.
+    /// Applies the persisted snapshot to restore server-side game state so that reconnecting
+    /// players will receive the correct game state during the existing reconnect flow.
+    /// </summary>
+    public void ApplyRestoredSnapshotOnRehost(SerializableGameState snapshot)
+    {
+        if (!IsServer)
+        {
+            Debug.LogWarning("[Server] ApplyRestoredSnapshotOnRehost: called on non-server - ignoring");
+            return;
+        }
+
+        Debug.Log($"[Server] ApplyRestoredSnapshotOnRehost: applying snapshot v{snapshot.snapshotVersion} (turn {snapshot.turnCounter}, players {snapshot.playerCount})");
+
+        // Restore player count; connected count starts at 1 (just this survivor)
+        playerCount = snapshot.playerCount;
+        connectedPlayerCount = 1;
+
+        // Bind the survivor's own network ID to their saved player number
+        int survivorPlayerNo = PlayerPrefs.GetInt("PlayerNumber", -1);
+        if (survivorPlayerNo >= 0 && survivorPlayerNo < playerCount)
+        {
+            playerClientIds[survivorPlayerNo] = NetworkManager.Singleton.LocalClientId;
+            Debug.Log($"[Server] ApplyRestoredSnapshotOnRehost: playerClientIds[{survivorPlayerNo}] = {NetworkManager.Singleton.LocalClientId}");
+        }
+
+        // Restore and re-persist the failover chain so the new host's clients also have it
+        if (snapshot.failoverChain != null && snapshot.failoverChain.Length > 0)
+        {
+            string chainJson = UnityEngine.JsonUtility.ToJson(new SerializableIntList(
+                new System.Collections.Generic.List<int>(snapshot.failoverChain)));
+            UnityEngine.PlayerPrefs.SetString("SurvivorChain", chainJson);
+            UnityEngine.PlayerPrefs.Save();
+            Debug.Log($"[Server] ApplyRestoredSnapshotOnRehost: restored failover chain [{string.Join(",", snapshot.failoverChain)}]");
+        }
+
+        // Restore allCardLookup BEFORE calling ApplyGameStateToServer so that
+        // centerCardsDict can be rebuilt from the snapshot center list.
+        if (snapshot.cardLookup != null && snapshot.cardLookup.Length > 0)
+        {
+            if (allCardLookup == null) allCardLookup = new Dictionary<string, int[]>();
+            allCardLookup.Clear();
+            foreach (var entry in snapshot.cardLookup)
+            {
+                if (!string.IsNullOrEmpty(entry.cardId))
+                    allCardLookup[entry.cardId] = new int[] { entry.kind, entry.value };
+            }
+            Debug.Log($"[Server] ApplyRestoredSnapshotOnRehost: restored {allCardLookup.Count} entries to allCardLookup");
+        }
+        else
+        {
+            Debug.LogError("[Server] ApplyRestoredSnapshotOnRehost: snapshot.cardLookup is empty - center card rules will be unavailable after rehost!");
+        }
+
+        // Apply full game state from snapshot
+        ApplyGameStateToServer(snapshot);
+
+        // Ensure server is not stuck in a move-processing state
+        isProcessingMove = false;
+
+        Debug.Log($"[Server] ApplyRestoredSnapshotOnRehost: complete. currentPlayer={currentPlayer}, turn={turnCounter}");
+    }
 
     // POWER DURATION TIMER: Tracks how long a player can take during interactive power selection
     private Coroutine activePowerDurationCoroutine;
@@ -73,6 +166,11 @@ public class Server : NetworkBehaviour
     private SerializableGameState manualSavedState;
     private bool hasManualSavedState = false;
     private int snapshotVersionCounter = 0;
+
+    // PHASE 2A: Persistent snapshot keys for host-loss recovery
+    private const string SNAPSHOT_PREFS_KEY = "Chkobba_Snapshot_Current";
+    private const string SNAPSHOT_BACKUP_PREFS_KEY = "Chkobba_Snapshot_Backup";
+    private const string SNAPSHOT_METADATA_KEY = "Chkobba_Snapshot_Meta";
     
     // REDO SYSTEM: Automatic game state tracking
     private SerializableGameState currentGameState;
@@ -168,6 +266,8 @@ public class Server : NetworkBehaviour
         // StopRelayKeepAlive(); // COMMENTED OUT - keep relay alive for reconnection
         // hostAllocationId = null; // COMMENTED OUT - keep allocation ID for reconnection
         // clientAllocationIds.Clear(); // COMMENTED OUT - keep client tracking for reconnection
+
+        BroadcastLiveScoreUpdate();
         
         Debug.LogWarning("[Server] Server reset complete - ready for NEW GAME with fresh cards");
     }
@@ -375,6 +475,38 @@ public class Server : NetworkBehaviour
         
         // REDO SYSTEM: Save initial game state after cards are dealt
         Invoke("SaveInitialGameStateForRedo", 4f); // After cards are dealt
+
+        // FAILOVER: Compute and persist deterministic sub-host order for all clients
+        ComputeAndSaveSurvivorChain();
+    }
+
+    /// <summary>
+    /// Computes the deterministic failover chain for this match and writes it to PlayerPrefs
+    /// on the server.  A companion ClientRPC pushes the same data to every client so all
+    /// survivors evaluate candidacy identically, without needing the dead host.
+    ///
+    /// Order: slot-descending, host (slot 0) excluded, bot slots excluded.
+    /// e.g. 4-player all-human => [3, 2, 1];  4-player bot-mode => [] (no human backup)
+    /// </summary>
+    private void ComputeAndSaveSurvivorChain()
+    {
+        var chain = new System.Collections.Generic.List<int>();
+        for (int i = playerCount - 1; i > 0; i--)
+        {
+            // Exclude bot-controlled slots when bot mode is active.
+            // In bot mode slot 1 (and 1-3 for 4p) is the bot; skip them.
+            bool isBotSlot = isBotModeEnabled && i >= 1;
+            if (!isBotSlot) chain.Add(i);
+        }
+
+        string json = UnityEngine.JsonUtility.ToJson(new SerializableIntList(chain));
+        UnityEngine.PlayerPrefs.SetString("SurvivorChain", json);
+        UnityEngine.PlayerPrefs.Save();
+        Debug.Log($"[Server] ComputeAndSaveSurvivorChain: [{string.Join(",", chain)}] -> PlayerPrefs");
+
+        // Broadcast to every connected client so they each have the chain locally
+        if (networkRelay != null)
+            networkRelay.DistributeSurvivorChainClientRPC(json);
     }
 
     public void CallUpdateCurrentPlayer()
@@ -755,11 +887,16 @@ public class Server : NetworkBehaviour
             else
             {
                 Debug.LogError($"[ROUND END] PostMoveSequence: Not enough cards, calling DecideWinner");
+                isProcessingMove = false;
                 DecideWinner();
                 yield break;
             }
         }
 
+        // PHASE 2A: Persist checkpoint after every processed turn for host-loss recovery
+        PersistSnapshotToPlayerPrefs();
+
+        isProcessingMove = false;
         NextTurn();
     }
 
@@ -1103,6 +1240,9 @@ public class Server : NetworkBehaviour
 
         Debug.LogWarning(points[0] + "_" + points[1]);
 
+        // Push final round-calculated scores (captured-card scoring) to always-visible HUD.
+        BroadcastLiveScoreUpdate();
+
         networkRelay.PrintPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs), 5);
 
         SendWinScreen(roundOverText, winnerSide, points[0], points[1]);
@@ -1110,6 +1250,11 @@ public class Server : NetworkBehaviour
         if (winnerSide == -1)
         {
             Invoke("StartGameAutomatic", 10f);
+        }
+        else
+        {
+            // Match fully ended - clear persisted snapshots so stale data does not carry into the next session
+            ClearPersistedSnapshots();
         }
     }
 
@@ -1181,6 +1326,7 @@ public class Server : NetworkBehaviour
         }
 
         networkRelay.ShowPistiTextClientRPC(playerID, jPiştiFlag);
+        BroadcastLiveScoreUpdate();
     }
 
     public void RemoveCardsFromCenter(SerializableCard serializableCard)
@@ -1238,6 +1384,12 @@ public class Server : NetworkBehaviour
     {
         Debug.Log($"[Server] GetMove called with selectedHandCardUniqueID: {selectedHandCardUniqueID}, playerNumber: {playerNumber}, sumValue: {sumValue}");
 
+        if (isProcessingMove)
+        {
+            Debug.LogWarning("[Server] GetMove rejected: already processing a move");
+            return;
+        }
+
         // VALIDATION: Only accept moves from the current player
         if (playerNumber != currentPlayer)
         {
@@ -1264,6 +1416,7 @@ public class Server : NetworkBehaviour
         
         // REDO SYSTEM: Save state before processing move
         SaveCurrentGameStateForRedo();
+        isProcessingMove = true;
         
         // === MOVE CHAIN TRACKING ===
         // Initialize variables needed for both hybrid power activation and regular card play
@@ -1365,6 +1518,7 @@ public class Server : NetworkBehaviour
                 networkRelay.ShowVerZehriEffectClientRPC(playerNumber, -5);
                 verZehriActive = false;
                 networkRelay.SetVerZehriActiveClientRPC(false); // Notify clients to stop effect
+                BroadcastLiveScoreUpdate();
             }
             if (kutsalDesteActive)
             {
@@ -1374,6 +1528,7 @@ public class Server : NetworkBehaviour
                 networkRelay.ShowKutsalDesteEffectClientRPC(playerNumber, 5);
                 kutsalDesteActive = false;
                 networkRelay.SetKutsalDesteActiveClientRPC(false); // Notify clients to stop effect
+                BroadcastLiveScoreUpdate();
             }
         }
         else
@@ -1409,6 +1564,14 @@ public class Server : NetworkBehaviour
     {
         Debug.LogWarning("AddCardIDToCenter called with cardID: " + cardID[0] + "_" + cardID[1]);
         centerCardsDict[uniqueID] = cardID;
+
+        int owner = FindOwnerOfCard(uniqueID);
+        if (owner != -1 && playersHandCardsIDs != null && playersHandCardsIDs.ContainsKey(owner))
+        {
+            playersHandCardsIDs[owner].Remove(uniqueID);
+            Debug.Log($"[Server] AddCardIDToCenter removed {uniqueID} from player {owner} hand");
+        }
+
         networkRelay.UpdateCenterCardIDListClientRPC(new SerializableCard(centerCardsDict));
         networkRelay.SendCardAddedToCenterClientRPC(uniqueID, cardID);
         //EndTurn();
@@ -1438,10 +1601,18 @@ public class Server : NetworkBehaviour
         connectionLog.AppendLine($"SERVER MESSAGE: Is Host: {NetworkManager.Singleton.IsHost}");
         connectionLog.AppendLine($"SERVER MESSAGE: Is Server: {NetworkManager.Singleton.IsServer}");
         
-        // CRITICAL FIX: Check if this is a reconnection vs a new game start
-        // If the game is already in progress (turnCounter > 0), this is a reconnection
-        // BUT: Only the reconnecting client should go through reconnection flow, not the host
-        bool isReconnection = turnCounter > 0 && clientId != NetworkManager.Singleton.LocalClientId;
+        // IDEMPOTENCY: If this client is already tracked (current player or mid-reconnect), skip duplicate notification
+        if (reconnectingClients.Contains(clientId) || playerClientIds.ContainsValue(clientId))
+        {
+            Debug.LogWarning($"[Server] AnotherPlayerConnected: Client {clientId} is already tracked - ignoring duplicate notification");
+            return;
+        }
+        
+        // RECONNECTION DETECTION: Game is "in progress" if cards have been set up.
+        // This is more robust than turnCounter > 0 because it also catches the initial-deal window
+        // (after first deal at turn 0 but before any moves have been made).
+        bool gameHasStarted = (deckCardsDict != null || playersHandCardsIDs != null || centerCardsDict != null);
+        bool isReconnection = gameHasStarted && clientId != NetworkManager.Singleton.LocalClientId;
         
         // Only assign player number to new players, not reconnecting ones
         // Reconnecting players will restore their player number from PlayerPrefs
@@ -1939,33 +2110,27 @@ public class Server : NetworkBehaviour
     private void HandleHostDisconnection()
     {
         Debug.LogWarning($"[Server] ===== HANDLING HOST DISCONNECTION =====");
-        Debug.LogWarning($"[Server] Host disconnected - performing complete server reset");
-        
-        // Perform complete server reset
-        ResetAllServerVariables();
-        
-        // Stop all keep-alive systems
+        // NOTE: This is running on a SURVIVING CLIENT's Server component (not the dead host).
+        // Do NOT call ResetAllServerVariables() or ResetServerSingletonForMainMenu() here —
+        // that would destroy all game state before the survivor rehost can use it.
+        // Survivor recovery is orchestrated entirely from NetworkManagerUI.SurvivorElectionAndRehost().
+
+        // Stop keep-alive — a new allocation will be created by the survivor rehost
         StopRelayKeepAlive();
-        
-        // Clear all tracking
+
+        // Clear stale connection tracking; survivors will re-register when they rejoin
         disconnectedClients.Clear();
         clientHeartbeats.Clear();
         reconnectingClients.Clear();
-        
-        // Reset connection count
         connectedPlayerCount = 0;
-        
-        // Reset Server singleton for fresh game start
-        ResetServerSingletonForMainMenu();
-        
-        // Notify all clients that host has disconnected
+
+        // Notify all LOCAL callbacks that host has disconnected (triggers NetworkManagerUI flow)
         if (networkRelay != null)
         {
             networkRelay.NotifyHostDisconnectedClientRPC();
         }
-        
-        Debug.LogWarning($"[Server] ===== HOST DISCONNECTION HANDLING COMPLETE =====");
-        Debug.LogWarning($"[Server] Complete server reset performed - ready for fresh host");
+
+        Debug.LogWarning($"[Server] ===== HOST DISCONNECTION: keep-alive stopped, waiting for survivor rehost =====");
     }
 
     /// <summary>
@@ -2315,6 +2480,71 @@ public class Server : NetworkBehaviour
         return -1;
     }
 
+    public bool IsCardInCenter(string cardID)
+    {
+        return centerCardsDict != null && centerCardsDict.ContainsKey(cardID);
+    }
+
+    public bool IsCardInPlayerHand(int playerNo, string cardID)
+    {
+        return playersHandCardsIDs != null &&
+               playersHandCardsIDs.ContainsKey(playerNo) &&
+               playersHandCardsIDs[playerNo] != null &&
+               playersHandCardsIDs[playerNo].Contains(cardID);
+    }
+
+    public int GetHandCardCount(int playerNo)
+    {
+        if (playersHandCardsIDs == null || !playersHandCardsIDs.ContainsKey(playerNo)) return 0;
+        return playersHandCardsIDs[playerNo].Count;
+    }
+
+    public List<int> GetOpponentPlayers(int myPlayerNo)
+    {
+        var result = new List<int>();
+        if (playerCount == 2)
+        {
+            result.Add((myPlayerNo + 1) % 2);
+            return result;
+        }
+
+        if (playerCount == 4)
+        {
+            if (myPlayerNo == 0 || myPlayerNo == 2) result.AddRange(new[] { 1, 3 });
+            else result.AddRange(new[] { 0, 2 });
+        }
+
+        return result;
+    }
+
+    public void ExecuteRandomDegisTokus(int myPlayerNo)
+    {
+        if (playersHandCardsIDs == null || !playersHandCardsIDs.ContainsKey(myPlayerNo)) return;
+
+        var myHand = playersHandCardsIDs[myPlayerNo];
+        if (myHand == null || myHand.Count == 0) return;
+
+        var validOpponents = new List<int>();
+        foreach (var opp in GetOpponentPlayers(myPlayerNo))
+        {
+            if (playersHandCardsIDs.ContainsKey(opp) && playersHandCardsIDs[opp] != null && playersHandCardsIDs[opp].Count > 0)
+                validOpponents.Add(opp);
+        }
+
+        if (validOpponents.Count == 0) return;
+
+        int oppPlayer = validOpponents[UnityEngine.Random.Range(0, validOpponents.Count)];
+        string myCard = myHand[UnityEngine.Random.Range(0, myHand.Count)];
+        string oppCard = playersHandCardsIDs[oppPlayer][UnityEngine.Random.Range(0, playersHandCardsIDs[oppPlayer].Count)];
+
+        if (!IsCardInPlayerHand(myPlayerNo, myCard)) return;
+        if (!IsCardInPlayerHand(oppPlayer, oppCard)) return;
+        if (IsCardInCenter(myCard) || IsCardInCenter(oppCard)) return;
+
+        SunuDegisTokusSwap(myPlayerNo, oppPlayer, myCard, oppCard);
+        networkRelay.UseSunuDegisTokusClientRPC(myPlayerNo, oppPlayer, myCard, oppCard);
+    }
+
     public void SunuDegisTokusSwap(int playerANo, int playerBNo, string cardAID, string cardBID)
     {
         // Swap in player hands
@@ -2470,6 +2700,8 @@ public class Server : NetworkBehaviour
             points[playerNo] += pointValue;
             Debug.LogWarning($"Player {playerNo} now has {points[playerNo]} points (added {pointValue} from Kapkaç)");
         }
+
+        BroadcastLiveScoreUpdate();
     }
 
     private void ApplyZaferPuaniPoints()
@@ -2483,6 +2715,23 @@ public class Server : NetworkBehaviour
         }
         zaferPuaniPoints.Clear();
         zaferPuaniReportsReceived = 0;
+
+        BroadcastLiveScoreUpdate();
+    }
+
+    private void BroadcastLiveScoreUpdate()
+    {
+        if (networkRelay == null)
+        {
+            return;
+        }
+
+        if (points == null || points.Length < 2)
+        {
+            return;
+        }
+
+        networkRelay.UpdateScoreDisplayClientRPC(points[0], points[1]);
     }
 
 
@@ -2641,6 +2890,30 @@ public class Server : NetworkBehaviour
         // Optional: Player gold (leave empty for now since it's client-managed)
         snapshot.playerGold = new SerializableDictionary(new Dictionary<int, List<string>>());
 
+        // Card master lookup - required for re-host so ApplyGameStateToServer can rebuild centerCardsDict
+        if (allCardLookup != null && allCardLookup.Count > 0)
+        {
+            var entries = new CardLookupEntry[allCardLookup.Count];
+            int i = 0;
+            foreach (var kvp in allCardLookup)
+            {
+                entries[i++] = new CardLookupEntry { cardId = kvp.Key, kind = kvp.Value[0], value = kvp.Value[1] };
+            }
+            snapshot.cardLookup = entries;
+        }
+
+        // Failover chain - persisted in snapshot so survivors and reconnectors share the same election inputs
+        if (UnityEngine.PlayerPrefs.HasKey("SurvivorChain"))
+        {
+            try
+            {
+                var chainList = UnityEngine.JsonUtility.FromJson<SerializableIntList>(
+                    UnityEngine.PlayerPrefs.GetString("SurvivorChain")).ToList();
+                snapshot.failoverChain = chainList.ToArray();
+            }
+            catch { snapshot.failoverChain = new int[0]; }
+        }
+
         Debug.Log($"[Server] Built game state snapshot version {snapshot.snapshotVersion} with {centerList.Count} center cards, {playersHandCardsIDs?.Count ?? 0} player hands");
         
         return snapshot;
@@ -2704,6 +2977,22 @@ public class Server : NetworkBehaviour
     /// </summary>
     private void ApplyGameStateToServer(SerializableGameState snapshot)
     {
+        // STALE SNAPSHOT GUARD: Reject snapshots that are older than current tracked state
+        if (hasCurrentState && snapshot.snapshotVersion > 0 && snapshot.snapshotVersion <= currentGameState.snapshotVersion)
+        {
+            Debug.LogWarning($"[Server] ApplyGameStateToServer: Rejecting stale snapshot v{snapshot.snapshotVersion} (current is v{currentGameState.snapshotVersion})");
+            return;
+        }
+
+        // SNAPSHOT VALIDATION: Ensure critical containers are present before wiping current state
+        var handsToApply = snapshot.hands.ToDictionary();
+        var poolsToApply = snapshot.pools.ToDictionary();
+        if (handsToApply == null || poolsToApply == null)
+        {
+            Debug.LogError("[Server] ApplyGameStateToServer: Snapshot failed validation - hands or pools is null. Aborting.");
+            return;
+        }
+
         // Core game info
         this.currentPlayer = snapshot.currentPlayer;
         this.turnCounter = snapshot.turnCounter;
@@ -2714,9 +3003,12 @@ public class Server : NetworkBehaviour
         // Rebuild dictionaries from snapshot
         if (centerCardsDict == null) centerCardsDict = new Dictionary<string, int[]>();
         centerCardsDict.Clear();
+        bool lookupMissing = allCardLookup == null || allCardLookup.Count == 0;
+        if (lookupMissing)
+            Debug.LogError("[Server] ApplyGameStateToServer: allCardLookup is empty - center card data will be missing!");
         foreach (string cardId in snapshot.center.ToList())
         {
-            if (allCardLookup.ContainsKey(cardId))
+            if (!lookupMissing && allCardLookup.ContainsKey(cardId))
             {
                 centerCardsDict[cardId] = allCardLookup[cardId];
             }
@@ -2724,16 +3016,14 @@ public class Server : NetworkBehaviour
 
         if (playersHandCardsIDs == null) playersHandCardsIDs = new Dictionary<int, List<string>>();
         playersHandCardsIDs.Clear();
-        var handsDict = snapshot.hands.ToDictionary();
-        foreach (var kvp in handsDict)
+        foreach (var kvp in handsToApply)
         {
             playersHandCardsIDs[kvp.Key] = kvp.Value;
         }
 
         if (playersPooledCardsIDs == null) playersPooledCardsIDs = new Dictionary<int, List<string>>();
         playersPooledCardsIDs.Clear();
-        var poolsDict = snapshot.pools.ToDictionary();
-        foreach (var kvp in poolsDict)
+        foreach (var kvp in poolsToApply)
         {
             playersPooledCardsIDs[kvp.Key] = kvp.Value;
         }
@@ -2765,6 +3055,103 @@ public class Server : NetworkBehaviour
     }
 
     // Note: Automatic or request-based broadcasting removed per user request. Only manual Save/Load remains.
+
+    // ===== PHASE 2A: PERSISTENT SNAPSHOT MANAGEMENT =====
+
+    /// <summary>
+    /// Persists a snapshot of the current game state to PlayerPrefs so it survives host crashes.
+    /// Rotates the previous snapshot to a backup slot before writing the new one.
+    /// Should be called at the end of every processed turn (PostMoveSequence).
+    /// </summary>
+    public void PersistSnapshotToPlayerPrefs()
+    {
+        if (!IsServer) return;
+
+        try
+        {
+            var snapshot = BuildGameStateSnapshot();
+            string json = JsonUtility.ToJson(snapshot);
+
+            // Rotate: current → backup before overwriting
+            if (PlayerPrefs.HasKey(SNAPSHOT_PREFS_KEY))
+                PlayerPrefs.SetString(SNAPSHOT_BACKUP_PREFS_KEY, PlayerPrefs.GetString(SNAPSHOT_PREFS_KEY));
+
+            PlayerPrefs.SetString(SNAPSHOT_PREFS_KEY, json);
+            PlayerPrefs.SetString(SNAPSHOT_METADATA_KEY,
+                $"{snapshot.snapshotVersion}|{snapshot.turnCounter}|{snapshot.playerCount}|{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}");
+            PlayerPrefs.Save();
+            Debug.Log($"[Server] PersistSnapshotToPlayerPrefs: saved v{snapshot.snapshotVersion} (turn {snapshot.turnCounter})");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[Server] PersistSnapshotToPlayerPrefs failed: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Tries to load the most recent persisted snapshot from PlayerPrefs.
+    /// Falls back to the backup slot if the primary is missing or corrupt.
+    /// </summary>
+    public bool TryLoadSnapshotFromPlayerPrefs(out SerializableGameState snapshot)
+    {
+        snapshot = default;
+        string json = null;
+
+        if (PlayerPrefs.HasKey(SNAPSHOT_PREFS_KEY))
+        {
+            json = PlayerPrefs.GetString(SNAPSHOT_PREFS_KEY);
+        }
+        else if (PlayerPrefs.HasKey(SNAPSHOT_BACKUP_PREFS_KEY))
+        {
+            json = PlayerPrefs.GetString(SNAPSHOT_BACKUP_PREFS_KEY);
+            Debug.LogWarning("[Server] TryLoadSnapshotFromPlayerPrefs: primary missing, using backup");
+        }
+
+        if (string.IsNullOrEmpty(json))
+        {
+            Debug.LogWarning("[Server] TryLoadSnapshotFromPlayerPrefs: no snapshot found in PlayerPrefs");
+            return false;
+        }
+
+        try
+        {
+            snapshot = JsonUtility.FromJson<SerializableGameState>(json);
+            Debug.Log($"[Server] TryLoadSnapshotFromPlayerPrefs: loaded v{snapshot.snapshotVersion} (turn {snapshot.turnCounter}, players {snapshot.playerCount})");
+            return true;
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[Server] TryLoadSnapshotFromPlayerPrefs: primary snapshot corrupt ({e.Message}), trying backup");
+
+            if (PlayerPrefs.HasKey(SNAPSHOT_BACKUP_PREFS_KEY))
+            {
+                try
+                {
+                    snapshot = JsonUtility.FromJson<SerializableGameState>(PlayerPrefs.GetString(SNAPSHOT_BACKUP_PREFS_KEY));
+                    Debug.LogWarning($"[Server] TryLoadSnapshotFromPlayerPrefs: loaded backup v{snapshot.snapshotVersion}");
+                    return true;
+                }
+                catch (Exception e2)
+                {
+                    Debug.LogError($"[Server] TryLoadSnapshotFromPlayerPrefs: backup also corrupt: {e2.Message}");
+                }
+            }
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Clears all persisted snapshot data from PlayerPrefs.
+    /// Call when the match fully ends so stale data does not carry into the next session.
+    /// </summary>
+    public void ClearPersistedSnapshots()
+    {
+        PlayerPrefs.DeleteKey(SNAPSHOT_PREFS_KEY);
+        PlayerPrefs.DeleteKey(SNAPSHOT_BACKUP_PREFS_KEY);
+        PlayerPrefs.DeleteKey(SNAPSHOT_METADATA_KEY);
+        PlayerPrefs.Save();
+        Debug.Log("[Server] ClearPersistedSnapshots: cleared all snapshot data from PlayerPrefs");
+    }
 
     // ===== REDO SYSTEM: AUTOMATIC GAME STATE TRACKING =====
 
@@ -3394,6 +3781,18 @@ public class Server : NetworkBehaviour
     {
         RemoveReconnectingClient(clientId);
         CallUpdateCurrentPlayer();
+
+        // Resume turn timer if it is not currently running (e.g. after re-host recovery from a crash)
+        if (activeTurnTimerCoroutine == null && reconnectingClients.Count == 0)
+        {
+            bool isBotTurn = botPlayerActive && ((playerCount == 2 && currentPlayer == 1) || (playerCount == 4 && currentPlayer != 0));
+            if (!isBotTurn)
+            {
+                activeTurnTimerCoroutine = StartCoroutine(TurnTimerCoroutine(currentPlayer));
+                Debug.Log($"[Server] OnReconnectionReady: resumed turn timer for player {currentPlayer}");
+            }
+        }
+
         Debug.Log($"[Server] Reconnection ready for client {clientId}, sent UpdateCurrentPlayer");
     }
 

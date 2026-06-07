@@ -388,11 +388,18 @@ public class MainUIScript : MonoBehaviour
     {
         Debug.Log("[MainUIScript] Disconnect detected - performing active disconnection like return button");
         
-        // CRITICAL FIX: Perform the same active disconnection as the return button
-        // This ensures the client properly disconnects from lobby and relay
+        // CRITICAL: Do not tear down during host-loss recovery.
+        // NetworkManagerUI.isRecoveringHostLoss is the authoritative guard.
         var networkManagerUI = FindObjectOfType<NetworkManagerUI>();
         if (networkManagerUI != null)
         {
+            // Access the recovery guard via the public property we added.
+            if (networkManagerUI.IsRecoveringHostLoss)
+            {
+                Debug.Log("[MainUIScript] OnDisconnectDetected suppressed - host-loss recovery in progress");
+                return;
+            }
+
             Debug.Log("[MainUIScript] Triggering active disconnection via NetworkManagerUI");
             networkManagerUI.PerformClientDisconnection();
         }

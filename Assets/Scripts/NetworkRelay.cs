@@ -9,6 +9,36 @@ public class NetworkRelay : NetworkBehaviour
     public static NetworkRelay Instance { get; private set; }
 
     private NetworkManagerUI networkManagerUI;
+
+    private bool ShouldRejectPowerRpcDuringMove(string rpcName)
+    {
+        if (server != null && server.IsProcessingMove)
+        {
+            Debug.LogWarning($"[NetworkRelay] {rpcName} rejected: server is processing a move");
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Validates that the RPC caller is the current player.
+    /// Returns true (valid) and outputs the caller's player number.
+    /// Returns false and logs a warning if the caller is not recognised or is not the current player.
+    /// </summary>
+    private bool ValidatePowerCaller(out int callerPlayerNo, ServerRpcParams rpcParams)
+    {
+        // SenderClientId is the actual network client that sent this RPC.
+        // OwnerClientId would always be the host (NetworkObject owner), NOT the sender.
+        ulong senderClientId = rpcParams.Receive.SenderClientId;
+        callerPlayerNo = server.GetPlayerNoForClient(senderClientId);
+        if (callerPlayerNo == -1 || callerPlayerNo != server.currentPlayer)
+        {
+            Debug.LogWarning($"[NetworkRelay] Power RPC rejected: senderClient={senderClientId} " +
+                             $"(callerPlayerNo={callerPlayerNo}, currentPlayer={server.currentPlayer})");
+            return false;
+        }
+        return true;
+    }
     // Start is called before the first frame update
     void Awake()
     {
@@ -105,6 +135,19 @@ public class NetworkRelay : NetworkBehaviour
     public void ShowWinScreenClientRPC(string message, int winnerSide, int point0, int point1)
     {
         GameManager.LocalInstance.ShowWinScreen(message, winnerSide, point0, point1);
+    }
+
+    [ClientRpc(RequireOwnership = false)]
+    public void UpdateScoreDisplayClientRPC(int point0, int point1)
+    {
+        if (GameManager.LocalInstance != null)
+        {
+            GameManager.LocalInstance.ApplyLiveScoreUpdate(point0, point1);
+        }
+        else
+        {
+            Debug.LogWarning($"[NetworkRelay] UpdateScoreDisplayClientRPC skipped: GameManager.LocalInstance is null (scores {point0}-{point1})");
+        }
     }
 
     [ClientRpc(RequireOwnership = false)]
@@ -244,10 +287,10 @@ public class NetworkRelay : NetworkBehaviour
     }
 
     [ClientRpc]
-    public void UseBuDahaIyiClientRPC(int playerNo, string handCardID, string centerCardID)
+    public void UseBuDahaIyiClientRPC(int activatingPlayerNo, int handCardOwnerPlayerNo, string handCardID, string centerCardID)
     {
-        Debug.Log($"[NetworkRelay] UseBuDahaIyiClientRPC received - Player: {playerNo}, HandCard: {handCardID}, CenterCard: {centerCardID}, Time: {Time.time}");
-        GameManager.LocalInstance.OnBuDahaIyiSynced(playerNo, handCardID, centerCardID);
+        Debug.Log($"[NetworkRelay] UseBuDahaIyiClientRPC received - ActivatingPlayer: {activatingPlayerNo}, HandCardOwner: {handCardOwnerPlayerNo}, HandCard: {handCardID}, CenterCard: {centerCardID}, Time: {Time.time}");
+        GameManager.LocalInstance.OnBuDahaIyiSynced(activatingPlayerNo, handCardOwnerPlayerNo, handCardID, centerCardID);
         Debug.Log($"[NetworkRelay] UseBuDahaIyiClientRPC complete");
     }
 
@@ -260,7 +303,9 @@ public class NetworkRelay : NetworkBehaviour
     [ClientRpc]
     public void UseSunuDegisBunuTokusClientRPC(int myPlayerNo, int otherPlayerNo, string myHandCardID, string otherHandCardID, int myHandIndex, bool readyToExit = false)
     {
-        StartCoroutine(GameManager.LocalInstance.OnSunuDegisBunuTokusSynced(myPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID, myHandIndex, readyToExit));
+        // Use the sequential queue so concurrent RPCs don't race with showcase restoration.
+        Debug.Log($"[ŞDBT] ClientRPC received: myPlayer={myPlayerNo}, otherPlayer={otherPlayerNo}, my={myHandCardID}, other={otherHandCardID}, idx={myHandIndex}, readyToExit={readyToExit}");
+        GameManager.LocalInstance.EnqueueSunuDegisBunuTokusSwap(myPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID, myHandIndex, readyToExit);
     }
     [ClientRpc(RequireOwnership = false)]
     public void KapkacCardChangedClientRPC(string cardUniqueID)
@@ -310,26 +355,44 @@ public class NetworkRelay : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void ActivateYandimAnamOnCardServerRPC(string cardUniqueID)
+    public void ActivateYandimAnamOnCardServerRPC(string cardUniqueID, ServerRpcParams rpcParams = default)
     {
+        if (!ValidatePowerCaller(out int callerPlayerNo, rpcParams)) return;
+
+        // Completing card selection ends interactive power flow.
+        if (server != null)
+        {
+            server.StopPowerDurationTimerAndResumeTurn();
+        }
+
         // Update the server's authoritative card data
         if (Server.Singleton != null && Server.Singleton.allCardLookup.ContainsKey(cardUniqueID))
         {
             Server.Singleton.allCardLookup[cardUniqueID][1] = 0; // Set value to 0
         }
+        ShowcaseSuperPowerClientRPC("Yandım Anam");
         YandimAnamCardChangedClientRPC(cardUniqueID);
     }
 
     [ServerRpc(RequireOwnership = false)]
     public void ShowcaseSuperPowerServerRPC(string powerName, float fadeDuration = 0.5f, float displayDuration = 2f)
     {
+        if (ShouldRejectPowerRpcDuringMove(nameof(ShowcaseSuperPowerServerRPC))) return;
         ShowcaseSuperPowerClientRPC(powerName, fadeDuration, displayDuration);
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void KopyalaYapistirServerRPC(string targetUniqueID, string sourceUniqueID)
+    public void KopyalaYapistirServerRPC(string targetUniqueID, string sourceUniqueID, ServerRpcParams rpcParams = default)
     {
+        if (!ValidatePowerCaller(out int callerPlayerNo, rpcParams)) return;
+
         Debug.Log($"[NetworkRelay] KopyalaYapistirServerRPC called - Target: {targetUniqueID}, Source: {sourceUniqueID}, Time: {Time.time}");
+
+        // Completing Kopyala Yapıştır ends interactive selection, so stop power timer and resume turn timer.
+        if (server != null)
+        {
+            server.StopPowerDurationTimerAndResumeTurn();
+        }
         
         // Update the server's authoritative card data
         if (Server.Singleton != null && Server.Singleton.allCardLookup.ContainsKey(sourceUniqueID) && Server.Singleton.allCardLookup.ContainsKey(targetUniqueID))
@@ -346,13 +409,22 @@ public class NetworkRelay : NetworkBehaviour
         
         // Notify all clients to update visuals and local cardID
         Debug.Log($"[NetworkRelay] Broadcasting KopyalaYapistirClientRPC to all clients");
+        ShowcaseSuperPowerClientRPC("Kopyala Yapıştır");
         KopyalaYapistirClientRPC(targetUniqueID, sourceUniqueID);
         Debug.Log($"[NetworkRelay] KopyalaYapistirServerRPC complete");
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void ActivateKapkacOnCardServerRPC(string cardUniqueID, int playerNumber)
+    public void ActivateKapkacOnCardServerRPC(string cardUniqueID, ServerRpcParams rpcParams = default)
     {
+        if (!ValidatePowerCaller(out int callerPlayerNo, rpcParams)) return;
+
+        // Completing card selection ends interactive power flow.
+        if (server != null)
+        {
+            server.StopPowerDurationTimerAndResumeTurn();
+        }
+
         // Update the server's authoritative card data
         if (Server.Singleton != null && Server.Singleton.allCardLookup.ContainsKey(cardUniqueID))
         {
@@ -368,9 +440,10 @@ public class NetworkRelay : NetworkBehaviour
         // SIMPLIFIED ZAFER PUANI: Add 1 point to the player/team who activated Kapkaç
         if (Server.Singleton != null)
         {
-            Server.Singleton.AddZaferPuaniPoint(playerNumber, 1);
+            Server.Singleton.AddZaferPuaniPoint(callerPlayerNo, 1);
         }
 
+        ShowcaseSuperPowerClientRPC("Kapkaç");
         KapkacCardChangedClientRPC(cardUniqueID);
     }
 
@@ -381,27 +454,49 @@ public class NetworkRelay : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void ActivateZaferPuaniServerRPC(int playerNumber, int points)
+    public void ActivateZaferPuaniServerRPC(int points, ServerRpcParams rpcParams = default)
     {
+        if (!ValidatePowerCaller(out int callerPlayerNo, rpcParams)) return;
+        if (ShouldRejectPowerRpcDuringMove(nameof(ActivateZaferPuaniServerRPC))) return;
         // DIRECT POINT ADDITION: Add points immediately to the player/team
         if (Server.Singleton != null)
         {
-            Server.Singleton.AddZaferPuaniPoint(playerNumber, points);
+            Server.Singleton.AddZaferPuaniPoint(callerPlayerNo, points);
         }
+        ShowcaseSuperPowerClientRPC("Zafer Puanı");
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void UseSunuDegisTokusServerRPC(int myPlayerNo, string myHandCardID, string otherHandCardID)
+    public void UseRandomDegisTokusServerRPC(ServerRpcParams rpcParams = default)
     {
-        // Find the owner of the otherHandCardID
-        int otherPlayerNo = server.FindOwnerOfCard(otherHandCardID);
-        if (otherPlayerNo == -1 || otherPlayerNo == myPlayerNo) return;
+        if (!ValidatePowerCaller(out int callerPlayerNo, rpcParams)) return;
+        if (ShouldRejectPowerRpcDuringMove(nameof(UseRandomDegisTokusServerRPC))) return;
+        ShowcaseSuperPowerClientRPC("Değiş Tokuş");
+        server.ExecuteRandomDegisTokus(callerPlayerNo);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void UseSunuDegisTokusServerRPC(string firstHandCardID, string secondHandCardID, ServerRpcParams rpcParams = default)
+    {
+        if (!ValidatePowerCaller(out int callerPlayerNo, rpcParams)) return;
+
+        if (string.IsNullOrEmpty(firstHandCardID) || string.IsNullOrEmpty(secondHandCardID)) return;
+        if (firstHandCardID == secondHandCardID) return;
+
+        int firstOwnerPlayerNo = server.FindOwnerOfCard(firstHandCardID);
+        int secondOwnerPlayerNo = server.FindOwnerOfCard(secondHandCardID);
+        if (firstOwnerPlayerNo == -1 || secondOwnerPlayerNo == -1) return;
+
+        if (!server.IsCardInPlayerHand(firstOwnerPlayerNo, firstHandCardID)) return;
+        if (!server.IsCardInPlayerHand(secondOwnerPlayerNo, secondHandCardID)) return;
+        if (server.IsCardInCenter(firstHandCardID) || server.IsCardInCenter(secondHandCardID)) return;
 
         // Stop the power selection timer and resume the turn timer after animation
         server.StopPowerDurationTimerAndResumeTurn();
 
-        server.SunuDegisTokusSwap(myPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID);
-        UseSunuDegisTokusClientRPC(myPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID);
+        ShowcaseSuperPowerClientRPC("Şunu Değiş Tokuş");
+        server.SunuDegisTokusSwap(firstOwnerPlayerNo, secondOwnerPlayerNo, firstHandCardID, secondHandCardID);
+        UseSunuDegisTokusClientRPC(firstOwnerPlayerNo, secondOwnerPlayerNo, firstHandCardID, secondHandCardID);
     }
 
     // --- Power Duration Timer RPCs ---
@@ -431,15 +526,39 @@ public class NetworkRelay : NetworkBehaviour
     // --- End Power Duration Timer RPCs ---
 
     [ServerRpc(RequireOwnership = false)]
-    public void UseBuDahaIyiServerRPC(int playerNo, string handCardID, string centerCardID)    {
-        Debug.Log($"[NetworkRelay] UseBuDahaIyiServerRPC called - Player: {playerNo}, HandCard: {handCardID}, CenterCard: {centerCardID}, Time: {Time.time}");
-        
+    public void UseBuDahaIyiServerRPC(string handCardID, string centerCardID, ServerRpcParams rpcParams = default)
+    {
+        if (!ValidatePowerCaller(out int callerPlayerNo, rpcParams)) return;
+
+        Debug.Log($"[NetworkRelay] UseBuDahaIyiServerRPC called - HandCard: {handCardID}, CenterCard: {centerCardID}, Time: {Time.time}");
+
+        // Completing card selection ends interactive power flow.
+        if (server != null)
+        {
+            server.StopPowerDurationTimerAndResumeTurn();
+        }
+
+        ShowcaseSuperPowerClientRPC("Bu Daha İyi");
         if (!server.TryBlockPower())
         {
+            int handCardOwnerPlayerNo = server.FindOwnerOfCard(handCardID);
+            if (handCardOwnerPlayerNo == -1)
+            {
+                Debug.LogWarning($"[NetworkRelay] UseBuDahaIyiServerRPC rejected: card {handCardID} is not in any player's hand");
+                return;
+            }
+
+            // Require the provided center card to still exist on server for deterministic sync.
+            if (!server.IsCardInCenter(centerCardID))
+            {
+                Debug.LogWarning($"[NetworkRelay] UseBuDahaIyiServerRPC rejected: center card {centerCardID} is not in center anymore");
+                return;
+            }
+
             Debug.Log($"[NetworkRelay] Power not blocked, calling server.BuDahaIyiSwap()");
-            server.BuDahaIyiSwap(playerNo, handCardID, centerCardID);
+            server.BuDahaIyiSwap(handCardOwnerPlayerNo, handCardID, centerCardID);
             Debug.Log($"[NetworkRelay] Broadcasting UseBuDahaIyiClientRPC to all clients");
-            UseBuDahaIyiClientRPC(playerNo, handCardID, centerCardID);
+            UseBuDahaIyiClientRPC(callerPlayerNo, handCardOwnerPlayerNo, handCardID, centerCardID);
             Debug.Log($"[NetworkRelay] UseBuDahaIyiServerRPC complete");
         }
         else
@@ -449,19 +568,25 @@ public class NetworkRelay : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void ActivateVerZehriServerRPC()
+    public void ActivateVerZehriServerRPC(ServerRpcParams rpcParams = default)
     {
+        if (!ValidatePowerCaller(out int callerPlayerNo, rpcParams)) return;
+        if (ShouldRejectPowerRpcDuringMove(nameof(ActivateVerZehriServerRPC))) return;
         Debug.Log($"[NetworkRelay] ActivateVerZehriServerRPC called - Time: {Time.time}");
         Debug.Log($"[NetworkRelay] Calling server.ActivateVerZehri() - This will set verZehriPending=true");
+        ShowcaseSuperPowerClientRPC("Ver Zehri");
         server.ActivateVerZehri();
         Debug.Log($"[NetworkRelay] ActivateVerZehriServerRPC complete - Effect will activate at end of turn");
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void ActivateKutsalDesteServerRPC()
+    public void ActivateKutsalDesteServerRPC(ServerRpcParams rpcParams = default)
     {
+        if (!ValidatePowerCaller(out int callerPlayerNo, rpcParams)) return;
+        if (ShouldRejectPowerRpcDuringMove(nameof(ActivateKutsalDesteServerRPC))) return;
         Debug.Log($"[NetworkRelay] ActivateKutsalDesteServerRPC called - Time: {Time.time}");
         Debug.Log($"[NetworkRelay] Calling server.ActivateKutsalDeste() - This will set kutsalDestePending=true");
+        ShowcaseSuperPowerClientRPC("Kutsal Deste");
         server.ActivateKutsalDeste();
         Debug.Log($"[NetworkRelay] ActivateKutsalDesteServerRPC complete - Effect will activate at end of turn");
     }
@@ -473,53 +598,80 @@ public class NetworkRelay : NetworkBehaviour
     }*/
 
     [ServerRpc(RequireOwnership = false)]
-    public void ActivateOynayamazsinServerRPC()
+    public void ActivateOynayamazsinServerRPC(ServerRpcParams rpcParams = default)
     {
+        if (!ValidatePowerCaller(out int callerPlayerNo, rpcParams)) return;
+        if (ShouldRejectPowerRpcDuringMove(nameof(ActivateOynayamazsinServerRPC))) return;
         Debug.Log($"[NetworkRelay] ActivateOynayamazsinServerRPC called - Time: {Time.time}");
         Debug.Log($"[NetworkRelay] Calling server.ActivateOynayamazsin() - This will set oynayamazsinPending=true");
+        ShowcaseSuperPowerClientRPC("Oynayamazsın");
         server.ActivateOynayamazsin();
         Debug.Log($"[NetworkRelay] ActivateOynayamazsinServerRPC complete - Effect will activate at end of turn");
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void ActivateYapamazsınServerRPC()
+    public void ActivateYapamazsınServerRPC(ServerRpcParams rpcParams = default)
     {
-        if (!server.TryBlockPower())server.ActivateYapamazsın();
+        if (!ValidatePowerCaller(out int callerPlayerNo, rpcParams)) return;
+        if (ShouldRejectPowerRpcDuringMove(nameof(ActivateYapamazsınServerRPC))) return;
+        ShowcaseSuperPowerClientRPC("Yapamazsın");
+        if (!server.TryBlockPower()) server.ActivateYapamazsın();
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void BombaServerRPC()
+    public void BombaServerRPC(ServerRpcParams rpcParams = default)
     {
-        if (!server.TryBlockPower())server.BombaCenter();
+        if (!ValidatePowerCaller(out int callerPlayerNo, rpcParams)) return;
+        if (ShouldRejectPowerRpcDuringMove(nameof(BombaServerRPC))) return;
+        ShowcaseSuperPowerClientRPC("Bomba");
+        if (!server.TryBlockPower()) server.BombaCenter();
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void UseBayaBayaBakServerRPC(int opponentPlayerNo)
+    public void UseBayaBayaBakServerRPC(ServerRpcParams rpcParams = default)
     {
-        Debug.Log($"[NetworkRelay] UseBayaBayaBakServerRPC called - Opponent: {opponentPlayerNo}, Time: {Time.time}");
-        
-        // Track the RPC call
-        DebugChainPrinter.LocalInstance?.TrackNetworkRPC("UseBayaBayaBakServerRPC", $"opponentPlayerNo={opponentPlayerNo}");
-        
-        // Get the hand from the server
+        if (!ValidatePowerCaller(out int callerPlayerNo, rpcParams)) return;
+        if (ShouldRejectPowerRpcDuringMove(nameof(UseBayaBayaBakServerRPC))) return;
+        Debug.Log($"[NetworkRelay] UseBayaBayaBakServerRPC called - Caller: {callerPlayerNo}, Time: {Time.time}");
+
+        DebugChainPrinter.LocalInstance?.TrackNetworkRPC("UseBayaBayaBakServerRPC", $"callerPlayerNo={callerPlayerNo}");
+
+        ShowcaseSuperPowerClientRPC("Baya Baya Bak");
         if (!server.TryBlockPower())
         {
-            Debug.Log($"[NetworkRelay] Power not blocked, calling UseBayaBayaBakClientRPC()");
-            UseBayaBayaBakClientRPC(opponentPlayerNo);
+            var opponents = server.GetOpponentPlayers(callerPlayerNo);
+            if (opponents.Count == 0) return;
+            int serverOpponentNo = opponents[UnityEngine.Random.Range(0, opponents.Count)];
+
+            Debug.Log($"[NetworkRelay] Power not blocked, calling UseBayaBayaBakClientRPC() with opponent {serverOpponentNo}");
+            DebugChainPrinter.LocalInstance?.TrackLocalAction($"BayaBayaBak targeting server-selected opponent {serverOpponentNo}");
+            UseBayaBayaBakClientRPC(serverOpponentNo);
         }
         else
         {
             Debug.Log($"[NetworkRelay] Power was blocked by Yapamazsın");
             DebugChainPrinter.LocalInstance?.TrackLocalAction("BayaBayaBak power was blocked by Yapamazsın");
         }
-        
+
         Debug.Log($"[NetworkRelay] UseBayaBayaBakServerRPC complete");
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void UsePeekOpponentCardPowerServerRPC(int opponentPlayerNo, int cardIndex)
+    public void UsePeekOpponentCardPowerServerRPC(ServerRpcParams rpcParams = default)
     {
-        if (!server.TryBlockPower())UsePeekOpponentCardPowerClientRPC(opponentPlayerNo, cardIndex);
+        if (!ValidatePowerCaller(out int callerPlayerNo, rpcParams)) return;
+        if (ShouldRejectPowerRpcDuringMove(nameof(UsePeekOpponentCardPowerServerRPC))) return;
+        ShowcaseSuperPowerClientRPC("Ucundan Göz At");
+        if (!server.TryBlockPower())
+        {
+            var opponents = server.GetOpponentPlayers(callerPlayerNo);
+            if (opponents.Count == 0) return;
+            int serverOpponentNo = opponents[UnityEngine.Random.Range(0, opponents.Count)];
+            int handCount = server.GetHandCardCount(serverOpponentNo);
+            if (handCount == 0) return;
+            int serverCardIndex = UnityEngine.Random.Range(0, handCount);
+            UsePeekOpponentCardPowerClientRPC(serverOpponentNo, serverCardIndex);
+        }
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -595,8 +747,14 @@ public class NetworkRelay : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void ReconnectingClientCardsReadyServerRPC(ulong clientId)
+    public void ReconnectingClientCardsReadyServerRPC(ulong clientId, ServerRpcParams rpcParams = default)
     {
+        // Trust the actual network sender ID - do not rely on the client-provided ID for server logic
+        ulong trustedClientId = rpcParams.Receive.SenderClientId;
+        if (trustedClientId != clientId)
+            Debug.LogWarning($"[NetworkRelay] ReconnectingClientCardsReadyServerRPC: client passed ID {clientId} but actual sender is {trustedClientId} - using trusted sender ID");
+        clientId = trustedClientId;
+
         Debug.LogError("[Visual Sync] ===== RECONNECTING CLIENT CARDS READY SERVER RPC RECEIVED =====");
         Debug.Log($"[NetworkRelay] ===== ÖNEMLİ: RECONNECTING CLIENT CARDS READY RPC RECEIVED =====\n" +
                  $"ClientId: {clientId}\n" +
@@ -666,15 +824,53 @@ public class NetworkRelay : NetworkBehaviour
         server.OnReconnectionReady(clientId);
     }
 
+    /// <summary>
+    /// Reconnecting client announces its saved player number so the server can rebind
+    /// playerClientIds with the new network client ID. Uses SenderClientId to prevent spoofing.
+    /// </summary>
     [ServerRpc(RequireOwnership = false)]
-    public void UseSunuDegisBunuTokusServerRPC(int myPlayerNo, string myHandCardID, string otherHandCardID, int myHandIndex, bool readyToExit = false)
+    public void AnnounceReconnectedPlayerNumberServerRPC(int playerNo, ServerRpcParams rpcParams = default)
     {
+        ulong senderClientId = rpcParams.Receive.SenderClientId;
+        Debug.Log($"[NetworkRelay] AnnounceReconnectedPlayerNumberServerRPC: player {playerNo} reconnected as client {senderClientId}");
+        server.RebindPlayerClientId(playerNo, senderClientId);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void UseSunuDegisBunuTokusServerRPC(string myHandCardID, string otherHandCardID, int myHandIndex, bool readyToExit = false, ServerRpcParams rpcParams = default)
+    {
+        ulong senderClientId = rpcParams.Receive.SenderClientId;
+        int callerPlayerNo = server.GetPlayerNoForClient(senderClientId);
+        Debug.Log($"[ŞDBT] ServerRPC received: my={myHandCardID}, other={otherHandCardID}, idx={myHandIndex}, readyToExit={readyToExit}, senderClient={senderClientId}, callerPlayerNo={callerPlayerNo}, currentPlayer={server.currentPlayer}");
+
+        if (callerPlayerNo == -1 || callerPlayerNo != server.currentPlayer)
+        {
+            Debug.LogWarning($"[ŞDBT] ServerRPC rejected: senderClient={senderClientId}, callerPlayerNo={callerPlayerNo}, currentPlayer={server.currentPlayer}");
+            return;
+        }
+
         // Find the owner of the otherHandCardID
         int otherPlayerNo = server.FindOwnerOfCard(otherHandCardID);
-        if (otherPlayerNo == -1 || otherPlayerNo == myPlayerNo) return;
+        if (otherPlayerNo == -1 || otherPlayerNo == callerPlayerNo)
+        {
+            Debug.LogWarning($"[ŞDBT] ServerRPC rejected after owner lookup. otherPlayerNo={otherPlayerNo}, callerPlayerNo={callerPlayerNo}");
+            return;
+        }
 
-        server.SunuDegisBunuTokusSwap(myPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID, myHandIndex);
-        UseSunuDegisBunuTokusClientRPC(myPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID, myHandIndex, readyToExit);
+        Debug.Log($"[ŞDBT] ServerRPC validated. callerPlayerNo={callerPlayerNo}, otherPlayerNo={otherPlayerNo}");
+
+        server.SunuDegisBunuTokusSwap(callerPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID, myHandIndex);
+        Debug.Log($"[ŞDBT] Server authoritative swap applied for idx={myHandIndex}");
+
+        if (readyToExit)
+        {
+            Debug.Log("[ŞDBT] Last swap reached on server. Stopping power timer and triggering showcase.");
+            server.StopPowerDurationTimerAndResumeTurn();
+            ShowcaseSuperPowerClientRPC("Şunu Değiş Bunu Tokuş");
+        }
+
+        Debug.Log($"[ŞDBT] Broadcasting ClientRPC for idx={myHandIndex}");
+        UseSunuDegisBunuTokusClientRPC(callerPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID, myHandIndex, readyToExit);
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -905,6 +1101,30 @@ public class NetworkRelay : NetworkBehaviour
         if (networkManagerUI != null)
         {
             networkManagerUI.OnHostDisconnected();
+        }
+    }
+
+    /// <summary>
+    /// Sends the precomputed failover chain JSON to every connected client so each
+    /// survivor can independently evaluate candidacy without contacting the (dead) host.
+    /// Called by Server.ComputeAndSaveSurvivorChain() immediately after match start.
+    /// </summary>
+    [ClientRpc]
+    public void DistributeSurvivorChainClientRPC(string chainJson)
+    {
+        // Ignore on the host itself - it already wrote to PlayerPrefs directly.
+        if (Unity.Netcode.NetworkManager.Singleton != null && Unity.Netcode.NetworkManager.Singleton.IsHost) return;
+
+        UnityEngine.PlayerPrefs.SetString("SurvivorChain", chainJson);
+        UnityEngine.PlayerPrefs.Save();
+        try
+        {
+            var list = UnityEngine.JsonUtility.FromJson<SerializableIntList>(chainJson).ToList();
+            Debug.Log($"[NetworkRelay] DistributeSurvivorChainClientRPC: received chain [{string.Join(",", list)}]");
+        }
+        catch
+        {
+            Debug.LogWarning("[NetworkRelay] DistributeSurvivorChainClientRPC: could not parse chain JSON");
         }
     }
 

@@ -21,8 +21,8 @@ public abstract class SuperPower : ScriptableObject
             DebugChainPrinter.LocalInstance?.TrackMoveChain($"Superpower activation tracked: {name} by P{DeckController.LocalInstance.thisPlayerNumber}");
         }
         
-        GameManager.LocalInstance.networkRelay.ShowcaseSuperPowerServerRPC(name);
-        DebugChainPrinter.LocalInstance?.TrackNetworkRPC("ShowcaseSuperPowerServerRPC", $"powerName={name}");
+        // Showcase is triggered by the server after it accepts the power RPC,
+        // so all clients see it at the same time regardless of who activated it.
     }
 
 }
@@ -92,33 +92,20 @@ public class Kapkaç : SuperPower
     private void OnEnable()
     {
         name = "Kapkaç";
-        description = "Çoktan seçili kartı Sahte Vale'ye dönüştür";
+        description = "Değiştirmek için bir kart seç. Seçilen kart Sahte Vale'ye dönüşür";
         rarityMultiplier = 15;
     }
     public override void ActivatePower()
     {
         Debug.Log($"[Kapkaç] POWER ACTIVATION START - Player: {DeckController.LocalInstance?.thisPlayerNumber}, Time: {Time.time}");
-        Debug.Log($"[Kapkaç] Currently selected card: {(CardInteraction.currentlySelectedCard != null ? CardInteraction.currentlySelectedCard.uniqueCardInstanceID : "NULL")}");
-        
-        // Check if a card is pre-selected
-        if (CardInteraction.currentlySelectedCard == null)
-        {
-            Debug.LogWarning("[Kapkaç] No card selected! Please select a card before activating this power.");
-            return;
-        }
-        
+
         Debug.Log($"[Kapkaç] Calling PowerActivated() - This will trigger ShowcaseSuperPowerServerRPC");
         PowerActivated();
-        
-        Debug.Log($"[Kapkaç] Calling ActivateKapkacOnCardServerRPC directly with selected card");
-        int playerNumber = DeckController.LocalInstance.thisPlayerNumber;
-        GameManager.LocalInstance.networkRelay.ActivateKapkacOnCardServerRPC(CardInteraction.currentlySelectedCard.uniqueCardInstanceID, playerNumber);
-        
-        // Reset selection state
-        CardInteraction.currentlySelectedCard = null;
-        GameManager.LocalInstance.SetCurrentSelectedHandCardNull();
-        
-        Debug.Log($"[Kapkaç] POWER ACTIVATION COMPLETE - Card transformed immediately");
+
+        // Enter pending single-card selection mode (activate first, then select a card).
+        GameManager.LocalInstance.StartKapkacSelectionPower();
+
+        Debug.Log($"[Kapkaç] POWER ACTIVATION COMPLETE - Waiting for card selection");
     }
 }
 
@@ -151,24 +138,14 @@ public class KopyalaYapistir : SuperPower
     private void OnEnable()
     {
         name = "Kopyala Yapıştır";
-        description = "Çoktan seçili kartı kopyalar, bir sonraki seçilen kartın üzerine yapıştırır";
+        description = "Bir kartı kopyala, başka bir kartın üzerine yapıştır";
         rarityMultiplier = 20;
     }
     public override void ActivatePower()
     {
         Debug.Log($"[KopyalaYapıştır] POWER ACTIVATION START - Player: {DeckController.LocalInstance?.thisPlayerNumber}, Time: {Time.time}");
-        Debug.Log($"[KopyalaYapıştır] Currently selected card: {(CardInteraction.currentlySelectedCard != null ? CardInteraction.currentlySelectedCard.uniqueCardInstanceID : "NULL")}");
-        
-        // Check if source card is pre-selected
-        if (CardInteraction.currentlySelectedCard == null)
-        {
-            Debug.LogWarning("[KopyalaYapıştır] No source card selected! Please select a source card first, then activate this power to select target card.");
-            return;
-        }
-        
-        // Start dual selection mode - store source card and wait for target selection
-        Debug.Log($"[KopyalaYapıştır] Starting dual selection mode - source card: {CardInteraction.currentlySelectedCard.uniqueCardInstanceID}");
-        GameManager.LocalInstance.StartKopyalaYapistirDualSelection(CardInteraction.currentlySelectedCard);
+        // Phase 1: enter source-selection mode (no pre-selected card required)
+        GameManager.LocalInstance.StartKopyalaYapistirDualSelection(null);
     }
 }
 
@@ -282,35 +259,21 @@ public class BuDahaİyi : SuperPower
     private void OnEnable()
     {
         name = "Bu Daha İyi";
-        description = "Çoktan seçili kart ile ortadaki kartı değiştir";
+        description = "Bir kart seç ve ortadaki kartla değiştir";
         rarityMultiplier = 20;
     }
     public override void ActivatePower()
     {
         Debug.Log($"[BuDahaİyi] POWER ACTIVATION START - Player: {DeckController.LocalInstance?.thisPlayerNumber}, Time: {Time.time}");
-        Debug.Log($"[BuDahaİyi] Currently selected card: {(GameManager.LocalInstance.GetCurrentSelectedHandCard() != null ? GameManager.LocalInstance.GetCurrentSelectedHandCard() : "NULL")}");
         Debug.Log($"[BuDahaİyi] Center cards count: {GameManager.LocalInstance.centerCards.Count}");
-        
-        // Check if a card is pre-selected and center has cards
-        if (GameManager.LocalInstance.GetCurrentSelectedHandCard() == null)
-        {
-            Debug.LogWarning("[BuDahaİyi] No hand card selected! Please select a card from your hand before activating this power.");
-            return;
-        }
-        
-        if (GameManager.LocalInstance.centerCards.Count == 0)
-        {
-            Debug.LogWarning("[BuDahaİyi] No center cards available to swap with!");
-            return;
-        }
-        
+
         Debug.Log($"[BuDahaİyi] Calling PowerActivated() - This will trigger ShowcaseSuperPowerServerRPC");
         PowerActivated();
-        
-        Debug.Log($"[BuDahaİyi] Calling UseBuDahaIyiPower() - This will trigger UseBuDahaIyiServerRPC");
-        GameManager.LocalInstance.UseBuDahaIyiPower();
-        
-        Debug.Log($"[BuDahaİyi] POWER ACTIVATION COMPLETE - Server will handle the card swap");
+
+        // Enter pending single-card selection mode (activate first, then pick hand card).
+        GameManager.LocalInstance.StartBuDahaIyiSelectionPower();
+
+        Debug.Log($"[BuDahaİyi] POWER ACTIVATION COMPLETE - Waiting for hand card selection");
     }
 }
 
@@ -320,14 +283,14 @@ public class SunuDegisTokus : SuperPower
     private void OnEnable()
     {
         name = "Şunu Değiş Tokuş";
-        description = "Önce kendi elinden bir kart seç, sonra rakibin elinden bir kart seç. Seçtiğin kartları birbirleriyle değiş tokuş yap";
+        description = "Adım 1: herhangi bir el kartı seç. Adım 2: farklı bir el kartı seç. Seçtiğin iki kart yer değiştirir";
         rarityMultiplier = 14;
     }
     public override void ActivatePower()
     {
         Debug.Log($"[ŞunuDeğişTokuş] POWER ACTIVATION START - Player: {DeckController.LocalInstance?.thisPlayerNumber}, Time: {Time.time}");
         GameManager.LocalInstance.StartSunuDegisTokusDualSelection(null, "Şunu Değiş Tokuş");
-        Debug.Log("[ŞunuDeğişTokuş] Selection mode started. Select own card first, then opponent card.");
+        Debug.Log("[ŞunuDeğişTokuş] Selection mode started. Select any two different hand cards.");
     }
 }
 
@@ -382,7 +345,7 @@ public class ZaferPuani : SuperPower
         
         // DIRECT POINT ADDITION: Add points immediately to the player/team
         int playerNumber = DeckController.LocalInstance.thisPlayerNumber;
-        GameManager.LocalInstance.networkRelay.ActivateZaferPuaniServerRPC(playerNumber, points);
+        GameManager.LocalInstance.networkRelay.ActivateZaferPuaniServerRPC(points);
         
         Debug.Log($"[ZaferPuani] POWER ACTIVATION COMPLETE - Added {points} points immediately to player {playerNumber}");
     }
@@ -398,32 +361,20 @@ public class YandımAnam : SuperPower
     private void OnEnable()
     {
         name = "Yandım Anam";
-        description = "Seçilen bir kartı yak. Yanık karları sadece başka yanık kartlar kapatabilir.";
+        description = "Değiştirmek için bir kart seç. Seçilen kart yanar ve sadece başka yanık kartlarca kapatılabilir.";
         rarityMultiplier = 19;
     }
     public override void ActivatePower()
     {
         Debug.Log($"[YandımAnam] POWER ACTIVATION START - Player: {DeckController.LocalInstance?.thisPlayerNumber}, Time: {Time.time}");
-        Debug.Log($"[YandımAnam] Currently selected card: {(CardInteraction.currentlySelectedCard != null ? CardInteraction.currentlySelectedCard.uniqueCardInstanceID : "NULL")}");
-        
-        // Check if a card is pre-selected
-        if (CardInteraction.currentlySelectedCard == null)
-        {
-            Debug.LogWarning("[YandımAnam] No card selected! Please select a card before activating this power.");
-            return;
-        }
-        
+
         Debug.Log($"[YandımAnam] Calling PowerActivated() - This will trigger ShowcaseSuperPowerServerRPC");
         PowerActivated();
-        
-        Debug.Log($"[YandımAnam] Calling ActivateYandimAnamOnCardServerRPC directly with selected card");
-        GameManager.LocalInstance.networkRelay.ActivateYandimAnamOnCardServerRPC(CardInteraction.currentlySelectedCard.uniqueCardInstanceID);
-        
-        // Reset selection state
-        CardInteraction.currentlySelectedCard = null;
-        GameManager.LocalInstance.SetCurrentSelectedHandCardNull();
-        
-        Debug.Log($"[YandımAnam] POWER ACTIVATION COMPLETE - Card burned immediately");
+
+        // Enter pending single-card selection mode (activate first, then select a card).
+        GameManager.LocalInstance.StartYandimAnamSelectionPower();
+
+        Debug.Log($"[YandımAnam] POWER ACTIVATION COMPLETE - Waiting for card selection");
     }
 }
 

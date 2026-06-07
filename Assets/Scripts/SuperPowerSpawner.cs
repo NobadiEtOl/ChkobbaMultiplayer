@@ -14,7 +14,7 @@ public class SuperPowerSpawner : MonoBehaviour
     private Dictionary<SuperPower, GameObject> superPowerPrefabs = new Dictionary<SuperPower, GameObject>();
     private List<SuperPower> superPowerList = new List<SuperPower>(); // Now contains unique powers only (no pre-pooling)
     [SerializeField] private int maxSuperPowers = 3;
-    private int numberOfSuperPowersToSpawn = 1;
+    private int numberOfSuperPowersToSpawn = 2;
     private List<GameObject> spawnedSuperPowers = new List<GameObject>();
     private Transform playerPowerPoolTransform;
     [SerializeField] private List<Transform> spawnPositions = new List<Transform>();
@@ -1107,17 +1107,17 @@ public class SuperPowerSpawner : MonoBehaviour
     }
 
     // Rest of your existing code remains the same...
-    public List<string> restirictedPowersName_CardNeedToBeSelected = new List<string> { "Bu Daha İyi", "Şunu Değiş Tokuş", "Kopyala Yapıştır", "Kapkaç", "Yandım Anam"};
+    public List<string> restirictedPowersName_CardNeedToBeSelected = new List<string> { "Şunu Değiş Tokuş"};
     private List<string> restirictedPowersName_CenterNotEmpty = new List<string> { "Bu Daha İyi", "Bomba" };
-    public List<string> restirictedPowersName_WaitForSwap = new List<string> { "Bu Daha İyi", "Şunu Değiş Tokuş", "Şunu Değiş Bunu Tokuş", "Değiş Tokuş"};
+    public List<string> restirictedPowersName_WaitForSwap = new List<string> { "Bu Daha İyi", "Şunu Değiş Tokuş", "Şunu Değiş Bunu Tokuş", "Değiş Tokuş", "Kopyala Yapıştır", "Kapkaç", "Yandım Anam"};
     // Powers that require automatic hand showcasing when opened
-    private List<string> powersRequiringHandShowcase = new List<string> { "Kapkaç", "Yandım Anam", "Kopyala Yapıştır" };
+    private List<string> powersRequiringHandShowcase = new List<string> { "Kapkaç", "Yandım Anam", "Bu Daha İyi", "Kopyala Yapıştır" };
     
     // Powers that require hand showcasing after activation (for dual selection)
     private List<string> powersRequiringHandShowcaseAfterActivation = new List<string> { "Şunu Değiş Tokuş", "Kopyala Yapıştır", "Şunu Değiş Bunu Tokuş" };
     
     // Reference to DeckController for showcasing hands
-    private DeckController deckController;
+    [SerializeField] private DeckController deckController;
     
     private bool CheckIfCardShouldBeSelected(string superPowerTokenName)
     {

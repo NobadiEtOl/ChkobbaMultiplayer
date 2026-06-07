@@ -701,6 +701,14 @@ public class DeckController : MonoBehaviour
 
         if (placedCard != null)
         {
+            // Normalize card state before sending it to center so no face-down idle rotation leaks.
+            CardInteraction placedInteraction = placedCard.GetComponent<CardInteraction>();
+            if (placedInteraction != null)
+            {
+                placedInteraction.StopAutoRotate();
+                placedInteraction.KillAllTweens();
+            }
+
             Vector3 centerPosition = centerTransform.position;
             Vector3 centerRotation = centerTransform.rotation.eulerAngles;
 
@@ -914,6 +922,73 @@ public class DeckController : MonoBehaviour
     private bool showcaseIncludeOwnHand = true;
     private bool showcaseOnlyOwnHand = false;
     public Dictionary<GameObject, (Vector3 pos, Quaternion rot, Vector3 scale, bool autoRotateFlag)> showcaseOriginalTransforms = new Dictionary<GameObject, (Vector3, Quaternion, Vector3, bool)>();
+    private readonly List<GameObject> degisTokusDebugIndicators = new List<GameObject>();
+
+    public void ShowDegisTokusDebugCandidates()
+    {
+        ClearDegisTokusDebugCandidates();
+
+        if (playerHandTransforms == null)
+        {
+            return;
+        }
+
+        for (int handIdx = 1; handIdx < playerHandTransforms.Count; handIdx++)
+        {
+            Transform hand = playerHandTransforms[handIdx];
+            if (hand == null)
+            {
+                continue;
+            }
+
+            int childIndex = 0;
+            foreach (Transform child in hand)
+            {
+                if (childIndex <= 1)
+                {
+                    childIndex++;
+                    continue;
+                }
+
+                if (child == null)
+                {
+                    childIndex++;
+                    continue;
+                }
+
+                CardInteraction ci = child.GetComponent<CardInteraction>();
+                if (ci == null)
+                {
+                    childIndex++;
+                    continue;
+                }
+
+                ci.ShowDebugCandidateIndicator(new Color(0.1f, 1f, 0.1f, 0.75f));
+                degisTokusDebugIndicators.Add(child.gameObject);
+                childIndex++;
+            }
+        }
+    }
+
+    public void ClearDegisTokusDebugCandidates()
+    {
+        for (int i = 0; i < degisTokusDebugIndicators.Count; i++)
+        {
+            GameObject go = degisTokusDebugIndicators[i];
+            if (go == null)
+            {
+                continue;
+            }
+
+            CardInteraction ci = go.GetComponent<CardInteraction>();
+            if (ci != null)
+            {
+                ci.HideDebugCandidateIndicator();
+            }
+        }
+
+        degisTokusDebugIndicators.Clear();
+    }
 
     [ContextMenu("ExitShowcaseAllOtherHands")]
     public void ExitShowcaseAllOtherHands()
@@ -1295,6 +1370,7 @@ public class DeckController : MonoBehaviour
 
     private Dictionary<GameObject, (Vector3 pos, Quaternion rot, Vector3 scale)> poolCardOriginalTransforms = new Dictionary<GameObject, (Vector3, Quaternion, Vector3)>();
     private bool isShowcasing = false;
+    private int showcasedPoolIndex = -1;
     
     [Header("Center Card Showcase Settings")]
     [SerializeField] private float centerShowcaseSpacing = 800f; // Spacing between showcased center cards
@@ -1311,8 +1387,20 @@ public class DeckController : MonoBehaviour
     [ContextMenu("Showcase Player Pool Cards")]
     public void ShowcasePlayerPoolCards()
     {
+        ShowcasePlayerPoolCards(0);
+    }
+
+    public void ShowcasePlayerPoolCards(int poolIndex)
+    {
+        if (poolIndex < 0 || poolIndex >= playerPoolTransforms.Count || poolIndex >= playerPiştiPoolTransforms.Count)
+        {
+            Debug.LogWarning($"[DeckController] ShowcasePlayerPoolCards ignored: invalid pool index {poolIndex}");
+            return;
+        }
+
         isShowcasing = true;
-        int poolIndex = 0;
+        showcasedPoolIndex = poolIndex;
+        poolCardOriginalTransforms.Clear();
         var poolTransform = playerPoolTransforms[poolIndex];
         var piştiPoolTransform = playerPiştiPoolTransforms[poolIndex];
         var centerRotation = poolTransform.rotation.eulerAngles;
@@ -1397,29 +1485,62 @@ public class DeckController : MonoBehaviour
     public void StopShowcasePlayerPoolCards()
     {
         isShowcasing = false;
-        int poolIndex = 0;
-        var poolTransform = playerPoolTransforms[poolIndex];
-        var piştiPoolTransform = playerPiştiPoolTransforms[poolIndex];
+        showcasedPoolIndex = -1;
 
-        // Restore regular pool cards
-        foreach (Transform child in poolTransform)
+        foreach (var kvp in poolCardOriginalTransforms)
         {
-            var card = child.gameObject;
-            if (poolCardOriginalTransforms.TryGetValue(card, out var original))
+            var card = kvp.Key;
+            var original = kvp.Value;
+            if (card != null)
             {
                 MoveCard(original.pos, card, 10, original.rot, original.scale);
             }
         }
-        // Restore pişti pool cards
-        foreach (Transform child in piştiPoolTransform)
-        {
-            var card = child.gameObject;
-            if (poolCardOriginalTransforms.TryGetValue(card, out var original))
-            {
-                MoveCard(original.pos, card, 10, original.rot, original.scale);
-            }
-        }
+
         poolCardOriginalTransforms.Clear();
+    }
+
+    public bool IsPoolShowcasing()
+    {
+        return isShowcasing;
+    }
+
+    public int GetShowcasingPoolIndex()
+    {
+        return showcasedPoolIndex;
+    }
+
+    public int GetPoolIndexFromParentName(string parentName)
+    {
+        if (string.IsNullOrEmpty(parentName))
+        {
+            return -1;
+        }
+
+        if (!parentName.StartsWith("PlayerPool") && !parentName.StartsWith("PlayerPiştiPool"))
+        {
+            return -1;
+        }
+
+        int suffixStart = parentName.Length - 1;
+        while (suffixStart >= 0 && char.IsDigit(parentName[suffixStart]))
+        {
+            suffixStart--;
+        }
+
+        string numberPart = parentName.Substring(suffixStart + 1);
+        if (!int.TryParse(numberPart, out int oneBasedPoolNo))
+        {
+            return -1;
+        }
+
+        int zeroBasedPoolIndex = oneBasedPoolNo - 1;
+        if (zeroBasedPoolIndex < 0 || zeroBasedPoolIndex >= playerPoolTransforms.Count)
+        {
+            return -1;
+        }
+
+        return zeroBasedPoolIndex;
     }
 
     [ContextMenu("Showcase Center Cards")]
@@ -2237,12 +2358,22 @@ public class DeckController : MonoBehaviour
         Quaternion originalRot = card.transform.rotation;
         Vector3 originalScale = card.transform.localScale;
 
-        Vector3 peekPos = originalPos + new Vector3(0, 1000, 0);
+        if (isMine)
+        {
+            // Keep local auto-rotation from fighting the temporary peek rotation.
+            CardInteraction interaction = card.GetComponent<CardInteraction>();
+            if (interaction != null)
+            {
+                interaction.StopAutoRotate();
+            }
+        }
+
+        Vector3 peekPos = originalPos + new Vector3(0, 1200, isMine ? 0 : (playerCount == 2 ? -500 : 0));
         Vector3 peekScale = isMine ? originalScale : originalScale * 2.0f;
         Quaternion peekRot = isMine ? Quaternion.Euler(-90, 0, 0) : Quaternion.Euler(90, 0, 0);
 
         float moveDuration = 0.4f;
-        float pauseDuration = 1.2f;
+        float pauseDuration = 3f;
 
         // Move to peek
         yield return TweenMoveTransform(card.transform, peekPos, peekRot, peekScale, moveDuration);
@@ -2252,11 +2383,23 @@ public class DeckController : MonoBehaviour
         // Move back
         yield return TweenMoveTransform(card.transform, originalPos, originalRot, originalScale, moveDuration);
 
-        if (isMine) card.GetComponent<CardInteraction>().StartAutoRotate();
+        if (isMine)
+        {
+            CardInteraction interaction = card.GetComponent<CardInteraction>();
+            if (interaction != null)
+            {
+                interaction.StartAutoRotate();
+            }
+        }
 
         if (SuperPowerSpawner.LocalInstance != null && SuperPowerSpawner.LocalInstance.isInfoBoxOpen)
         {
             SuperPowerSpawner.LocalInstance.StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
+        }
+
+        if (GameManager.LocalInstance != null)
+        {
+            GameManager.LocalInstance.EndGameplayActionIfTagStartsWith("SuperPower", "Ucundan Goz At animation completed");
         }
     }
 
@@ -2354,6 +2497,11 @@ public class DeckController : MonoBehaviour
         {
             SuperPowerSpawner.LocalInstance.StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
         }
+
+        if (GameManager.LocalInstance != null)
+        {
+            GameManager.LocalInstance.EndGameplayActionIfTagStartsWith("SuperPower", "Baya Baya Bak animation completed");
+        }
     }
 
 
@@ -2423,112 +2571,136 @@ public class DeckController : MonoBehaviour
 
     public IEnumerator SwapHandCardWithCenterCard(string handCardID, string centerCardID, int playerNo)
     {
+        // Track card movement in move chain
+        MoveChainIntegrator.TrackCardMovement(playerNo, handCardID, "Hand", "Center", "Bu Daha İyi power");
+        MoveChainIntegrator.TrackCardMovement(playerNo, centerCardID, "Center", "Hand", "Bu Daha İyi power");
+
+        if (!CardInteraction.cardLookup.ContainsKey(handCardID) || !CardInteraction.cardLookup.ContainsKey(centerCardID))
         {
-            // Track card movement in move chain
-            MoveChainIntegrator.TrackCardMovement(playerNo, handCardID, "Hand", "Center", "Bu Daha İyi power");
-            MoveChainIntegrator.TrackCardMovement(playerNo, centerCardID, "Center", "Hand", "Bu Daha İyi power");
-
-            GameObject handCardObj = CardInteraction.cardLookup[handCardID].gameObject;
-            GameObject centerCardObj = CardInteraction.cardLookup[centerCardID].gameObject;
-
-            int relativeIndex = (playerNo - thisPlayerNumber + playerCount) % playerCount;
-            Transform handTransform = playerHandTransforms[GetPoolIndex(relativeIndex)];
-
-            // Find the index of the hand card in the hand
-            int handCardIndex = -1;
-            int idx = 0;
-            foreach (Transform child in handTransform)
-            {
-                if (child.gameObject == handCardObj)
-                {
-                    handCardIndex = idx;
-                    break;
-                }
-                idx++;
-            }
-
-            // Find the index of the center card in the center
-            int centerCardIndex = -1;
-            idx = 0;
-            foreach (Transform child in centerTransform)
-            {
-                if (child.gameObject == centerCardObj)
-                {
-                    centerCardIndex = idx;
-                    break;
-                }
-                idx++;
-            }
-
-            // Store world positions before changing parents
-            Vector3 handCardOldPos = handCardObj.transform.position;
-            Quaternion handCardOldRot = handCardObj.transform.rotation;
-            Vector3 handCardOldScale = handCardObj.transform.localScale;
-
-            Vector3 centerCardOldPos = centerCardObj.transform.position;
-            Quaternion centerCardOldRot = centerCardObj.transform.rotation;
-            Vector3 centerCardOldScale = centerCardObj.transform.localScale;
-
-            // Change parents but keep world positions for animation
-            handCardObj.transform.SetParent(centerTransform, true);
-            centerCardObj.transform.SetParent(handTransform, true);
-
-            // Animate hand card to center card's old position
-            yield return StartCoroutine(MoveCardCoroutine(centerCardOldPos, handCardObj, 1, centerCardOldRot, new Vector3(centerScale, centerScale, centerScale)));
-
-            // Animate center card to hand card's old position
-            yield return StartCoroutine(MoveCardCoroutine(handCardOldPos, centerCardObj, 1, handCardOldRot, new Vector3(myCardsScale, myCardsScale, myCardsScale)));
-
-            // Insert centerCardObj at the same index in the hand as handCardObj was
-            List<Transform> handChildren = new List<Transform>();
-            foreach (Transform child in handTransform) handChildren.Add(child);
-
-            handChildren.Remove(centerCardObj.transform);
-            if (handCardIndex >= 0 && handCardIndex <= handChildren.Count)
-                handChildren.Insert(handCardIndex, centerCardObj.transform);
-            else
-                handChildren.Add(centerCardObj.transform);
-
-            // Reorder children
-            for (int i = 0; i < handChildren.Count; i++)
-                handChildren[i].SetSiblingIndex(i);
-
-            // Insert handCardObj at the same index in the center as centerCardObj was (optional, for visual consistency)
-            List<Transform> centerChildren = new List<Transform>();
-            foreach (Transform child in centerTransform) centerChildren.Add(child);
-
-            centerChildren.Remove(handCardObj.transform);
-            if (centerCardIndex >= 0 && centerCardIndex <= centerChildren.Count)
-                centerChildren.Insert(centerCardIndex, handCardObj.transform);
-            else
-                centerChildren.Add(handCardObj.transform);
-
-            for (int i = 0; i < centerChildren.Count; i++)
-                centerChildren[i].SetSiblingIndex(i);
-
-            // Set auto-rotate flags
-            handCardObj.GetComponent<CardInteraction>().StopAutoRotate();
-            centerCardObj.GetComponent<CardInteraction>().StartAutoRotate();
-            //centerCardObj.GetComponent<CardInteraction>().OnCardTouched(Input.mousePosition);
-
-            //UpdateCurrentPlayerHandLayout();
-            CardInteraction.currentlySelectedCard = null;
-            GameManager.LocalInstance.SetCurrentSelectedHandCardNull();
+            yield break;
         }
+
+        GameObject handCardObj = CardInteraction.cardLookup[handCardID].gameObject;
+        GameObject centerCardObj = CardInteraction.cardLookup[centerCardID].gameObject;
+        if (handCardObj == null || centerCardObj == null)
+        {
+            yield break;
+        }
+
+        int relativeIndex = (playerNo - thisPlayerNumber + playerCount) % playerCount;
+        int poolIndex = GetPoolIndex(relativeIndex);
+        if (poolIndex < 0 || poolIndex >= playerHandTransforms.Count)
+        {
+            yield break;
+        }
+
+        Transform handTransform = playerHandTransforms[poolIndex];
+
+        // Find hand card sibling index in destination hand
+        int handCardIndex = -1;
+        int idx = 0;
+        foreach (Transform child in handTransform)
+        {
+            if (child.gameObject == handCardObj)
+            {
+                handCardIndex = idx;
+                break;
+            }
+            idx++;
+        }
+
+        // Find center card sibling index in center
+        int centerCardIndex = -1;
+        idx = 0;
+        foreach (Transform child in centerTransform)
+        {
+            if (child.gameObject == centerCardObj)
+            {
+                centerCardIndex = idx;
+                break;
+            }
+            idx++;
+        }
+
+        // Capture world-space targets before any parenting changes to avoid visual jumps.
+        Vector3 handCardOldPos = handCardObj.transform.position;
+        Quaternion handCardOldRot = handCardObj.transform.rotation;
+
+        Vector3 centerCardOldPos = centerCardObj.transform.position;
+        Quaternion centerCardOldRot = centerCardObj.transform.rotation;
+
+        // Animate both cards first, then reparent.
+        yield return StartCoroutine(WaitForBoth(
+            MoveCardCoroutine(centerCardOldPos, handCardObj, 1, centerCardOldRot, new Vector3(centerScale, centerScale, centerScale)),
+            MoveCardCoroutine(handCardOldPos, centerCardObj, 1, handCardOldRot, new Vector3(myCardsScale, myCardsScale, myCardsScale))));
+
+        // Now swap parents while preserving world transforms.
+        handCardObj.transform.SetParent(centerTransform, true);
+        centerCardObj.transform.SetParent(handTransform, true);
+
+        // Keep list ordering deterministic for all peers.
+        List<Transform> handChildren = new List<Transform>();
+        foreach (Transform child in handTransform) handChildren.Add(child);
+        handChildren.Remove(centerCardObj.transform);
+        if (handCardIndex >= 0 && handCardIndex <= handChildren.Count)
+            handChildren.Insert(handCardIndex, centerCardObj.transform);
+        else
+            handChildren.Add(centerCardObj.transform);
+        for (int i = 0; i < handChildren.Count; i++)
+            handChildren[i].SetSiblingIndex(i);
+
+        List<Transform> centerChildren = new List<Transform>();
+        foreach (Transform child in centerTransform) centerChildren.Add(child);
+        centerChildren.Remove(handCardObj.transform);
+        if (centerCardIndex >= 0 && centerCardIndex <= centerChildren.Count)
+            centerChildren.Insert(centerCardIndex, handCardObj.transform);
+        else
+            centerChildren.Add(handCardObj.transform);
+        for (int i = 0; i < centerChildren.Count; i++)
+            centerChildren[i].SetSiblingIndex(i);
+
+        // Normalize idle behavior by destination ownership.
+        var handCardInteraction = handCardObj.GetComponent<CardInteraction>();
+        var centerCardInteraction = centerCardObj.GetComponent<CardInteraction>();
+        handCardInteraction?.StopAutoRotate(); // Card moved to center should not idle-rotate.
+
+        // Card moved from center to hand should be face-up only in the local player's own hand.
+        if (centerCardInteraction != null)
+        {
+            if (relativeIndex == 0)
+            {
+                centerCardInteraction.StartAutoRotate();
+            }
+            else
+            {
+                centerCardInteraction.StartAutoRotateFaceDown();
+            }
+        }
+
+        CardInteraction.currentlySelectedCard = null;
+        GameManager.LocalInstance.SetCurrentSelectedHandCardNull();
     }
 
 
 
     public IEnumerator SwapCardsBetweenPlayersByID(int playerANo, string cardAID, int playerBNo, string cardBID, bool sunuFlag = false)
     {
+        Debug.Log($"[ŞDBT] Visual swap start: playerA={playerANo}, cardA={cardAID}, playerB={playerBNo}, cardB={cardBID}, sunuFlag={sunuFlag}");
         int relA = (playerANo - thisPlayerNumber + playerCount) % playerCount;
         int relB = (playerBNo - thisPlayerNumber + playerCount) % playerCount;
 
         Transform handA = playerHandTransforms[GetPoolIndex(relA)];
         Transform handB = playerHandTransforms[GetPoolIndex(relB)];
 
-        GameObject cardAObj = CardInteraction.cardLookup[cardAID].gameObject;
-        GameObject cardBObj = CardInteraction.cardLookup[cardBID].gameObject;
+        if (!CardInteraction.cardLookup.TryGetValue(cardAID, out var cardAInteraction) ||
+            !CardInteraction.cardLookup.TryGetValue(cardBID, out var cardBInteraction))
+        {
+            Debug.LogWarning($"[ŞDBT] Visual swap aborted because lookup failed. hasA={CardInteraction.cardLookup.ContainsKey(cardAID)}, hasB={CardInteraction.cardLookup.ContainsKey(cardBID)}");
+            yield break;
+        }
+
+        GameObject cardAObj = cardAInteraction.gameObject;
+        GameObject cardBObj = cardBInteraction.gameObject;
 
         // --- Find original indexes ---
         int idxA = -1, idxB = -1, i = 0;
@@ -2544,18 +2716,25 @@ public class DeckController : MonoBehaviour
             i++;
         }
 
+        Debug.Log($"[ŞDBT] Visual swap indexes resolved. idxA={idxA}, idxB={idxB}, relA={relA}, relB={relB}");
+
         // Store world positions before changing parents
         Vector3 cardAOldPos = cardAObj.transform.position;
         Quaternion cardAOldRot = cardAObj.transform.rotation;
-        Vector3 cardAOldScale = cardAObj.transform.localScale;
-
         Vector3 cardBOldPos = cardBObj.transform.position;
         Quaternion cardBOldRot = cardBObj.transform.rotation;
-        Vector3 cardBOldScale = cardBObj.transform.localScale;
+
+        // Target scale must be based on destination hand (local hand uses myCardsScale, others use normalScale).
+        Vector3 targetScaleInHandA = (relA == 0)
+            ? new Vector3(myCardsScale, myCardsScale, myCardsScale)
+            : new Vector3(normalScale, normalScale, normalScale);
+        Vector3 targetScaleInHandB = (relB == 0)
+            ? new Vector3(myCardsScale, myCardsScale, myCardsScale)
+            : new Vector3(normalScale, normalScale, normalScale);
 
         // Animate cards to each other's old positions
-        StartCoroutine(MoveCardCoroutine(cardBOldPos, cardAObj, 1, cardBOldRot, cardBOldScale));
-        yield return StartCoroutine(MoveCardCoroutine(cardAOldPos, cardBObj, 1, cardAOldRot, new Vector3(myCardsScale, myCardsScale, myCardsScale)));
+        StartCoroutine(MoveCardCoroutine(cardBOldPos, cardAObj, 1, cardBOldRot, targetScaleInHandB));
+        yield return StartCoroutine(MoveCardCoroutine(cardAOldPos, cardBObj, 1, cardAOldRot, targetScaleInHandA));
 
         if (sunuFlag)
         {
@@ -2598,6 +2777,10 @@ public class DeckController : MonoBehaviour
         for (int j = 0; j < handBChildren.Count; j++)
             handBChildren[j].SetSiblingIndex(j);
 
+        // Snap final scale to destination-hand scale in case any previous tween/state left residual size.
+        cardAObj.transform.localScale = targetScaleInHandB;
+        cardBObj.transform.localScale = targetScaleInHandA;
+
         // Set auto-rotate flags and input
         if (thisPlayerNumber == playerANo)
         {
@@ -2615,6 +2798,7 @@ public class DeckController : MonoBehaviour
         //UpdateCurrentPlayerHandLayout();
         CardInteraction.currentlySelectedCard = null;
         GameManager.LocalInstance.SetCurrentSelectedHandCardNull();
+        Debug.Log($"[ŞDBT] Visual swap finished: cardA={cardAID}, cardB={cardBID}");
         //yield return new WaitForSeconds(0.5f);
     }
 

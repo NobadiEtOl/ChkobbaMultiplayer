@@ -134,6 +134,12 @@ public class CardInteraction : MonoBehaviour
     public void OnCardTouched(Vector3 touchPosition)
     {
         Debug.Log($"[CardSelection] OnCardTouched called for card: {gameObject.name}, parent: {gameObject.transform.parent?.name}");
+
+        if (GameManager.LocalInstance != null && GameManager.LocalInstance.IsGameplayActionInProgress())
+        {
+            Debug.Log($"[CardSelection] Blocking card touch while a gameplay action is active: {gameObject.name}");
+            return;
+        }
         
         // Check if this card can be selected
         if (!CanBeSelected())
@@ -176,6 +182,50 @@ public class CardInteraction : MonoBehaviour
         // Kapkaç and Yandım Anam pending checks
         if (GameManager.LocalInstance != null)
         {
+            // Bu Daha İyi pending
+            if (GameManager.LocalInstance.isBuDahaIyiPending)
+            {
+                if (!parentName.StartsWith("PlayerHand"))
+                {
+                    Debug.LogWarning("[CardInteraction] Bu Daha İyi requires selecting a hand card.");
+                    return;
+                }
+
+                if (GameManager.LocalInstance.centerCards == null || GameManager.LocalInstance.centerCards.Count == 0)
+                {
+                    Debug.LogWarning("[CardInteraction] Bu Daha İyi cannot resolve because center is empty.");
+                    return;
+                }
+
+                Debug.Log($"[CardInteraction] BU DAHA IYI POWER ACTIVATED on card: {this.uniqueCardInstanceID}");
+                GameManager.LocalInstance.isBuDahaIyiPending = false;
+                CardInteraction.RestrictSelectionToOwnHand();
+
+                if (CardInteraction.currentlySelectedCard != null)
+                {
+                    Debug.Log($"[CardInteraction] Clearing currently selected card before Bu Daha İyi: {CardInteraction.currentlySelectedCard.uniqueCardInstanceID}");
+                    CardInteraction.currentlySelectedCard = null;
+                    CardInteraction.isOneCardSelected = false;
+                }
+
+                GameManager.LocalInstance.SetCurrentSelectedHandCard(this.uniqueCardInstanceID);
+                GameManager.LocalInstance.UseBuDahaIyiPower();
+
+                if (DeckController.LocalInstance != null)
+                {
+                    DeckController.LocalInstance.ExitShowcaseAllOtherHands();
+                }
+
+                if (SuperPowerSpawner.LocalInstance != null)
+                {
+                    SuperPowerSpawner.LocalInstance.StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
+                }
+
+                GameManager.LocalInstance.SetCurrentSelectedHandCardNull();
+                Debug.Log("[CardInteraction] BU DAHA IYI POWER - Returning early, should NOT continue to normal selection");
+                return;
+            }
+
             // Kapkaç pending
             if (GameManager.LocalInstance.isKapkacPending)
             {
@@ -193,7 +243,19 @@ public class CardInteraction : MonoBehaviour
                 }
                 
                 int playerNumber = DeckController.LocalInstance.thisPlayerNumber;
-                GameManager.LocalInstance.networkRelay.ActivateKapkacOnCardServerRPC(this.uniqueCardInstanceID, playerNumber);
+                GameManager.LocalInstance.networkRelay.ActivateKapkacOnCardServerRPC(this.uniqueCardInstanceID);
+
+                if (DeckController.LocalInstance != null)
+                {
+                    DeckController.LocalInstance.ExitShowcaseAllOtherHands();
+                }
+
+                if (SuperPowerSpawner.LocalInstance != null)
+                {
+                    SuperPowerSpawner.LocalInstance.StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
+                }
+
+                GameManager.LocalInstance.SetCurrentSelectedHandCardNull();
                 Debug.Log($"[CardInteraction] KAPKAÇ POWER - Returning early, should NOT continue to normal selection");
                 return;
             }
@@ -214,6 +276,18 @@ public class CardInteraction : MonoBehaviour
                 }
                 
                 GameManager.LocalInstance.networkRelay.ActivateYandimAnamOnCardServerRPC(this.uniqueCardInstanceID);
+
+                if (DeckController.LocalInstance != null)
+                {
+                    DeckController.LocalInstance.ExitShowcaseAllOtherHands();
+                }
+
+                if (SuperPowerSpawner.LocalInstance != null)
+                {
+                    SuperPowerSpawner.LocalInstance.StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
+                }
+
+                GameManager.LocalInstance.SetCurrentSelectedHandCardNull();
                 Debug.Log($"[CardInteraction] YANDIM ANAM POWER - Returning early, should NOT continue to normal selection");
                 return;
             }
@@ -264,12 +338,42 @@ public class CardInteraction : MonoBehaviour
 
 
         // Check if this is a player pool card
-        if (gameObject.transform.parent.name == "PlayerPool1" || gameObject.transform.parent.name == "PlayerPiştiPool1")
+        if (gameObject.transform.parent.name.StartsWith("PlayerPool") || gameObject.transform.parent.name.StartsWith("PlayerPiştiPool"))
         {
             Debug.Log($"[CardInteraction] Player pool card touched: {gameObject.name}");
-            // Stop center showcase if active
-            DeckController.LocalInstance.StopShowcaseCenterCards();
-            DeckController.LocalInstance.ShowcasePlayerPoolCards();
+            if (DeckController.LocalInstance != null)
+            {
+                // Stop center showcase if active
+                DeckController.LocalInstance.TryStopShowcaseCenterCards();
+
+                string touchedParentName = gameObject.transform.parent.name;
+                int touchedPoolIndex = DeckController.LocalInstance.GetPoolIndexFromParentName(touchedParentName);
+
+                if (touchedPoolIndex == -1)
+                {
+                    Debug.LogWarning($"[CardInteraction] Could not resolve pool index from parent: {touchedParentName}");
+                    return;
+                }
+
+                bool isSamePoolAlreadyShown = DeckController.LocalInstance.IsPoolShowcasing() &&
+                                             DeckController.LocalInstance.GetShowcasingPoolIndex() == touchedPoolIndex;
+
+                if (isSamePoolAlreadyShown)
+                {
+                    DeckController.LocalInstance.StopShowcasePlayerPoolCards();
+                }
+                else
+                {
+                    DeckController.LocalInstance.TryStopShowcasePlayerPoolCards();
+                    DeckController.LocalInstance.ShowcasePlayerPoolCards(touchedPoolIndex);
+                }
+            }
+            else
+            {
+                Debug.LogError("[CardInteraction] DeckController.LocalInstance is null!");
+            }
+
+            return;
         }
         // Handle center cards and hand cards for selection
         else if (gameObject.transform.parent.name == "Center" || gameObject.transform.parent.name.StartsWith("PlayerHand"))
@@ -296,6 +400,13 @@ public class CardInteraction : MonoBehaviour
 
             // Invoke OnCardSelected
             OnCardSelected?.Invoke(this.uniqueCardInstanceID);
+        }
+
+        if (GameManager.LocalInstance != null && GameManager.LocalInstance.isKopyalaSelectingSource)
+        {
+            Debug.Log("Kopyala phase 1 - selecting source card: " + gameObject.name);
+            GameManager.LocalInstance.SelectKopyalaSource(this);
+            return;
         }
 
         if (GameManager.LocalInstance != null && GameManager.LocalInstance.isKopyalaActive)
@@ -418,7 +529,9 @@ public class CardInteraction : MonoBehaviour
                     Debug.Log("[CardInteraction] Not own hand - might be power selection, invoking OnCardsPlayed");
                     OnCardsPlayed?.Invoke(this.uniqueCardInstanceID, this.gameObject, GameManager.currentPlayerNo);
                     
-                    if (activeCardIndicator != null)
+                    // During ŞDBT, the teal accumulation indicator is set inside OnCardsPlayed — don't turn it off.
+                    bool sdbtActive = GameManager.LocalInstance != null && GameManager.LocalInstance.isSunuDegisBunuTokusActive;
+                    if (activeCardIndicator != null && !sdbtActive)
                     {
                         activeCardIndicator.SetActive(false);
                     }
@@ -456,7 +569,10 @@ public class CardInteraction : MonoBehaviour
     {
         Debug.Log($"[CardInteraction] SelectCard called for: {gameObject.name}, parent: {gameObject.transform.parent?.name}");
         
-        if (activeCardIndicator != null)
+        // During ŞDBT accumulation, previously selected opponent cards keep their teal indicator —
+        // do not deactivate the previous activeCardIndicator.
+        bool sdbtActive = GameManager.LocalInstance != null && GameManager.LocalInstance.isSunuDegisBunuTokusActive;
+        if (activeCardIndicator != null && !sdbtActive)
         {
             activeCardIndicator.SetActive(false); // Deactivate the previous card indicator
         }
@@ -502,6 +618,31 @@ public class CardInteraction : MonoBehaviour
         // -17, back
         jiggleSequence.Append(transform.DORotate(startEuler + new Vector3(0, 0, -17), 0.025f));
         jiggleSequence.Append(transform.DORotate(startEuler, 0.025f));
+    }
+
+    public void ShowDebugCandidateIndicator(Color color)
+    {
+        if (selectedCardIndicator == null)
+        {
+            return;
+        }
+
+        selectedCardIndicator.SetActive(true);
+        SpriteRenderer sr = selectedCardIndicator.GetComponent<SpriteRenderer>();
+        if (sr != null)
+        {
+            sr.color = color;
+        }
+    }
+
+    public void HideDebugCandidateIndicator()
+    {
+        if (selectedCardIndicator == null)
+        {
+            return;
+        }
+
+        selectedCardIndicator.SetActive(false);
     }
 
 
@@ -713,21 +854,11 @@ public class CardInteraction : MonoBehaviour
         
         string parentName = gameObject.transform.parent != null ? gameObject.transform.parent.name : "";
         
-        // Check if it's a pool/pişti card - allow local player's pool cards for showcasing
+        // Check if it's a pool/pişti card - allow all pool cards for showcasing
         if (parentName.Contains("Pool") || parentName.Contains("Pişti"))
         {
-            // Check if this is the local player's pool/pişti (Player 1)
-            // Pool1 and Pişti1 are the local player's pools
-            if (parentName.Contains("Pool1") || parentName.Contains("Pişti1"))
-            {
-                Debug.Log($"[CardSelection] Can select {gameObject.name} - local player pool/pişti card (for showcasing)");
-                return true;
-            }
-            else
-            {
-                Debug.Log($"[CardSelection] Cannot select {gameObject.name} - other player's pool/pişti card");
-                return false;
-            }
+            Debug.Log($"[CardSelection] Can select {gameObject.name} - pool/pişti card (for showcasing)");
+            return true;
         }
         
         // Allow center cards for showcasing purposes
@@ -750,16 +881,12 @@ public class CardInteraction : MonoBehaviour
         // Check if any dual selection powers are active
         bool isDualSelectionActive = GameManager.LocalInstance != null && 
             (GameManager.LocalInstance.isKopyalaActive || 
+             GameManager.LocalInstance.isKopyalaSelectingSource ||
              GameManager.LocalInstance.isSunuDegisTokusActive || 
              GameManager.LocalInstance.isSunuDegisBunuTokusActive);
 
-        bool isSunuDegisTokusFirstPhase = GameManager.LocalInstance != null &&
-                                         GameManager.LocalInstance.isSunuDegisTokusActive &&
-                                         !GameManager.LocalInstance.IsSunuDegisTokusSelectingOpponent();
-
-        bool isSunuDegisTokusSecondPhase = GameManager.LocalInstance != null &&
-                                          GameManager.LocalInstance.isSunuDegisTokusActive &&
-                                          GameManager.LocalInstance.IsSunuDegisTokusSelectingOpponent();
+        bool isSunuDegisTokusActive = GameManager.LocalInstance != null &&
+                         GameManager.LocalInstance.isSunuDegisTokusActive;
 
         bool isSunuDegisBunuTokusActive = GameManager.LocalInstance != null &&
                                          GameManager.LocalInstance.isSunuDegisBunuTokusActive;
@@ -783,28 +910,10 @@ public class CardInteraction : MonoBehaviour
             return false;
         }
 
-        if (isSunuDegisTokusFirstPhase)
+        if (isSunuDegisTokusActive)
         {
-            if (isOwnHand)
-            {
-                Debug.Log($"[CardSelection] Can select {gameObject.name} - DeğişTokuş phase 1 (own hand)");
-                return true;
-            }
-
-            Debug.Log($"[CardSelection] Cannot select {gameObject.name} - DeğişTokuş phase 1 requires own hand");
-            return false;
-        }
-
-        if (isSunuDegisTokusSecondPhase)
-        {
-            if (!isOwnHand)
-            {
-                Debug.Log($"[CardSelection] Can select {gameObject.name} - DeğişTokuş phase 2 (opponent hand)");
-                return true;
-            }
-
-            Debug.Log($"[CardSelection] Cannot select {gameObject.name} - DeğişTokuş phase 2 requires opponent hand");
-            return false;
+            Debug.Log($"[CardSelection] Can select {gameObject.name} - Şunu Değiş Tokuş allows all hand cards");
+            return true;
         }
 
         if (isShowcaseActive || isDualSelectionActive || isCardSelectionPowerActive)

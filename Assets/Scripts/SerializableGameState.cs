@@ -3,6 +3,18 @@ using System.Collections.Generic;
 using Unity.Netcode;
 
 /// <summary>
+/// One entry in the allCardLookup dictionary (cardId -> {kind, value}).
+/// Used only for PlayerPrefs-based snapshot persistence; not sent over the network.
+/// </summary>
+[Serializable]
+public class CardLookupEntry
+{
+    public string cardId;
+    public int kind;
+    public int value;
+}
+
+/// <summary>
 /// Serializable DTO that represents the complete game state for syncing clients
 /// </summary>
 [Serializable]
@@ -54,6 +66,15 @@ public struct SerializableGameState : INetworkSerializable
 
     // Optional: Player gold (if you want gold to be sync-safe)
     public SerializableDictionary playerGold; // Dictionary<int, int>
+
+    // Card master lookup (cardId -> {kind, value}). Serialized for PlayerPrefs only.
+    // Not included in NetworkSerialize so it does not affect RPC bandwidth.
+    public CardLookupEntry[] cardLookup;
+
+    // Precomputed sub-host failover chain (slot-descending, host excluded).
+    // Set once at game start; survivors read this to determine who should rehost.
+    // Stored in PlayerPrefs only - not sent over network.
+    public int[] failoverChain;
 
     public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
     {
@@ -254,5 +275,27 @@ public struct SerializableStringDictionary : INetworkSerializable
                 values[i] = v;
             }
         }
+    }
+}
+
+/// <summary>
+/// Plain-class wrapper around int[] used for PlayerPrefs-only failover chain serialisation.
+/// Not INetworkSerializable — never sent over the wire.
+/// </summary>
+[Serializable]
+public class SerializableIntList
+{
+    public int[] items;
+
+    public SerializableIntList() { items = new int[0]; }
+
+    public SerializableIntList(System.Collections.Generic.List<int> list)
+    {
+        items = list != null ? list.ToArray() : new int[0];
+    }
+
+    public System.Collections.Generic.List<int> ToList()
+    {
+        return items != null ? new System.Collections.Generic.List<int>(items) : new System.Collections.Generic.List<int>();
     }
 }
