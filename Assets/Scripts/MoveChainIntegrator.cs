@@ -189,14 +189,14 @@ public class MoveChainIntegrator : MonoBehaviour
         }
         
         // Broadcast move to clients for validation
-        var networkRelay = FindObjectOfType<NetworkRelay>();
+        var networkRelay = FindObjectOfType<GameNetworkRelay>();
         if (networkRelay != null)
         {
             networkRelay.BroadcastMoveForValidationClientRPC(move);
         }
     }
     
-
+ 
     
     /// <summary>
     /// Called when client records a move
@@ -245,7 +245,7 @@ public class MoveChainIntegrator : MonoBehaviour
         {
             // Use existing save/load system
             var gameState = server.BuildGameStateSnapshot();
-            var networkRelay = FindObjectOfType<NetworkRelay>();
+            var networkRelay = FindObjectOfType<GameNetworkRelay>();
             if (networkRelay != null)
             {
                 networkRelay.ApplyGameStateClientRPC(gameState);
@@ -259,7 +259,7 @@ public class MoveChainIntegrator : MonoBehaviour
     /// </summary>
     private void RequestFullStateSync()
     {
-        var networkRelay = FindObjectOfType<NetworkRelay>();
+        var networkRelay = FindObjectOfType<GameNetworkRelay>();
         if (networkRelay != null)
         {
             networkRelay.RequestFullStateSyncServerRPC();

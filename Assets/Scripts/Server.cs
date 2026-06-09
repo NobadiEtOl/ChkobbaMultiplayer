@@ -1,20 +1,17 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.UI;
 using System.Linq;
 using Unity.Netcode;
 using UnityEngine.Pool;
 using UnityEngine.Tilemaps;
-using Unity.Services.Lobbies;
-using Unity.Services.Lobbies.Models;
 
 public class Server : NetworkBehaviour
 {
     public static Server Singleton { get; private set; } // Singleton instance
-    [SerializeField] private NetworkRelay networkRelay; // Reference to the NetworkRelay script
+    [SerializeField] private GameNetworkRelay networkRelay; // Reference to the GameNetworkRelay script
     private Dictionary<int, List<string>> playersHandCardsIDs;//Dictionary containing all the players' hands
     private Dictionary<int, List<string>> playersPooledCardsIDs;//Dictionary containing all the players' pools
     private Dictionary<string, int[]> deckCardsDict; // replaces deckCardsIDs
@@ -91,69 +88,6 @@ public class Server : NetworkBehaviour
         Debug.Log($"[Server] RebindPlayerClientId: playerClientIds[{playerNo}] = {newClientId}");
     }
 
-    /// <summary>
-    /// Called by the survivor client after it re-hosts following original host loss.
-    /// Applies the persisted snapshot to restore server-side game state so that reconnecting
-    /// players will receive the correct game state during the existing reconnect flow.
-    /// </summary>
-    public void ApplyRestoredSnapshotOnRehost(SerializableGameState snapshot)
-    {
-        if (!IsServer)
-        {
-            Debug.LogWarning("[Server] ApplyRestoredSnapshotOnRehost: called on non-server - ignoring");
-            return;
-        }
-
-        Debug.Log($"[Server] ApplyRestoredSnapshotOnRehost: applying snapshot v{snapshot.snapshotVersion} (turn {snapshot.turnCounter}, players {snapshot.playerCount})");
-
-        // Restore player count; connected count starts at 1 (just this survivor)
-        playerCount = snapshot.playerCount;
-        connectedPlayerCount = 1;
-
-        // Bind the survivor's own network ID to their saved player number
-        int survivorPlayerNo = PlayerPrefs.GetInt("PlayerNumber", -1);
-        if (survivorPlayerNo >= 0 && survivorPlayerNo < playerCount)
-        {
-            playerClientIds[survivorPlayerNo] = NetworkManager.Singleton.LocalClientId;
-            Debug.Log($"[Server] ApplyRestoredSnapshotOnRehost: playerClientIds[{survivorPlayerNo}] = {NetworkManager.Singleton.LocalClientId}");
-        }
-
-        // Restore and re-persist the failover chain so the new host's clients also have it
-        if (snapshot.failoverChain != null && snapshot.failoverChain.Length > 0)
-        {
-            string chainJson = UnityEngine.JsonUtility.ToJson(new SerializableIntList(
-                new System.Collections.Generic.List<int>(snapshot.failoverChain)));
-            UnityEngine.PlayerPrefs.SetString("SurvivorChain", chainJson);
-            UnityEngine.PlayerPrefs.Save();
-            Debug.Log($"[Server] ApplyRestoredSnapshotOnRehost: restored failover chain [{string.Join(",", snapshot.failoverChain)}]");
-        }
-
-        // Restore allCardLookup BEFORE calling ApplyGameStateToServer so that
-        // centerCardsDict can be rebuilt from the snapshot center list.
-        if (snapshot.cardLookup != null && snapshot.cardLookup.Length > 0)
-        {
-            if (allCardLookup == null) allCardLookup = new Dictionary<string, int[]>();
-            allCardLookup.Clear();
-            foreach (var entry in snapshot.cardLookup)
-            {
-                if (!string.IsNullOrEmpty(entry.cardId))
-                    allCardLookup[entry.cardId] = new int[] { entry.kind, entry.value };
-            }
-            Debug.Log($"[Server] ApplyRestoredSnapshotOnRehost: restored {allCardLookup.Count} entries to allCardLookup");
-        }
-        else
-        {
-            Debug.LogError("[Server] ApplyRestoredSnapshotOnRehost: snapshot.cardLookup is empty - center card rules will be unavailable after rehost!");
-        }
-
-        // Apply full game state from snapshot
-        ApplyGameStateToServer(snapshot);
-
-        // Ensure server is not stuck in a move-processing state
-        isProcessingMove = false;
-
-        Debug.Log($"[Server] ApplyRestoredSnapshotOnRehost: complete. currentPlayer={currentPlayer}, turn={turnCounter}");
-    }
 
     // POWER DURATION TIMER: Tracks how long a player can take during interactive power selection
     private Coroutine activePowerDurationCoroutine;
@@ -167,11 +101,6 @@ public class Server : NetworkBehaviour
     private bool hasManualSavedState = false;
     private int snapshotVersionCounter = 0;
 
-    // PHASE 2A: Persistent snapshot keys for host-loss recovery
-    private const string SNAPSHOT_PREFS_KEY = "Chkobba_Snapshot_Current";
-    private const string SNAPSHOT_BACKUP_PREFS_KEY = "Chkobba_Snapshot_Backup";
-    private const string SNAPSHOT_METADATA_KEY = "Chkobba_Snapshot_Meta";
-    
     // REDO SYSTEM: Automatic game state tracking
     private SerializableGameState currentGameState;
     private SerializableGameState previousGameState;
@@ -187,20 +116,6 @@ public class Server : NetworkBehaviour
     // RECONNECTION TRACKING: Track which clients are reconnecting
     private HashSet<ulong> reconnectingClients = new HashSet<ulong>();
 
-    // COORDINATED DISCONNECTION TRACKING: Track clients that have confirmed disconnection
-    private HashSet<ulong> clientsConfirmedDisconnection = new HashSet<ulong>();
-    private bool isCoordinatedDisconnectionInProgress = false;
-    
-    /// <summary>
-    /// Public property to check if coordinated disconnection is in progress
-    /// </summary>
-    public bool IsCoordinatedDisconnectionInProgress => isCoordinatedDisconnectionInProgress;
-
-    // KEEP-ALIVE SYSTEM for relay connections
-    private Coroutine relayKeepAliveCoroutine;
-    private bool isRelayKeepAliveActive = false;
-    private string hostAllocationId;
-    private List<string> clientAllocationIds = new List<string>();
     private NetworkManagerUI networkManagerUI;
 
     public void ResetAllServerVariables()
@@ -379,12 +294,6 @@ public class Server : NetworkBehaviour
         {
             SubscribeToNetworkEvents();
         }
-        
-        // Check for heartbeat timeouts
-        if (IsServer && clientHeartbeats.Count > 0)
-        {
-            CheckHeartbeatTimeouts();
-        }
     }
 
     public void StartGame(int tempPlayerCount)
@@ -475,38 +384,6 @@ public class Server : NetworkBehaviour
         
         // REDO SYSTEM: Save initial game state after cards are dealt
         Invoke("SaveInitialGameStateForRedo", 4f); // After cards are dealt
-
-        // FAILOVER: Compute and persist deterministic sub-host order for all clients
-        ComputeAndSaveSurvivorChain();
-    }
-
-    /// <summary>
-    /// Computes the deterministic failover chain for this match and writes it to PlayerPrefs
-    /// on the server.  A companion ClientRPC pushes the same data to every client so all
-    /// survivors evaluate candidacy identically, without needing the dead host.
-    ///
-    /// Order: slot-descending, host (slot 0) excluded, bot slots excluded.
-    /// e.g. 4-player all-human => [3, 2, 1];  4-player bot-mode => [] (no human backup)
-    /// </summary>
-    private void ComputeAndSaveSurvivorChain()
-    {
-        var chain = new System.Collections.Generic.List<int>();
-        for (int i = playerCount - 1; i > 0; i--)
-        {
-            // Exclude bot-controlled slots when bot mode is active.
-            // In bot mode slot 1 (and 1-3 for 4p) is the bot; skip them.
-            bool isBotSlot = isBotModeEnabled && i >= 1;
-            if (!isBotSlot) chain.Add(i);
-        }
-
-        string json = UnityEngine.JsonUtility.ToJson(new SerializableIntList(chain));
-        UnityEngine.PlayerPrefs.SetString("SurvivorChain", json);
-        UnityEngine.PlayerPrefs.Save();
-        Debug.Log($"[Server] ComputeAndSaveSurvivorChain: [{string.Join(",", chain)}] -> PlayerPrefs");
-
-        // Broadcast to every connected client so they each have the chain locally
-        if (networkRelay != null)
-            networkRelay.DistributeSurvivorChainClientRPC(json);
     }
 
     public void CallUpdateCurrentPlayer()
@@ -530,8 +407,7 @@ public class Server : NetworkBehaviour
     private int initialDealCoroutineCheckCounter = 0;
     private bool hasSubscribedToNetworkEvents = false;
     
-    // === HEARTBEAT TRACKING ===
-    private Dictionary<ulong, float> clientHeartbeats = new Dictionary<ulong, float>();
+    // === DISCONNECT TRACKING ===
     private Dictionary<ulong, bool> disconnectedClients = new Dictionary<ulong, bool>();
     
     public void InitialDealCoroutineCheck()
@@ -894,7 +770,7 @@ public class Server : NetworkBehaviour
         }
 
         // PHASE 2A: Persist checkpoint after every processed turn for host-loss recovery
-        PersistSnapshotToPlayerPrefs();
+        // (Implementation removed)
 
         isProcessingMove = false;
         NextTurn();
@@ -1253,8 +1129,7 @@ public class Server : NetworkBehaviour
         }
         else
         {
-            // Match fully ended - clear persisted snapshots so stale data does not carry into the next session
-            ClearPersistedSnapshots();
+            // Match fully ended
         }
     }
 
@@ -1633,15 +1508,6 @@ public class Server : NetworkBehaviour
         connectionLog.AppendLine($"SERVER MESSAGE: Expected player count: {playerCount}");
         connectionLog.AppendLine($"SERVER MESSAGE: Turn counter: {turnCounter}");
 
-        // CRITICAL: Restart keep-alive if it was stopped due to disconnections
-        bool wasKeepAliveInactive = !isRelayKeepAliveActive;
-        if (IsServer && !isRelayKeepAliveActive && !string.IsNullOrEmpty(hostAllocationId))
-        {
-            connectionLog.AppendLine($"SERVER MESSAGE: Restarting relay keep-alive system (was inactive due to disconnections)");
-            isRelayKeepAliveActive = true;
-            relayKeepAliveCoroutine = StartCoroutine(RelayKeepAliveCoroutine());
-        }
-        
         // Debug.Log($"[Server] ===== TURN COUNTER CHECK =====\n" +
         //          $"ClientId: {clientId}\n" +
         //          $"TurnCounter: {turnCounter}\n" +
@@ -1655,10 +1521,6 @@ public class Server : NetworkBehaviour
             Debug.LogError($"[RECONNECTION] Client {clientId} reconnected to existing game - turnCounter: {turnCounter}, connectedPlayerCount: {connectedPlayerCount}");
             
             connectionLog.AppendLine($"SERVER MESSAGE: Client {clientId} reconnected to existing game (turn {turnCounter})");
-            if (wasKeepAliveInactive)
-            {
-                connectionLog.AppendLine($"SERVER MESSAGE: Keep-alive restarted for reconnected client");
-            }
             
             // RECONNECTION: Track this client as reconnecting
             reconnectingClients.Add(clientId);
@@ -1673,7 +1535,6 @@ public class Server : NetworkBehaviour
                      $"Client {clientId} reconnected to existing game\n" +
                      $"Game state: turn {turnCounter}, players: {playerCount}, connected: {connectedPlayerCount}\n" +
                      $"Center cards: {centerCardsDict?.Count ?? 0}, Player hands: {playersHandCardsIDs?.Count ?? 0}\n" +
-                     $"Keep-alive was inactive: {wasKeepAliveInactive}\n" +
                      $"Client added to reconnecting set: {reconnectingClients.Count} clients reconnecting");
             
             // RECONNECTION: Follow the same initialization as StartGame() but with sync instead of deals
@@ -1697,7 +1558,7 @@ public class Server : NetworkBehaviour
             }
             else
             {
-                Debug.LogError($"[Server] NetworkRelay is null - cannot initialize card prefabs for reconnected client");
+                Debug.LogError($"[Server] GameNetworkRelay is null - cannot initialize card prefabs for reconnected client");
             }
         }
         else if (playerCount == connectedPlayerCount || (isBotModeEnabled && playerCount == 2 && connectedPlayerCount == 1) || (isBotModeEnabled && playerCount == 4 && connectedPlayerCount == 1))
@@ -1749,7 +1610,7 @@ public class Server : NetworkBehaviour
         }
         
         // CRITICAL FIX: Check if this is a host disconnection - ALWAYS reset server when host disconnects
-        if (clientId == NetworkManager.Singleton.LocalClientId)
+        if (clientId == NetworkManager.ServerClientId)
         {
             Debug.LogWarning($"[Server] HOST DISCONNECTED - performing complete server reset");
             HandleHostDisconnection();
@@ -1790,9 +1651,6 @@ public class Server : NetworkBehaviour
         
         // Mark client as disconnected FIRST (to prevent double processing)
         disconnectedClients[clientId] = true;
-        
-        // Remove from heartbeat tracking
-        clientHeartbeats.Remove(clientId);
 
         // CONFIRMATION SYSTEM: Remove disconnected client so waiting coroutines can proceed
         pendingTurnConfirmations.Remove(clientId);
@@ -1820,34 +1678,13 @@ public class Server : NetworkBehaviour
             disconnectionLog.AppendLine($"SERVER MESSAGE: Connected player count was already 0 - no change");
         }
         
-        // Log current relay allocation status
-        if (networkManagerUI != null && networkManagerUI.currentLobby != null)
-        {
-            disconnectionLog.AppendLine($"SERVER MESSAGE: Current lobby: {networkManagerUI.currentLobby.Name}");
-            disconnectionLog.AppendLine($"SERVER MESSAGE: Lobby players: {networkManagerUI.currentLobby.Players.Count}");
-            disconnectionLog.AppendLine($"SERVER MESSAGE: Lobby max players: {networkManagerUI.currentLobby.MaxPlayers}");
-            disconnectionLog.AppendLine($"SERVER MESSAGE: Lobby available slots: {networkManagerUI.currentLobby.AvailableSlots}");
-            
-            if (networkManagerUI.currentLobby.Data != null && networkManagerUI.currentLobby.Data.ContainsKey("RelayJoinCode"))
-            {
-                string relayCode = networkManagerUI.currentLobby.Data["RelayJoinCode"].Value;
-                disconnectionLog.AppendLine($"SERVER MESSAGE: Current relay join code: {relayCode}");
-                disconnectionLog.AppendLine($"SERVER MESSAGE: Relay keep-alive active: {isRelayKeepAliveActive}");
-                disconnectionLog.AppendLine($"SERVER MESSAGE: Host allocation ID: {hostAllocationId}");
-                disconnectionLog.AppendLine($"SERVER MESSAGE: Tracked client allocations: {clientAllocationIds.Count}");
-            }
-        }
-        
         // CRITICAL FIX: Do NOT reset game state when all clients disconnect
-        // Keep the relay allocation alive for potential reconnection
         // connectedPlayerCount == 1 means only host is left (no clients)
         if (connectedPlayerCount == 1)
         {
-            disconnectionLog.AppendLine("SERVER MESSAGE: All players disconnected, but keeping relay allocation alive for reconnection");
-            disconnectionLog.AppendLine("SERVER MESSAGE: NOT resetting game state - relay keep-alive continues");
-            disconnectionLog.AppendLine($"SERVER MESSAGE: Keep-alive coroutine running: {relayKeepAliveCoroutine != null}");
-            disconnectionLog.AppendLine($"SERVER MESSAGE: Keep-alive active flag: {isRelayKeepAliveActive}");
-            // DO NOT call ResetAllServerVariables() - this stops the keep-alive system!
+            disconnectionLog.AppendLine("SERVER MESSAGE: All players disconnected");
+            disconnectionLog.AppendLine("SERVER MESSAGE: NOT resetting game state");
+            // DO NOT call ResetAllServerVariables() here
         }
         
         // Reset only the essential connection tracking (don't reset game state)
@@ -1862,53 +1699,6 @@ public class Server : NetworkBehaviour
         
         // Print as one log entry
         Debug.LogError(disconnectionLog.ToString());
-    }
-
-    /// <summary>
-    /// Handles heartbeat from a client
-    /// </summary>
-    public void OnClientHeartbeat(ulong clientId)
-    {
-        if (!clientHeartbeats.ContainsKey(clientId))
-        {
-            Debug.Log($"[Server] New client {clientId} heartbeat registered");
-        }
-        
-        clientHeartbeats[clientId] = Time.time;
-        
-        // If this client was marked as disconnected, mark them as reconnected
-        if (disconnectedClients.ContainsKey(clientId) && disconnectedClients[clientId])
-        {
-            disconnectedClients[clientId] = false;
-            Debug.Log($"[Server] Client {clientId} reconnected after disconnect");
-        }
-    }
-
-    /// <summary>
-    /// Checks for clients that haven't sent heartbeats recently
-    /// </summary>
-    private void CheckHeartbeatTimeouts()
-    {
-        float currentTime = Time.time;
-        List<ulong> timedOutClients = new List<ulong>();
-        
-        foreach (var kvp in clientHeartbeats)
-        {
-            ulong clientId = kvp.Key;
-            float lastHeartbeat = kvp.Value;
-            
-            if (currentTime - lastHeartbeat > 20f) // 20 second timeout
-            {
-                Debug.LogWarning($"[Server] Client {clientId} heartbeat timeout - marking as disconnected");
-                timedOutClients.Add(clientId);
-            }
-        }
-        
-        // Handle timed out clients
-        foreach (ulong clientId in timedOutClients)
-        {
-            OnClientDisconnected(clientId);
-        }
     }
 
     /// <summary>
@@ -1942,12 +1732,8 @@ public class Server : NetworkBehaviour
             // Perform complete reset
             Singleton.ResetAllServerVariables();
             
-            // Stop all keep-alive systems
-            Singleton.StopRelayKeepAlive();
-            
             // Clear all tracking dictionaries
             Singleton.disconnectedClients.Clear();
-            Singleton.clientHeartbeats.Clear();
             Singleton.reconnectingClients.Clear();
             
             // Reset connection count to 0
@@ -2015,7 +1801,6 @@ public class Server : NetworkBehaviour
         
         // Mark client as disconnected
         disconnectedClients[clientId] = true;
-        clientHeartbeats.Remove(clientId);
         
         // Decrease connected player count
         if (connectedPlayerCount > 0)
@@ -2083,7 +1868,6 @@ public class Server : NetworkBehaviour
         
         // Mark client as disconnected
         disconnectedClients[clientId] = true;
-        clientHeartbeats.Remove(clientId);
         
         // Decrease connected player count
         if (connectedPlayerCount > 0)
@@ -2110,27 +1894,17 @@ public class Server : NetworkBehaviour
     private void HandleHostDisconnection()
     {
         Debug.LogWarning($"[Server] ===== HANDLING HOST DISCONNECTION =====");
-        // NOTE: This is running on a SURVIVING CLIENT's Server component (not the dead host).
-        // Do NOT call ResetAllServerVariables() or ResetServerSingletonForMainMenu() here —
-        // that would destroy all game state before the survivor rehost can use it.
-        // Survivor recovery is orchestrated entirely from NetworkManagerUI.SurvivorElectionAndRehost().
+        // NOTE: Host migration / survivor re-host has been removed. When the host leaves,
+        // each client detects the loss via NetworkManager's OnClientDisconnectCallback and
+        // returns to the main menu itself (handled in NetworkManagerUI). Here we only clear
+        // stale server-side connection tracking.
 
-        // Stop keep-alive — a new allocation will be created by the survivor rehost
-        StopRelayKeepAlive();
-
-        // Clear stale connection tracking; survivors will re-register when they rejoin
+        // Clear stale connection tracking
         disconnectedClients.Clear();
-        clientHeartbeats.Clear();
         reconnectingClients.Clear();
         connectedPlayerCount = 0;
 
-        // Notify all LOCAL callbacks that host has disconnected (triggers NetworkManagerUI flow)
-        if (networkRelay != null)
-        {
-            networkRelay.NotifyHostDisconnectedClientRPC();
-        }
-
-        Debug.LogWarning($"[Server] ===== HOST DISCONNECTION: keep-alive stopped, waiting for survivor rehost =====");
+        Debug.LogWarning($"[Server] ===== HOST DISCONNECTION: connection tracking cleared =====");
     }
 
     /// <summary>
@@ -2145,12 +1919,8 @@ public class Server : NetworkBehaviour
         // Perform complete server reset
         ResetAllServerVariables();
         
-        // Stop all keep-alive systems
-        StopRelayKeepAlive();
-        
         // Clear all tracking
         disconnectedClients.Clear();
-        clientHeartbeats.Clear();
         reconnectingClients.Clear();
         
         // Reset connection count
@@ -2160,104 +1930,6 @@ public class Server : NetworkBehaviour
         Debug.LogWarning($"[Server] Complete server reset performed - ready for fresh host");
     }
 
-    /// <summary>
-    /// Starts coordinated disconnection process - host notifies all clients to disconnect
-    /// </summary>
-    public void StartCoordinatedDisconnection()
-    {
-        if (!IsServer)
-        {
-            Debug.LogWarning("[Server] StartCoordinatedDisconnection called on non-server instance");
-            return;
-        }
-
-        Debug.Log($"[Server] Starting coordinated disconnection - {connectedPlayerCount - 1} clients need to confirm disconnection");
-        
-        // Reset tracking
-        clientsConfirmedDisconnection.Clear();
-        isCoordinatedDisconnectionInProgress = true;
-        
-        // Notify all clients to disconnect
-        var networkRelay = FindObjectOfType<NetworkRelay>();
-        if (networkRelay != null)
-        {
-            networkRelay.NotifyClientsToDisconnectServerRPC();
-        }
-        else
-        {
-            Debug.LogError("[Server] NetworkRelay not found - cannot notify clients to disconnect");
-        }
-    }
-
-    /// <summary>
-    /// Called when a client confirms they have disconnected
-    /// </summary>
-    public void OnClientConfirmedDisconnection(ulong clientId)
-    {
-        if (!isCoordinatedDisconnectionInProgress)
-        {
-            Debug.LogWarning($"[Server] Client {clientId} confirmed disconnection but coordinated disconnection not in progress - ignoring");
-            return;
-        }
-
-        if (clientsConfirmedDisconnection.Contains(clientId))
-        {
-            Debug.LogWarning($"[Server] Client {clientId} already confirmed disconnection - ignoring duplicate");
-            return;
-        }
-
-        clientsConfirmedDisconnection.Add(clientId);
-        Debug.Log($"[Server] Client {clientId} confirmed disconnection - {clientsConfirmedDisconnection.Count}/{connectedPlayerCount - 1} clients confirmed");
-
-        // Check if all clients have confirmed disconnection
-        if (clientsConfirmedDisconnection.Count >= connectedPlayerCount - 1)
-        {
-            Debug.Log("[Server] All clients have confirmed disconnection - host can now disconnect");
-            OnAllClientsConfirmedDisconnection();
-        }
-    }
-
-    /// <summary>
-    /// Called when all clients have confirmed their disconnection
-    /// </summary>
-    private void OnAllClientsConfirmedDisconnection()
-    {
-        Debug.Log("[Server] All clients confirmed disconnection - notifying host to disconnect");
-        
-        // Reset tracking
-        isCoordinatedDisconnectionInProgress = false;
-        clientsConfirmedDisconnection.Clear();
-        
-        // Notify NetworkManagerUI that host can now disconnect
-        if (networkManagerUI != null)
-        {
-            networkManagerUI.OnAllClientsConfirmedDisconnection();
-        }
-        else
-        {
-            Debug.LogError("[Server] NetworkManagerUI not found - cannot notify host to disconnect");
-        }
-    }
-
-    /// <summary>
-    /// Context menu method to clear saved game info from NetworkManagerUI (for testing/debugging)
-    /// </summary>
-    [ContextMenu("Clear Saved Game Info")]
-    public void ClearSavedGameInfoFromServer()
-    {
-        Debug.Log("[Server] Context Menu: Clearing saved game info via NetworkManagerUI...");
-        
-        if (networkManagerUI != null)
-        {
-            networkManagerUI.ClearSavedGameInfo();
-            Debug.Log("[Server] Context Menu: Successfully cleared saved game info");
-        }
-        else
-        {
-            Debug.LogWarning("[Server] Context Menu: NetworkManagerUI not found - cannot clear saved game info");
-        }
-    }
-    
     void OnDestroy()
     {
         if (Singleton == this)
@@ -2902,22 +2574,10 @@ public class Server : NetworkBehaviour
             snapshot.cardLookup = entries;
         }
 
-        // Failover chain - persisted in snapshot so survivors and reconnectors share the same election inputs
-        if (UnityEngine.PlayerPrefs.HasKey("SurvivorChain"))
-        {
-            try
-            {
-                var chainList = UnityEngine.JsonUtility.FromJson<SerializableIntList>(
-                    UnityEngine.PlayerPrefs.GetString("SurvivorChain")).ToList();
-                snapshot.failoverChain = chainList.ToArray();
-            }
-            catch { snapshot.failoverChain = new int[0]; }
-        }
-
         Debug.Log($"[Server] Built game state snapshot version {snapshot.snapshotVersion} with {centerList.Count} center cards, {playersHandCardsIDs?.Count ?? 0} player hands");
         
         return snapshot;
-    }
+}
 
     /// <summary>
     /// Context menu to manually save current game state for testing
@@ -3055,103 +2715,6 @@ public class Server : NetworkBehaviour
     }
 
     // Note: Automatic or request-based broadcasting removed per user request. Only manual Save/Load remains.
-
-    // ===== PHASE 2A: PERSISTENT SNAPSHOT MANAGEMENT =====
-
-    /// <summary>
-    /// Persists a snapshot of the current game state to PlayerPrefs so it survives host crashes.
-    /// Rotates the previous snapshot to a backup slot before writing the new one.
-    /// Should be called at the end of every processed turn (PostMoveSequence).
-    /// </summary>
-    public void PersistSnapshotToPlayerPrefs()
-    {
-        if (!IsServer) return;
-
-        try
-        {
-            var snapshot = BuildGameStateSnapshot();
-            string json = JsonUtility.ToJson(snapshot);
-
-            // Rotate: current → backup before overwriting
-            if (PlayerPrefs.HasKey(SNAPSHOT_PREFS_KEY))
-                PlayerPrefs.SetString(SNAPSHOT_BACKUP_PREFS_KEY, PlayerPrefs.GetString(SNAPSHOT_PREFS_KEY));
-
-            PlayerPrefs.SetString(SNAPSHOT_PREFS_KEY, json);
-            PlayerPrefs.SetString(SNAPSHOT_METADATA_KEY,
-                $"{snapshot.snapshotVersion}|{snapshot.turnCounter}|{snapshot.playerCount}|{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}");
-            PlayerPrefs.Save();
-            Debug.Log($"[Server] PersistSnapshotToPlayerPrefs: saved v{snapshot.snapshotVersion} (turn {snapshot.turnCounter})");
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[Server] PersistSnapshotToPlayerPrefs failed: {e.Message}");
-        }
-    }
-
-    /// <summary>
-    /// Tries to load the most recent persisted snapshot from PlayerPrefs.
-    /// Falls back to the backup slot if the primary is missing or corrupt.
-    /// </summary>
-    public bool TryLoadSnapshotFromPlayerPrefs(out SerializableGameState snapshot)
-    {
-        snapshot = default;
-        string json = null;
-
-        if (PlayerPrefs.HasKey(SNAPSHOT_PREFS_KEY))
-        {
-            json = PlayerPrefs.GetString(SNAPSHOT_PREFS_KEY);
-        }
-        else if (PlayerPrefs.HasKey(SNAPSHOT_BACKUP_PREFS_KEY))
-        {
-            json = PlayerPrefs.GetString(SNAPSHOT_BACKUP_PREFS_KEY);
-            Debug.LogWarning("[Server] TryLoadSnapshotFromPlayerPrefs: primary missing, using backup");
-        }
-
-        if (string.IsNullOrEmpty(json))
-        {
-            Debug.LogWarning("[Server] TryLoadSnapshotFromPlayerPrefs: no snapshot found in PlayerPrefs");
-            return false;
-        }
-
-        try
-        {
-            snapshot = JsonUtility.FromJson<SerializableGameState>(json);
-            Debug.Log($"[Server] TryLoadSnapshotFromPlayerPrefs: loaded v{snapshot.snapshotVersion} (turn {snapshot.turnCounter}, players {snapshot.playerCount})");
-            return true;
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[Server] TryLoadSnapshotFromPlayerPrefs: primary snapshot corrupt ({e.Message}), trying backup");
-
-            if (PlayerPrefs.HasKey(SNAPSHOT_BACKUP_PREFS_KEY))
-            {
-                try
-                {
-                    snapshot = JsonUtility.FromJson<SerializableGameState>(PlayerPrefs.GetString(SNAPSHOT_BACKUP_PREFS_KEY));
-                    Debug.LogWarning($"[Server] TryLoadSnapshotFromPlayerPrefs: loaded backup v{snapshot.snapshotVersion}");
-                    return true;
-                }
-                catch (Exception e2)
-                {
-                    Debug.LogError($"[Server] TryLoadSnapshotFromPlayerPrefs: backup also corrupt: {e2.Message}");
-                }
-            }
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// Clears all persisted snapshot data from PlayerPrefs.
-    /// Call when the match fully ends so stale data does not carry into the next session.
-    /// </summary>
-    public void ClearPersistedSnapshots()
-    {
-        PlayerPrefs.DeleteKey(SNAPSHOT_PREFS_KEY);
-        PlayerPrefs.DeleteKey(SNAPSHOT_BACKUP_PREFS_KEY);
-        PlayerPrefs.DeleteKey(SNAPSHOT_METADATA_KEY);
-        PlayerPrefs.Save();
-        Debug.Log("[Server] ClearPersistedSnapshots: cleared all snapshot data from PlayerPrefs");
-    }
 
     // ===== REDO SYSTEM: AUTOMATIC GAME STATE TRACKING =====
 
@@ -3452,304 +3015,6 @@ public class Server : NetworkBehaviour
             
             // Send current player update immediately (this will also trigger bot if needed)
             SendCurrentPlayerUpdateAfterRedo();
-        }
-    }
-
-    // ===== RELAY KEEP-ALIVE SYSTEM =====
-
-    /// <summary>
-    /// Starts the relay keep-alive system to maintain all relay connections
-    /// </summary>
-    public void StartRelayKeepAlive(string hostAllocationId)
-    {
-        Debug.Log($"[Server] StartRelayKeepAlive called with allocation: {hostAllocationId}");
-        Debug.Log($"[Server] IsServer: {IsServer}, isRelayKeepAliveActive: {isRelayKeepAliveActive}");
-        
-        if (IsServer && !isRelayKeepAliveActive)
-        {
-            this.hostAllocationId = hostAllocationId;
-            isRelayKeepAliveActive = true;
-            relayKeepAliveCoroutine = StartCoroutine(RelayKeepAliveCoroutine());
-            Debug.Log($"[Server] Successfully started relay keep-alive system for allocation: {hostAllocationId}");
-        }
-        else
-        {
-            Debug.LogWarning($"[Server] Cannot start relay keep-alive: IsServer={IsServer}, isRelayKeepAliveActive={isRelayKeepAliveActive}");
-        }
-    }
-
-    /// <summary>
-    /// Stops the relay keep-alive system
-    /// </summary>
-    public void StopRelayKeepAlive()
-    {
-        if (isRelayKeepAliveActive)
-        {
-            isRelayKeepAliveActive = false;
-            if (relayKeepAliveCoroutine != null)
-            {
-                StopCoroutine(relayKeepAliveCoroutine);
-                relayKeepAliveCoroutine = null;
-            }
-            Debug.Log("[Server] Stopped relay keep-alive system");
-        }
-    }
-
-    /// <summary>
-    /// Adds a client allocation ID to the keep-alive tracking
-    /// </summary>
-    public void AddClientAllocationForKeepAlive(string clientAllocationId)
-    {
-        if (!clientAllocationIds.Contains(clientAllocationId))
-        {
-            clientAllocationIds.Add(clientAllocationId);
-            Debug.Log($"[Server] Added client allocation to keep-alive: {clientAllocationId}");
-        }
-    }
-
-    /// <summary>
-    /// Coroutine that sends heartbeats every 5 seconds to maintain relay connections
-    /// ONLY when the host is present and there's an active game session
-    /// </summary>
-    private IEnumerator RelayKeepAliveCoroutine()
-    {
-        Debug.Log("[Server] Relay keep-alive coroutine started");
-        
-        while (isRelayKeepAliveActive)
-        {
-            yield return new WaitForSeconds(5f); // Send heartbeat every 5 seconds
-            
-            // PROPER LOGIC: Only send heartbeat if:
-            // 1. We're the server
-            // 2. Keep-alive is active
-            // 3. Host is still present (connectedPlayerCount >= 1)
-            // 4. We have a valid allocation ID
-            if (IsServer && isRelayKeepAliveActive && connectedPlayerCount >= 1 && !string.IsNullOrEmpty(hostAllocationId))
-            {
-                // Build detailed heartbeat log
-                var heartbeatLog = new System.Text.StringBuilder();
-                heartbeatLog.AppendLine("SERVER MESSAGE: ===== RELAY KEEP-ALIVE HEARTBEAT =====");
-                heartbeatLog.AppendLine($"[Server] Sending relay keep-alive heartbeat at {DateTime.UtcNow:HH:mm:ss}");
-                heartbeatLog.AppendLine($"SERVER MESSAGE: Connected player count: {connectedPlayerCount}");
-                heartbeatLog.AppendLine($"SERVER MESSAGE: Keep-alive justified: Host present (count >= 1)");
-                
-                // CRITICAL FIX: Only access ConnectedClients if we're actually the server
-                if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
-                {
-                    heartbeatLog.AppendLine($"SERVER MESSAGE: NetworkManager connected clients: {NetworkManager.Singleton.ConnectedClients.Count}");
-                }
-                else
-                {
-                    heartbeatLog.AppendLine($"SERVER MESSAGE: NetworkManager connected clients: N/A (not server)");
-                }
-                
-                heartbeatLog.AppendLine($"SERVER MESSAGE: Is Server: {IsServer}");
-                heartbeatLog.AppendLine($"SERVER MESSAGE: Relay keep-alive active: {isRelayKeepAliveActive}");
-                heartbeatLog.AppendLine($"SERVER MESSAGE: Host allocation ID: {hostAllocationId}");
-                heartbeatLog.AppendLine("SERVER MESSAGE: ===== END RELAY KEEP-ALIVE HEARTBEAT =====");
-                
-                Debug.LogError(heartbeatLog.ToString());
-                
-                // Send heartbeat to maintain relay connection
-                SendRelayHeartbeat();
-                
-                // Send host heartbeat to all clients for timeout detection
-                SendHostHeartbeatToClients();
-                
-                // Update lobby with heartbeat timestamp
-                UpdateLobbyHeartbeat();
-            }
-            else if (connectedPlayerCount < 1)
-            {
-                // PROPER SHUTDOWN: If no players left, stop keep-alive
-                Debug.LogWarning($"[Server] STOPPING keep-alive - no players left (connectedPlayerCount: {connectedPlayerCount})");
-                isRelayKeepAliveActive = false;
-                break;
-            }
-            else
-            {
-                Debug.LogWarning($"[Server] Skipping heartbeat - IsServer: {IsServer}, isRelayKeepAliveActive: {isRelayKeepAliveActive}, connectedPlayerCount: {connectedPlayerCount}, hostAllocationId: {hostAllocationId}");
-            }
-        }
-        
-        Debug.Log("[Server] Relay keep-alive coroutine stopped");
-    }
-
-    /// <summary>
-    /// Sends heartbeat to maintain relay connections
-    /// </summary>
-    private void SendRelayHeartbeat()
-    {
-        try
-        {
-            // The act of being connected as a host/server maintains the relay allocation
-            // We just need to ensure we're actively using the connection
-            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
-            {
-                // CRITICAL FIX: Send actual network traffic that works even with 0 clients
-                // Use a ServerRpc that the server calls on itself to generate network traffic
-                if (networkRelay != null)
-                {
-                    // Call a ServerRpc from the server to itself - this generates actual network traffic
-                    networkRelay.PrintMessageServerRPC($"KeepAlive_{DateTime.UtcNow:HH:mm:ss}");
-                    Debug.Log($"[Server] Sent relay keep-alive heartbeat for allocation: {hostAllocationId}");
-                }
-                else
-                {
-                    Debug.LogWarning($"[Server] NetworkRelay is null - cannot send keep-alive heartbeat");
-                }
-                
-                // Log all tracked allocations
-                if (clientAllocationIds.Count > 0)
-                {
-                    Debug.Log($"[Server] Maintaining {clientAllocationIds.Count} client allocations: {string.Join(", ", clientAllocationIds)}");
-                }
-            }
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogWarning($"[Server] Error sending relay heartbeat: {e.Message}");
-        }
-    }
-
-    /// <summary>
-    /// Sends host heartbeat to all clients for timeout detection
-    /// </summary>
-    private void SendHostHeartbeatToClients()
-    {
-        try
-        {
-            if (networkRelay != null)
-            {
-                // Send host heartbeat to all clients
-                networkRelay.SendHostHeartbeatClientRPC();
-                Debug.Log($"[Server] Host heartbeat sent to all clients at {DateTime.UtcNow:HH:mm:ss}");
-            }
-            else
-            {
-                Debug.LogWarning("[Server] NetworkRelay is null - cannot send host heartbeat to clients");
-            }
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogWarning($"[Server] Error sending host heartbeat to clients: {e.Message}");
-        }
-    }
-
-    /// <summary>
-    /// Updates lobby metadata with heartbeat timestamp to keep lobby active
-    /// </summary>
-    private async void UpdateLobbyHeartbeat()
-    {
-        try
-        {
-            if (networkManagerUI != null && networkManagerUI.currentLobby != null)
-            {
-                // Update lobby with heartbeat timestamp to keep it active
-                var updateOptions = new UpdateLobbyOptions
-                {
-                    Data = new Dictionary<string, DataObject>
-                    {
-                        { "LastHeartbeat", new DataObject(DataObject.VisibilityOptions.Public, DateTime.UtcNow.ToString("O")) }
-                    }
-                };
-                
-                await Lobbies.Instance.UpdateLobbyAsync(networkManagerUI.currentLobby.Id, updateOptions);
-                // Debug.Log($"[Server] Lobby heartbeat sent at {DateTime.UtcNow:HH:mm:ss} - lobby kept active");
-            }
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogWarning($"[Server] Error updating lobby heartbeat: {e.Message}");
-        }
-    }
-
-    /// <summary>
-    /// Called when a client connects - adds their allocation to keep-alive tracking
-    /// </summary>
-    public void OnClientConnectedForKeepAlive(ulong clientId, string clientAllocationId)
-    {
-        AddClientAllocationForKeepAlive(clientAllocationId);
-                    // Debug.Log($"[Server] Client {clientId} connected, tracking allocation: {clientAllocationId}");
-    }
-
-    /// <summary>
-    /// Called when a client disconnects - keeps their allocation alive for reconnection
-    /// </summary>
-    public void OnClientDisconnectedKeepAlive(ulong clientId)
-    {
-        // CRITICAL: Do NOT remove client allocation from keep-alive
-        // We want to keep it alive for potential reconnection
-        Debug.Log($"[Server] Client {clientId} disconnected, but keeping their relay allocation alive for reconnection");
-        
-        // Start server-side keep-alive for disconnected client
-        StartServerSideKeepAliveForDisconnectedClient(clientId);
-        
-        // Check relay allocation status
-        CheckRelayAllocationStatus();
-    }
-    
-    /// <summary>
-    /// Starts server-side keep-alive to maintain disconnected client's relay allocation
-    /// </summary>
-    private void StartServerSideKeepAliveForDisconnectedClient(ulong clientId)
-    {
-        // The server will now send keep-alive pings on behalf of the disconnected client
-        // This prevents the client's relay allocation from expiring
-        Debug.Log($"[Server] Starting server-side keep-alive for disconnected client {clientId}");
-        
-        // We don't need to track individual client allocations anymore
-        // The server's existing keep-alive system will maintain the entire relay allocation
-        // including slots for disconnected clients
-    }
-    
-    /// <summary>
-    /// Checks and logs the current relay allocation status
-    /// </summary>
-    private void CheckRelayAllocationStatus()
-    {
-        try
-        {
-            if (networkManagerUI != null && networkManagerUI.currentLobby != null && 
-                networkManagerUI.currentLobby.Data != null && 
-                networkManagerUI.currentLobby.Data.ContainsKey("RelayJoinCode"))
-            {
-                string relayCode = networkManagerUI.currentLobby.Data["RelayJoinCode"].Value;
-                
-                // Build complete relay status log as one string
-                var relayStatusLog = new System.Text.StringBuilder();
-                relayStatusLog.AppendLine("SERVER MESSAGE: ===== RELAY ALLOCATION STATUS CHECK =====");
-                relayStatusLog.AppendLine($"SERVER MESSAGE: Relay join code: {relayCode}");
-                relayStatusLog.AppendLine($"SERVER MESSAGE: Relay keep-alive active: {isRelayKeepAliveActive}");
-                relayStatusLog.AppendLine($"SERVER MESSAGE: Host allocation ID: {hostAllocationId}");
-                relayStatusLog.AppendLine($"SERVER MESSAGE: Tracked client allocations: {clientAllocationIds.Count}");
-                
-                // CRITICAL FIX: Only access ConnectedClients if we're actually the server
-                if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
-                {
-                    relayStatusLog.AppendLine($"SERVER MESSAGE: NetworkManager connected clients: {NetworkManager.Singleton.ConnectedClients.Count}");
-                }
-                else
-                {
-                    relayStatusLog.AppendLine($"SERVER MESSAGE: NetworkManager connected clients: N/A (not server)");
-                }
-                
-                relayStatusLog.AppendLine($"SERVER MESSAGE: Server connected player count: {connectedPlayerCount}");
-                
-                // Note: Unity Relay API doesn't provide direct allocation status query
-                // The "Not Found: join code not found" error typically means no available slots
-                relayStatusLog.AppendLine("SERVER MESSAGE: Note: Unity Relay doesn't provide direct slot status");
-                relayStatusLog.AppendLine("SERVER MESSAGE: 'Not Found' error usually means relay allocation is full");
-                
-                relayStatusLog.AppendLine("SERVER MESSAGE: ===== END RELAY ALLOCATION STATUS =====");
-                
-                // Print as one log entry
-                Debug.LogError(relayStatusLog.ToString());
-            }
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"SERVER MESSAGE: Could not check relay allocation status: {e.Message}");
         }
     }
 

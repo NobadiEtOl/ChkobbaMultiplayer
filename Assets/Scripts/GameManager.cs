@@ -4,8 +4,6 @@ using System.Collections;
 
 using System.Collections.Generic;
 
-using Unity.VisualScripting;
-
 using System.Linq;
 
 using UnityEngine;
@@ -248,7 +246,7 @@ public class GameManager : MonoBehaviour
 
     [SerializeField] private DeckController deckController;
 
-    public NetworkRelay networkRelay;
+    public GameNetworkRelay networkRelay;
 
     //Card Variables
 
@@ -825,7 +823,7 @@ public class GameManager : MonoBehaviour
         Debug.LogError("[Visual Sync] ===== DECK READY CALLED =====");
         Debug.Log($"[GameManager] ===== ÖNEMLİ: DECK READY CALLED =====\n" +
                  $"IsReconnecting: {isReconnecting}\n" +
-                 $"NetworkRelay: {(networkRelay != null ? "FOUND" : "NULL")}\n" +
+                 $"GameNetworkRelay: {(networkRelay != null ? "FOUND" : "NULL")}\n" +
                  $"IsConnectedClient: {NetworkManager.Singleton.IsConnectedClient}\n" +
                  $"IsHost: {NetworkManager.Singleton.IsHost}\n" +
                  $"IsServer: {NetworkManager.Singleton.IsServer}\n" +
@@ -2301,7 +2299,7 @@ public class GameManager : MonoBehaviour
 
         //Setting the networkRealy script to sen ServerRPCs
 
-        networkRelay = FindObjectOfType<NetworkRelay>();
+        networkRelay = FindObjectOfType<GameNetworkRelay>();
 
 
 
@@ -5303,19 +5301,8 @@ public class GameManager : MonoBehaviour
         SyncLog("Step 7: Unfreezing client after resync");
         UnfreezeClientAfterResync();
 
-        // 8. Handle reconnection completion and sync mode
-        SyncLog("Step 8: Checking if this was a reconnection and handling sync mode");
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient)
-        {
-            // Check if this was a reconnection by looking for saved game info
-            var networkManagerUI = FindObjectOfType<NetworkManagerUI>();
-            if (networkManagerUI != null && !string.IsNullOrEmpty(networkManagerUI.GetLastGameJoinCode()))
-            {
-                SyncLog("Step 8: This was a reconnection - notifying completion");
-                OnReconnectionGameStateApplied();
-            }
-        }
-        
+        // 8. (Reconnection completion detection is deferred — dormant path removed.)
+
         // 9. Stop sync mode if it was active (this will apply buffered moves)
         if (isSyncMode)
         {
@@ -6932,7 +6919,7 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            Debug.LogError("[GameManager] NetworkRelay is null - cannot confirm redo completion");
+            Debug.LogError("[GameManager] GameNetworkRelay is null - cannot confirm redo completion");
         }
         
         Debug.Log($"[GameManager] Redo scene reconstruction confirmation sent for {revertType}");
@@ -6960,7 +6947,7 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            Debug.LogError("[GameManager] NetworkRelay is null - cannot request redo");
+            Debug.LogError("[GameManager] GameNetworkRelay is null - cannot request redo");
         }
     }
 
@@ -6977,7 +6964,7 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            Debug.LogError("[GameManager] NetworkRelay is null - cannot request redo");
+            Debug.LogError("[GameManager] GameNetworkRelay is null - cannot request redo");
         }
     }
 
@@ -6994,7 +6981,7 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            Debug.LogError("[GameManager] NetworkRelay is null - cannot request redo status");
+            Debug.LogError("[GameManager] GameNetworkRelay is null - cannot request redo status");
         }
     }
 

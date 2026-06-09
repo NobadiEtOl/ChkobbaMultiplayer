@@ -1686,7 +1686,7 @@ public class SuperPowerSpawner : MonoBehaviour
                 totalPoints += zaferPower.points;
             }
         }
-        NetworkRelay.Instance.ReportZaferPuaniServerRPC(playerNo, totalPoints);
+        GameNetworkRelay.Instance.ReportZaferPuaniServerRPC(playerNo, totalPoints);
     }
     
     // ===== GOLD SYSTEM METHODS =====

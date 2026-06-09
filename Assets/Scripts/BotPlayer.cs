@@ -20,7 +20,7 @@ public class BotPlayer : MonoBehaviour
     [Header("References")]
     private GameManager gameManager;
     private Server server;
-    private NetworkRelay networkRelay;
+    private GameNetworkRelay networkRelay;
     
     [Header("Bot State")]
     private bool isActive = false;
@@ -92,7 +92,7 @@ public class BotPlayer : MonoBehaviour
         // Get references to other components
         gameManager = GameManager.LocalInstance;
         server = Server.Singleton;
-        networkRelay = NetworkRelay.Instance;
+        networkRelay = GameNetworkRelay.Instance;
         
         if (gameManager == null)
         {
@@ -106,7 +106,7 @@ public class BotPlayer : MonoBehaviour
         
         if (networkRelay == null)
         {
-            Debug.LogError("[BotPlayer] NetworkRelay not found!");
+            Debug.LogError("[BotPlayer] GameNetworkRelay not found!");
         }
         
     }
@@ -286,7 +286,7 @@ public class BotPlayer : MonoBehaviour
         BotLog($"[Bot] Center cards count: {centerCards.Count}");
         
         // Send the move to server
-        BotLog($"[Bot] Sending move to server via NetworkRelay...");
+        BotLog($"[Bot] Sending move to server via GameNetworkRelay...");
         gameManager.networkRelay.SendMoveToServerRPC(selectedCard.uniqueCardInstanceID, serializableCard, botPlayerNumber, sumValue);
         
         BotLog($"[Bot] ✓ Move sent to server successfully");

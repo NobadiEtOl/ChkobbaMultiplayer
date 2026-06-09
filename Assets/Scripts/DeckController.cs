@@ -322,7 +322,7 @@ public class DeckController : MonoBehaviour
         }
 
         // Signal server that this client finished receiving/displaying player hands
-        NetworkRelay.Instance.NotifyDealHandsFinishedServerRPC(Unity.Netcode.NetworkManager.Singleton.LocalClientId);
+        GameNetworkRelay.Instance.NotifyDealHandsFinishedServerRPC(Unity.Netcode.NetworkManager.Singleton.LocalClientId);
     }
 
     private IEnumerator DealTwoPlayers(Dictionary<int, List<string>> playerHands)
@@ -595,7 +595,7 @@ public class DeckController : MonoBehaviour
         Debug.Log("[DeckController] Finished dealing to center, deck remains open for player dealing");
         
         // After DealCenter animation/logic is done:
-        NetworkRelay.Instance.NotifyDealCenterFinishedServerRPC(NetworkManager.Singleton.LocalClientId);
+        GameNetworkRelay.Instance.NotifyDealCenterFinishedServerRPC(NetworkManager.Singleton.LocalClientId);
 
     }
 

@@ -364,7 +364,7 @@ public class DebugChainPrinter : MonoBehaviour
         sb.AppendLine($"networkRelay: {(GameManager.LocalInstance?.networkRelay != null ? "EXISTS" : "NULL")}");
         if (GameManager.LocalInstance?.networkRelay != null)
         {
-            sb.AppendLine($"NetworkRelay.Instance: {(NetworkRelay.Instance != null ? "EXISTS" : "NULL")}");
+            sb.AppendLine($"GameNetworkRelay.Instance: {(GameNetworkRelay.Instance != null ? "EXISTS" : "NULL")}");
         }
         sb.AppendLine();
         

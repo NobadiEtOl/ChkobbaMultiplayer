@@ -12,7 +12,7 @@ public class CardDrag : MonoBehaviour
     {
         rb = GetComponent<Rigidbody>();
         rb.useGravity = false; // Ensure the card doesn't fall due to gravity
-        rb.angularDrag = 5f; // Add some angular drag for smoother rotation
+        rb.angularDamping = 5f; // Add some angular drag for smoother rotation
     }
 
     void OnMouseDown()
@@ -31,7 +31,7 @@ public class CardDrag : MonoBehaviour
         dragging = false;
 
         // Stop movement and rotation when the mouse is released
-        rb.velocity = Vector3.zero;
+        rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
 
         transform.rotation = Quaternion.Euler(originalRotation); // Reset to original rotation

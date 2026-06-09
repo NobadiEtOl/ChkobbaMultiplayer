@@ -233,15 +233,7 @@ public class MainUIScript : MonoBehaviour
     {
         Debug.Log("[MainUIScript] Disconnecting from network...");
         
-        // STEP 1: Disconnect from lobby services first
-        var networkManagerUI = FindObjectOfType<NetworkManagerUI>();
-        if (networkManagerUI != null)
-        {
-            Debug.Log("[MainUIScript] Found NetworkManagerUI, disconnecting from lobby services...");
-            networkManagerUI.DisconnectFromLobbyAndNetwork();
-        }
-        
-        // STEP 2: Shutdown NetworkManager if it's running
+        // Shutdown NetworkManager if it's running
         if (NetworkManager.Singleton != null)
         {
             if (NetworkManager.Singleton.IsListening)
@@ -274,12 +266,12 @@ public class MainUIScript : MonoBehaviour
             Debug.Log("[MainUIScript] NetworkManager.Singleton is null");
         }
         
-        // STEP 3: Also try to find and disconnect from any NetworkRelay
-        var networkRelay = FindObjectOfType<NetworkRelay>();
+        // STEP 3: Also try to find and disconnect from any GameNetworkRelay
+        var networkRelay = FindObjectOfType<GameNetworkRelay>();
         if (networkRelay != null)
         {
-            Debug.Log("[MainUIScript] Found NetworkRelay, ensuring clean state");
-            // NetworkRelay will be cleaned up when NetworkManager shuts down
+            Debug.Log("[MainUIScript] Found GameNetworkRelay, ensuring clean state");
+            // GameNetworkRelay will be cleaned up when NetworkManager shuts down
         }
         
         Debug.Log("[MainUIScript] Network disconnection complete");
@@ -386,30 +378,11 @@ public class MainUIScript : MonoBehaviour
     /// </summary>
     public void OnDisconnectDetected()
     {
-        Debug.Log("[MainUIScript] Disconnect detected - performing active disconnection like return button");
-        
-        // CRITICAL: Do not tear down during host-loss recovery.
-        // NetworkManagerUI.isRecoveringHostLoss is the authoritative guard.
-        var networkManagerUI = FindObjectOfType<NetworkManagerUI>();
-        if (networkManagerUI != null)
-        {
-            // Access the recovery guard via the public property we added.
-            if (networkManagerUI.IsRecoveringHostLoss)
-            {
-                Debug.Log("[MainUIScript] OnDisconnectDetected suppressed - host-loss recovery in progress");
-                return;
-            }
-
-            Debug.Log("[MainUIScript] Triggering active disconnection via NetworkManagerUI");
-            networkManagerUI.PerformClientDisconnection();
-        }
-        else
-        {
-            Debug.LogError("[MainUIScript] NetworkManagerUI not found - falling back to basic cleanup");
-            // Fallback: just close UI and reset to main page
-            CloseAllUIPages();
-            ResetToMainPage();
-        }
+        // NetworkManagerUI.OnClientDisconnected already performs the network teardown
+        // (LeaveAsync + Shutdown) before calling this. Here we only do UI cleanup.
+        Debug.Log("[MainUIScript] Disconnect detected - returning to main page");
+        CloseAllUIPages();
+        ResetToMainPage();
     }
 
     #region Volume Control Methods
