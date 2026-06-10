@@ -6730,7 +6730,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 1
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 00000000
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -11458,7 +11458,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 2725558510415544895, guid: 2128d9bd8ccc7024395cc083fbafe5b3, type: 3}
       propertyPath: GlobalObjectIdHash
-      value: 1231505424
+      value: 906301884
       objectReference: {fileID: 0}
     - target: {fileID: 2725558510415544895, guid: 2128d9bd8ccc7024395cc083fbafe5b3, type: 3}
       propertyPath: InScenePlacedSourceGlobalObjectIdHash
@@ -28463,7 +28463,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 1
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 00000000
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1

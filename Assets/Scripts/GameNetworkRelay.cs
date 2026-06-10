@@ -716,6 +716,19 @@ public class GameNetworkRelay : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
+    public void ReclaimSeatServerRPC(int playerNo, ulong clientId)
+    {
+        Debug.Log($"[GameNetworkRelay] ReclaimSeatServerRPC: Player {playerNo} reclaiming seat for client {clientId}");
+        if (server != null)
+        {
+            server.RebindPlayerClientId(playerNo, clientId);
+            
+            // Re-notify the server that this client is connected so it counts towards player count
+            server.AnotherPlayerConnected(clientId);
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
     public void NotifyCientConnectedServerRPC(ulong clientId)
     {
         Debug.Log($"[GameNetworkRelay] ===== ÖNEMLİ: NOTIFY CLIENT CONNECTED SERVER RPC RECEIVED =====\n" +

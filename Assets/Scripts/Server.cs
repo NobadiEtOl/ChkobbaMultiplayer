@@ -2635,7 +2635,7 @@ public class Server : NetworkBehaviour
     /// <summary>
     /// Applies a game state snapshot to the server's internal state
     /// </summary>
-    private void ApplyGameStateToServer(SerializableGameState snapshot)
+    public void ApplyGameStateToServer(SerializableGameState snapshot)
     {
         // STALE SNAPSHOT GUARD: Reject snapshots that are older than current tracked state
         if (hasCurrentState && snapshot.snapshotVersion > 0 && snapshot.snapshotVersion <= currentGameState.snapshotVersion)

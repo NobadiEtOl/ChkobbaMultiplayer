@@ -244,6 +244,9 @@ public class GameManager : MonoBehaviour
 
     public static GameManager LocalInstance { get; private set; }
 
+    // Store the last received game state snapshot for host migration
+    [HideInInspector] public SerializableGameState lastReceivedGameState;
+
     [SerializeField] private DeckController deckController;
 
     public GameNetworkRelay networkRelay;
@@ -5206,6 +5209,7 @@ public class GameManager : MonoBehaviour
     /// </summary>
     public void ApplyGameState(SerializableGameState snapshot)
     {
+        lastReceivedGameState = snapshot;
         Debug.LogError("[Visual Sync] ===== APPLY GAME STATE CALLED =====");
         // Single comprehensive log for game state application start
         Debug.Log($"[GameManager] ===== ÖNEMLİ: APPLYING GAME STATE START =====\n" +
