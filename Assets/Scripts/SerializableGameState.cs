@@ -30,6 +30,9 @@ public struct SerializableGameState : INetworkSerializable
     public int startingPlayerNo;
     public int seed;
     public int lastPlayerToCapture;
+    public int readyToEndTurnCounter;
+    public float turnTimerElapsed;
+    public float turnTimeLimit;
 
     // Card containers (all using uniqueCardID strings)
     public SerializableStringList deck;
@@ -52,6 +55,7 @@ public struct SerializableGameState : INetworkSerializable
     public bool verZehriPending;
     public bool kutsalDestePending;
     public bool oynayamazsinPending;
+    public int oynayamazsinActivatedBy;
     public int blockCount;
 
     // Client-side superpower states that need to persist
@@ -66,6 +70,8 @@ public struct SerializableGameState : INetworkSerializable
 
     // Optional: Player gold (if you want gold to be sync-safe)
     public SerializableDictionary playerGold; // Dictionary<int, int>
+
+    public SerializableIntArray botControlledPlayers; // Players currently controlled by bots
 
     // Card master lookup (cardId -> {kind, value}). Serialized for PlayerPrefs only.
     // Not included in NetworkSerialize so it does not affect RPC bandwidth.
@@ -87,6 +93,9 @@ public struct SerializableGameState : INetworkSerializable
         serializer.SerializeValue(ref startingPlayerNo);
         serializer.SerializeValue(ref seed);
         serializer.SerializeValue(ref lastPlayerToCapture);
+        serializer.SerializeValue(ref readyToEndTurnCounter);
+        serializer.SerializeValue(ref turnTimerElapsed);
+        serializer.SerializeValue(ref turnTimeLimit);
 
         serializer.SerializeValue(ref deck);
         serializer.SerializeValue(ref center);
@@ -106,6 +115,7 @@ public struct SerializableGameState : INetworkSerializable
         serializer.SerializeValue(ref verZehriPending);
         serializer.SerializeValue(ref kutsalDestePending);
         serializer.SerializeValue(ref oynayamazsinPending);
+        serializer.SerializeValue(ref oynayamazsinActivatedBy);
         serializer.SerializeValue(ref blockCount);
         
         // Client-side superpower states
@@ -115,10 +125,25 @@ public struct SerializableGameState : INetworkSerializable
         serializer.SerializeValue(ref isSunuDegisTokusActive);
         serializer.SerializeValue(ref isSunuDegisBunuTokusActive);
 
-        // Card power effects
         serializer.SerializeValue(ref cardPowerEffects);
 
         serializer.SerializeValue(ref playerGold);
+        serializer.SerializeValue(ref botControlledPlayers);
+
+        // Card master lookup (cardId -> {kind, value})
+        int lookupLength = cardLookup != null ? cardLookup.Length : 0;
+        serializer.SerializeValue(ref lookupLength);
+        if (serializer.IsReader)
+        {
+            cardLookup = new CardLookupEntry[lookupLength];
+        }
+        for (int i = 0; i < lookupLength; i++)
+        {
+            if (serializer.IsReader) cardLookup[i] = new CardLookupEntry();
+            serializer.SerializeValue(ref cardLookup[i].cardId);
+            serializer.SerializeValue(ref cardLookup[i].kind);
+            serializer.SerializeValue(ref cardLookup[i].value);
+        }
     }
 }
 

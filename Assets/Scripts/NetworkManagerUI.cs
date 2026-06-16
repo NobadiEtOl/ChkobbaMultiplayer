@@ -16,6 +16,57 @@ using UnityEngine.UI;
 
 public class NetworkManagerUI : MonoBehaviour
 {
+    private const string SeatMapPropertyKey = "SEAT_MAP";
+
+    [Serializable]
+    private class SeatMapPayload
+    {
+        public int version = 1;
+        public List<SeatBinding> seats = new List<SeatBinding>();
+    }
+
+    [Serializable]
+    private class SeatBinding
+    {
+        public int seat;
+        public string ownerPlayerId;
+        public string clientId;
+    }
+
+    private readonly struct SeatOwner
+    {
+        public string OwnerPlayerId { get; }
+        public ulong ClientId { get; }
+
+        public SeatOwner(string ownerPlayerId, ulong clientId)
+        {
+            OwnerPlayerId = ownerPlayerId;
+            ClientId = clientId;
+        }
+    }
+
+    private static class SeatMapSerializer
+    {
+        public static string Serialize(Dictionary<int, SeatOwner> seatMap)
+        {
+            var payload = new SeatMapPayload();
+            if (seatMap != null)
+            {
+                payload.seats = seatMap
+                    .OrderBy(entry => entry.Key)
+                    .Select(entry => new SeatBinding
+                    {
+                        seat = entry.Key,
+                        ownerPlayerId = entry.Value.OwnerPlayerId,
+                        clientId = entry.Value.ClientId.ToString()
+                    })
+                    .ToList();
+            }
+
+            return JsonUtility.ToJson(payload);
+        }
+    }
+
     [SerializeField]private MainUIScript mainUIScript;
     [SerializeField] private Button clientButton;
     [SerializeField] private Button hostTwoPlayerButton;
@@ -29,6 +80,7 @@ public class NetworkManagerUI : MonoBehaviour
 
     private bool isInGame = false; // Whether we're currently in an active game
     private bool isMigrating = false;
+    private bool isFlowBusy = false;
 
     // === SESSIONS API ===
     private ISession currentSession;
@@ -85,6 +137,105 @@ public class NetworkManagerUI : MonoBehaviour
         catch (Exception e) { Debug.LogError($"[NetworkManagerUI] EnsureServicesReady failed: {e.Message}"); }
     }
 
+    private bool TryBeginFlow(string flowName)
+    {
+        if (isFlowBusy)
+        {
+            Debug.LogWarning($"[FLOW] Ignoring '{flowName}' because another flow is already running.");
+            return false;
+        }
+
+        isFlowBusy = true;
+        Debug.Log($"[FLOW] Begin: {flowName}");
+        return true;
+    }
+
+    private void EndFlow(string flowName)
+    {
+        isFlowBusy = false;
+        Debug.Log($"[FLOW] End: {flowName}");
+    }
+
+    public async Task<string> StartNewHost(int playerCount, bool isPrivate)
+    {
+        const string flowName = "StartNewHost";
+        if (!TryBeginFlow(flowName)) return null;
+
+        try
+        {
+            return await StartHostWithRelay(playerCount, isPrivate, false);
+        }
+        finally
+        {
+            EndFlow(flowName);
+        }
+    }
+
+    public async Task<bool> StartNewClient(string joinCode)
+    {
+        const string flowName = "StartNewClient";
+        if (!TryBeginFlow(flowName)) return false;
+
+        try
+        {
+            return await StartClientWithRelay(joinCode);
+        }
+        finally
+        {
+            EndFlow(flowName);
+        }
+    }
+
+    public void AttemptReconnect()
+    {
+        if (NetworkManager.Singleton == null)
+        {
+            Debug.LogError("[FLOW] AttemptReconnect failed: NetworkManager.Singleton is null.");
+            return;
+        }
+
+        Debug.Log("[FLOW] AttemptReconnect invoked.");
+        StartCoroutine(RejoinNGOHostRoutine());
+    }
+
+    private async Task PersistInitialSeatMapAsync()
+    {
+        if (currentSession == null || !currentSession.IsHost) return;
+
+        string ownerPlayerId = AuthenticationService.Instance.PlayerId;
+        if (string.IsNullOrEmpty(ownerPlayerId))
+        {
+            Debug.LogWarning("[SEATMAP] Skipping initial SEAT_MAP write: missing authenticated player id.");
+            return;
+        }
+
+        int hostSeat = 0;
+        if (DeckController.LocalInstance != null && DeckController.LocalInstance.thisPlayerNumber >= 0)
+        {
+            hostSeat = DeckController.LocalInstance.thisPlayerNumber;
+        }
+
+        ulong hostClientId = NetworkManager.Singleton != null ? NetworkManager.Singleton.LocalClientId : 0UL;
+        var seatMap = new Dictionary<int, SeatOwner>
+        {
+            [hostSeat] = new SeatOwner(ownerPlayerId, hostClientId)
+        };
+
+        string serializedSeatMap = SeatMapSerializer.Serialize(seatMap);
+
+        try
+        {
+            var hostSession = currentSession.AsHost();
+            hostSession.SetProperty(SeatMapPropertyKey, new SessionProperty(serializedSeatMap, VisibilityPropertyOptions.Public));
+            await hostSession.SavePropertiesAsync();
+            Debug.Log($"[SEATMAP] Initial seat map persisted: {serializedSeatMap}");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[SEATMAP] Failed to save initial seat map: {e.Message}");
+        }
+    }
+
     public async Task<string> StartHostWithRelay(int playerCount, bool privateFlag, bool isQuickPlay = false)
     {
         if (Server.Singleton != null) 
@@ -98,6 +249,7 @@ public class NetworkManagerUI : MonoBehaviour
         {
             var options = new SessionOptions { MaxPlayers = playerCount, IsPrivate = privateFlag }.WithRelayNetwork();
             currentSession = await MultiplayerService.Instance.CreateSessionAsync(options);
+            await PersistInitialSeatMapAsync();
             joinCodeText.text = currentSession.Code;
             if (inputField != null) inputField.text = currentSession.Code;
             PlayerPrefs.SetString("LastSessionCode", currentSession.Code);
@@ -110,9 +262,17 @@ public class NetworkManagerUI : MonoBehaviour
         catch (Exception e) { Debug.LogError($"[NetworkManagerUI] Failed to start host: {e.Message}"); return null; }
     }
 
-    public async Task<bool> StartClientWithRelay()
+    public async Task<bool> StartClientWithRelay(string joinCodeOverride = null)
     {
-        string inputJoinCode = inputField.text;
+        string inputJoinCode = string.IsNullOrWhiteSpace(joinCodeOverride)
+            ? (inputField != null ? inputField.text : string.Empty)
+            : joinCodeOverride.Trim();
+
+        if (inputField != null && !string.IsNullOrWhiteSpace(joinCodeOverride))
+        {
+            inputField.text = inputJoinCode;
+        }
+
         if (string.IsNullOrEmpty(inputJoinCode)) return false;
         if (mainUIScript != null) mainUIScript.OpenWaitingScreenUI("yellow", "2", inputJoinCode);
         await EnsureServicesReady();
@@ -210,81 +370,8 @@ public class NetworkManagerUI : MonoBehaviour
         {
             if (currentSession != null && currentSession.IsHost)
             {
-                Debug.Log("[NetworkManagerUI] I am the new session host! Starting Relay re-allocation...");
-                
-                // 1. Create a NEW Relay allocation
-                var allocationTask = RelayService.Instance.CreateAllocationAsync(currentSession.MaxPlayers - 1);
-                yield return new WaitUntil(() => allocationTask.IsCompleted);
-                if (allocationTask.IsFaulted)
-                {
-                    Debug.LogError("[NetworkManagerUI] Relay allocation failed: " + allocationTask.Exception.Message);
-                    isMigrating = false;
-                    PerformDisconnect();
-                    yield break;
-                }
-                var allocation = allocationTask.Result;
-
-                var joinCodeTask = RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
-                yield return new WaitUntil(() => joinCodeTask.IsCompleted);
-                var relayJoinCode = joinCodeTask.Result;
-                Debug.Log("[NetworkManagerUI] New Relay Join Code generated: " + relayJoinCode);
-
-                // 2. Update the session with the new relay code so others can find us
-                var hostSession = currentSession.AsHost();
-                hostSession.SetProperty("ACTIVE_RELAY_CODE", new SessionProperty(relayJoinCode, VisibilityPropertyOptions.Public));
-                var saveTask = hostSession.SavePropertiesAsync();
-                yield return new WaitUntil(() => saveTask.IsCompleted);
-
-                // 3. Configure NetworkManager with the new Relay data
-                var transport = NetworkManager.Singleton.NetworkConfig.NetworkTransport;
-                var utp = transport as UnityTransport;
-                if (utp != null)
-                {
-                    ConfigureTransport(utp, allocation);
-                }
-                else
-                {
-                    Debug.LogWarning("[NetworkManagerUI] Could not cast transport to UnityTransport. Migration might fail.");
-                }
-
-                // 4. Start as NGO Host
-                NetworkManager.Singleton.StartHost();
-                
-                // 5. Wait for Server singleton to be ready
-                yield return new WaitUntil(() => Server.Singleton != null);
-                
-                // 6. Apply the last known state to the new authoritative server
-                if (GameManager.LocalInstance != null && GameManager.LocalInstance.lastReceivedGameState.snapshotVersion > 0)
-                {
-                    Debug.Log("[NetworkManagerUI] Restoring game state from last received snapshot version " + GameManager.LocalInstance.lastReceivedGameState.snapshotVersion);
-                    Server.Singleton.ApplyGameStateToServer(GameManager.LocalInstance.lastReceivedGameState);
-                    
-                    // SELF-BINDING: Map our new host clientId to our original seat
-                    if (DeckController.LocalInstance != null)
-                    {
-                        int mySeat = DeckController.LocalInstance.thisPlayerNumber;
-                        Debug.Log($"[NetworkManagerUI] Host Self-Binding: Claiming seat {mySeat} for Host ID {NetworkManager.Singleton.LocalClientId}");
-                        Server.Singleton.RebindPlayerClientId(mySeat, NetworkManager.Singleton.LocalClientId);
-                        Server.Singleton.AnotherPlayerConnected(NetworkManager.Singleton.LocalClientId);
-                    }
-                    
-                    // CRITICAL: Broadcast the restored state to all clients (including ourselves)
-                    var relay = UnityEngine.Object.FindAnyObjectByType<GameNetworkRelay>();
-                    if (relay != null)
-                    {
-                        relay.ApplyGameStateClientRPC(GameManager.LocalInstance.lastReceivedGameState);
-                    }
-                    
-                    // Mark NGO host as ready for clients to rejoin
-                    UpdateSessionHostReadyProperty();
-                }
-                else
-                {
-                    Debug.LogError($"[NetworkManagerUI] Cannot restore state: GameManager.LocalInstance or valid snapshot is missing!");
-                }
-                
-                isMigrating = false;
-                break;
+                yield return StartCoroutine(HandleHostMigrationAsNewHost());
+                yield break;
             }
             
             // Refresh session to get latest properties from backend
@@ -321,7 +408,7 @@ public class NetworkManagerUI : MonoBehaviour
                 }
 
                 // 3. Re-join NGO as client
-                StartCoroutine(RejoinNGOHostRoutine());
+                AttemptReconnect();
                 yield break;
             }
 
@@ -335,6 +422,70 @@ public class NetworkManagerUI : MonoBehaviour
             isMigrating = false;
             PerformDisconnect();
         }
+    }
+
+    private IEnumerator HandleHostMigrationAsNewHost()
+    {
+        Debug.Log("[FLOW] HandleHostMigrationAsNewHost: relay re-allocation started.");
+
+        var allocationTask = RelayService.Instance.CreateAllocationAsync(currentSession.MaxPlayers - 1);
+        yield return new WaitUntil(() => allocationTask.IsCompleted);
+        if (allocationTask.IsFaulted)
+        {
+            Debug.LogError("[NetworkManagerUI] Relay allocation failed: " + allocationTask.Exception.Message);
+            isMigrating = false;
+            PerformDisconnect();
+            yield break;
+        }
+        var allocation = allocationTask.Result;
+
+        var joinCodeTask = RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
+        yield return new WaitUntil(() => joinCodeTask.IsCompleted);
+        var relayJoinCode = joinCodeTask.Result;
+        Debug.Log("[NetworkManagerUI] New Relay Join Code generated: " + relayJoinCode);
+
+        var hostSession = currentSession.AsHost();
+        hostSession.SetProperty("ACTIVE_RELAY_CODE", new SessionProperty(relayJoinCode, VisibilityPropertyOptions.Public));
+        var saveTask = hostSession.SavePropertiesAsync();
+        yield return new WaitUntil(() => saveTask.IsCompleted);
+
+        var transport = NetworkManager.Singleton.NetworkConfig.NetworkTransport;
+        var utp = transport as UnityTransport;
+        if (utp != null)
+        {
+            ConfigureTransport(utp, allocation);
+        }
+        else
+        {
+            Debug.LogWarning("[NetworkManagerUI] Could not cast transport to UnityTransport. Migration might fail.");
+        }
+
+        NetworkManager.Singleton.StartHost();
+        yield return new WaitUntil(() => Server.Singleton != null);
+
+        var migrationSnapshot = Server.Singleton.CaptureMigrationSnapshot();
+        if (!Server.Singleton.RestoreFromSnapshot(migrationSnapshot))
+        {
+            Debug.LogError("[MIGRATION] Host migration restore failed; disconnecting to avoid a partial state.");
+            isMigrating = false;
+            PerformDisconnect();
+            yield break;
+        }
+
+        Debug.Log($"[MIGRATION] Restored migration snapshot v{migrationSnapshot.snapshotVersion} on new host.");
+
+        int mySeat = -1;
+        if (DeckController.LocalInstance != null)
+        {
+            mySeat = DeckController.LocalInstance.thisPlayerNumber;
+        }
+
+        Debug.Log($"[NetworkManagerUI] Host Self-Binding: Claiming seat {mySeat} for Host ID {NetworkManager.Singleton.LocalClientId}");
+        Server.Singleton.HandleMigratedHostSelfBind(mySeat, NetworkManager.Singleton.LocalClientId);
+
+        UpdateSessionHostReadyProperty();
+        isMigrating = false;
+        Debug.Log("[FLOW] HandleHostMigrationAsNewHost completed.");
     }
 
     private async void UpdateSessionHostReadyProperty()
@@ -379,21 +530,22 @@ public class NetworkManagerUI : MonoBehaviour
             yield break;
         }
         
-        // 4. Perform the Reclaim Seat handshake
+        // 4. Perform the Reclaim Seat handshake.
         if (DeckController.LocalInstance != null)
         {
-            int myOriginalSeat = DeckController.LocalInstance.thisPlayerNumber;
+            int myOriginalSeat = PlayerPrefs.GetInt("SavedPlayerSeat", -1);
+            if (myOriginalSeat < 0) myOriginalSeat = DeckController.LocalInstance.thisPlayerNumber;
             Debug.Log($"[NetworkManagerUI] Re-joined! Reclaiming seat {myOriginalSeat}...");
             
             // Find the relay object - check GameManager first as it usually has it
             var relay = UnityEngine.Object.FindAnyObjectByType<GameNetworkRelay>();
             if (relay != null)
             {
-                relay.ReclaimSeatServerRPC(myOriginalSeat, NetworkManager.Singleton.LocalClientId);
-                
-                // Request full state sync to reconstruct scene
-                Debug.Log("[NetworkManagerUI] Requesting full state sync to reconstruct scene...");
-                relay.RequestFullStateSyncServerRPC();
+                // ReclaimSeatServerRPC starts the TARGETED reconnect handshake: the server
+                // sends only this client its snapshot once it confirms its cards are ready.
+                // Do NOT call RequestFullStateSyncServerRPC here, that is a global broadcast
+                // which resets every other client's scene.
+                relay.ReclaimSeatServerRPC(myOriginalSeat, NetworkManager.Singleton.LocalClientId, AuthenticationService.Instance.PlayerId);
             }
         }
         isMigrating = false;
@@ -405,6 +557,15 @@ public class NetworkManagerUI : MonoBehaviour
     {
         isInGame = false;
         isMigrating = false;
+
+        // SESSION TEARDOWN: clear all session-scoped reconnect/seat state so the NEXT lobby
+        // starts from the clean fresh-join path. Without this, a finished game can leave a
+        // saved seat or reconnect tracking behind and the next game is wrongly treated as a
+        // reconnection.
+        if (Server.Singleton != null) Server.Singleton.ResetSessionStateForTeardown();
+        PlayerPrefs.DeleteKey("SavedPlayerSeat");
+        PlayerPrefs.Save();
+
         ResetPlayerGameStateBeforeDisconnection();
         EnsureMainScreenIsActive();
         if (DeckController.LocalInstance != null) DeckController.LocalInstance.DestroyAllCards();
@@ -416,7 +577,7 @@ public class NetworkManagerUI : MonoBehaviour
 
     private void ResetPlayerGameStateBeforeDisconnection()
     {
-        SuperPowerSpawner spawner = FindObjectOfType<SuperPowerSpawner>();
+        SuperPowerSpawner spawner = FindFirstObjectByType<SuperPowerSpawner>();
         if (spawner != null) { spawner.ResetGoldToStarting(); spawner.ClearAllSpawnedPowers(); }
     }
 
@@ -436,9 +597,9 @@ public class NetworkManagerUI : MonoBehaviour
 
     void SetupButtonListeners()
     {
-        clientButton.onClick.AddListener(async () => await StartClientWithRelay());
-        hostTwoPlayerButton.onClick.AddListener(async () => await StartHostWithRelay(2, true, false));
-        hostFourPlayerButton.onClick.AddListener(async () => await StartHostWithRelay(4, true, false));
+        clientButton.onClick.AddListener(async () => await StartNewClient(inputField != null ? inputField.text : string.Empty));
+        hostTwoPlayerButton.onClick.AddListener(async () => await StartNewHost(2, true));
+        hostFourPlayerButton.onClick.AddListener(async () => await StartNewHost(4, true));
         quickPlayTwoPlayerButton.onClick.AddListener(async () => await FindLobbiesAndStartHostIfNoneExist(2));
         quickPlayFourPlayerButton.onClick.AddListener(async () => await FindLobbiesAndStartHostIfNoneExist(4));
         if (returnToMainMenuButton != null) returnToMainMenuButton.onClick.AddListener(OnReturnToMainMenuButtonClicked);

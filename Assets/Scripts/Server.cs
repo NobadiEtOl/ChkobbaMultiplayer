@@ -7,9 +7,39 @@ using System.Linq;
 using Unity.Netcode;
 using UnityEngine.Pool;
 using UnityEngine.Tilemaps;
+using Unity.Services.Multiplayer;
 
 public class Server : NetworkBehaviour
 {
+    private const string SeatMapPropertyKey = "SEAT_MAP";
+
+    [Serializable]
+    private class SeatMapPayload
+    {
+        public int version = 1;
+        public List<SeatBinding> seats = new List<SeatBinding>();
+    }
+
+    [Serializable]
+    private class SeatBinding
+    {
+        public int seat;
+        public string ownerPlayerId;
+        public string clientId;
+    }
+
+    private struct SeatOwnerInfo
+    {
+        public string OwnerPlayerId;
+        public ulong ClientId;
+
+        public SeatOwnerInfo(string ownerPlayerId, ulong clientId)
+        {
+            OwnerPlayerId = ownerPlayerId;
+            ClientId = clientId;
+        }
+    }
+
     public static Server Singleton { get; private set; } // Singleton instance
     [SerializeField] private GameNetworkRelay networkRelay; // Reference to the GameNetworkRelay script
     private Dictionary<int, List<string>> playersHandCardsIDs;//Dictionary containing all the players' hands
@@ -19,6 +49,7 @@ public class Server : NetworkBehaviour
     public Dictionary<string, int[]> allCardLookup = new Dictionary<string, int[]>();
     private int playerCount; // Number of players in the game for the game mode
     private int connectedPlayerCount = 0; // Start with 0, host will make it 1
+    private HashSet<ulong> countedClients = new HashSet<ulong>(); // Tracks clients that contributed to connectedPlayerCount
     [SerializeField] private int seed;//Seed for the deck suffle
     public int turnCounter = 0;
     public int currentPlayer;//The player that is currently playing
@@ -42,6 +73,9 @@ public class Server : NetworkBehaviour
     
     // Reference to BotPlayer script
     private BotPlayer botPlayer;
+    
+    // BOT PLACEHOLDER SYSTEM: Track which players are currently controlled by bots
+    private HashSet<int> botControlledPlayers = new HashSet<int>();
     
     // Server.cs
     private Dictionary<string, string> copiedCardMap = new Dictionary<string, string>();
@@ -74,6 +108,14 @@ public class Server : NetworkBehaviour
     }
 
     /// <summary>
+    /// Checks if the current player is controlled by a bot.
+    /// </summary>
+    private bool IsBotTurn()
+    {
+        return botControlledPlayers.Contains(currentPlayer);
+    }
+
+    /// <summary>
     /// Rebinds a player slot to a new client ID after reconnection.
     /// Called when a reconnecting client announces their player number via ServerRPC.
     /// </summary>
@@ -84,8 +126,196 @@ public class Server : NetworkBehaviour
             Debug.LogWarning($"[Server] RebindPlayerClientId: invalid playerNo {playerNo} (playerCount={playerCount})");
             return;
         }
+        // Reject if this clientId already owns a *different* seat to prevent a single client
+        // from claiming two seats simultaneously (e.g. a stale reconnect race).
+        foreach (var kvp in playerClientIds)
+        {
+            if (kvp.Value == newClientId && kvp.Key != playerNo)
+            {
+                Debug.LogWarning($"[Server] RebindPlayerClientId: client {newClientId} already owns seat {kvp.Key}, rejecting rebind to seat {playerNo}");
+                return;
+            }
+        }
         playerClientIds[playerNo] = newClientId;
-        Debug.Log($"[Server] RebindPlayerClientId: playerClientIds[{playerNo}] = {newClientId}");
+        Debug.Log($"[Server] RebindPlayerClientId: seat {playerNo} -> client {newClientId}");
+
+        if (newClientId == NetworkManager.Singleton.LocalClientId)
+        {
+            PlayerPrefs.SetInt("SavedPlayerSeat", playerNo);
+            PlayerPrefs.Save();
+            Debug.Log($"[Server] Updated SavedPlayerSeat to {playerNo} for client {newClientId}");
+        }
+    }
+
+    private Dictionary<int, SeatOwnerInfo> LoadSeatMapFromSession()
+    {
+        var seatMap = new Dictionary<int, SeatOwnerInfo>();
+
+        if (networkManagerUI == null || networkManagerUI.CurrentSession == null)
+            return seatMap;
+
+        var session = networkManagerUI.CurrentSession;
+        if (!session.Properties.ContainsKey(SeatMapPropertyKey))
+            return seatMap;
+
+        string serialized = session.Properties[SeatMapPropertyKey].Value;
+        if (string.IsNullOrEmpty(serialized))
+            return seatMap;
+
+        try
+        {
+            SeatMapPayload payload = JsonUtility.FromJson<SeatMapPayload>(serialized);
+            if (payload == null || payload.seats == null)
+                return seatMap;
+
+            foreach (SeatBinding binding in payload.seats)
+            {
+                if (binding == null || string.IsNullOrEmpty(binding.ownerPlayerId))
+                    continue;
+
+                ulong parsedClientId = 0UL;
+                if (!string.IsNullOrEmpty(binding.clientId))
+                {
+                    ulong.TryParse(binding.clientId, out parsedClientId);
+                }
+
+                seatMap[binding.seat] = new SeatOwnerInfo(binding.ownerPlayerId, parsedClientId);
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[SEATMAP] Failed to parse SEAT_MAP from session: {e.Message}");
+        }
+
+        return seatMap;
+    }
+
+    private static string SerializeSeatMap(Dictionary<int, SeatOwnerInfo> seatMap)
+    {
+        var payload = new SeatMapPayload();
+        if (seatMap != null)
+        {
+            foreach (var seat in seatMap.OrderBy(kvp => kvp.Key))
+            {
+                payload.seats.Add(new SeatBinding
+                {
+                    seat = seat.Key,
+                    ownerPlayerId = seat.Value.OwnerPlayerId,
+                    clientId = seat.Value.ClientId.ToString()
+                });
+            }
+        }
+
+        return JsonUtility.ToJson(payload);
+    }
+
+    private async void PersistSeatMapToSessionAsync(Dictionary<int, SeatOwnerInfo> seatMap)
+    {
+        if (!IsServer || networkManagerUI == null || networkManagerUI.CurrentSession == null)
+            return;
+
+        var session = networkManagerUI.CurrentSession;
+        if (!session.IsHost)
+            return;
+
+        try
+        {
+            string serialized = SerializeSeatMap(seatMap);
+            var hostSession = session.AsHost();
+            hostSession.SetProperty(SeatMapPropertyKey, new SessionProperty(serialized, VisibilityPropertyOptions.Public));
+            await hostSession.SavePropertiesAsync();
+            Debug.Log($"[SEATMAP] Updated session seat map: {serialized}");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[SEATMAP] Failed to persist SEAT_MAP: {e.Message}");
+        }
+    }
+
+    public bool TryHandleSeatReclaim(int playerNo, ulong clientId, string claimantPlayerId)
+    {
+        if (playerNo < 0 || playerNo >= playerCount)
+        {
+            Debug.LogWarning($"[RECLAIM] Reject seat reclaim: invalid seat {playerNo}.");
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(claimantPlayerId))
+        {
+            Debug.LogWarning($"[RECLAIM] Reject seat reclaim for seat {playerNo}: missing claimant player id.");
+            return false;
+        }
+
+        Dictionary<int, SeatOwnerInfo> seatMap = LoadSeatMapFromSession();
+        if (seatMap.TryGetValue(playerNo, out SeatOwnerInfo ownerInfo))
+        {
+            if (!string.IsNullOrEmpty(ownerInfo.OwnerPlayerId) && ownerInfo.OwnerPlayerId != claimantPlayerId)
+            {
+                Debug.LogWarning($"[RECLAIM] Reject seat {playerNo}: claimant '{claimantPlayerId}' does not match owner '{ownerInfo.OwnerPlayerId}'.");
+                return false;
+            }
+        }
+
+        Debug.Log($"[RECLAIM] Seat {playerNo} accepted for claimant '{claimantPlayerId}' and client {clientId}.");
+        RebindPlayerClientId(playerNo, clientId);
+        RemoveBotFromSeat(playerNo);
+
+        seatMap[playerNo] = new SeatOwnerInfo(claimantPlayerId, clientId);
+        PersistSeatMapToSessionAsync(seatMap);
+
+        HandleReconnectJoin(clientId);
+        return true;
+    }
+
+    public void AssignBotToSeat(int seat)
+    {
+        if (seat < 0 || seat >= playerCount)
+        {
+            Debug.LogWarning($"[BOT] AssignBotToSeat ignored invalid seat {seat}.");
+            return;
+        }
+
+        if (botControlledPlayers.Contains(seat))
+        {
+            Debug.Log($"[BOT] Seat {seat} is already bot-controlled.");
+            return;
+        }
+
+        botControlledPlayers.Add(seat);
+        Debug.Log($"[BOT] Assigned bot filler to seat {seat}.");
+
+        if (botPlayer != null)
+        {
+            botPlayer.ActivateBot();
+        }
+
+        if (currentPlayer == seat && isActiveHost && botPlayer != null)
+        {
+            Debug.Log($"[BOT] Seat {seat} is current turn; triggering bot takeover.");
+            botPlayer.OnBotTurn(seat);
+        }
+    }
+
+    public void RemoveBotFromSeat(int seat)
+    {
+        if (seat < 0 || seat >= playerCount)
+        {
+            Debug.LogWarning($"[BOT] RemoveBotFromSeat ignored invalid seat {seat}.");
+            return;
+        }
+
+        if (!botControlledPlayers.Remove(seat))
+        {
+            return;
+        }
+
+        Debug.Log($"[BOT] Removed bot filler from seat {seat}.");
+
+        if (botControlledPlayers.Count == 0 && !isBotModeEnabled && botPlayer != null)
+        {
+            botPlayer.DeactivateBot();
+            Debug.Log("[BOT] No filler seats left; bot deactivated.");
+        }
     }
 
 
@@ -100,6 +330,7 @@ public class Server : NetworkBehaviour
     private SerializableGameState manualSavedState;
     private bool hasManualSavedState = false;
     private int snapshotVersionCounter = 0;
+    public bool isActiveHost { get; private set; } = false;
 
     // REDO SYSTEM: Automatic game state tracking
     private SerializableGameState currentGameState;
@@ -115,26 +346,38 @@ public class Server : NetworkBehaviour
     
     // RECONNECTION TRACKING: Track which clients are reconnecting
     private HashSet<ulong> reconnectingClients = new HashSet<ulong>();
+    
+    public enum ReconnectPhase { None, InitSent, ReadyReceived, SnapshotSent, Completed }
+    public Dictionary<ulong, ReconnectPhase> clientReconnectPhases = new Dictionary<ulong, ReconnectPhase>();
+    // Tracks when each client's reconnect handshake started, for stale-reconnect cleanup.
+    private Dictionary<ulong, float> reconnectStartTimes = new Dictionary<ulong, float>();
+private const float RECONNECT_TIMEOUT = 15f;
 
     private NetworkManagerUI networkManagerUI;
 
-    public void ResetAllServerVariables()
-    {
-        Debug.LogWarning("[Server] ===== RESETTING ALL SERVER VARIABLES FOR NEW GAME =====");
-        
-        deckCardsDict = null;
-        centerCardsDict = null;
-        playersHandCardsIDs = null;
-        playersPooledCardsIDs = null;
-        
-        // CRITICAL: Reset allCardLookup for NEW GAME - this clears all power effects!
-        if (allCardLookup != null)
+    public void ResetAllServerVariables(bool isMigration = false)
+{
+        if (isMigration)
         {
-            Debug.LogWarning($"[Server] Clearing allCardLookup ({allCardLookup.Count} cards) - all power effects will be reset for NEW GAME");
-            allCardLookup.Clear();
-            allCardLookup = new Dictionary<string, int[]>();
+            Debug.LogWarning("[Server] ===== RESETTING SERVER VARIABLES FOR HOST MIGRATION (PRESERVING CORE DATA) =====");
         }
-        
+        else
+        {
+            Debug.LogWarning("[Server] ===== RESETTING ALL SERVER VARIABLES FOR NEW GAME =====");
+            deckCardsDict = null;
+            centerCardsDict = null;
+            playersHandCardsIDs = null;
+            playersPooledCardsIDs = null;
+
+            // CRITICAL: Reset allCardLookup for NEW GAME - this clears all power effects!
+            if (allCardLookup != null)
+            {
+                Debug.LogWarning($"[Server] Clearing allCardLookup ({allCardLookup.Count} cards) - all power effects will be reset for NEW GAME");
+                allCardLookup.Clear();
+                allCardLookup = new Dictionary<string, int[]>();
+            }
+        }
+
         seed = 0;
         turnCounter = 0;
         currentPlayer = 0;
@@ -147,6 +390,7 @@ public class Server : NetworkBehaviour
         timer = 0f;
         turnTime = 15f;
         connectedPlayerCount = 0; // FIXED: Reset connection count (host will make it 1)
+        countedClients.Clear();
         roundCount = 0; // CRITICAL: Reset round count so SaveAllCards creates fresh cards
         singleDebuggingMode = false;
         winnerPrintFlag = false;
@@ -184,7 +428,16 @@ public class Server : NetworkBehaviour
 
         BroadcastLiveScoreUpdate();
         
-        Debug.LogWarning("[Server] Server reset complete - ready for NEW GAME with fresh cards");
+        if (isMigration)
+        {
+            Debug.LogWarning("[Server] Server migration reset complete - core card data preserved");
+        }
+        else
+        {
+            PlayerPrefs.DeleteKey("HostMigrated");
+            PlayerPrefs.Save();
+            Debug.LogWarning("[Server] Server reset complete - ready for NEW GAME with fresh cards");
+        }
     }
 
     public void ResetForNewRound()
@@ -254,8 +507,14 @@ public class Server : NetworkBehaviour
         
         // Initialize BotPlayer reference
         botPlayer = BotPlayer.Instance;
-        // Note: BotPlayer manages its own delays, don't override them
+
+        // AUTHENTIC HOST CHECK: If we are starting as server, we are the active host
+        if (IsServer) isActiveHost = true;
         
+        StartCoroutine(CleanupStaleReconnections());
+
+        // Note: BotPlayer manages its own delays, don't override them
+
         //StartCoroutine(ServerSubsciribe());
     }
 
@@ -267,12 +526,13 @@ public class Server : NetworkBehaviour
         if (NetworkManager.Singleton != null && !hasSubscribedToNetworkEvents)
         {
             NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
+            NetworkManager.Singleton.OnClientConnectedCallback += AnotherPlayerConnected;
             hasSubscribedToNetworkEvents = true;
-            Debug.Log("[Server] Subscribed to NetworkManager disconnect events");
+            Debug.Log("[Server] Subscribed to NetworkManager connect and disconnect events");
         }
         else if (hasSubscribedToNetworkEvents)
         {
-            Debug.Log("[Server] Already subscribed to NetworkManager disconnect events - skipping");
+            Debug.Log("[Server] Already subscribed to NetworkManager events - skipping");
         }
         else
         {
@@ -314,16 +574,21 @@ public class Server : NetworkBehaviour
 
         // Bot system: Activate bot for 1v1 or 2v2 games if bot mode is enabled
         // Bot activates when we have a 1v1 game (bot plays as player 1) or 2v2 game (bot plays as players 1, 2, 3)
+        botControlledPlayers.Clear();
         if (isBotModeEnabled && (playerCount == 2 || playerCount == 4))
         {
             botPlayerActive = true;
             if (playerCount == 2)
             {
+                botControlledPlayers.Add(1);
                 Debug.Log($"[Server] Bot mode activated for 1v1! Bot will play as player 1");
                 Debug.Log($"[Server] Connected players: {connectedPlayerCount}, Bot will fill the second slot");
             }
             else if (playerCount == 4)
             {
+                botControlledPlayers.Add(1);
+                botControlledPlayers.Add(2);
+                botControlledPlayers.Add(3);
                 Debug.Log($"[Server] Bot mode activated for 2v2! Bot will play as players 1, 2, and 3");
                 Debug.Log($"[Server] Connected players: {connectedPlayerCount}, Bot will fill slots 2, 3, and 4");
             }
@@ -391,10 +656,8 @@ public class Server : NetworkBehaviour
         networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer, turnCounter);
         
         // Bot system: Check if it's the bot's turn at game start
-        // In 1v1 mode: bot is player 1
-        // In 2v2 mode: bot plays for players 1, 2, and 3 (host is player 0)
-        bool isBotTurn = botPlayerActive && ((playerCount == 2 && currentPlayer == 1) || (playerCount == 4 && currentPlayer != 0));
-        if (isBotTurn)
+        bool isBotTurn = IsBotTurn();
+        if (isBotTurn && isActiveHost)
         {
             Debug.Log($"[Server] It's bot's turn at game start (player {currentPlayer}), notifying BotPlayer");
             if (botPlayer != null)
@@ -402,7 +665,7 @@ public class Server : NetworkBehaviour
                 botPlayer.OnBotTurn(currentPlayer);
             }
         }
-    }
+}
 
     private int initialDealCoroutineCheckCounter = 0;
     private bool hasSubscribedToNetworkEvents = false;
@@ -464,14 +727,14 @@ public class Server : NetworkBehaviour
         Debug.LogWarning("InitialDealCoroutine: DealPhase complete, starting turn timer");
 
         // Start turn timer for the first player if human
-        bool isBotTurn = botPlayerActive && ((playerCount == 2 && currentPlayer == 1) || (playerCount == 4 && currentPlayer != 0));
-        if (!isBotTurn)
+        bool isBotTurn = IsBotTurn();
+        if (!isBotTurn && isActiveHost)
         {
             if (activeTurnTimerCoroutine != null) StopCoroutine(activeTurnTimerCoroutine);
             activeTurnTimerCoroutine = StartCoroutine(TurnTimerCoroutine(currentPlayer));
         }
     }
-    private void ServerStart()
+private void ServerStart()
     {
         if (!IsServer)
         {
@@ -849,9 +1112,12 @@ public class Server : NetworkBehaviour
     {
         yield return new WaitForSeconds(delay);
         if (currentPlayer != forPlayer) yield break;
-        if (activeTurnTimerCoroutine != null) StopCoroutine(activeTurnTimerCoroutine);
-        activeTurnTimerCoroutine = StartCoroutine(TurnTimerCoroutine(currentPlayer));
-        Debug.Log($"[Server] Turn timer resumed for player {forPlayer} after power completion");
+        if (isActiveHost)
+        {
+            if (activeTurnTimerCoroutine != null) StopCoroutine(activeTurnTimerCoroutine);
+            activeTurnTimerCoroutine = StartCoroutine(TurnTimerCoroutine(currentPlayer));
+            Debug.Log($"[Server] Turn timer resumed for player {forPlayer} after power completion");
+        }
     }
 
     // --- End Power Duration Timer Methods ---
@@ -895,24 +1161,28 @@ public class Server : NetworkBehaviour
         networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer, turnCounter);
 
         // Bot system: Check if it's the bot's turn
-        // In 1v1 mode: bot is player 1
-        // In 2v2 mode: bot plays for players 1, 2, and 3 (host is player 0)
-        bool isBotTurn = botPlayerActive && ((playerCount == 2 && currentPlayer == 1) || (playerCount == 4 && currentPlayer != 0));
+        bool isBotTurn = IsBotTurn();
         if (isBotTurn)
         {
-            Debug.Log($"[Server] It's bot's turn (player {currentPlayer}), notifying BotPlayer");
-            if (botPlayer != null)
+            if (isActiveHost)
             {
-                botPlayer.OnBotTurn(currentPlayer);
+                Debug.Log($"[Server] It's bot's turn (player {currentPlayer}), notifying BotPlayer");
+                if (botPlayer != null)
+                {
+                    botPlayer.OnBotTurn(currentPlayer);
+                }
             }
         }
         else
         {
             // Start turn timer for human players
-            if (activeTurnTimerCoroutine != null) StopCoroutine(activeTurnTimerCoroutine);
-            activeTurnTimerCoroutine = StartCoroutine(TurnTimerCoroutine(currentPlayer));
+            if (isActiveHost)
+            {
+                if (activeTurnTimerCoroutine != null) StopCoroutine(activeTurnTimerCoroutine);
+                activeTurnTimerCoroutine = StartCoroutine(TurnTimerCoroutine(currentPlayer));
+            }
         }
-    }
+}
 
     private void GivePlayerCount()
     {
@@ -1457,8 +1727,188 @@ public class Server : NetworkBehaviour
         return NetworkManager.Singleton.ConnectedClients.Count - 1;
     }
 
-    public void AnotherPlayerConnected(ulong clientId)
+    public void HandleFreshJoin(ulong clientId)
     {
+        Debug.Log($"[Server] HandleFreshJoin: client {clientId}, connected {connectedPlayerCount}/{playerCount}");
+        
+        // CRITICAL FIX: Check if game has already started
+        // If so, this is a reconnection, not a fresh join — route to reconnection logic instead
+        bool gameHasStarted = (deckCardsDict != null || playersHandCardsIDs != null || centerCardsDict != null);
+        if (gameHasStarted)
+        {
+            Debug.LogWarning($"[Server] HandleFreshJoin: Game already in progress - routing client {clientId} to reconnection path");
+            HandleReconnectJoin(clientId);
+            return;
+        }
+        
+        // Guard: Check if this client already has an assigned seat (e.g., bound during host migration self-bind)
+        int existingSeat = GetPlayerNoForClient(clientId);
+        if (existingSeat != -1)
+        {
+            Debug.LogWarning($"[Server] HandleFreshJoin: client {clientId} already has seat {existingSeat}. Skipping fresh seat assignment.");
+            
+            // Still register the connection and count them so the server knows they are connected
+            if (!countedClients.Contains(clientId))
+            {
+                countedClients.Add(clientId);
+                connectedPlayerCount++;
+            }
+            return;
+        }
+
+        // Only assign player number to new players
+        networkRelay.GetPlayerNumberClientRPC(clientId, connectedPlayerCount);
+        playerClientIds[connectedPlayerCount] = clientId;
+        Debug.LogError($"[PLAYER NUMBER] Assigned player number {connectedPlayerCount} to new client {clientId}");
+        
+        if (clientId == NetworkManager.Singleton.LocalClientId)
+        {
+            PlayerPrefs.SetInt("SavedPlayerSeat", connectedPlayerCount);
+            PlayerPrefs.Save();
+            Debug.Log($"[Server] Saved player seat {connectedPlayerCount} for client {clientId}");
+        }
+        
+        if (!countedClients.Contains(clientId))
+        {
+            countedClients.Add(clientId);
+            connectedPlayerCount++;
+        }
+        
+        // RECONNECTION FIX: Guard against starting fresh game if ANY clients are reconnecting
+        if ((playerCount == connectedPlayerCount || (isBotModeEnabled && playerCount == 2 && connectedPlayerCount == 1) || (isBotModeEnabled && playerCount == 4 && connectedPlayerCount == 1)) && reconnectingClients.Count == 0)
+        {
+            if (playerCount == 2) StartGameAfterDelayTwoPlayer();
+            else if (playerCount == 4) StartGameAfterDelayFourPlayer();
+        }
+    }
+
+    public void HandleReconnectJoin(ulong clientId)
+    {
+        // IDEMPOTENCY GUARD: If this client is already in reconnection handshake, skip
+        if (clientReconnectPhases.ContainsKey(clientId) && clientReconnectPhases[clientId] != ReconnectPhase.None)
+        {
+            Debug.Log($"[Server] HandleReconnectJoin: Client {clientId} is already in phase {clientReconnectPhases[clientId]}. Skipping duplicate initialization.");
+            return;
+        }
+
+        Debug.Log($"[Server] HandleReconnectJoin: client {clientId} reconnected to existing game");
+        
+        // RECONNECTION: Track this client as reconnecting
+        reconnectingClients.Add(clientId);
+        clientReconnectPhases[clientId] = ReconnectPhase.InitSent;
+        reconnectStartTimes[clientId] = Time.time;
+        
+        // Clear pending confirmations to avoid blocking
+        pendingTurnConfirmations.Remove(clientId);
+        dealCenterFinishedClients.Remove(clientId);
+        dealHandsFinishedClients.Remove(clientId);
+        
+        // BOT PLACEHOLDER SYSTEM: If a player reconnects, they are no longer bot-controlled
+        int reconnectedPlayerNo = GetPlayerNoForClient(clientId);
+        if (reconnectedPlayerNo != -1 && botControlledPlayers.Contains(reconnectedPlayerNo))
+        {
+            RemoveBotFromSeat(reconnectedPlayerNo);
+            Debug.Log($"[Server] Player {reconnectedPlayerNo} reconnected - bot control removed");
+        }
+
+        // Count the client for this server instance
+        if (!countedClients.Contains(clientId))
+        {
+            countedClients.Add(clientId);
+            connectedPlayerCount++;
+        }
+
+        // Initialize reconnected client
+        networkRelay.GivePlayerCountForReconnectedClientClientRPC(playerCount, clientId);
+        networkRelay.InitializeCardPrefabsForReconnectedClientClientRPC(true, clientId);
+        
+        Debug.Log($"[Server] Reconnection handshake started for {clientId}. Phase: InitSent");
+    }
+
+    public void HandleMigratedHostSelfBind(int playerNo, ulong clientId)
+    {
+        if (playerClientIds.ContainsKey(playerNo) && playerClientIds[playerNo] != clientId)
+        {
+            Debug.LogError($"[Server] Seat {playerNo} already owned by another client! Migration bind rejected.");
+            return;
+        }
+        Debug.Log($"[Server] HandleMigratedHostSelfBind: seat {playerNo} bound to new host {clientId}");
+        RebindPlayerClientId(playerNo, clientId);
+        
+        // Host is never a bot, but for consistency:
+        RemoveBotFromSeat(playerNo);
+
+        if (!countedClients.Contains(clientId))
+        {
+            countedClients.Add(clientId);
+            connectedPlayerCount++;
+        }
+        // Skips all client-side reset/reconnect RPCs as the host is already in sync
+    }
+
+    /// <summary>
+    /// Clears all session-scoped reconnect/seat tracking when the local user leaves a game
+    /// (return to main menu, or after the match ends). This guarantees the NEXT session
+    /// starts from the clean fresh-join path instead of being misdetected as a reconnect.
+    /// </summary>
+    public void ResetSessionStateForTeardown()
+    {
+        Debug.LogWarning("[Server] ResetSessionStateForTeardown: clearing session-scoped reconnect/seat state");
+        reconnectingClients.Clear();
+        clientReconnectPhases.Clear();
+        reconnectStartTimes.Clear();
+        countedClients.Clear();
+        disconnectedClients.Clear();
+        playerClientIds.Clear();
+        connectedPlayerCount = 0;
+        PlayerPrefs.DeleteKey("HostMigrated");
+        PlayerPrefs.Save();
+    }
+
+    private IEnumerator CleanupStaleReconnections()
+    {
+        while (true)
+        {
+            yield return new WaitForSeconds(5f);
+            
+            List<ulong> staleClients = new List<ulong>();
+            foreach (var kvp in clientReconnectPhases)
+            {
+                // A client stuck before completing the handshake past the timeout is stale
+                // (e.g. it dropped again mid-reconnect). Clearing it prevents the InitialDeal
+                // guard (reconnectingClients.Count > 0) from blocking the rest of the table.
+                if (kvp.Value == ReconnectPhase.Completed) continue;
+
+                if (reconnectStartTimes.TryGetValue(kvp.Key, out float startTime))
+                {
+                    if (Time.time - startTime > RECONNECT_TIMEOUT)
+                        staleClients.Add(kvp.Key);
+                }
+                else
+                {
+                    // No start time tracked, treat as stale to avoid blocking future joins.
+                    staleClients.Add(kvp.Key);
+                }
+            }
+            
+            foreach (ulong id in staleClients)
+            {
+                Debug.LogWarning($"[Server] Cleaning up stale reconnection for client {id}");
+                int staleSeat = GetPlayerNoForClient(id);
+                if (staleSeat != -1)
+                {
+                    AssignBotToSeat(staleSeat);
+                    Debug.LogWarning($"[BOT] Stale reconnect timeout: seat {staleSeat} switched to bot filler.");
+                }
+                reconnectingClients.Remove(id);
+                clientReconnectPhases.Remove(id);
+                reconnectStartTimes.Remove(id);
+            }
+        }
+    }
+
+    public void AnotherPlayerConnected(ulong clientId)
+{
         Debug.Log($"[Server] ===== ÖNEMLİ: ANOTHER PLAYER CONNECTED METHOD CALLED =====\n" +
                  $"ClientId: {clientId}\n" +
                  $"IsServer: {IsServer}\n" +
@@ -1476,33 +1926,60 @@ public class Server : NetworkBehaviour
         connectionLog.AppendLine($"SERVER MESSAGE: Is Host: {NetworkManager.Singleton.IsHost}");
         connectionLog.AppendLine($"SERVER MESSAGE: Is Server: {NetworkManager.Singleton.IsServer}");
         
-        // IDEMPOTENCY: If this client is already tracked (current player or mid-reconnect), skip duplicate notification
-        if (reconnectingClients.Contains(clientId) || playerClientIds.ContainsValue(clientId))
+        // IDEMPOTENCY: If this client is already tracked (mid-reconnect), skip duplicate notification
+        // Note: We don't skip if they are in playerClientIds because we need to count them for this session instance
+        if (reconnectingClients.Contains(clientId))
         {
-            Debug.LogWarning($"[Server] AnotherPlayerConnected: Client {clientId} is already tracked - ignoring duplicate notification");
+            Debug.LogWarning($"[Server] AnotherPlayerConnected: Client {clientId} is already in reconnecting set - ignoring duplicate notification");
             return;
         }
         
         // RECONNECTION DETECTION: Game is "in progress" if cards have been set up.
-        // This is more robust than turnCounter > 0 because it also catches the initial-deal window
-        // (after first deal at turn 0 but before any moves have been made).
         bool gameHasStarted = (deckCardsDict != null || playersHandCardsIDs != null || centerCardsDict != null);
-        bool isReconnection = gameHasStarted && clientId != NetworkManager.Singleton.LocalClientId;
+        bool isReconnection = gameHasStarted; // FIXED: Host is also a reconnection during migration
         
         // Only assign player number to new players, not reconnecting ones
-        // Reconnecting players will restore their player number from PlayerPrefs
+        // Reconnecting players will restore their player number from PlayerPrefs (handled by re-binding or sync)
         if (!isReconnection)
         {
             networkRelay.GetPlayerNumberClientRPC(clientId, connectedPlayerCount);
             playerClientIds[connectedPlayerCount] = clientId;
             Debug.LogError($"[PLAYER NUMBER] Assigned player number {connectedPlayerCount} to new client {clientId}");
+            
+            if (clientId == NetworkManager.Singleton.LocalClientId)
+            {
+                PlayerPrefs.SetInt("SavedPlayerSeat", connectedPlayerCount);
+                PlayerPrefs.Save();
+                Debug.Log($"[Server] Saved player seat {connectedPlayerCount} for client {clientId}");
+            }
         }
         else
         {
-            Debug.LogError($"[PLAYER NUMBER] Skipping player number assignment for reconnecting client {clientId} - will restore from PlayerPrefs");
+            Debug.LogError($"[PLAYER NUMBER] Skipping player number assignment for reconnecting client {clientId}");
         }
         
-        connectedPlayerCount++;
+        // SESSION COUNTING: Increment connectedPlayerCount only once per client for this server instance
+        if (!countedClients.Contains(clientId))
+        {
+            countedClients.Add(clientId);
+            connectedPlayerCount++;
+            Debug.Log($"[Server] Incrementing connectedPlayerCount to {connectedPlayerCount} for client {clientId}");
+        }
+        
+        // BOT PLACEHOLDER SYSTEM: If a player reconnects, they are no longer bot-controlled
+        int reconnectedPlayerNo = GetPlayerNoForClient(clientId);
+        if (reconnectedPlayerNo != -1)
+        {
+            if (botControlledPlayers.Contains(reconnectedPlayerNo))
+            {
+                botControlledPlayers.Remove(reconnectedPlayerNo);
+                Debug.Log($"[Server] Player {reconnectedPlayerNo} reconnected - bot control removed");
+            }
+        }
+        else
+        {
+            Debug.LogWarning($"[Server] Client {clientId} already counted for this session instance - skipping increment");
+        }
         
         connectionLog.AppendLine($"SERVER MESSAGE: New connected player count: {connectedPlayerCount}");
         connectionLog.AppendLine($"SERVER MESSAGE: Expected player count: {playerCount}");
@@ -1519,50 +1996,20 @@ public class Server : NetworkBehaviour
         if (isReconnection)
         {
             Debug.LogError($"[RECONNECTION] Client {clientId} reconnected to existing game - turnCounter: {turnCounter}, connectedPlayerCount: {connectedPlayerCount}");
-            
             connectionLog.AppendLine($"SERVER MESSAGE: Client {clientId} reconnected to existing game (turn {turnCounter})");
             
-            // RECONNECTION: Track this client as reconnecting
-            reconnectingClients.Add(clientId);
+            // UNIFIED FLOW: Delegate to master function
+            Debug.Log($"[Server] AnotherPlayerConnected delegating to HandleReconnectJoin for client {clientId}");
+            HandleReconnectJoin(clientId);
             
-            // RECONNECTION FIX: Clear pending confirmations to avoid blocking on the reconnecting client
-            pendingTurnConfirmations.Remove(clientId);
-            dealCenterFinishedClients.Remove(clientId);
-            dealHandsFinishedClients.Remove(clientId);
-            
-            // Single comprehensive log for reconnection start
-            Debug.Log($"[Server] ===== ÖNEMLİ: RECONNECTION START =====\n" +
-                     $"Client {clientId} reconnected to existing game\n" +
-                     $"Game state: turn {turnCounter}, players: {playerCount}, connected: {connectedPlayerCount}\n" +
-                     $"Center cards: {centerCardsDict?.Count ?? 0}, Player hands: {playersHandCardsIDs?.Count ?? 0}\n" +
-                     $"Client added to reconnecting set: {reconnectingClients.Count} clients reconnecting");
-            
-            // RECONNECTION: Follow the same initialization as StartGame() but with sync instead of deals
-            // Step 1: Give player count (same as StartGame) - but only to reconnecting client
-            networkRelay.GivePlayerCountForReconnectedClientClientRPC(playerCount, clientId);
-            
-            // Step 2: Initialize card system (same as StartGame but with reconnection flag)
-            if (networkRelay != null)
-            {
-                // Step 3: UpdateCurrentPlayer will be called when client signals ReconnectionReadyServerRPC
-                // Step 4: Initialize card prefabs (same as StartGame but with reconnection flag)
-                // CRITICAL FIX: Only send to the reconnecting client, not all clients
-                networkRelay.InitializeCardPrefabsForReconnectedClientClientRPC(true, clientId); // true = isReconnection
-                
-                Debug.Log($"[Server] ===== ÖNEMLİ: RECONNECTION INITIALIZATION COMPLETE =====\n" +
-                         $"Client {clientId} scene and cards initialized\n" +
-                         $"GivePlayerCount() called to set up UI screens\n" +
-                         $"UpdateCurrentPlayer will fire when client calls ReconnectionReadyServerRPC\n" +
-                         $"InitializeCardPrefabsClientRPC(true) called for card objects\n" +
-                         $"Will sync game state when client calls ReconnectingClientCardsReadyServerRPC()");
-            }
-            else
-            {
-                Debug.LogError($"[Server] GameNetworkRelay is null - cannot initialize card prefabs for reconnected client");
-            }
+            // Early return: skip fresh-join logic below
+            connectionLog.AppendLine("SERVER MESSAGE: ===== END CLIENT CONNECTION LOG =====");
+            Debug.LogError(connectionLog.ToString());
+            return;
         }
-        else if (playerCount == connectedPlayerCount || (isBotModeEnabled && playerCount == 2 && connectedPlayerCount == 1) || (isBotModeEnabled && playerCount == 4 && connectedPlayerCount == 1))
+        else if ((playerCount == connectedPlayerCount && !isReconnection) || (isBotModeEnabled && playerCount == 2 && connectedPlayerCount == 1) || (isBotModeEnabled && playerCount == 4 && connectedPlayerCount == 1))
         {
+            Debug.LogError("e niye girdik.");
             // This is a fresh game start
             // Normal case: All players connected
             // Bot case 1v1: 1 human player + bot mode enabled
@@ -1696,6 +2143,13 @@ public class Server : NetworkBehaviour
         
         // TODO: Implement bot placeholder system here
         disconnectionLog.AppendLine($"SERVER MESSAGE: Client {clientId} disconnected - bot placeholder system should activate");
+        
+        int playerNo = GetPlayerNoForClient(clientId);
+        if (playerNo != -1)
+        {
+            AssignBotToSeat(playerNo);
+            disconnectionLog.AppendLine($"SERVER MESSAGE: Player {playerNo} is now bot-controlled");
+        }
         
         // Print as one log entry
         Debug.LogError(disconnectionLog.ToString());
@@ -1907,28 +2361,6 @@ public class Server : NetworkBehaviour
         Debug.LogWarning($"[Server] ===== HOST DISCONNECTION: connection tracking cleared =====");
     }
 
-    /// <summary>
-    /// Handles when the host disconnects before the game starts
-    /// Performs complete server reset since host is gone
-    /// </summary>
-    private void HandleHostPreGameDisconnection()
-    {
-        Debug.LogWarning($"[Server] ===== HANDLING HOST PRE-GAME DISCONNECTION =====");
-        Debug.LogWarning($"[Server] Host disconnected before game started - performing complete reset");
-        
-        // Perform complete server reset
-        ResetAllServerVariables();
-        
-        // Clear all tracking
-        disconnectedClients.Clear();
-        reconnectingClients.Clear();
-        
-        // Reset connection count
-        connectedPlayerCount = 0;
-        
-        Debug.LogWarning($"[Server] ===== HOST PRE-GAME DISCONNECTION HANDLING COMPLETE =====");
-        Debug.LogWarning($"[Server] Complete server reset performed - ready for fresh host");
-    }
 
     void OnDestroy()
     {
@@ -1941,8 +2373,9 @@ public class Server : NetworkBehaviour
         if (NetworkManager.Singleton != null && hasSubscribedToNetworkEvents)
         {
             NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
+            NetworkManager.Singleton.OnClientConnectedCallback -= AnotherPlayerConnected;
             hasSubscribedToNetworkEvents = false;
-            Debug.Log("[Server] Unsubscribed from NetworkManager disconnect events");
+            Debug.Log("[Server] Unsubscribed from NetworkManager connect and disconnect events");
         }
         
     }
@@ -2475,6 +2908,9 @@ public class Server : NetworkBehaviour
         snapshot.startingPlayerNo = this.startingPlayerNo;
         snapshot.seed = this.seed;
         snapshot.lastPlayerToCapture = this.lastPlayerToCapture;
+        snapshot.readyToEndTurnCounter = this.readyToEndTurnCounter;
+        snapshot.turnTimerElapsed = this.timer;
+        snapshot.turnTimeLimit = this.turnTime;
 
         // Convert deck from dictionary to ordered list (if you maintain deck order)
         var deckList = new List<string>();
@@ -2535,6 +2971,14 @@ public class Server : NetworkBehaviour
         snapshot.points = new SerializableIntArray(points ?? new int[playerCount]);
         snapshot.pistiCounts = new SerializableIntArray(piştiCounts ?? new int[playerCount]);
 
+        // Bot-controlled players
+        var botList = new List<int>();
+        if (botControlledPlayers != null)
+        {
+            botList.AddRange(botControlledPlayers);
+        }
+        snapshot.botControlledPlayers = new SerializableIntArray(botList.ToArray());
+
         // Active effects and flags
         snapshot.copiedCardMap = new SerializableStringDictionary(copiedCardMap ?? new Dictionary<string, string>());
         snapshot.oynayamazsinActive = oynayamazsinPending; // Use your actual flag
@@ -2544,20 +2988,31 @@ public class Server : NetworkBehaviour
         snapshot.verZehriPending = verZehriPending;
         snapshot.kutsalDestePending = kutsalDestePending;
         snapshot.oynayamazsinPending = oynayamazsinPending;
+        snapshot.oynayamazsinActivatedBy = oynayamazsinActivatedBy;
         snapshot.blockCount = blockCount;
 
-        // Client-side superpower states (get from GameManager if available)
-        snapshot.isKapkacPending = false;
-        snapshot.isYandimAnamPending = false;
-        snapshot.isKopyalaActive = false;
-        snapshot.isSunuDegisTokusActive = false;
-        snapshot.isSunuDegisBunuTokusActive = false;
-        
-        // Card power effects (get from GameManager if available)
-        snapshot.cardPowerEffects = new SerializableStringDictionary(new Dictionary<string, string>());
-        
-        // Note: These client-side states will be set by the client during ApplyGameState
-        // since the server doesn't have direct access to GameManager.LocalInstance
+        // Pull host-side client power states when available so migration snapshots are complete.
+        GameManager gameManager = GameManager.LocalInstance;
+        if (gameManager != null)
+        {
+            snapshot.oynayamazsinActive = gameManager.oynayamazsinActive;
+            snapshot.isKapkacPending = gameManager.isKapkacPending;
+            snapshot.isYandimAnamPending = gameManager.isYandimAnamPending;
+            snapshot.isKopyalaActive = gameManager.isKopyalaActive;
+            snapshot.isSunuDegisTokusActive = gameManager.isSunuDegisTokusActive;
+            snapshot.isSunuDegisBunuTokusActive = gameManager.isSunuDegisBunuTokusActive;
+            snapshot.cardPowerEffects = new SerializableStringDictionary(gameManager.GetCardPowerEffectsSnapshot());
+        }
+        else
+        {
+            snapshot.oynayamazsinActive = oynayamazsinPending;
+            snapshot.isKapkacPending = false;
+            snapshot.isYandimAnamPending = false;
+            snapshot.isKopyalaActive = false;
+            snapshot.isSunuDegisTokusActive = false;
+            snapshot.isSunuDegisBunuTokusActive = false;
+            snapshot.cardPowerEffects = new SerializableStringDictionary(new Dictionary<string, string>());
+        }
 
         // Optional: Player gold (leave empty for now since it's client-managed)
         snapshot.playerGold = new SerializableDictionary(new Dictionary<int, List<string>>());
@@ -2638,7 +3093,7 @@ public class Server : NetworkBehaviour
     public void ApplyGameStateToServer(SerializableGameState snapshot)
     {
         // STALE SNAPSHOT GUARD: Reject snapshots that are older than current tracked state
-        if (hasCurrentState && snapshot.snapshotVersion > 0 && snapshot.snapshotVersion <= currentGameState.snapshotVersion)
+if (hasCurrentState && snapshot.snapshotVersion > 0 && snapshot.snapshotVersion <= currentGameState.snapshotVersion)
         {
             Debug.LogWarning($"[Server] ApplyGameStateToServer: Rejecting stale snapshot v{snapshot.snapshotVersion} (current is v{currentGameState.snapshotVersion})");
             return;
@@ -2654,13 +3109,40 @@ public class Server : NetworkBehaviour
         }
 
         // Core game info
+        this.playerCount = snapshot.playerCount; // FIX: Ensure playerCount is restored
         this.currentPlayer = snapshot.currentPlayer;
         this.turnCounter = snapshot.turnCounter;
         this.roundCount = snapshot.roundCount;
         this.startingPlayerNo = snapshot.startingPlayerNo;
+        this.seed = snapshot.seed; // FIX: Restore seed for consistent deck across migration
         this.lastPlayerToCapture = snapshot.lastPlayerToCapture;
+        this.readyToEndTurnCounter = snapshot.readyToEndTurnCounter;
+        this.timer = snapshot.turnTimerElapsed;
+        this.turnTime = snapshot.turnTimeLimit;
+
+        // Restore allCardLookup first so other card rebuilds work
+        if (snapshot.cardLookup != null && snapshot.cardLookup.Length > 0)
+        {
+            if (allCardLookup == null) allCardLookup = new Dictionary<string, int[]>();
+            allCardLookup.Clear();
+            foreach (var entry in snapshot.cardLookup)
+            {
+                allCardLookup[entry.cardId] = new int[] { entry.kind, entry.value };
+            }
+            Debug.Log($"[Server] Restored allCardLookup with {allCardLookup.Count} cards");
+        }
 
         // Rebuild dictionaries from snapshot
+        if (deckCardsDict == null) deckCardsDict = new Dictionary<string, int[]>();
+        deckCardsDict.Clear();
+        foreach (string cardId in snapshot.deck.ToList())
+        {
+            if (allCardLookup != null && allCardLookup.ContainsKey(cardId))
+            {
+                deckCardsDict[cardId] = allCardLookup[cardId];
+            }
+        }
+
         if (centerCardsDict == null) centerCardsDict = new Dictionary<string, int[]>();
         centerCardsDict.Clear();
         bool lookupMissing = allCardLookup == null || allCardLookup.Count == 0;
@@ -2688,6 +3170,17 @@ public class Server : NetworkBehaviour
             playersPooledCardsIDs[kvp.Key] = kvp.Value;
         }
 
+        // Restore bot-controlled players
+        botControlledPlayers.Clear();
+        if (snapshot.botControlledPlayers.items != null)
+        {
+            foreach (int playerNo in snapshot.botControlledPlayers.items)
+            {
+                botControlledPlayers.Add(playerNo);
+                Debug.Log($"[Server] Load: Restored bot control for player {playerNo}");
+            }
+        }
+
         // Apply bombed cards (cards outside normal game flow)
         bombedCards.Clear();
         var bombedList = snapshot.bombStack.ToList();
@@ -2705,6 +3198,7 @@ public class Server : NetworkBehaviour
         verZehriPending = snapshot.verZehriPending;
         kutsalDestePending = snapshot.kutsalDestePending;
         oynayamazsinPending = snapshot.oynayamazsinPending;
+        oynayamazsinActivatedBy = snapshot.oynayamazsinActivatedBy;
         blockCount = snapshot.blockCount;
 
         // Apply scores
@@ -2712,6 +3206,51 @@ public class Server : NetworkBehaviour
         piştiCounts = snapshot.pistiCounts.ToArray();
 
         Debug.Log($"[Server] Applied game state snapshot version {snapshot.snapshotVersion} to server");
+    }
+
+    public SerializableGameState CaptureMigrationSnapshot()
+    {
+        if (hasCurrentState)
+        {
+            return currentGameState;
+        }
+
+        return BuildGameStateSnapshot();
+    }
+
+    public bool RestoreFromSnapshot(SerializableGameState snapshot)
+    {
+        if (!IsSnapshotValidForRestore(snapshot, out string validationError))
+        {
+            Debug.LogWarning($"[Server] RestoreFromSnapshot rejected snapshot v{snapshot.snapshotVersion}: {validationError}");
+            return false;
+        }
+
+        ApplyGameStateToServer(snapshot);
+        currentGameState = snapshot;
+        hasCurrentState = true;
+        return true;
+    }
+
+    private bool IsSnapshotValidForRestore(SerializableGameState snapshot, out string validationError)
+    {
+        validationError = string.Empty;
+
+        var hands = snapshot.hands.ToDictionary();
+        var pools = snapshot.pools.ToDictionary();
+        if (hands == null || pools == null)
+        {
+            validationError = "hands or pools is null";
+            return false;
+        }
+
+        if (snapshot.playerCount <= 0)
+        {
+            validationError = "playerCount is invalid";
+            return false;
+        }
+
+        return true;
     }
 
     // Note: Automatic or request-based broadcasting removed per user request. Only manual Save/Load remains.
@@ -2887,9 +3426,7 @@ public class Server : NetworkBehaviour
         networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer, turnCounter);
         
         // REDO BOT FIX: Check if it's bot's turn after redo and trigger bot move
-        // In 1v1 mode: bot is player 1
-        // In 2v2 mode: bot plays for players 1, 2, and 3 (host is player 0)
-        bool isBotTurn = botPlayerActive && ((playerCount == 2 && currentPlayer == 1) || (playerCount == 4 && currentPlayer != 0));
+        bool isBotTurn = IsBotTurn();
         if (isBotTurn)
         {
             Debug.Log($"[Server] Redo: It's bot's turn after redo (player {currentPlayer}), triggering bot move");
@@ -2916,15 +3453,13 @@ public class Server : NetworkBehaviour
     {
         Debug.Log($"[Server] Triggering bot move after redo completion");
         
-        // In 1v1 mode: bot is player 1
-        // In 2v2 mode: bot plays for players 1, 2, and 3 (host is player 0)
-        bool isBotTurn = botPlayerActive && ((playerCount == 2 && currentPlayer == 1) || (playerCount == 4 && currentPlayer != 0));
-        if (isBotTurn && botPlayer != null)
+        bool isBotTurn = IsBotTurn();
+        if (isBotTurn && botPlayer != null && isActiveHost)
         {
             Debug.Log($"[Server] Bot is active and it's bot's turn - calling OnBotTurn() for player {currentPlayer}");
             botPlayer.OnBotTurn(currentPlayer);
         }
-        else
+else
         {
             Debug.LogWarning($"[Server] Cannot trigger bot move - botPlayerActive: {botPlayerActive}, currentPlayer: {currentPlayer}, isBotTurn: {isBotTurn}, botPlayer null: {botPlayer == null}");
         }
@@ -3040,6 +3575,7 @@ public class Server : NetworkBehaviour
             reconnectingClients.Remove(clientId);
             Debug.Log($"[Server] Removed client {clientId} from reconnecting set");
         }
+        reconnectStartTimes.Remove(clientId);
     }
 
     public void OnReconnectionReady(ulong clientId)
@@ -3048,7 +3584,7 @@ public class Server : NetworkBehaviour
         CallUpdateCurrentPlayer();
 
         // Resume turn timer if it is not currently running (e.g. after re-host recovery from a crash)
-        if (activeTurnTimerCoroutine == null && reconnectingClients.Count == 0)
+        if (activeTurnTimerCoroutine == null && reconnectingClients.Count == 0 && isActiveHost)
         {
             bool isBotTurn = botPlayerActive && ((playerCount == 2 && currentPlayer == 1) || (playerCount == 4 && currentPlayer != 0));
             if (!isBotTurn)

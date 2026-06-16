@@ -201,7 +201,9 @@ public class GameNetworkRelay : NetworkBehaviour
     [ClientRpc(RequireOwnership = false)]
     public void GetPlayerNumberClientRPC(ulong clientID, int playerNumber)
     {
-        if (NetworkManager.Singleton.LocalClientId == clientID && !IsHost)
+        // Include IsHost: the original host must also save their seat (0) to PlayerPrefs
+        // so that GetSavedPlayerSeat() works correctly on reconnect after host migration.
+        if (NetworkManager.Singleton.LocalClientId == clientID)
         {
             GameManager.LocalInstance.GetPlayerNumber(playerNumber);
         }
@@ -716,31 +718,27 @@ public class GameNetworkRelay : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void ReclaimSeatServerRPC(int playerNo, ulong clientId)
+    public void ReclaimSeatServerRPC(int playerNo, ulong clientId, string claimantPlayerId = null, ServerRpcParams rpcParams = default)
     {
-        Debug.Log($"[GameNetworkRelay] ReclaimSeatServerRPC: Player {playerNo} reclaiming seat for client {clientId}");
+        // Always use the authenticated sender id — never trust the client-passed value for auth decisions.
+        ulong trustedClientId = rpcParams.Receive.SenderClientId;
+        Debug.Log($"[GameNetworkRelay] ReclaimSeatServerRPC: seat {playerNo} claimed by sender {trustedClientId} (passed id: {clientId}, playerId: {claimantPlayerId})");
         if (server != null)
         {
-            server.RebindPlayerClientId(playerNo, clientId);
-            
-            // Re-notify the server that this client is connected so it counts towards player count
-            server.AnotherPlayerConnected(clientId);
+            bool accepted = server.TryHandleSeatReclaim(playerNo, trustedClientId, claimantPlayerId);
+            if (!accepted)
+            {
+                Debug.LogWarning($"[RECLAIM] Reclaim request rejected for seat {playerNo}, sender {trustedClientId}.");
+            }
         }
     }
 
     [ServerRpc(RequireOwnership = false)]
     public void NotifyCientConnectedServerRPC(ulong clientId)
     {
-        Debug.Log($"[GameNetworkRelay] ===== ÖNEMLİ: NOTIFY CLIENT CONNECTED SERVER RPC RECEIVED =====\n" +
-                 $"ClientId from RPC: {clientId}\n" +
-                 $"OwnerClientId: {OwnerClientId}\n" +
-                 $"IsServer: {IsServer}\n" +
-                 $"Server instance: {(server != null ? "FOUND" : "NULL")}\n" +
-                 $"Calling server.AnotherPlayerConnected({clientId})");
-        
-        server.AnotherPlayerConnected(clientId);
-        
-        Debug.Log($"[GameNetworkRelay] ===== ÖNEMLİ: ANOTHER PLAYER CONNECTED CALL COMPLETED =====");
+        Debug.Log($"[GameNetworkRelay] NotifyCientConnectedServerRPC: {clientId} (deprecated)");
+        // Manual path disabled - AnotherPlayerConnected handles all reconnections
+        return;
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -762,53 +760,44 @@ public class GameNetworkRelay : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void ReconnectingClientCardsReadyServerRPC(ulong clientId, ServerRpcParams rpcParams = default)
     {
-        // Trust the actual network sender ID - do not rely on the client-provided ID for server logic
+        // Trust the actual network sender ID
         ulong trustedClientId = rpcParams.Receive.SenderClientId;
-        if (trustedClientId != clientId)
-            Debug.LogWarning($"[GameNetworkRelay] ReconnectingClientCardsReadyServerRPC: client passed ID {clientId} but actual sender is {trustedClientId} - using trusted sender ID");
-        clientId = trustedClientId;
-
-        Debug.LogError("[Visual Sync] ===== RECONNECTING CLIENT CARDS READY SERVER RPC RECEIVED =====");
-        Debug.Log($"[GameNetworkRelay] ===== ÖNEMLİ: RECONNECTING CLIENT CARDS READY RPC RECEIVED =====\n" +
-                 $"ClientId: {clientId}\n" +
-                 $"IsServer: {IsServer}\n" +
-                 $"Server instance: {(server != null ? "FOUND" : "NULL")}\n" +
-                 $"This RPC is specifically for reconnection - no client ID check needed");
         
-        // RECONNECTION: Always proceed with reconnection sync (no client ID check)
+        // Handshake state check
+        if (server.clientReconnectPhases.TryGetValue(trustedClientId, out Server.ReconnectPhase phase))
+        {
+            if (phase != Server.ReconnectPhase.InitSent)
+            {
+                Debug.LogWarning($"[GameNetworkRelay] ReconnectingClientCardsReady from {trustedClientId} ignored: phase is {phase}");
+                return;
+            }
+        }
+        else
+        {
+            Debug.LogWarning($"[GameNetworkRelay] ReconnectingClientCardsReady from {trustedClientId} ignored: no phase tracked");
+            return;
+        }
+
+        server.clientReconnectPhases[trustedClientId] = Server.ReconnectPhase.SnapshotSent;
+
         // Build current game state and send to reconnected client
         var gameState = server.BuildGameStateSnapshot();
         
-        // Single comprehensive log for reconnection sync start
-        Debug.Log($"[GameNetworkRelay] ===== ÖNEMLİ: RECONNECTION SYNC START =====\n" +
-                 $"Client {clientId} cards are ready - applying game state for reconnection\n" +
-                 $"Server game state: turn={server.turnCounter}, currentPlayer={server.currentPlayer}\n" +
-                 $"Built game state snapshot: version={gameState.snapshotVersion}, centerCards={gameState.center.items?.Length ?? 0}, hands={gameState.hands.Count}\n" +
-                 $"Sending ApplyGameStateClientRPC to all clients");
+        Debug.Log($"[GameNetworkRelay] Sending state snapshot v{gameState.snapshotVersion} to {trustedClientId}");
         
-        // RECONNECTION FIX: Send game state only to the reconnecting client, not all clients
-        // This prevents triggering normal game flow on other clients
-        ApplyGameStateToReconnectedClientClientRPC(gameState, clientId);
+        // Single point of truth for state sync
+        ApplySnapshotToClient(gameState, trustedClientId);
         
+        server.clientReconnectPhases[trustedClientId] = Server.ReconnectPhase.Completed;
+
         // Update current player info for reconnected client
         server.CallUpdateCurrentPlayer();
         
-        // Remove client from reconnecting set (if it exists)
-        server.RemoveReconnectingClient(clientId);
+        // Remove client from reconnecting set
+        server.RemoveReconnectingClient(trustedClientId);
         
-        // RECONNECTION FIX: Trigger desync check after game state is applied
-        // This ensures the reconnecting client's move chain is synchronized
-        TriggerDesyncCheckForReconnectedClientClientRPC(clientId);
-        
-        // RECONNECTION FIX: Do NOT call InitialDealCoroutineCheck() during reconnection
-        // The reconnecting client will sync via existing desync detection system
-        
-        // Single comprehensive log for reconnection sync end
-        Debug.Log($"[GameNetworkRelay] ===== ÖNEMLİ: RECONNECTION SYNC COMPLETED =====\n" +
-                 $"Game state applied to reconnected client {clientId}\n" +
-                 $"Client removed from reconnecting set\n" +
-                 $"Current player updated and sync process finished\n" +
-                 $"InitialDealCoroutineCheck() called to ensure normal game flow continues");
+        // Trigger desync check
+        TriggerDesyncCheckForReconnectedClientClientRPC(trustedClientId);
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -904,9 +893,10 @@ public class GameNetworkRelay : NetworkBehaviour
     /// Client RPC to apply a complete game state snapshot to all clients
     /// </summary>
     [ClientRpc(RequireOwnership = false)]
-    public void ApplyGameStateClientRPC(SerializableGameState snapshot)
+    public void ApplyGameStateClientRPC(SerializableGameState snapshot, ClientRpcParams clientRpcParams = default)
     {
         Debug.Log($"[GameNetworkRelay] Received game state snapshot version {snapshot.snapshotVersion}");
+        
         GameManager.LocalInstance?.ApplyGameState(snapshot);
     }
 
@@ -972,15 +962,16 @@ public class GameNetworkRelay : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void RequestFullStateSyncServerRPC()
+    public void RequestFullStateSyncServerRPC(ServerRpcParams rpcParams = default)
     {
-        // Client requests full state sync due to desync
-        Debug.Log("[GameNetworkRelay] Client requested full state sync due to desync");
+        ulong clientId = rpcParams.Receive.SenderClientId;
+        Debug.Log($"[Relay] Full state sync requested by client {clientId}");
         
         if (Server.Singleton != null)
         {
-            var gameState = Server.Singleton.BuildGameStateSnapshot();
-            ApplyGameStateClientRPC(gameState);
+            ApplyGameStateClientRPC(Server.Singleton.BuildGameStateSnapshot(), new ClientRpcParams {
+                Send = new ClientRpcSendParams { TargetClientIds = new ulong[] { clientId } }
+            });
         }
     }
 
@@ -1027,12 +1018,17 @@ public class GameNetworkRelay : NetworkBehaviour
             Debug.Log($"[GameNetworkRelay] Sending game state snapshot v{gameState.snapshotVersion} to reconnected client {clientId}");
             
             // Send game state to the requesting client
-            ApplyGameStateToReconnectedClientClientRPC(gameState, clientId);
+            ApplySnapshotToClient(gameState, clientId);
         }
         else
         {
             Debug.LogError("[GameNetworkRelay] Server.Singleton is null - cannot provide game state");
         }
+    }
+
+    public void ApplySnapshotToClient(SerializableGameState snapshot, ulong targetClientId)
+    {
+        ApplyGameStateToReconnectedClientClientRPC(snapshot, targetClientId);
     }
 
     // Note: Reconnection now uses existing desync detection system
@@ -1041,42 +1037,6 @@ public class GameNetworkRelay : NetworkBehaviour
 
     // ===== MOVE BUFFERING RPCs =====
     
-    /// <summary>
-    /// Buffers a move during client synchronization
-    /// </summary>
-    [ClientRpc(RequireOwnership = false)]
-    public void BufferMoveForSyncingClientClientRPC(GameMove move, ulong targetClientId)
-    {
-        // Only buffer if this is the target client and we're in sync mode
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.LocalClientId == targetClientId)
-        {
-            Debug.Log($"[GameNetworkRelay] Buffering move for syncing client {targetClientId}: {move.moveType} by P{move.playerNumber}");
-            
-            if (GameManager.LocalInstance != null)
-            {
-                GameManager.LocalInstance.BufferMoveForSync(move);
-            }
-        }
-    }
-    
-    /// <summary>
-    /// Applies all buffered moves after sync is complete
-    /// </summary>
-    [ClientRpc(RequireOwnership = false)]
-    public void ApplyBufferedMovesClientRPC(GameMove[] bufferedMoves, ulong targetClientId)
-    {
-        // Only apply if this is the target client
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.LocalClientId == targetClientId)
-        {
-            Debug.Log($"[GameNetworkRelay] Applying {bufferedMoves.Length} buffered moves for client {targetClientId}");
-            
-            if (GameManager.LocalInstance != null)
-            {
-                GameManager.LocalInstance.ApplyBufferedMoves(bufferedMoves);
-            }
-        }
-    }
-
     // ===== REDO SYSTEM RPCs =====
     
     /// <summary>

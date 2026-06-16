@@ -149,6 +149,7 @@ public class DeckController : MonoBehaviour
     //Initialize and instantiate all the card objects that can be used
     private List<GameObject> cardObjectList = new List<GameObject>();
     private int uniqueCardCounter = 0;
+    public bool isInstantMode = false; // Flag to make all animations instant during reconnection
     private IEnumerator InitializeCardPool()
     {
         yield return new WaitForSeconds(0);
@@ -1646,20 +1647,32 @@ public class DeckController : MonoBehaviour
     /// </summary>
     private IEnumerator MoveCardCoroutineShowcase(Vector3 endPos, GameObject cardObject, float speedMultiplier, Quaternion rotation, Vector3 scale)
     {
-        float duration = 1f/speedMultiplier;
+        // If instant mode (reconnection), teleport immediately
+        if (isInstantMode)
+        {
+            cardObject.transform.position = endPos;
+            cardObject.transform.rotation = rotation;
+            cardObject.transform.localScale = scale;
+            CheckAndClearShowcaseAnimationFlag();
+            yield return null;
+        }
+        else
+        {
+            float duration = 1f/speedMultiplier;
 
-        // Create a DOTween sequence for position, rotation, and scale
-        DG.Tweening.Sequence moveSeq = DOTween.Sequence();
-        moveSeq.Join(cardObject.transform.DOMove(endPos, duration));
-        moveSeq.Join(cardObject.transform.DORotateQuaternion(rotation, duration));
-        moveSeq.Join(cardObject.transform.DOScale(scale, duration));
+            // Create a DOTween sequence for position, rotation, and scale
+            DG.Tweening.Sequence moveSeq = DOTween.Sequence();
+            moveSeq.Join(cardObject.transform.DOMove(endPos, duration));
+            moveSeq.Join(cardObject.transform.DORotateQuaternion(rotation, duration));
+            moveSeq.Join(cardObject.transform.DOScale(scale, duration));
 
-        yield return moveSeq.WaitForCompletion();
-        
-        // Clear animation flag when this specific card's animation completes
-        // Note: This will be called for each card, but we only need to clear it once
-        // We'll use a counter or check if all animations are done
-        CheckAndClearShowcaseAnimationFlag();
+            yield return moveSeq.WaitForCompletion();
+            
+            // Clear animation flag when this specific card's animation completes
+            // Note: This will be called for each card, but we only need to clear it once
+            // We'll use a counter or check if all animations are done
+            CheckAndClearShowcaseAnimationFlag();
+        }
     }
     
 
@@ -1975,22 +1988,33 @@ public class DeckController : MonoBehaviour
 
     private IEnumerator MoveCardCoroutine(Vector3 endPos, GameObject cardObject, float speedMultiplier, Quaternion rotation, Vector3 scale)
     {
-        var cardInteraction = cardObject.GetComponent<CardInteraction>();
-        /*if (cardInteraction != null)
+        // If instant mode (reconnection), teleport immediately
+        if (isInstantMode)
         {
-            cardInteraction.KillAllTweens();
-            yield return cardInteraction.WaitForAllTweens();
-        }*/
+            cardObject.transform.position = endPos;
+            cardObject.transform.rotation = rotation;
+            cardObject.transform.localScale = scale;
+            yield return null;
+        }
+        else
+        {
+            var cardInteraction = cardObject.GetComponent<CardInteraction>();
+            /*if (cardInteraction != null)
+            {
+                cardInteraction.KillAllTweens();
+                yield return cardInteraction.WaitForAllTweens();
+            }*/
 
-        float duration = 1f/speedMultiplier; // Adjust as needed
+            float duration = 1f/speedMultiplier; // Adjust as needed
 
-        // Create a DOTween sequence for position, rotation, and scale
-        DG.Tweening.Sequence moveSeq = DOTween.Sequence();
-        moveSeq.Join(cardObject.transform.DOMove(endPos, duration));
-        moveSeq.Join(cardObject.transform.DORotateQuaternion(rotation, duration));
-        moveSeq.Join(cardObject.transform.DOScale(scale, duration));
+            // Create a DOTween sequence for position, rotation, and scale
+            DG.Tweening.Sequence moveSeq = DOTween.Sequence();
+            moveSeq.Join(cardObject.transform.DOMove(endPos, duration));
+            moveSeq.Join(cardObject.transform.DORotateQuaternion(rotation, duration));
+            moveSeq.Join(cardObject.transform.DOScale(scale, duration));
 
-        yield return moveSeq.WaitForCompletion();
+            yield return moveSeq.WaitForCompletion();
+        }
     }
 
     public IEnumerator ChainMoveCards(List<Vector3> positions, List<GameObject> cardObject, float speed, List<Quaternion> rotations, List<Vector3> scales, bool endTurnFlag = false, bool lastMove = false, bool updateFlag = true)
@@ -2089,11 +2113,16 @@ public class DeckController : MonoBehaviour
         Debug.LogError($"[PLAYER NUMBER] SetPlayerNumber called with playerNumber: {playerNumber}, thisPlayerNumber now: {thisPlayerNumber}");
         
         // CRITICAL FIX: Save player number to PlayerPrefs for reconnection
-        PlayerPrefs.SetInt("PlayerNumber", playerNumber);
+        PlayerPrefs.SetInt("SavedPlayerSeat", playerNumber);
         PlayerPrefs.Save();
-        Debug.LogError($"[PLAYER NUMBER] Saved player number {playerNumber} to PlayerPrefs for reconnection");
+        Debug.LogError($"[PLAYER NUMBER] Saved player number {playerNumber} to PlayerPrefs (SavedPlayerSeat) for reconnection");
     }
-    
+
+    public int GetSavedPlayerSeat()
+    {
+        return PlayerPrefs.GetInt("SavedPlayerSeat", -1);
+    }
+
     /// <summary>
     /// Sets the startingPlayerNoCounter from server game state during reconnection
     /// </summary>
@@ -2238,10 +2267,10 @@ public class DeckController : MonoBehaviour
             }
             
             var mainScreen = GameObject.Find("MainScreen");
-            if (mainScreen != null && !mainScreen.activeSelf)
+            if (mainScreen != null && mainScreen.activeSelf)
             {
-                Debug.Log("[DeckController] ✓ Activating main screen for reconnection");
-                mainScreen.SetActive(true);
+                Debug.Log("[DeckController] ✓ Deactivating main screen for reconnection");
+                mainScreen.SetActive(false);
             }
         }
         else
@@ -3010,11 +3039,22 @@ public class DeckController : MonoBehaviour
 
     private IEnumerator TweenMoveTransform(Transform target, Vector3 endPos, Quaternion endRot, Vector3 endScale, float duration)
     {
-        DG.Tweening.Sequence seq = DOTween.Sequence();
-        seq.Join(target.DOMove(endPos, duration));
-        seq.Join(target.DORotateQuaternion(endRot, duration));
-        seq.Join(target.DOScale(endScale, duration));
-        yield return seq.WaitForCompletion();
+        // If instant mode (reconnection), teleport immediately
+        if (isInstantMode)
+        {
+            target.position = endPos;
+            target.rotation = endRot;
+            target.localScale = endScale;
+            yield return null;
+        }
+        else
+        {
+            DG.Tweening.Sequence seq = DOTween.Sequence();
+            seq.Join(target.DOMove(endPos, duration));
+            seq.Join(target.DORotateQuaternion(endRot, duration));
+            seq.Join(target.DOScale(endScale, duration));
+            yield return seq.WaitForCompletion();
+        }
     }
 
     // ===== DECK MOVEMENT METHODS =====

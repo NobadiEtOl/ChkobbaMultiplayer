@@ -244,9 +244,6 @@ public class GameManager : MonoBehaviour
 
     public static GameManager LocalInstance { get; private set; }
 
-    // Store the last received game state snapshot for host migration
-    [HideInInspector] public SerializableGameState lastReceivedGameState;
-
     [SerializeField] private DeckController deckController;
 
     public GameNetworkRelay networkRelay;
@@ -347,13 +344,11 @@ public class GameManager : MonoBehaviour
 
     public bool isBuDahaIyiPending = false;
     
-    // ENHANCED RECONNECTION: Sync mode and move buffering
-    private bool isSyncMode = false;
-    private MoveBuffer moveBuffer = new MoveBuffer();
-    private List<GameMove> pendingMovesToApply = new List<GameMove>();
-    
     // RECONNECTION TRACKING: Track if we're currently reconnecting
     private bool isReconnecting = false;
+    
+    // BOT PLACEHOLDER SYSTEM: Track which players are currently controlled by bots
+    public List<int> botControlledPlayers = new List<int>();
 
 
 
@@ -566,16 +561,10 @@ public class GameManager : MonoBehaviour
 
 
     public void NotifyConnection()
-
     {
-        Debug.Log($"[GameManager] ===== ÖNEMLİ: NOTIFY CONNECTION CALLED =====\n" +
-                 $"LocalClientId: {NetworkManager.Singleton.LocalClientId}\n" +
-                 $"IsHost: {NetworkManager.Singleton.IsHost}\n" +
-                 $"IsServer: {NetworkManager.Singleton.IsServer}\n" +
-                 $"IsConnectedClient: {NetworkManager.Singleton.IsConnectedClient}\n" +
-                 $"Calling NotifyCientConnectedServerRPC to notify server of client connection");
-
-        networkRelay.NotifyCientConnectedServerRPC(NetworkManager.Singleton.LocalClientId);// Tells the server that a client is started
+        Debug.Log("[GameManager] NotifyConnection called (deprecated - reconnection handled by AnotherPlayerConnected)");
+        // Manual notification path no longer needed
+        return;
     }
 
     /// <summary>
@@ -585,20 +574,37 @@ public class GameManager : MonoBehaviour
     {
         Debug.Log("[GameManager] Reconnected client game state applied successfully");
         
-        // Close any waiting screens that might still be open
+        // 1. Close any waiting screens that might still be open
         if (waitingScreen != null && waitingScreen.activeSelf)
         {
             waitingScreen.SetActive(false);
             Debug.Log("[GameManager] Closed waiting screen after reconnection");
         }
         
-        // Ensure main screen is hidden and game is visible
+        // 2. Ensure main screen (lobby) is hidden and game is visible
         if (mainScreen != null && mainScreen.activeSelf)
         {
             mainScreen.SetActive(false);
+            Debug.Log("[GameManager] Closed main screen (lobby) after reconnection");
+        }
+
+        // 3. Specifically deactivate "MainUI" as requested by user
+        GameObject mainUI = GameObject.Find("MainUI");
+        if (mainUI != null && mainUI.activeSelf)
+        {
+            mainUI.SetActive(false);
+            Debug.Log("[GameManager] Deactivated MainUI after reconnection so game can be seen");
         }
         
-        Debug.Log("[GameManager] Reconnected client is now ready to play");
+        // 4. Update button visibility in case MainUIScript is still active (unlikely if MainUI is deactivated)
+        MainUIScript mainUIScript = FindObjectOfType<MainUIScript>();
+        if (mainUIScript != null)
+        {
+            // We can't easily call private methods, but deactivating the object should be enough
+            // The user wants MainUI deactivated, so we've done that.
+        }
+        
+        Debug.Log("[GameManager] Reconnected client is now ready to play and game should be visible");
     }
 
 
@@ -751,39 +757,21 @@ public class GameManager : MonoBehaviour
                  $"WinScreen: {(winScreen != null ? "FOUND" : "NULL")}\n" +
                  $"MainScreen: {(mainScreen != null ? "FOUND" : "NULL")}");
 
-        if (!isReconnection)
+        if (isReconnection)
         {
-            Debug.Log("[GameManager] InitializeCardPrefabs called for new game - resetting game state");
-            ResetForNewRound();
-            roundCount++;
-            isReconnecting = false;
-        }
-        else
-        {
-            // SAFETY CHECK: Only process reconnection logic if we're not the host
-            if (NetworkManager.Singleton.IsHost)
+            isReconnecting = true;
+            Debug.Log("[GameManager] Reconnection detected – waiting for server snapshot");
+            if (networkRelay != null)
             {
-                Debug.LogError("[GameManager] SAFETY CHECK: Host received reconnection InitializeCardPrefabs - this should not happen! Treating as new game instead.");
-                ResetForNewRound();
-                roundCount++;
-                isReconnecting = false;
+                networkRelay.RequestFullStateSyncServerRPC();
             }
-            else
-            {
-                Debug.Log("[GameManager] InitializeCardPrefabs called for reconnection - following normal StartGame flow");
-                isReconnecting = true;
-            }
-            
-            // RECONNECTION FIX: Do NOT clear cardLookup - let it be populated normally
-            // The card IDs will be deterministic and match the server
-            
-            // CRITICAL: Reset event subscription flag for reconnection
-            Debug.Log("[GameManager] Resetting alreadySubbed flag for reconnection");
-            alreadySubbed = false;
-            
-            // CRITICAL FIX: Restore player number from PlayerPrefs for reconnection
-            RestorePlayerNumberFromPrefs();
+            yield break; // Do not reset or redeal locally
         }
+
+        Debug.Log("[GameManager] InitializeCardPrefabs called for new game - resetting game state");
+        ResetForNewRound();
+        roundCount++;
+        isReconnecting = false;
 
         Debug.Log("[GameManager] Checking and managing UI screens...");
         if (waitingScreen.activeSelf) 
@@ -832,37 +820,18 @@ public class GameManager : MonoBehaviour
                  $"IsServer: {NetworkManager.Singleton.IsServer}\n" +
                  $"LocalClientId: {NetworkManager.Singleton.LocalClientId}");
 
-        Debug.Log("Deck is ready, notifying server.");
-
         if (isReconnecting)
         {
-            // SAFETY CHECK: Only process reconnection logic if we're not the host
-            if (NetworkManager.Singleton.IsHost)
-            {
-                Debug.LogError("[GameManager] SAFETY CHECK: Host is in reconnecting state - this should not happen! Using normal flow instead.");
-                networkRelay.DeckReadyServerRPC();
-            }
-            else
-            {
-                // For reconnecting clients, use the specific RPC that passes the client ID explicitly
-                Debug.LogError("[Visual Sync] ===== CALLING RECONNECTING CLIENT CARDS READY SERVER RPC =====");
-                Debug.Log($"[GameManager] Calling networkRelay.ReconnectingClientCardsReadyServerRPC({NetworkManager.Singleton.LocalClientId})...");
-                networkRelay.ReconnectingClientCardsReadyServerRPC(NetworkManager.Singleton.LocalClientId);
-                Debug.LogError("[Visual Sync] ===== RECONNECTING CLIENT CARDS READY SERVER RPC CALL COMPLETED =====");
-                Debug.Log($"[GameManager] networkRelay.ReconnectingClientCardsReadyServerRPC() call completed");
-            }
+            Debug.Log("[GameManager] Reconnecting client – waiting for snapshot only");
+            return; // Do not call DeckReadyServerRPC
         }
-        else
-        {
-            // For normal game flow, use the regular RPC
-            Debug.Log($"[GameManager] Calling networkRelay.DeckReadyServerRPC()...");
-            networkRelay.DeckReadyServerRPC();
-            Debug.Log($"[GameManager] networkRelay.DeckReadyServerRPC() call completed");
-        }
-        
-        // Note: For reconnection, game state sync is now handled directly in the RPC
-        // No need for desync detection since we call ApplyGameStateClientRPC() directly
 
+        Debug.Log("Deck is ready, notifying server.");
+
+        // For normal game flow, use the regular RPC
+        Debug.Log($"[GameManager] Calling networkRelay.DeckReadyServerRPC()...");
+        networkRelay.DeckReadyServerRPC();
+        Debug.Log($"[GameManager] networkRelay.DeckReadyServerRPC() call completed");
     }
 
 
@@ -2466,13 +2435,26 @@ public class GameManager : MonoBehaviour
             return false;
         }
 
-        // Check if this is a bot playing from PlayerHand3
-        bool isBotPlaying = (isInPlayerHand3 && currentPlayerNo == 1); // Bot is player 1
-        AddToDebugLog($"[GameManager] Is bot playing: {isBotPlaying}");
+        // Determine which hand the current player should be playing from
+        string expectedHandName = "";
+        if (deckController.playerCount == 4)
+        {
+            expectedHandName = "PlayerHand" + (currentPlayerNo + 1);
+        }
+        else if (deckController.playerCount == 2)
+        {
+            int handIndex = (currentPlayerNo == 0) ? 0 : 2;
+            expectedHandName = "PlayerHand" + (handIndex + 1);
+        }
+
+        bool isInCurrentPlayerHand = cardObj != null && cardObj.transform.parent != null && cardObj.transform.parent.name == expectedHandName;
+        bool isBotPlaying = botControlledPlayers.Contains(currentPlayerNo) && isInCurrentPlayerHand;
+
+        AddToDebugLog($"[GameManager] Expected Hand: {expectedHandName}, Is in hand: {isInCurrentPlayerHand}, Is bot playing: {isBotPlaying}");
 
         // Player can play if:
-        // 1. It's their turn AND the card is in PlayerHand1, OR
-        // 2. It's the bot's turn AND the card is in PlayerHand3
+        // 1. It's their turn AND the card is in their local hand (PlayerHand1), OR
+        // 2. It's a bot-controlled turn AND the card is in the bot's corresponding hand
         if ((isMyTurn && isInPlayerHand1) || isBotPlaying)
         {
             AddToDebugLog($"[GameManager] Player can play - isMyTurn: {isMyTurn}, isInPlayerHand1: {isInPlayerHand1}, isBotPlaying: {isBotPlaying}");
@@ -3092,7 +3074,7 @@ public class GameManager : MonoBehaviour
 
 
 
-    public void OnKopyalaYapistir(string targetUniqueID, string sourceUniqueID)
+    public void OnKopyalaYapistir(string targetUniqueID, string sourceUniqueID, bool instant = false)
 
     {
 
@@ -3131,13 +3113,17 @@ public class GameManager : MonoBehaviour
 
             targetCard.activePowerEffect = sourceCard.activePowerEffect; // Copy active power effect
 
-
-
-            // Set cardID and sprite with fade-in
-
-            StartCoroutine(SetCardIDAndSpriteWithFade(targetCard, newCardID, newSprite));
-
-
+            // Set cardID and sprite with fade-in (or instantly)
+            if (instant)
+            {
+                targetCard.SetCardID(newCardID);
+                targetCard.GetComponent<SpriteRenderer>().sprite = newSprite;
+                targetCard.GetComponent<SpriteRenderer>().color = Color.white;
+            }
+            else
+            {
+                StartCoroutine(SetCardIDAndSpriteWithFade(targetCard, newCardID, newSprite));
+            }
 
             ResetVisuals(targetCard);
 
@@ -4752,7 +4738,7 @@ public class GameManager : MonoBehaviour
 
 
 
-    public void OnKapkacCardChanged(string cardUniqueID)
+    public void OnKapkacCardChanged(string cardUniqueID, bool instant = false)
 
     {
 
@@ -4781,12 +4767,31 @@ public class GameManager : MonoBehaviour
             // Track this card change for save/load persistence
             cardPowerEffects[cardUniqueID] = "Kapkaç";
 
-
-
             // Optionally, update the card's visual to indicate Kapkaç (e.g., highlight, effect)
-
-            StartCoroutine(KapkacCourotine(cardUniqueID));
-            ShowAffectedCardsDebugVisual("Kapkaç", cardUniqueID);
+            if (instant)
+            {
+                // Apply visual instantly without animation
+                ResetVisuals(cardInteraction);
+                if (kapkacEffectPrefab != null)
+                {
+                    GameObject effect = Instantiate(kapkacEffectPrefab, cardInteraction.transform);
+                    effect.transform.localPosition = new Vector3(0, 0, -0.001f);
+                    kapkacCardsToBeReset.Add(cardInteraction.gameObject);
+                    SpriteRenderer sr = effect.GetComponent<SpriteRenderer>();
+                    if (sr != null)
+                    {
+                        Color c = sr.color;
+                        c.a = 1f;
+                        sr.color = c;
+                    }
+                }
+                ShowAffectedCardsDebugVisual("Kapkaç", cardUniqueID);
+            }
+            else
+            {
+                StartCoroutine(KapkacCourotine(cardUniqueID));
+                ShowAffectedCardsDebugVisual("Kapkaç", cardUniqueID);
+            }
 
         }
 
@@ -5022,7 +5027,7 @@ public class GameManager : MonoBehaviour
 
 
 
-    public void OnYandimAnamCardChanged(string cardUniqueID)
+    public void OnYandimAnamCardChanged(string cardUniqueID, bool instant = false)
 
     {
 
@@ -5039,8 +5044,29 @@ public class GameManager : MonoBehaviour
             };
             MoveChainIntegrator.TrackSuperpowerEffect(currentPlayerNo, "Yandım Anam", new[] { cardUniqueID }, effectData);
 
-            StartCoroutine(YandimAnamCoroutine(cardUniqueID));
-            ShowAffectedCardsDebugVisual("Yandım Anam", cardUniqueID);
+            if (instant)
+            {
+                // Apply visual instantly without animation
+                ResetVisuals(cardInteraction);
+                if (yandimAnamSpritePrefab != null)
+                {
+                    GameObject effect = Instantiate(yandimAnamSpritePrefab, cardInteraction.transform);
+                    effect.transform.localPosition = new Vector3(0, 0, -0.002f);
+                    SpriteRenderer sr = effect.GetComponent<SpriteRenderer>();
+                    if (sr != null)
+                    {
+                        Color c = sr.color;
+                        c.a = 1f;
+                        sr.color = c;
+                    }
+                }
+                ShowAffectedCardsDebugVisual("Yandım Anam", cardUniqueID);
+            }
+            else
+            {
+                StartCoroutine(YandimAnamCoroutine(cardUniqueID));
+                ShowAffectedCardsDebugVisual("Yandım Anam", cardUniqueID);
+            }
 
         }
 
@@ -5209,7 +5235,6 @@ public class GameManager : MonoBehaviour
     /// </summary>
     public void ApplyGameState(SerializableGameState snapshot)
     {
-        lastReceivedGameState = snapshot;
         Debug.LogError("[Visual Sync] ===== APPLY GAME STATE CALLED =====");
         // Single comprehensive log for game state application start
         Debug.Log($"[GameManager] ===== ÖNEMLİ: APPLYING GAME STATE START =====\n" +
@@ -5240,6 +5265,25 @@ public class GameManager : MonoBehaviour
     private IEnumerator ApplyGameStateWithReset(SerializableGameState snapshot)
     {
         Debug.LogError("[Visual Sync] ===== APPLY GAME STATE WITH RESET STARTED =====");
+
+        // CRITICAL: Reset transient state BEFORE initializing deck or resetting cards
+        // This ensures flags like alreadySubbed are cleared so new cards can subscribe to events.
+        ResetTransientClientState();
+        
+        // Enable instant mode for all animations during reconnection
+        if (deckController != null)
+        {
+            deckController.isInstantMode = true;
+            Debug.Log("[GameManager] Instant mode ENABLED for reconnection animations");
+        }
+        
+        // Ensure cards are initialized if this client is reconnecting and bypassed standard initialization
+        if (deckController != null && (deckController.cardInteractionList == null || deckController.cardInteractionList.Count == 0))
+        {
+            Debug.Log("[GameManager] Deck has not been initialized yet. Initializing deck first...");
+            yield return StartCoroutine(deckController.DeckStart());
+        }
+
         // Hard reset the scene cards first so we do not stack
         SyncLog("Starting ResetCards to clear scene");
         yield return StartCoroutine(deckController.ResetCards());
@@ -5307,24 +5351,24 @@ public class GameManager : MonoBehaviour
 
         // 8. (Reconnection completion detection is deferred — dormant path removed.)
 
-        // 9. Stop sync mode if it was active (this will apply buffered moves)
-        if (isSyncMode)
-        {
-            SyncLog("Step 9: Stopping sync mode and applying buffered moves");
-            StopSyncMode();
-        }
-
         // Single comprehensive log for game state application completion
         Debug.Log($"[GameManager] ===== ÖNEMLİ: APPLYING GAME STATE COMPLETED =====\n" +
                  $"Snapshot version: {snapshot.snapshotVersion}\n" +
                  $"Final state: turnCounter={turnCounter}, currentPlayerNo={currentPlayerNo}\n" +
                  $"Center cards: {centerCards.Count}, My cards: {myCards.Count}\n" +
-                 $"Sync mode active: {isSyncMode}, Reconnecting: {isReconnecting}\n" +
+                 $"Reconnecting: {isReconnecting}\n" +
                  $"Game state application process finished successfully");
         
         SyncLog($"ApplyGameStateCoroutine completed successfully for snapshot v{snapshot.snapshotVersion}");
         // Final detailed dump AFTER apply for comparison
         LogDetailedLocalState("CLIENT AFTER APPLY");
+        
+        // Disable instant mode now that reconstruction is complete
+        if (deckController != null)
+        {
+            deckController.isInstantMode = false;
+            Debug.Log("[GameManager] Instant mode DISABLED - reconstruction complete");
+        }
     }
 
     /// <summary>
@@ -5365,6 +5409,11 @@ public class GameManager : MonoBehaviour
         // Reset movement flags
         movePlayedLocally = false;
         isProcessingCapture = false;
+
+        // RECONNECTION FIX: Reset critical flags to allow re-subscription and new RPCs
+        alreadySubbed = false;
+        hasAlreadySentRPC = false;
+        EndGameplayAction("Reconnection reset");
 
         // Reset special power states
         isKopyalaActive = false;
@@ -5429,6 +5478,14 @@ public class GameManager : MonoBehaviour
         {
             deckController.SetStartingPlayerNoCounter(snapshot.roundCount);
             Debug.LogError($"[GAME STATE] Applied roundCount {snapshot.roundCount} to startingPlayerNoCounter for reconnection");
+        }
+        
+        // Update bot-controlled players
+        botControlledPlayers.Clear();
+        if (snapshot.botControlledPlayers.items != null)
+        {
+            botControlledPlayers.AddRange(snapshot.botControlledPlayers.items);
+            Debug.Log($"[GameManager] Applied {botControlledPlayers.Count} bot-controlled players from snapshot");
         }
         
         Debug.Log($"[GameManager] Applied server game state - currentPlayer: {currentPlayerNo}, turnCounter: {turnCounter}, roundCount: {roundCount}");
@@ -5566,8 +5623,8 @@ public class GameManager : MonoBehaviour
         
         SyncLog($"Restoring Kopyala Yapıştır: {sourceCardId} -> {targetCardId}");
         
-        // Use existing OnKopyalaYapistir method to restore visual state
-        OnKopyalaYapistir(targetCardId, sourceCardId);
+        // Use existing OnKopyalaYapistir method to restore visual state instantly
+        OnKopyalaYapistir(targetCardId, sourceCardId, true);
         
         yield return null; // Allow one frame for processing
     }
@@ -5599,8 +5656,8 @@ public class GameManager : MonoBehaviour
         
         Debug.LogError($"[Visual Sync] Card {cardId} found in lookup - calling OnKapkacCardChanged");
         
-        // Use existing OnKapkacCardChanged method to restore visual state
-        OnKapkacCardChanged(cardId);
+        // Use existing OnKapkacCardChanged method to restore visual state instantly
+        OnKapkacCardChanged(cardId, true);
         
         Debug.LogError($"[Visual Sync] OnKapkacCardChanged completed for card: {cardId}");
         
@@ -5621,8 +5678,8 @@ public class GameManager : MonoBehaviour
         string cardId = move.affectedCardIds[0];
         SyncLog($"Restoring Yandım Anam visual effect for card: {cardId}");
         
-        // Use existing OnYandimAnamCardChanged method to restore visual state
-        OnYandimAnamCardChanged(cardId);
+        // Use existing OnYandimAnamCardChanged method to restore visual state instantly
+        OnYandimAnamCardChanged(cardId, true);
         
         yield return null; // Allow one frame for processing
     }
@@ -5648,6 +5705,12 @@ public class GameManager : MonoBehaviour
         if (playerCountLocal <= 0)
         {
             SyncLogWarning("playerCount is not set; skipping rebuild");
+            yield break;
+        }
+
+        if (myNo < 0)
+        {
+            SyncLogWarning($"thisPlayerNumber is {myNo} (seat not yet assigned); skipping rebuild to prevent perspective corruption");
             yield break;
         }
 
@@ -5918,6 +5981,16 @@ public class GameManager : MonoBehaviour
                 Debug.LogWarning($"Card {cardUniqueID} not found in cardLookup when applying power effect {powerEffect}");
             }
         }
+    }
+
+    public Dictionary<string, string> GetCardPowerEffectsSnapshot()
+    {
+        if (cardPowerEffects == null)
+        {
+            return new Dictionary<string, string>();
+        }
+
+        return new Dictionary<string, string>(cardPowerEffects);
     }
 
     /// <summary>
@@ -6396,278 +6469,6 @@ public class GameManager : MonoBehaviour
         Debug.Log("[GameManager] Manually reset all move chains");
     }
 
-    // ===== ENHANCED RECONNECTION: SYNC MODE & MOVE BUFFERING =====
-    
-    /// <summary>
-    /// Starts sync mode - moves will be buffered instead of applied immediately
-    /// </summary>
-    public void StartSyncMode()
-    {
-        Debug.Log("[GameManager] Starting sync mode - moves will be buffered");
-        isSyncMode = true;
-        moveBuffer.StartBuffering();
-        
-        // Subscribe to buffer events
-        moveBuffer.OnMoveBuffered += OnMoveBuffered;
-        moveBuffer.OnBufferedMovesApplied += OnBufferedMovesApplied;
-        moveBuffer.OnMoveTimedOut += OnMoveTimedOut;
-        
-        // ENHANCED RECONNECTION: Ensure UI is in correct state during sync
-        EnsureCorrectUIStateForReconnection();
-    }
-    
-    /// <summary>
-    /// Ensures UI is in correct state for reconnection (closes win screens, etc.)
-    /// This replicates the normal game initialization flow
-    /// </summary>
-    public void EnsureCorrectUIStateForReconnection()
-    {
-        Debug.Log("[GameManager] ===== ENSURING UI STATE FOR RECONNECTION =====");
-        Debug.Log("[GameManager] Replicating normal game initialization flow");
-        
-        // STEP 1: Close waiting screen (like in InitialGameManagerSetUp)
-        if (waitingScreen != null)
-        {
-            if (waitingScreen.activeSelf)
-            {
-                Debug.Log("[GameManager] ✓ Closing waiting screen during reconnection");
-                waitingScreen.SetActive(false);
-            }
-            else
-            {
-                Debug.Log("[GameManager] ✓ Waiting screen already closed");
-            }
-        }
-        else
-        {
-            Debug.LogError("[GameManager] CRITICAL ERROR: waitingScreen is null!");
-        }
-        
-        // STEP 2: Close win screen (like in InitializeCardPrefabs)
-        if (winScreen != null)
-        {
-            if (winScreen.activeSelf)
-            {
-                Debug.Log("[GameManager] ✓ Closing win screen during reconnection");
-                winScreen.SetActive(false);
-            }
-            else
-            {
-                Debug.Log("[GameManager] ✓ Win screen already closed");
-            }
-        }
-        else
-        {
-            Debug.LogError("[GameManager] CRITICAL ERROR: winScreen is null!");
-        }
-        
-        // STEP 3: Ensure main screen is active (game view)
-        if (mainScreen != null)
-        {
-            if (!mainScreen.activeSelf)
-            {
-                Debug.Log("[GameManager] ✓ Activating main screen during reconnection");
-                mainScreen.SetActive(true);
-            }
-            else
-            {
-                Debug.Log("[GameManager] ✓ Main screen already active");
-            }
-        }
-        else
-        {
-            Debug.LogError("[GameManager] CRITICAL ERROR: mainScreen is null!");
-        }
-        
-        // STEP 4: Reset point texts to current values (not "0" since game is ongoing)
-        if (pointTexts != null && pointTexts.Count >= 2)
-        {
-            Debug.Log($"[GameManager] ✓ Point texts ready (count: {pointTexts.Count})");
-            // Don't reset to "0" - the game state will set the correct values
-            // Just ensure they exist and are ready
-        }
-        else
-        {
-            Debug.LogError("[GameManager] CRITICAL ERROR: pointTexts is null or empty!");
-        }
-        
-        // STEP 5: Reset any game state flags that might interfere
-        movePlayedLocally = false;
-        isProcessingCapture = false;
-        Debug.Log("[GameManager] ✓ Game state flags reset");
-        
-        // STEP 6: Ensure ElHolderScript is in correct state
-        if (ElHolderScript.LocalInstance != null)
-        {
-            Debug.Log("[GameManager] ✓ ElHolderScript found and ready");
-            // Don't call ReturnAllHandsToIdle() as it might interfere with game state
-        }
-        else
-        {
-            Debug.LogWarning("[GameManager] ElHolderScript.LocalInstance is null");
-        }
-        
-        Debug.Log("[GameManager] ===== UI STATE CORRECTED FOR RECONNECTION =====");
-    }
-    
-    /// <summary>
-    /// Stops sync mode and applies any buffered moves
-    /// </summary>
-    public void StopSyncMode()
-    {
-        if (!isSyncMode) return;
-        
-        Debug.Log("[GameManager] Stopping sync mode");
-        isSyncMode = false;
-        
-        // Get all buffered moves
-        var bufferedMoves = moveBuffer.StopBuffering();
-        
-        // Apply them in order
-        if (bufferedMoves.Length > 0)
-        {
-            Debug.Log($"[GameManager] Applying {bufferedMoves.Length} buffered moves after sync");
-            ApplyBufferedMoves(bufferedMoves);
-        }
-        
-        // Unsubscribe from buffer events
-        moveBuffer.OnMoveBuffered -= OnMoveBuffered;
-        moveBuffer.OnBufferedMovesApplied -= OnBufferedMovesApplied;
-        moveBuffer.OnMoveTimedOut -= OnMoveTimedOut;
-        
-        // Note: Server notification removed - using desync detection system
-    }
-    
-    /// <summary>
-    /// Buffers a move during sync mode
-    /// </summary>
-    public void BufferMoveForSync(GameMove move)
-    {
-        if (!isSyncMode)
-        {
-            Debug.LogWarning($"[GameManager] Not in sync mode - cannot buffer move {move.moveType} by P{move.playerNumber}");
-            return;
-        }
-        
-        Debug.Log($"[GameManager] Buffering move for sync: {move.moveType} by P{move.playerNumber}");
-        moveBuffer.BufferMove(move);
-    }
-    
-    /// <summary>
-    /// Applies buffered moves after sync is complete
-    /// </summary>
-    public void ApplyBufferedMoves(GameMove[] moves)
-    {
-        Debug.Log($"[GameManager] Applying {moves.Length} buffered moves");
-        
-        // Add to pending moves list
-        pendingMovesToApply.AddRange(moves);
-        
-        // Start applying moves one by one
-        StartCoroutine(ApplyPendingMovesCoroutine());
-    }
-    
-    /// <summary>
-    /// Coroutine to apply pending moves in sequence
-    /// </summary>
-    private IEnumerator ApplyPendingMovesCoroutine()
-    {
-        while (pendingMovesToApply.Count > 0)
-        {
-            var move = pendingMovesToApply[0];
-            pendingMovesToApply.RemoveAt(0);
-            
-            Debug.Log($"[GameManager] Applying buffered move: {move.moveType} by P{move.playerNumber}");
-            
-            // Apply the move based on its type
-            yield return StartCoroutine(ApplyIndividualMove(move));
-            
-            // Small delay between moves to prevent overwhelming the system
-            yield return new WaitForSeconds(0.1f);
-        }
-        
-        Debug.Log("[GameManager] All buffered moves applied");
-    }
-    
-    /// <summary>
-    /// Applies an individual move based on its type
-    /// </summary>
-    private IEnumerator ApplyIndividualMove(GameMove move)
-    {
-        try
-        {
-            switch (move.moveType)
-            {
-                case GameMove.MoveType.PlayToCenter:
-                    Debug.Log($"[GameManager] Applying PlayToCenter move: {move.cardId}");
-                    // The move will be processed by the normal game flow when it arrives via RPC
-                    break;
-                    
-                case GameMove.MoveType.Capture:
-                    Debug.Log($"[GameManager] Applying Capture move: {move.cardId} captures {move.capturedCardIds?.Length ?? 0} cards");
-                    // The move will be processed by the normal game flow when it arrives via RPC
-                    break;
-                    
-                case GameMove.MoveType.SuperPower_Activation:
-                    Debug.Log($"[GameManager] Applying SuperPower activation: {move.superPowerName}");
-                    // Superpower moves will be processed by their respective systems
-                    break;
-                    
-                case GameMove.MoveType.SuperPower_Effect:
-                    Debug.Log($"[GameManager] Applying SuperPower effect: {move.superPowerName}");
-                    // Effects will be applied when the RPC arrives
-                    break;
-                    
-                default:
-                    Debug.LogWarning($"[GameManager] Unknown move type: {move.moveType}");
-                    break;
-            }
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[GameManager] Error applying buffered move {move.moveId}: {e.Message}");
-        }
-        
-        yield return null;
-    }
-    
-    /// <summary>
-    /// Checks if we're currently in sync mode
-    /// </summary>
-    public bool IsSyncMode => isSyncMode;
-    
-    /// <summary>
-    /// Gets the current buffer statistics for debugging
-    /// </summary>
-    public string GetBufferStats()
-    {
-        return moveBuffer.GetBufferStats();
-    }
-    
-    /// <summary>
-    /// Event handler for when a move is buffered
-    /// </summary>
-    private void OnMoveBuffered(GameMove move)
-    {
-        Debug.Log($"[GameManager] Move buffered: {move.moveType} by P{move.playerNumber}");
-    }
-    
-    /// <summary>
-    /// Event handler for when buffered moves are applied
-    /// </summary>
-    private void OnBufferedMovesApplied(GameMove[] moves)
-    {
-        Debug.Log($"[GameManager] {moves.Length} buffered moves were applied");
-    }
-    
-    /// <summary>
-    /// Event handler for when a buffered move times out
-    /// </summary>
-    private void OnMoveTimedOut(GameMove move)
-    {
-        Debug.LogWarning($"[GameManager] Buffered move timed out: {move.moveType} by P{move.playerNumber}");
-    }
-    
     /// <summary>
     /// Rebuilds cardLookup for reconnection by mapping newly created cards to server IDs
     /// </summary>
@@ -6786,6 +6587,9 @@ public class GameManager : MonoBehaviour
         
         // Now restore visual states from the properly synchronized move chain
         yield return StartCoroutine(RestoreVisualStatesFromMoveChain());
+
+        // Deactivate MainUI and other lobby screens after reconnection is complete
+        OnReconnectionGameStateApplied();
         
         Debug.LogError("[Visual Sync] ===== VISUAL RESTORATION AFTER DESYNC CHECK COMPLETED =====");
     }
@@ -6816,12 +6620,12 @@ public class GameManager : MonoBehaviour
     private void RestorePlayerNumberFromPrefs()
     {
         Debug.LogError($"[PLAYER NUMBER] ===== RESTORING PLAYER NUMBER FROM PREFS =====");
-        Debug.LogError($"[PLAYER NUMBER] PlayerPrefs.HasKey('PlayerNumber'): {PlayerPrefs.HasKey("PlayerNumber")}");
+        Debug.LogError($"[PLAYER NUMBER] PlayerPrefs.HasKey('SavedPlayerSeat'): {PlayerPrefs.HasKey("SavedPlayerSeat")}");
         
-        if (PlayerPrefs.HasKey("PlayerNumber"))
+        if (PlayerPrefs.HasKey("SavedPlayerSeat"))
         {
-            int savedPlayerNumber = PlayerPrefs.GetInt("PlayerNumber");
-            Debug.LogError($"[PLAYER NUMBER] Restoring player number {savedPlayerNumber} from PlayerPrefs during reconnection");
+            int savedPlayerNumber = PlayerPrefs.GetInt("SavedPlayerSeat");
+            Debug.LogError($"[PLAYER NUMBER] Restoring player number {savedPlayerNumber} from PlayerPrefs (SavedPlayerSeat) during reconnection");
             
             // Set the player number directly on DeckController
             if (deckController != null)
@@ -6857,6 +6661,7 @@ public class GameManager : MonoBehaviour
         // This is a helper method to debug what's in PlayerPrefs
         // Note: Unity doesn't provide a direct way to get all keys, so we'll check common ones
         var keys = new List<string>();
+        if (PlayerPrefs.HasKey("SavedPlayerSeat")) keys.Add("SavedPlayerSeat");
         if (PlayerPrefs.HasKey("PlayerNumber")) keys.Add("PlayerNumber");
         if (PlayerPrefs.HasKey("JoinCode")) keys.Add("JoinCode");
         if (PlayerPrefs.HasKey("LobbyCode")) keys.Add("LobbyCode");

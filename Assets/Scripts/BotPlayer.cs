@@ -152,7 +152,14 @@ public class BotPlayer : MonoBehaviour
             AddBotLog("[Bot] WARNING: Bot turn called but bot is not active");
             return;
         }
-        
+
+        // DOUBLE SAFETY: Only proceed if the server instance on this client is the active host
+        if (server != null && !server.isActiveHost)
+        {
+            Debug.LogWarning("[Bot] WARNING: Bot turn called but this client's server is NOT the active host. Ignoring.");
+            return;
+        }
+
         // Store the player number for this move
         botPlayerNumber = playerNumber;
         
