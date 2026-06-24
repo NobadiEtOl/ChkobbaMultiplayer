@@ -10,6 +10,7 @@ public class SuperPowerSpawner : MonoBehaviour
     [SerializeField] private Transform infoBoxOriginalPosition; // Original position stored at Start
     [SerializeField] private GameObject infoBoxReachPoint;
     public static SuperPowerSpawner LocalInstance { get; private set; }
+    public bool isDisconnectingCleanUp = false;
     [SerializeField] private List<GameObject> superPowerTokens = new List<GameObject>();
     private Dictionary<SuperPower, GameObject> superPowerPrefabs = new Dictionary<SuperPower, GameObject>();
     private List<SuperPower> superPowerList = new List<SuperPower>(); // Now contains unique powers only (no pre-pooling)
@@ -79,6 +80,97 @@ public class SuperPowerSpawner : MonoBehaviour
 
         centerPosition = centerGameObject.transform.position;
         GetUIElements();
+    }
+
+    public void NotifyServerOfGoldAndPowers()
+    {
+        if (isDisconnectingCleanUp)
+        {
+            Debug.Log("[SuperPowerSpawner] NotifyServerOfGoldAndPowers skipped - disconnection cleanup active");
+            return;
+        }
+
+        if (GameNetworkRelay.Instance != null && DeckController.LocalInstance != null)
+        {
+            int myPlayerNo = DeckController.LocalInstance.thisPlayerNumber;
+            if (myPlayerNo != -1)
+            {
+                List<string> powers = new List<string>();
+                foreach (GameObject obj in spawnedSuperPowers)
+                {
+                    if (obj != null)
+                    {
+                        // Clean check: if it is a placeholder, skip or if it has a token script, extract name
+                        SuperPowerToken token = obj.GetComponent<SuperPowerToken>();
+                        if (token != null && token.power != null)
+                        {
+                            powers.Add(token.power.name);
+                        }
+                    }
+                }
+                GameNetworkRelay.Instance.SyncGoldAndPowersServerRPC(myPlayerNo, currentGold, powers.ToArray());
+                Debug.Log($"[SuperPowerSpawner] Synced with server - Gold: {currentGold}, Powers Count: {powers.Count}");
+            }
+        }
+    }
+
+    public void SetGold(int amount)
+    {
+        currentGold = amount;
+        UpdateGoldDisplay();
+        NotifyServerOfGoldAndPowers();
+    }
+
+    public void RestorePowers(List<string> powerNames)
+    {
+        // CRITICAL FIX: If the dictionary hasn't been initialized yet, initialize it now
+        if (superPowerPrefabs == null || superPowerPrefabs.Count == 0)
+        {
+            Debug.Log("[SuperPowerSpawner] superPowerPrefabs is empty during RestorePowers. Initializing now...");
+            InitializeSuperPowers();
+        }
+
+        // Temporarily set flag to avoid sending sync messages during clearing
+        bool prevFlag = isDisconnectingCleanUp;
+        isDisconnectingCleanUp = true;
+        try
+        {
+            foreach (var power in spawnedSuperPowers.ToArray())
+            {
+                if (power != null)
+                {
+                    Destroy(power);
+                }
+            }
+            spawnedSuperPowers.Clear();
+        }
+        finally
+        {
+            isDisconnectingCleanUp = prevFlag;
+        }
+
+        // Spawn each restored power
+        foreach (string powerName in powerNames)
+        {
+            SuperPower targetPower = null;
+            foreach (var power in superPowerPrefabs.Keys)
+            {
+                if (power != null && (power.name == powerName || power.GetType().Name == powerName))
+                {
+                    targetPower = power;
+                    break;
+                }
+            }
+
+            if (targetPower != null)
+            {
+                StartCoroutine(SpawnSuperPower(targetPower, null, 150f));
+            }
+            else
+            {
+                Debug.LogWarning($"[SuperPowerSpawner] RestorePowers: Could not find key for power: {powerName}");
+            }
+        }
     }
 
     void Start()
@@ -1511,6 +1603,7 @@ public class SuperPowerSpawner : MonoBehaviour
             instance.transform.localScale = finalScale;
 
             UpdateTokenPositions();
+            NotifyServerOfGoldAndPowers();
         }
         else
         {
@@ -1567,6 +1660,7 @@ public class SuperPowerSpawner : MonoBehaviour
         {
             Debug.LogWarning($"{token.name} not found in spawned super powers.");
         }
+        NotifyServerOfGoldAndPowers();
     }
 
     private static readonly int[][] spawnIndexPatterns = new int[][]
@@ -1731,6 +1825,7 @@ public class SuperPowerSpawner : MonoBehaviour
         currentGold = Mathf.Min(currentGold + amount, maxGold);
         UpdateGoldDisplay();
         Debug.Log($"[SuperPowerSpawner] Added {amount} gold. New balance: {currentGold}");
+        NotifyServerOfGoldAndPowers();
     }
     
     /// <summary>
@@ -1743,6 +1838,7 @@ public class SuperPowerSpawner : MonoBehaviour
             currentGold -= amount;
             UpdateGoldDisplay();
             Debug.Log($"[SuperPowerSpawner] Spent {amount} gold. New balance: {currentGold}");
+            NotifyServerOfGoldAndPowers();
             return true;
         }
         else
@@ -2683,6 +2779,7 @@ public class SuperPowerSpawner : MonoBehaviour
         }
         spawnedSuperPowers.Clear();
         Debug.Log("[SuperPowerSpawner] All spawned superpowers cleared.");
+        NotifyServerOfGoldAndPowers();
     }
     
     /// <summary>

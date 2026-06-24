@@ -37,6 +37,7 @@ public struct SerializableGameState : INetworkSerializable
     // Card containers (all using uniqueCardID strings)
     public SerializableStringList deck;
     public SerializableStringList center;
+    public SerializableStringList firstThreeDealtCardIds;
     public SerializableDictionary hands; // Dictionary<int, List<string>>
     public SerializableDictionary pools; // Dictionary<int, List<string>>
     public SerializableDictionary pistiPools; // Dictionary<int, List<string>>
@@ -69,7 +70,9 @@ public struct SerializableGameState : INetworkSerializable
     public SerializableStringDictionary cardPowerEffects; // Dictionary<string, string> - cardID -> powerEffect
 
     // Optional: Player gold (if you want gold to be sync-safe)
-    public SerializableDictionary playerGold; // Dictionary<int, int>
+    public SerializableIntDictionary playerGold; // Dictionary<int, int>
+
+    public SerializableDictionary playerSuperPowers; // Dictionary<int, List<string>>
 
     public SerializableIntArray botControlledPlayers; // Players currently controlled by bots
 
@@ -99,6 +102,7 @@ public struct SerializableGameState : INetworkSerializable
 
         serializer.SerializeValue(ref deck);
         serializer.SerializeValue(ref center);
+        serializer.SerializeValue(ref firstThreeDealtCardIds);
         serializer.SerializeValue(ref hands);
         serializer.SerializeValue(ref pools);
         serializer.SerializeValue(ref pistiPools);
@@ -128,6 +132,7 @@ public struct SerializableGameState : INetworkSerializable
         serializer.SerializeValue(ref cardPowerEffects);
 
         serializer.SerializeValue(ref playerGold);
+        serializer.SerializeValue(ref playerSuperPowers);
         serializer.SerializeValue(ref botControlledPlayers);
 
         // Card master lookup (cardId -> {kind, value})
@@ -143,6 +148,81 @@ public struct SerializableGameState : INetworkSerializable
             serializer.SerializeValue(ref cardLookup[i].cardId);
             serializer.SerializeValue(ref cardLookup[i].kind);
             serializer.SerializeValue(ref cardLookup[i].value);
+        }
+    }
+}
+
+/// <summary>
+/// Helper for serializing Dictionary<int, int>
+/// </summary>
+[Serializable]
+public struct SerializableIntDictionary : INetworkSerializable
+{
+    public int[] keys;
+    public int[] values;
+
+    public SerializableIntDictionary(Dictionary<int, int> dict)
+    {
+        if (dict != null && dict.Count > 0)
+        {
+            keys = new int[dict.Count];
+            values = new int[dict.Count];
+            int i = 0;
+            foreach (var kvp in dict)
+            {
+                keys[i] = kvp.Key;
+                values[i] = kvp.Value;
+                i++;
+            }
+        }
+        else
+        {
+            keys = new int[0];
+            values = new int[0];
+        }
+    }
+
+    public Dictionary<int, int> ToDictionary()
+    {
+        var dict = new Dictionary<int, int>();
+        if (keys != null && values != null)
+        {
+            for (int i = 0; i < Math.Min(keys.Length, values.Length); i++)
+            {
+                dict[keys[i]] = values[i];
+            }
+        }
+        return dict;
+    }
+
+    public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
+    {
+        int length = keys != null ? keys.Length : 0;
+        int valuesLength = values != null ? values.Length : 0;
+
+        if (serializer.IsWriter)
+        {
+            length = Math.Min(length, valuesLength);
+        }
+        serializer.SerializeValue(ref length);
+
+        if (serializer.IsReader)
+        {
+            keys = new int[length];
+            values = new int[length];
+        }
+
+        for (int i = 0; i < length; i++)
+        {
+            int k = serializer.IsWriter ? keys[i] : 0;
+            int v = serializer.IsWriter ? values[i] : 0;
+            serializer.SerializeValue(ref k);
+            serializer.SerializeValue(ref v);
+            if (serializer.IsReader)
+            {
+                keys[i] = k;
+                values[i] = v;
+            }
         }
     }
 }

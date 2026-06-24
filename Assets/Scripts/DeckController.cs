@@ -16,6 +16,11 @@ public class DeckController : MonoBehaviour
 {
     public static DeckController LocalInstance;
     public int thisPlayerNumber;
+
+    public int GetThisPlayerNumber()
+    {
+        return thisPlayerNumber;
+    }
     [SerializeField] private GameManager gameManager;
     [SerializeField] private SoundEffectsController soundEffectsController;
     [SerializeField] private List<GameObject> cardPrefabsList;//Prefabs of all the cards.
@@ -26,7 +31,7 @@ public class DeckController : MonoBehaviour
     public List<Transform> playerHandTransforms = new List<Transform>();
     public List<Transform> playerPoolTransforms = new List<Transform>();
     public Transform centerTransform;
-    private List<Transform> playerPiştiPoolTransforms = new List<Transform>();
+    public List<Transform> playerPiştiPoolTransforms = new List<Transform>();
     private int relativeIndex = 0;
     public int playerCount = 0;
     int offset = 150;
@@ -66,7 +71,7 @@ public class DeckController : MonoBehaviour
 
     void Start()
     {
-        thisPlayerNumber = 0;
+        thisPlayerNumber = -1;
         InitialDeckSetUp();
         
         // Store deck starting position
@@ -557,18 +562,22 @@ public class DeckController : MonoBehaviour
         for (int i = 0; i < 4; i++)
         {
             string uniqueCardID = centerCardIDs[i];
-            GameObject tempCenterCard = CardInteraction.cardLookup[uniqueCardID].gameObject;
+            CardInteraction ci = CardInteraction.cardLookup[uniqueCardID];
+            GameObject tempCenterCard = ci.gameObject;
             cardObjects.Add(tempCenterCard);
             if (tempCenterCard != null)
             {
                 tempCenterCard.transform.parent = centerTransform;
+
+                // Explicitly set/clear the isFirstThreeDealtCard flag on the client
+                ci.isFirstThreeDealtCard = (i < 3);
 
                 // Calculate position based on centerTransform
                 Vector3 centerPosition = centerTransform.position;
                 Vector3 centerRotation = centerTransform.rotation.eulerAngles;
 
                 gameManager.centerCardsObjects.Add(tempCenterCard);
-                gameManager.centerCards.Add(uniqueCardID, CardInteraction.cardLookup[uniqueCardID].GetCardID());
+                gameManager.centerCards.Add(uniqueCardID, ci.GetCardID());
 
                 if (i == 3)
                 {
@@ -1426,29 +1435,82 @@ public class DeckController : MonoBehaviour
                 poolCardOriginalTransforms[card] = (card.transform.position, card.transform.rotation, card.transform.localScale);
         }
 
-        // --- Layout Regular Pool Cards (sorted) ---
+        // --- Layout Regular Pool Cards (sorted/unsorted face down depending on side) ---
         if (poolCards.Count > 0)
         {
-            poolCards.Sort((a, b) =>
+            if (poolIndex == 0) // Owner: Sort all cards and show them face-up as normal
             {
-                int aKind = 0, aValue = 0, bKind = 0, bValue = 0;
-                var aParts = a.tag.Split('_');
-                var bParts = b.tag.Split('_');
-                if (aParts.Length == 2) { int.TryParse(aParts[0], out aKind); int.TryParse(aParts[1], out aValue); }
-                if (bParts.Length == 2) { int.TryParse(bParts[0], out bKind); int.TryParse(bParts[1], out bValue); }
-                int kindCompare = aKind.CompareTo(bKind);
-                return kindCompare != 0 ? kindCompare : aValue.CompareTo(bValue);
-            });
+                poolCards.Sort((a, b) =>
+                {
+                    int aKind = 0, aValue = 0, bKind = 0, bValue = 0;
+                    var aParts = a.tag.Split('_');
+                    var bParts = b.tag.Split('_');
+                    if (aParts.Length == 2) { int.TryParse(aParts[0], out aKind); int.TryParse(aParts[1], out aValue); }
+                    if (bParts.Length == 2) { int.TryParse(bParts[0], out bKind); int.TryParse(bParts[1], out bValue); }
+                    int kindCompare = aKind.CompareTo(bKind);
+                    return kindCompare != 0 ? kindCompare : aValue.CompareTo(bValue);
+                });
 
-            float spacing = 600f;
-            float offsetMult = (poolCards.Count - 1) / 2f;
-            float baseZ = centerTransform.position.z - 1200;
-            for (int i = 0; i < poolCards.Count; i++)
+                float spacing = 600f;
+                float offsetMult = (poolCards.Count - 1) / 2f;
+                float baseZ = centerTransform.position.z - 1200;
+                for (int i = 0; i < poolCards.Count; i++)
+                {
+                    Quaternion rotation = Quaternion.Euler(90, 0, 0); // Face up
+                    Vector3 targetPosition = new Vector3(spacing * (i - offsetMult), (i * 10) + centerTransform.position.y + 5000, baseZ);
+                    Vector3 targetScale = new Vector3(myCardsScale, myCardsScale, myCardsScale);
+                    MoveCard(targetPosition, poolCards[i], 10, rotation, targetScale);
+                }
+            }
+            else // Opponent: First 3 dealt center cards stay face-down and unsorted at the beginning of the list
             {
-                Quaternion rotation = Quaternion.Euler(90, 0, 0);
-                Vector3 targetPosition = new Vector3(spacing * (i - offsetMult), (i * 10) + centerTransform.position.y + 5000, baseZ);
-                Vector3 targetScale = new Vector3(myCardsScale, myCardsScale, myCardsScale);
-                MoveCard(targetPosition, poolCards[i], 10, rotation, targetScale);
+                var firstThree = new List<GameObject>();
+                var others = new List<GameObject>();
+
+                foreach (var card in poolCards)
+                {
+                    var ci = card.GetComponent<CardInteraction>();
+                    if (ci != null && ci.isFirstThreeDealtCard)
+                    {
+                        firstThree.Add(card);
+                    }
+                    else
+                    {
+                        others.Add(card);
+                    }
+                }
+
+                // Sort only subsequent cards (others)
+                others.Sort((a, b) =>
+                {
+                    int aKind = 0, aValue = 0, bKind = 0, bValue = 0;
+                    var aParts = a.tag.Split('_');
+                    var bParts = b.tag.Split('_');
+                    if (aParts.Length == 2) { int.TryParse(aParts[0], out aKind); int.TryParse(aParts[1], out aValue); }
+                    if (bParts.Length == 2) { int.TryParse(bParts[0], out bKind); int.TryParse(bParts[1], out bValue); }
+                    int kindCompare = aKind.CompareTo(bKind);
+                    return kindCompare != 0 ? kindCompare : aValue.CompareTo(bValue);
+                });
+
+                // Combine: unsorted first-three cards at the beginning, followed by sorted others
+                var combinedPoolCards = new List<GameObject>();
+                combinedPoolCards.AddRange(firstThree);
+                combinedPoolCards.AddRange(others);
+
+                float spacing = 600f;
+                float offsetMult = (combinedPoolCards.Count - 1) / 2f;
+                float baseZ = centerTransform.position.z - 1200;
+                for (int i = 0; i < combinedPoolCards.Count; i++)
+                {
+                    var card = combinedPoolCards[i];
+                    var ci = card.GetComponent<CardInteraction>();
+                    bool isFaceDown = ci != null && ci.isFirstThreeDealtCard;
+                    
+                    Quaternion rotation = isFaceDown ? Quaternion.Euler(-90, 0, 0) : Quaternion.Euler(90, 0, 0);
+                    Vector3 targetPosition = new Vector3(spacing * (i - offsetMult), (i * 10) + centerTransform.position.y + 5000, baseZ);
+                    Vector3 targetScale = new Vector3(myCardsScale, myCardsScale, myCardsScale);
+                    MoveCard(targetPosition, card, 10, rotation, targetScale);
+                }
             }
         }
 
@@ -2116,6 +2178,47 @@ public class DeckController : MonoBehaviour
         PlayerPrefs.SetInt("SavedPlayerSeat", playerNumber);
         PlayerPrefs.Save();
         Debug.LogError($"[PLAYER NUMBER] Saved player number {playerNumber} to PlayerPrefs (SavedPlayerSeat) for reconnection");
+    }
+
+    /// <summary>
+    /// Rebuilds CardInteraction.cardLookup deterministically from active GameObjects.
+    /// Prevents KeyNotFoundExceptions on reconnection due to stale static references.
+    /// </summary>
+    public void RebuildCardLookup()
+    {
+        if (CardInteraction.cardLookup == null)
+        {
+            CardInteraction.cardLookup = new Dictionary<string, CardInteraction>();
+        }
+        CardInteraction.cardLookup.Clear();
+
+        // 1. First rebuild from our tracked cardObjectList
+        if (cardObjectList != null)
+        {
+            foreach (var cardObj in cardObjectList)
+            {
+                if (cardObj != null)
+                {
+                    CardInteraction cardInteraction = cardObj.GetComponent<CardInteraction>();
+                    if (cardInteraction != null && !string.IsNullOrEmpty(cardInteraction.uniqueCardInstanceID))
+                    {
+                        CardInteraction.cardLookup[cardInteraction.uniqueCardInstanceID] = cardInteraction;
+                    }
+                }
+            }
+        }
+
+        // 2. Fallback: Scan the scene to ensure we catch every card (e.g. if list was cleared but objects remain)
+        var allCardInteractions = UnityEngine.Object.FindObjectsByType<CardInteraction>(UnityEngine.FindObjectsSortMode.None);
+        foreach (var ci in allCardInteractions)
+        {
+            if (ci != null && !string.IsNullOrEmpty(ci.uniqueCardInstanceID))
+            {
+                CardInteraction.cardLookup[ci.uniqueCardInstanceID] = ci;
+            }
+        }
+
+        Debug.LogWarning($"[DeckController] Rebuilt CardInteraction.cardLookup with {CardInteraction.cardLookup.Count} active cards.");
     }
 
     public int GetSavedPlayerSeat()
@@ -2969,7 +3072,7 @@ public class DeckController : MonoBehaviour
 
 
     /// <summary>
-    /// Assigns card GameObjects to player pools based on a dictionary of playerNo -> List of card IDs.
+    /// Assigns and visually formats card GameObjects to player pools with proper layout offsets and rotation.
     /// </summary>
     public void AssignCardsToPlayerPools(SerializableDictionary playersPooledCardsIDsSerialized)
     {
@@ -2986,16 +3089,30 @@ public class DeckController : MonoBehaviour
             List<string> cardIDs = kvp.Value;
 
             // Get the correct pool transform for this player
-            int poolIndex = GetPoolIndex(playerNo); // Use your existing logic for 2v2/1v1
+            int poolIndex = GetPoolIndex(playerNo);
             Transform poolTransform = playerPoolTransforms[poolIndex];
 
-            foreach (string cardID in cardIDs)
+            // Re-sync the layout offset counters based on the count of rebuilt pool cards
+            ResetOffsetCounterForPool(poolIndex, cardIDs.Count);
+
+            for (int i = 0; i < cardIDs.Count; i++)
             {
+                string cardID = cardIDs[i];
                 if (CardInteraction.cardLookup.TryGetValue(cardID, out var cardInteraction))
                 {
                     GameObject cardObj = cardInteraction.gameObject;
                     cardObj.transform.SetParent(poolTransform, false);
-                    // Optionally, reset position/rotation/scale here if needed
+
+                    // Re-connection fix: Place exactly at pool world position (localPosition = zero)
+                    cardObj.transform.localPosition = Vector3.zero;
+
+                    // Re-connection fix: Set world rotation to avoid double-rotation under parent
+                    Vector3 tempRotation = poolTransform.rotation.eulerAngles;
+                    cardObj.transform.rotation = Quaternion.Euler(tempRotation.x - 90, tempRotation.y, tempRotation.z + UnityEngine.Random.Range(170f, 190f));
+
+                    // Scaled based on whether it is local player (poolIndex == 0) or opponent
+                    int targetScale = (poolIndex == 0) ? initialScale : normalScale;
+                    cardObj.transform.localScale = new Vector3(targetScale, targetScale, targetScale);
                 }
                 else
                 {
@@ -3003,6 +3120,72 @@ public class DeckController : MonoBehaviour
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Assigns and visually formats card GameObjects to player Pişti pools.
+    /// </summary>
+    public void AssignCardsToPlayerPistiPools(SerializableDictionary playersPistiCardsIDsSerialized)
+    {
+        Dictionary<int, List<string>> playersPistiCardsIDs = playersPistiCardsIDsSerialized.ToDictionary();
+        if (playerPiştiPoolTransforms == null || playerPiştiPoolTransforms.Count == 0)
+        {
+            Debug.LogError("playerPiştiPoolTransforms not set!");
+            return;
+        }
+
+        foreach (var kvp in playersPistiCardsIDs)
+        {
+            int playerNo = kvp.Key;
+            List<string> cardIDs = kvp.Value;
+
+            // Get the correct pişti pool transform for this player
+            int poolIndex = GetPoolIndex(playerNo);
+            Transform pistiTransform = playerPiştiPoolTransforms[poolIndex];
+
+            for (int i = 0; i < cardIDs.Count; i++)
+            {
+                string cardID = cardIDs[i];
+                if (CardInteraction.cardLookup.TryGetValue(cardID, out var cardInteraction))
+                {
+                    GameObject cardObj = cardInteraction.gameObject;
+                    cardObj.transform.SetParent(pistiTransform, false);
+
+                    Vector3 tempRotation = pistiTransform.rotation.eulerAngles;
+                    int targetScale = (poolIndex == 0) ? initialScale : normalScale;
+                    cardObj.transform.localScale = new Vector3(targetScale, targetScale, targetScale);
+
+                    // Re-connection fix: Set world position and world rotation directly
+                    if (i == cardIDs.Count - 1 && cardIDs.Count > 1)
+                    {
+                        // Capturing card faces UP
+                        cardObj.transform.position = new Vector3(pistiTransform.position.x + 100 + i, pistiTransform.position.y, pistiTransform.position.z - i + 10);
+                        cardObj.transform.rotation = Quaternion.Euler(tempRotation.x + 90, tempRotation.y, tempRotation.z + UnityEngine.Random.Range(170f, 190f) + 90);
+                    }
+                    else
+                    {
+                        // Base pişti cards face DOWN
+                        cardObj.transform.position = pistiTransform.position;
+                        cardObj.transform.rotation = Quaternion.Euler(tempRotation.x - 90, tempRotation.y, tempRotation.z + UnityEngine.Random.Range(170f, 190f));
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning($"CardInteraction.cardLookup does not contain pişti cardID: {cardID}");
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Private helper to synchronize layout counters with rebuilt pool sizes
+    /// </summary>
+    private void ResetOffsetCounterForPool(int poolIndex, int cardCount)
+    {
+        int counterVal = cardCount - 1;
+        if (poolIndex == 0) offsetCounter0 = counterVal;
+        else if (poolIndex == 1) offsetCounter1 = counterVal;
+        else if (poolIndex == 2) offsetCounter2 = counterVal;
     }
 
     public void AssignCardsToPlayerHands(Dictionary<int, List<string>> playersHandCardsIDs)

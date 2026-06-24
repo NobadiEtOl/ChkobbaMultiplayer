@@ -81,10 +81,87 @@ public class NetworkManagerUI : MonoBehaviour
     private bool isInGame = false; // Whether we're currently in an active game
     private bool isMigrating = false;
     private bool isFlowBusy = false;
+    private SerializableGameState localMigrationSnapshot;
 
     // === SESSIONS API ===
     private ISession currentSession;
     public ISession CurrentSession => currentSession;
+    public bool IsMigrating => isMigrating;
+
+    [Serializable]
+    public struct ServerTruths
+    {
+        public int seed;
+        public int[] points;
+        public int[] pistiCounts;
+        public int turnCounter;
+        public int roundCount;
+        public int lastPlayerToCapture;
+        public int currentPlayer;
+        public int startingPlayerNo;
+        public List<Server.PlayerGoldEntry> playerGolds;
+        public List<Server.PlayerPowersEntry> playerSuperPowers;
+    }
+
+    private SerializableGameState Merge(ServerTruths truths, SerializableGameState snapshot)
+    {
+        snapshot.seed = truths.seed;
+        
+        // Prioritize local real-time captured turn state over stale cloud truths
+        if (snapshot.turnCounter == 0)
+        {
+            snapshot.turnCounter = truths.turnCounter;
+            snapshot.currentPlayer = truths.currentPlayer;
+        }
+        else
+        {
+            Debug.Log($"[MIGRATION] Prioritizing local real-time turn state - Turn: {snapshot.turnCounter}, Player: {snapshot.currentPlayer}");
+        }
+
+        snapshot.roundCount = truths.roundCount;
+        snapshot.lastPlayerToCapture = truths.lastPlayerToCapture;
+        snapshot.points = new SerializableIntArray(truths.points);
+        snapshot.pistiCounts = new SerializableIntArray(truths.pistiCounts);
+        snapshot.startingPlayerNo = truths.startingPlayerNo;
+
+        // Restore player gold dictionaries from ServerTruths during migration merge
+        if (truths.playerGolds != null && truths.playerGolds.Count > 0)
+        {
+            var goldDict = new Dictionary<int, int>();
+            foreach (var entry in truths.playerGolds)
+            {
+                goldDict[entry.playerNo] = entry.gold;
+            }
+            snapshot.playerGold = new SerializableIntDictionary(goldDict);
+            Debug.Log($"[MIGRATION] Merged {goldDict.Count} player gold values from ServerTruths into snapshot.");
+        }
+
+        // Restore player superpowers from ServerTruths during migration merge
+        if (truths.playerSuperPowers != null && truths.playerSuperPowers.Count > 0)
+        {
+            var powersDict = new Dictionary<int, List<string>>();
+            foreach (var entry in truths.playerSuperPowers)
+            {
+                powersDict[entry.playerNo] = new List<string>(entry.powers);
+            }
+            snapshot.playerSuperPowers = new SerializableDictionary(powersDict);
+            Debug.Log($"[MIGRATION] Merged {powersDict.Count} player superpower sets from ServerTruths into snapshot.");
+        }
+
+        return snapshot;
+    }
+
+    public ServerTruths ReadServerTruthsFromSession()
+    {
+        if (currentSession != null && currentSession.Properties.ContainsKey("GAME_META"))
+        {
+            string json = currentSession.Properties["GAME_META"].Value;
+            Debug.Log($"[SERVER_TRUTHS] Read from session: {json}");
+            return JsonUtility.FromJson<ServerTruths>(json);
+        }
+        Debug.LogWarning("[SERVER_TRUTHS] No GAME_META found in session properties.");
+        return default;
+    }
 
     // === UI REFERENCES ===
     private GameObject mainScreen;
@@ -244,6 +321,12 @@ public class NetworkManagerUI : MonoBehaviour
             Server.Singleton.SetBotModeEnabled(isQuickPlay);
         }
         if (GameManager.LocalInstance != null) GameManager.LocalInstance.ResetForNewGame();
+
+        if (privateFlag && mainUIScript != null)
+        {
+            mainUIScript.OpenWaitingScreenUI("blue", playerCount.ToString(), "YÜKLENİYOR");
+        }
+
         await EnsureServicesReady();
         try
         {
@@ -259,7 +342,15 @@ public class NetworkManagerUI : MonoBehaviour
             isInGame = true;
             return currentSession.Code;
         }
-        catch (Exception e) { Debug.LogError($"[NetworkManagerUI] Failed to start host: {e.Message}"); return null; }
+        catch (Exception e) 
+        { 
+            Debug.LogError($"[NetworkManagerUI] Failed to start host: {e.Message}"); 
+            if (privateFlag && mainUIScript != null)
+            {
+                mainUIScript.OnReturnFromWaitingScreen();
+            }
+            return null; 
+        }
     }
 
     public async Task<bool> StartClientWithRelay(string joinCodeOverride = null)
@@ -358,13 +449,38 @@ public class NetworkManagerUI : MonoBehaviour
 
     private IEnumerator HandleHostMigrationRoutine()
     {
-        Debug.Log("[NetworkManagerUI] Host migration routine started. Waiting for session update...");
-        
-        // Ensure NGO is shut down before we try to restart it
+        Debug.Log("[NetworkManagerUI] Host migration routine started. Capturing local state...");
+
+        // 1. Pull metadata from Session
+        ServerTruths truths = ReadServerTruthsFromSession();
+
+        // 2. Capture visual snapshot from scene
+        if (GameManager.LocalInstance != null)
+        {
+            localMigrationSnapshot = GameManager.LocalInstance.CaptureVisualSnapshot();
+
+            // 3. Merge
+            localMigrationSnapshot = Merge(truths, localMigrationSnapshot);
+            Debug.Log($"[MIGRATION] State captured and merged. Snapshot v{localMigrationSnapshot.snapshotVersion}, Seed: {localMigrationSnapshot.seed}");
+        }
+        else
+        {
+            Debug.LogWarning("[MIGRATION] GameManager.LocalInstance is null. Cannot capture visual state.");
+            localMigrationSnapshot = default;
+        }
+
+        // 4. Shutdown NGO
         if (NetworkManager.Singleton.IsListening) NetworkManager.Singleton.Shutdown();
-        
+        yield return new WaitUntil(() => !NetworkManager.Singleton.IsListening);
+
+        // A7: Staggered start based on seat index to prevent simultaneous promotion attempts
+        int mySeat = DeckController.LocalInstance != null ? DeckController.LocalInstance.thisPlayerNumber : 0;
+        float staggerDelay = mySeat * 1.5f;
+        Debug.Log($"[MIGRATION] Staggering migration start by {staggerDelay}s (Seat {mySeat})");
+        yield return new WaitForSeconds(staggerDelay);
+
         // Wait a few seconds for the Session API to elect a new host
-        float timeout = 10f;
+        float timeout = 15f; // Increased timeout for staggered starts
         float elapsed = 0f;
         while (elapsed < timeout)
         {
@@ -463,8 +579,20 @@ public class NetworkManagerUI : MonoBehaviour
         NetworkManager.Singleton.StartHost();
         yield return new WaitUntil(() => Server.Singleton != null);
 
-        var migrationSnapshot = Server.Singleton.CaptureMigrationSnapshot();
-        if (!Server.Singleton.RestoreFromSnapshot(migrationSnapshot))
+        bool restoreSuccess = false;
+        if (localMigrationSnapshot.snapshotVersion > 0)
+        {
+            Debug.Log($"[MIGRATION] Injecting local migration snapshot v{localMigrationSnapshot.snapshotVersion}");
+            restoreSuccess = Server.Singleton.RestoreFromSnapshot(localMigrationSnapshot);
+        }
+        else
+        {
+            Debug.LogWarning("[MIGRATION] No local snapshot found, attempting server-side capture fallback.");
+            var migrationSnapshot = Server.Singleton.CaptureMigrationSnapshot();
+            restoreSuccess = Server.Singleton.RestoreFromSnapshot(migrationSnapshot);
+        }
+
+        if (!restoreSuccess)
         {
             Debug.LogError("[MIGRATION] Host migration restore failed; disconnecting to avoid a partial state.");
             isMigrating = false;
@@ -472,7 +600,7 @@ public class NetworkManagerUI : MonoBehaviour
             yield break;
         }
 
-        Debug.Log($"[MIGRATION] Restored migration snapshot v{migrationSnapshot.snapshotVersion} on new host.");
+        Debug.Log($"[MIGRATION] Restored migration snapshot on new host.");
 
         int mySeat = -1;
         if (DeckController.LocalInstance != null)
@@ -533,8 +661,10 @@ public class NetworkManagerUI : MonoBehaviour
         // 4. Perform the Reclaim Seat handshake.
         if (DeckController.LocalInstance != null)
         {
-            int myOriginalSeat = PlayerPrefs.GetInt("SavedPlayerSeat", -1);
-            if (myOriginalSeat < 0) myOriginalSeat = DeckController.LocalInstance.thisPlayerNumber;
+            // Prefer the live, safe in-memory RAM seat over the shared registry PlayerPrefs
+            // to support seamless local multi-tab testing on a single computer.
+            int myOriginalSeat = DeckController.LocalInstance.thisPlayerNumber;
+            if (myOriginalSeat < 0) myOriginalSeat = PlayerPrefs.GetInt("SavedPlayerSeat", -1);
             Debug.Log($"[NetworkManagerUI] Re-joined! Reclaiming seat {myOriginalSeat}...");
             
             // Find the relay object - check GameManager first as it usually has it
@@ -578,7 +708,12 @@ public class NetworkManagerUI : MonoBehaviour
     private void ResetPlayerGameStateBeforeDisconnection()
     {
         SuperPowerSpawner spawner = FindFirstObjectByType<SuperPowerSpawner>();
-        if (spawner != null) { spawner.ResetGoldToStarting(); spawner.ClearAllSpawnedPowers(); }
+        if (spawner != null)
+        {
+            spawner.isDisconnectingCleanUp = true;
+            spawner.ResetGoldToStarting();
+            spawner.ClearAllSpawnedPowers();
+        }
     }
 
     private void EnsureMainScreenIsActive()

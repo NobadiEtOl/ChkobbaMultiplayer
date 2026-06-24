@@ -24,6 +24,8 @@ public class MainUIScript : MonoBehaviour
     [SerializeField] private GameObject currentModeYellow;
     [SerializeField] private GameObject mainScreen;
     
+    private Coroutine joinCodeAnimationCoroutine;
+    
     // Start is called before the first frame update
     void Start()
     {
@@ -123,6 +125,12 @@ public class MainUIScript : MonoBehaviour
 
     public void OpenWaitingScreenUI(string color, string playerCount, string joinCode)
     {
+        if (joinCodeAnimationCoroutine != null)
+        {
+            StopCoroutine(joinCodeAnimationCoroutine);
+            joinCodeAnimationCoroutine = null;
+        }
+
         if(startingScreenUI.activeSelf)startingScreenUI.SetActive(false);
         waitingScreenUI.SetActive(true);
         
@@ -150,18 +158,55 @@ public class MainUIScript : MonoBehaviour
             if (playerCount == "2")
             {
                 currentMode1v1[1].SetActive(true);
-                currentMode1v1[1].transform.GetChild(0).gameObject.GetComponent<Text>().text = joinCode;
+                Text txt = currentMode1v1[1].transform.GetChild(0).gameObject.GetComponent<Text>();
+                if (txt != null)
+                {
+                    if (joinCode == "YÜKLENİYOR")
+                    {
+                        joinCodeAnimationCoroutine = StartCoroutine(AnimateJoinCode(txt));
+                    }
+                    else
+                    {
+                        txt.text = joinCode;
+                    }
+                }
             }
             else if (playerCount == "4")
             {
                 currentMode2v2[1].SetActive(true);
-                currentMode2v2[1].transform.GetChild(0).gameObject.GetComponent<Text>().text = joinCode;
+                Text txt = currentMode2v2[1].transform.GetChild(0).gameObject.GetComponent<Text>();
+                if (txt != null)
+                {
+                    if (joinCode == "YÜKLENİYOR")
+                    {
+                        joinCodeAnimationCoroutine = StartCoroutine(AnimateJoinCode(txt));
+                    }
+                    else
+                    {
+                        txt.text = joinCode;
+                    }
+                }
             }
         }
         else if(color == "yellow")
         {
             currentModeYellow.SetActive(true);
             currentModeYellow.transform.GetChild(0).gameObject.GetComponent<Text>().text = joinCode;
+        }
+    }
+
+    private IEnumerator AnimateJoinCode(Text textComponent)
+    {
+        if (textComponent == null) yield break;
+        
+        while (true)
+        {
+            textComponent.text = ".";
+            yield return new WaitForSeconds(0.5f);
+            textComponent.text = "..";
+            yield return new WaitForSeconds(0.5f);
+            textComponent.text = "...";
+            yield return new WaitForSeconds(0.5f);
         }
     }
 
@@ -198,6 +243,12 @@ public class MainUIScript : MonoBehaviour
     private void CloseAllUIPages()
     {
         Debug.Log("[MainUIScript] Closing all UI pages...");
+
+        if (joinCodeAnimationCoroutine != null)
+        {
+            StopCoroutine(joinCodeAnimationCoroutine);
+            joinCodeAnimationCoroutine = null;
+        }
         
         // Close all popup UIs
         quickPlayUI.SetActive(false);
@@ -611,6 +662,13 @@ public class MainUIScript : MonoBehaviour
     private void ResetPlayerGameStateBeforeDisconnection()
     {
         Debug.Log("[MainUIScript] Resetting player game state before disconnection...");
+        
+        SuperPowerSpawner spawner = FindObjectOfType<SuperPowerSpawner>();
+        if (spawner != null)
+        {
+            spawner.isDisconnectingCleanUp = true;
+            Debug.Log("[MainUIScript] Set isDisconnectingCleanUp = true on spawner to safeguard server state");
+        }
         
         // STEP 1: Reset gold to starting amount
         ResetPlayerGoldToStarting();

@@ -244,6 +244,30 @@ public class GameManager : MonoBehaviour
 
     public static GameManager LocalInstance { get; private set; }
 
+    public static SerializableGameState BuildEmptySerializableGameState()
+    {
+        return new SerializableGameState
+        {
+            snapshotVersion = 1,
+            timestamp = DateTime.UtcNow.Ticks,
+            deck = new SerializableStringList(new List<string>()),
+            center = new SerializableStringList(new List<string>()),
+            hands = new SerializableDictionary(new Dictionary<int, List<string>>()),
+            pools = new SerializableDictionary(new Dictionary<int, List<string>>()),
+            pistiPools = new SerializableDictionary(new Dictionary<int, List<string>>()),
+            bombStack = new SerializableStringList(new List<string>()),
+            points = new SerializableIntArray(new int[4]),
+            pistiCounts = new SerializableIntArray(new int[4]),
+            copiedCardMap = new SerializableStringDictionary(new Dictionary<string, string>()),
+            cardPowerEffects = new SerializableStringDictionary(new Dictionary<string, string>()),
+            playerGold = new SerializableIntDictionary(new Dictionary<int, int>()),
+            playerSuperPowers = new SerializableDictionary(new Dictionary<int, List<string>>()),
+            botControlledPlayers = new SerializableIntArray(new int[0]),
+            cardLookup = new CardLookupEntry[0],
+            failoverChain = new int[0]
+        };
+    }
+
     [SerializeField] private DeckController deckController;
 
     public GameNetworkRelay networkRelay;
@@ -329,6 +353,7 @@ public class GameManager : MonoBehaviour
 
     // Track cards that have been changed by powers (for save/load persistence)
     private Dictionary<string, string> cardPowerEffects = new Dictionary<string, string>();
+    private Dictionary<string, string> copiedCardMap = new Dictionary<string, string>();
 
     [SerializeField] public GameObject kapkacEffectPrefab; // Prefab with your PNG as a SpriteRenderers
 
@@ -371,6 +396,15 @@ public class GameManager : MonoBehaviour
         // CRITICAL: Don't try to reset destroyed cards - they'll be recreated fresh
         // Clear the list since all card objects have been destroyed
         if (cardInteractionsScripts != null) cardInteractionsScripts.Clear();
+        if (copiedCardMap != null) copiedCardMap.Clear();
+
+        foreach (var kvp in CardInteraction.cardLookup)
+        {
+            if (kvp.Value != null)
+            {
+                kvp.Value.isFirstThreeDealtCard = false;
+            }
+        }
 
         currentSelectedHandCard = null;
 
@@ -470,6 +504,7 @@ public class GameManager : MonoBehaviour
         if (cardInteractionsScripts != null) cardInteractionsScripts.Clear();
         if (kapkacCardsToBeReset != null) kapkacCardsToBeReset.Clear();
         if (cardPowerEffects != null) cardPowerEffects.Clear();
+        if (copiedCardMap != null) copiedCardMap.Clear();
         
         // CRITICAL: Reset event subscription flag so new cards can subscribe to events!
         alreadySubbed = false;
@@ -3021,15 +3056,15 @@ public class GameManager : MonoBehaviour
 
     public void TryKopyalaYapistir(CardInteraction targetCard)
     {
-        Debug.Log($"[GameManager] TryKopyalaYapistir called - Target: {targetCard.gameObject.name}");
+        Debug.Log($"[KopyalaYapıştırLogs] [Client] TryKopyalaYapistir called - Target: {targetCard?.gameObject.name}, Source: {kopyalaSourceCard?.gameObject.name}");
 
         if (!isKopyalaActive || kopyalaSourceCard == null || targetCard == null || targetCard == kopyalaSourceCard)
         {
-            Debug.LogWarning("[GameManager] TryKopyalaYapistir - Invalid state or same card selected");
+            Debug.LogWarning($"[KopyalaYapıştırLogs] [Client] TryKopyalaYapistir rejected - Invalid state: isKopyalaActive={isKopyalaActive}, sourceNull={kopyalaSourceCard == null}, targetNull={targetCard == null}, sameCard={targetCard == kopyalaSourceCard}");
             return;
         }
 
-        Debug.Log($"[GameManager] KopyalaYapıştır: {kopyalaSourceCard.gameObject.name} -> {targetCard.gameObject.name}");
+        Debug.Log($"[KopyalaYapıştırLogs] [Client] Executing local KopyalaYapıştır play: {kopyalaSourceCard.gameObject.name} ({kopyalaSourceCard.uniqueCardInstanceID}) -> {targetCard.gameObject.name} ({targetCard.uniqueCardInstanceID})");
 
         // NOW call PowerActivated() since both cards are selected and we're executing the power
         if (DeckController.LocalInstance != null)
@@ -3077,6 +3112,7 @@ public class GameManager : MonoBehaviour
     public void OnKopyalaYapistir(string targetUniqueID, string sourceUniqueID, bool instant = false)
 
     {
+        Debug.Log($"[KopyalaYapıştırLogs] [Client] OnKopyalaYapistir called - Target: {targetUniqueID}, Source: {sourceUniqueID}, Instant: {instant}");
 
         if (CardInteraction.cardLookup.TryGetValue(targetUniqueID, out var targetCard) &&
 
@@ -3101,7 +3137,7 @@ public class GameManager : MonoBehaviour
             // CRITICAL FIX: Force game state save after power completion to ensure reconnection sync
             if (Server.Singleton != null)
             {
-                Debug.Log("[GameManager] Power effect completed - forcing game state save for reconnection sync");
+                Debug.Log("[KopyalaYapıştırLogs] [Server] Power effect completed - forcing game state save for reconnection sync");
                 Server.Singleton.SaveCurrentGameState();
             }
 
@@ -3112,6 +3148,8 @@ public class GameManager : MonoBehaviour
             Sprite newSprite = sourceCard.GetComponent<SpriteRenderer>().sprite;
 
             targetCard.activePowerEffect = sourceCard.activePowerEffect; // Copy active power effect
+            copiedCardMap[targetUniqueID] = sourceUniqueID;
+            Debug.Log($"[KopyalaYapıştırLogs] [Client] OnKopyalaYapistir local mapping stored: target={targetUniqueID}, source={sourceUniqueID}");
 
             // Set cardID and sprite with fade-in (or instantly)
             if (instant)
@@ -3131,19 +3169,23 @@ public class GameManager : MonoBehaviour
 
             {
 
-                CopyEffectVisuals(targetCard);
+                CopyEffectVisuals(targetCard, instant);
 
             }
 
             ShowAffectedCardsDebugVisual("Kopyala Yapıştır", sourceUniqueID, targetUniqueID);
 
         }
+        else
+        {
+            Debug.LogWarning($"[KopyalaYapıştırLogs] [Client] OnKopyalaYapistir failed! Target exists: {CardInteraction.cardLookup.ContainsKey(targetUniqueID)}, Source exists: {CardInteraction.cardLookup.ContainsKey(sourceUniqueID)}");
+        }
 
     }
 
 
 
-    private void CopyEffectVisuals(CardInteraction targetCard)
+    private void CopyEffectVisuals(CardInteraction targetCard, bool instant = false)
 
     {
 
@@ -3153,7 +3195,14 @@ public class GameManager : MonoBehaviour
 
         {
 
-            StartCoroutine(KapkacCourotine(targetCard.uniqueCardInstanceID));
+            if (instant)
+            {
+                OnKapkacCardChanged(targetCard.uniqueCardInstanceID, true);
+            }
+            else
+            {
+                StartCoroutine(KapkacCourotine(targetCard.uniqueCardInstanceID));
+            }
 
         }
 
@@ -3161,7 +3210,14 @@ public class GameManager : MonoBehaviour
 
         {
 
-            StartCoroutine(YandimAnamCoroutine(targetCard.uniqueCardInstanceID));
+            if (instant)
+            {
+                OnYandimAnamCardChanged(targetCard.uniqueCardInstanceID, true);
+            }
+            else
+            {
+                StartCoroutine(YandimAnamCoroutine(targetCard.uniqueCardInstanceID));
+            }
 
         }
 
@@ -5048,9 +5104,10 @@ public class GameManager : MonoBehaviour
             {
                 // Apply visual instantly without animation
                 ResetVisuals(cardInteraction);
+                GameObject effect = null;
                 if (yandimAnamSpritePrefab != null)
                 {
-                    GameObject effect = Instantiate(yandimAnamSpritePrefab, cardInteraction.transform);
+                    effect = Instantiate(yandimAnamSpritePrefab, cardInteraction.transform);
                     effect.transform.localPosition = new Vector3(0, 0, -0.002f);
                     SpriteRenderer sr = effect.GetComponent<SpriteRenderer>();
                     if (sr != null)
@@ -5060,6 +5117,13 @@ public class GameManager : MonoBehaviour
                         sr.color = c;
                     }
                 }
+
+                // Apply missing state changes in instant path
+                cardInteraction.SetCardValue(0);
+                cardInteraction.activePowerEffect = "YandımAnam";
+                cardPowerEffects[cardUniqueID] = "YandımAnam";
+                cardInteraction.yandimAnamSpriteInstance = effect;
+
                 ShowAffectedCardsDebugVisual("Yandım Anam", cardUniqueID);
             }
             else
@@ -5284,6 +5348,12 @@ public class GameManager : MonoBehaviour
             yield return StartCoroutine(deckController.DeckStart());
         }
 
+        // CRITICAL RECONNECTION FIX: Rebuild static cardLookup dictionary with active references
+        if (deckController != null)
+        {
+            deckController.RebuildCardLookup();
+        }
+
         // Hard reset the scene cards first so we do not stack
         SyncLog("Starting ResetCards to clear scene");
         yield return StartCoroutine(deckController.ResetCards());
@@ -5293,6 +5363,10 @@ public class GameManager : MonoBehaviour
         // Then continue the usual coroutine
         yield return StartCoroutine(ApplyGameStateCoroutine(snapshot));
         Debug.LogError("[Visual Sync] ApplyGameStateCoroutine completed");
+
+        // CRITICAL RECONNECTION FIX: Ensure isReconnecting is false once state is fully restored
+        isReconnecting = false;
+        Debug.LogError("[RECONNECTION] isReconnecting explicitly set to false – normal dealing can proceed.");
     }
 
     /// <summary>
@@ -5445,6 +5519,7 @@ public class GameManager : MonoBehaviour
         cardObjectsToBeDiscarted.Clear();
         kapkacCardsToBeReset.Clear();
         cardPowerEffects.Clear();
+        copiedCardMap.Clear();
         
         // CRITICAL: Reset move chains to prevent infinite desync loops
         // When we apply a full game state, the chains should be reset to match the new state
@@ -5466,6 +5541,10 @@ public class GameManager : MonoBehaviour
     private void ApplyCoreGameState(SerializableGameState snapshot)
     {
         Debug.Log("[GameManager] Applying core game state");
+
+        // Restore player number from PlayerPrefs immediately during reconnection/migration
+        // to ensure we have the correct local seat perspective before card container rebuild starts.
+        RestorePlayerNumberFromPrefs();
         
         // Update turn and player info from server snapshot
         currentPlayerNo = snapshot.currentPlayer;
@@ -5500,62 +5579,7 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private IEnumerator RestoreVisualStatesFromMoveChain()
     {
-        Debug.LogError("[Visual Sync] ===== RESTORE VISUAL STATES FROM MOVE CHAIN STARTED =====");
-        SyncLog("RestoreVisualStatesFromMoveChain started");
-        
-        // Get the current move chain to parse for visual effects
-        if (MoveChainTracker.ClientInstance == null)
-        {
-            Debug.LogError("[Visual Sync] ERROR: MoveChainTracker.ClientInstance is null - cannot restore visual states");
-            SyncLogWarning("MoveChainTracker.ClientInstance is null - cannot restore visual states");
-            yield break;
-        }
-        
-        var moveChain = MoveChainTracker.ClientInstance.GetCurrentChain();
-        Debug.LogError($"[Visual Sync] Move chain retrieved - version: {moveChain.chainVersion}, moves count: {moveChain.moves?.Length ?? 0}");
-        
-        if (moveChain.moves == null || moveChain.moves.Length == 0)
-        {
-            Debug.LogError("[Visual Sync] No moves in chain to process for visual state restoration");
-            SyncLog("No moves in chain to process for visual state restoration");
-            yield break;
-        }
-        
-        Debug.LogError($"[Visual Sync] Processing {moveChain.moves.Length} moves from chain v{moveChain.chainVersion} for visual effects");
-        SyncLog($"Processing {moveChain.moves.Length} moves from chain v{moveChain.chainVersion} for visual effects");
-        
-        int visualEffectsRestored = 0;
-        int superPowerEffectMoves = 0;
-        
-        // Parse each move in the chain for visual-changing powers
-        for (int i = 0; i < moveChain.moves.Length; i++)
-        {
-            var move = moveChain.moves[i];
-            Debug.LogError($"[Visual Sync] Move {i}: Type={move.moveType}, Power={move.superPowerName}, Cards={string.Join(",", move.affectedCardIds ?? new string[0])}");
-            
-            if (move.moveType == GameMove.MoveType.SuperPower_Effect)
-            {
-                superPowerEffectMoves++;
-                Debug.LogError($"[Visual Sync] Found SuperPower_Effect move: {move.superPowerName}");
-                
-                // This is a power effect - check if it changes visuals
-                if (IsVisualChangingPower(move.superPowerName))
-                {
-                    Debug.LogError($"[Visual Sync] Power {move.superPowerName} is visual-changing - restoring effect");
-                    yield return StartCoroutine(RestoreVisualEffectFromMove(move));
-                    visualEffectsRestored++;
-                    Debug.LogError($"[Visual Sync] Completed restoration for {move.superPowerName}");
-                }
-                else
-                {
-                    Debug.LogError($"[Visual Sync] Power {move.superPowerName} is NOT visual-changing - skipping");
-                }
-            }
-        }
-        
-        Debug.LogError($"[Visual Sync] ===== RESTORE VISUAL STATES COMPLETED =====");
-        Debug.LogError($"[Visual Sync] Total moves: {moveChain.moves.Length}, SuperPower_Effect moves: {superPowerEffectMoves}, Visual effects restored: {visualEffectsRestored}");
-        SyncLog($"RestoreVisualStatesFromMoveChain completed - restored {visualEffectsRestored} visual effects");
+        yield break;
     }
     
     /// <summary>
@@ -5621,6 +5645,12 @@ public class GameManager : MonoBehaviour
         string targetCardId = effectData["targetCard"];
         string sourceCardId = effectData["sourceCard"];
         
+        if (!CardInteraction.cardLookup.TryGetValue(targetCardId, out var targetCard))
+        {
+            Debug.LogError($"[Visual Sync] ERROR: Card {targetCardId} not found in cardLookup during Kopyala Yapıştır restoration");
+            yield break;
+        }
+        
         SyncLog($"Restoring Kopyala Yapıştır: {sourceCardId} -> {targetCardId}");
         
         // Use existing OnKopyalaYapistir method to restore visual state instantly
@@ -5648,7 +5678,7 @@ public class GameManager : MonoBehaviour
         SyncLog($"Restoring Kapkaç visual effect for card: {cardId}");
         
         // Check if card exists in lookup before calling
-        if (!CardInteraction.cardLookup.ContainsKey(cardId))
+        if (!CardInteraction.cardLookup.TryGetValue(cardId, out var targetCard))
         {
             Debug.LogError($"[Visual Sync] ERROR: Card {cardId} not found in cardLookup during Kapkaç restoration");
             yield break;
@@ -5678,6 +5708,12 @@ public class GameManager : MonoBehaviour
         string cardId = move.affectedCardIds[0];
         SyncLog($"Restoring Yandım Anam visual effect for card: {cardId}");
         
+        if (!CardInteraction.cardLookup.TryGetValue(cardId, out var targetCard))
+        {
+            Debug.LogError($"[Visual Sync] ERROR: Card {cardId} not found in cardLookup during Yandım Anam restoration");
+            yield break;
+        }
+        
         // Use existing OnYandimAnamCardChanged method to restore visual state instantly
         OnYandimAnamCardChanged(cardId, true);
         
@@ -5700,6 +5736,20 @@ public class GameManager : MonoBehaviour
 
         int playerCountLocal = deckCtrl.playerCount;
         int myNo = deckCtrl.thisPlayerNumber;
+        
+        if (myNo < 0)
+        {
+            SyncLogWarning($"thisPlayerNumber is {myNo} (seat not yet assigned); waiting up to 2 seconds for identity restoration...");
+            float waitTimer = 0f;
+            while (deckCtrl.thisPlayerNumber < 0 && waitTimer < 2.0f)
+            {
+                yield return new WaitForSeconds(0.05f);
+                waitTimer += 0.05f;
+            }
+            myNo = deckCtrl.thisPlayerNumber;
+            SyncLog($"Wait finished. thisPlayerNumber is now: {myNo}");
+        }
+
         SyncLog($"Local info: playerCount={playerCountLocal}, myNo={myNo}");
         
         if (playerCountLocal <= 0)
@@ -5710,7 +5760,7 @@ public class GameManager : MonoBehaviour
 
         if (myNo < 0)
         {
-            SyncLogWarning($"thisPlayerNumber is {myNo} (seat not yet assigned); skipping rebuild to prevent perspective corruption");
+            SyncLogWarning($"thisPlayerNumber is {myNo} (seat still not assigned after waiting); skipping rebuild to prevent perspective corruption");
             yield break;
         }
 
@@ -5718,6 +5768,27 @@ public class GameManager : MonoBehaviour
         SyncLog("Clearing current center tracking");
         centerCards.Clear();
         centerCardsObjects.Clear();
+
+        // Clear and restore traditional first three dealt cards flags
+        foreach (var kvp in CardInteraction.cardLookup)
+        {
+            if (kvp.Value != null)
+            {
+                kvp.Value.isFirstThreeDealtCard = false;
+            }
+        }
+        var snapshotFirstThree = snapshot.firstThreeDealtCardIds.ToList();
+        if (snapshotFirstThree != null)
+        {
+            foreach (var uid in snapshotFirstThree)
+            {
+                if (CardInteraction.cardLookup.TryGetValue(uid, out var ci) && ci != null)
+                {
+                    ci.isFirstThreeDealtCard = true;
+                    SyncLog($"Flagged card {uid} as traditional first-three dealt card");
+                }
+            }
+        }
 
         // 1) Rebuild center cards (order preserved from snapshot)
         var centerList = snapshot.center.ToList();
@@ -5753,20 +5824,22 @@ public class GameManager : MonoBehaviour
                 Vector3 centerPosition = centerTransform.position;
                 Vector3 centerRotation = centerTransform.rotation.eulerAngles;
                 
-                if (i == centerList.Count - 1) // Last card (top card) should be face up
+                bool isFaceUp = !cardInteraction.isFirstThreeDealtCard;
+                if (isFaceUp) // Played center cards and the 4th card should be face up
                 {
                     cardObject.transform.rotation = Quaternion.Euler(centerRotation.x + 180, centerRotation.y, UnityEngine.Random.Range(-12, 12));
-                    cardObject.transform.position = new Vector3(centerPosition.x, centerPosition.y + 10, centerPosition.z);
                 }
-                else
+                else // First 3 dealt center cards should be face down
                 {
                     cardObject.transform.rotation = Quaternion.Euler(centerRotation.x, centerRotation.y, UnityEngine.Random.Range(-12, 12));
-                    cardObject.transform.position = new Vector3(centerPosition.x, centerPosition.y, centerPosition.z);
                 }
+                
+                // Stack cards with an increasing height offset to match normal gameplay stacking and prevent z-fighting
+                cardObject.transform.position = new Vector3(centerPosition.x, centerPosition.y + (i * 10), centerPosition.z);
                 
                 cardObject.transform.localScale = new Vector3(deckCtrl.centerScale, deckCtrl.centerScale, deckCtrl.centerScale);
                 
-                SyncLog($"Center card rebuilt: {cardId} -> [{cardInteraction.GetCardID()[0]},{cardInteraction.GetCardID()[1]}] (face up: {i == centerList.Count - 1})");
+                SyncLog($"Center card rebuilt: {cardId} -> [{cardInteraction.GetCardID()[0]},{cardInteraction.GetCardID()[1]}] (face up: {isFaceUp})");
             }
             else
             {
@@ -5825,6 +5898,22 @@ public class GameManager : MonoBehaviour
         SyncLog("Calling AssignCardsToPlayerPools");
         deckCtrl.AssignCardsToPlayerPools(new SerializableDictionary(relPools));
         SyncLog("AssignCardsToPlayerPools completed");
+
+        // 4.1) Remap pişti pools (absolute -> relative) and assign
+        var absPistiPools = snapshot.pistiPools.ToDictionary();
+        var relPistiPools = new Dictionary<int, List<string>>();
+        SyncLog("Remapping pişti pools from absolute to relative indices");
+        foreach (var kvp in absPistiPools)
+        {
+            int absPlayerNo = kvp.Key;
+            int relIndex = (absPlayerNo - myNo + playerCountLocal) % playerCountLocal;
+            relPistiPools[relIndex] = new List<string>(kvp.Value);
+            SyncLog($"Pişti Pool mapping: abs P{absPlayerNo} -> rel {relIndex} ({kvp.Value.Count} cards)");
+        }
+
+        SyncLog("Calling AssignCardsToPlayerPistiPools");
+        deckCtrl.AssignCardsToPlayerPistiPools(new SerializableDictionary(relPistiPools));
+        SyncLog("AssignCardsToPlayerPistiPools completed");
 
         // 5) Handle bombed cards (cards outside normal game flow)
         var bombedList = snapshot.bombStack.ToList();
@@ -5891,13 +5980,221 @@ public class GameManager : MonoBehaviour
         activeSunuDegisTokusPowerName = "Şunu Değiş Tokuş";
         isSunuDegisBunuTokusActive = snapshot.isSunuDegisBunuTokusActive;
 
-        // Apply card power effects (Kapkaç, Yandım Anam, etc.)
+        // --- UNIFIED VISUAL RECONSTRUCTION PIPELINE ---
+        // Reconstruct all card copies and power overlays in a single, ordered step.
+        copiedCardMap = snapshot.copiedCardMap.ToDictionary();
         cardPowerEffects = snapshot.cardPowerEffects.ToDictionary();
-        ApplyCardPowerEffects();
+        Debug.Log($"[KopyalaYapıştırLogs] [Client] ApplyEffectsAndFlags: received copiedCardMap of size {(copiedCardMap != null ? copiedCardMap.Count : 0)} and cardPowerEffects of size {(cardPowerEffects != null ? cardPowerEffects.Count : 0)} from snapshot.");
+        ReconstructPowerVisuals(snapshot);
+        // ----------------------------------------------
 
-        // CRITICAL FIX: Apply copied card map to restore Kopyala Yapıştır visual changes
-        var copiedCards = snapshot.copiedCardMap.ToDictionary();
-        ApplyCopiedCardMap(copiedCards);
+        // Restore local player gold and superpower tokens from state snapshot
+        if (SuperPowerSpawner.LocalInstance != null && deckController != null)
+        {
+            int myPlayerNo = deckController.thisPlayerNumber;
+            if (myPlayerNo != -1)
+            {
+                // 1. Restore Gold
+                var goldDict = snapshot.playerGold.ToDictionary();
+                if (goldDict != null && goldDict.TryGetValue(myPlayerNo, out int restoredGold))
+                {
+                    SuperPowerSpawner.LocalInstance.SetGold(restoredGold);
+                    Debug.Log($"[GameManager] Restored local gold to {restoredGold} from snapshot");
+                }
+                
+                // 2. Restore Superpowers
+                var powersDict = snapshot.playerSuperPowers.ToDictionary();
+                if (powersDict != null && powersDict.TryGetValue(myPlayerNo, out List<string> restoredPowers))
+                {
+                    SuperPowerSpawner.LocalInstance.RestorePowers(restoredPowers);
+                    Debug.Log($"[GameManager] Restored local superpowers: {string.Join(", ", restoredPowers)}");
+                }
+            }
+        }
+    }
+
+    private int localSnapshotVersion = 0;
+
+    private int GetTransformIndexForSeat(int absSeat, int mySeat, int playerCount, int transformCount)
+    {
+        int relSeat = (absSeat - mySeat + playerCount) % playerCount;
+        if (playerCount == 2)
+        {
+            // 1vs1 Board layout: bottom = index 0, top/opponent = index 2
+            return (relSeat == 0) ? 0 : 2;
+        }
+        // 2vs2 Mode (4 players)
+        return UnityEngine.Mathf.Clamp(relSeat, 0, transformCount - 1);
+    }
+
+    public SerializableGameState CaptureVisualSnapshot()
+    {
+        SerializableGameState snapshot = BuildEmptySerializableGameState();
+        
+        if (deckController == null) return snapshot;
+
+        int playerCount = deckController.playerCount;
+        int mySeat = deckController.GetThisPlayerNumber();
+        
+        // 1. Hands, Pools, PistiPools
+        Dictionary<int, List<string>> playerHands = new Dictionary<int, List<string>>();
+        Dictionary<int, List<string>> playerPools = new Dictionary<int, List<string>>();
+        Dictionary<int, List<string>> playerPistiPools = new Dictionary<int, List<string>>();
+        for (int i = 0; i < playerCount; i++)
+        {
+            playerHands[i] = new List<string>();
+            playerPools[i] = new List<string>();
+            playerPistiPools[i] = new List<string>();
+        }
+
+        // Hands Audit (absolute-seat first mapping)
+        for (int absSeat = 0; absSeat < playerCount; absSeat++)
+        {
+            int transformIdx = GetTransformIndexForSeat(absSeat, mySeat, playerCount, deckController.playerHandTransforms.Count);
+            if (transformIdx < 0 || transformIdx >= deckController.playerHandTransforms.Count) continue;
+            Transform handTransform = deckController.playerHandTransforms[transformIdx];
+            if (handTransform == null) continue;
+
+            foreach (Transform child in handTransform)
+            {
+                CardInteraction ci = child.GetComponent<CardInteraction>();
+                if (ci != null && !string.IsNullOrEmpty(ci.uniqueCardInstanceID)) playerHands[absSeat].Add(ci.uniqueCardInstanceID);
+            }
+        }
+
+        // Pools Audit
+        for (int absSeat = 0; absSeat < playerCount; absSeat++)
+        {
+            int transformIdx = GetTransformIndexForSeat(absSeat, mySeat, playerCount, deckController.playerPoolTransforms.Count);
+            if (transformIdx < 0 || transformIdx >= deckController.playerPoolTransforms.Count) continue;
+            Transform poolTransform = deckController.playerPoolTransforms[transformIdx];
+            if (poolTransform == null) continue;
+
+            foreach (Transform child in poolTransform)
+            {
+                CardInteraction ci = child.GetComponent<CardInteraction>();
+                if (ci != null && !string.IsNullOrEmpty(ci.uniqueCardInstanceID)) playerPools[absSeat].Add(ci.uniqueCardInstanceID);
+            }
+        }
+
+        // PistiPools Audit
+        for (int absSeat = 0; absSeat < playerCount; absSeat++)
+        {
+            int transformIdx = GetTransformIndexForSeat(absSeat, mySeat, playerCount, deckController.playerPiştiPoolTransforms.Count);
+            if (transformIdx < 0 || transformIdx >= deckController.playerPiştiPoolTransforms.Count) continue;
+            Transform pistiTransform = deckController.playerPiştiPoolTransforms[transformIdx];
+            if (pistiTransform == null) continue;
+
+            foreach (Transform child in pistiTransform)
+            {
+                CardInteraction ci = child.GetComponent<CardInteraction>();
+                if (ci != null && !string.IsNullOrEmpty(ci.uniqueCardInstanceID)) playerPistiPools[absSeat].Add(ci.uniqueCardInstanceID);
+            }
+        }
+        
+        snapshot.hands = new SerializableDictionary(playerHands);
+        snapshot.pools = new SerializableDictionary(playerPools);
+        snapshot.pistiPools = new SerializableDictionary(playerPistiPools);
+
+        // 2. Center Cards
+        List<string> centerList = new List<string>();
+        foreach (var obj in centerCardsObjects)
+        {
+            if (obj != null)
+            {
+                CardInteraction ci = obj.GetComponent<CardInteraction>();
+                if (ci != null && !string.IsNullOrEmpty(ci.uniqueCardInstanceID))
+                {
+                    centerList.Add(ci.uniqueCardInstanceID);
+                }
+            }
+        }
+        snapshot.center = new SerializableStringList(centerList);
+
+        // 3. Power Effects & Flags
+        snapshot.cardPowerEffects = new SerializableStringDictionary(cardPowerEffects);
+        snapshot.copiedCardMap = new SerializableStringDictionary(copiedCardMap);
+        snapshot.oynayamazsinActive = this.oynayamazsinActive;
+        snapshot.isYapamazsınActive = this.isYapamazsınActive;
+        snapshot.verZehriActive = this.verZehriActive;
+        snapshot.kutsalDesteActive = this.kutsalDesteActive;
+        
+        snapshot.isKapkacPending = this.isKapkacPending;
+        snapshot.isYandimAnamPending = this.isYandimAnamPending;
+        snapshot.isKopyalaActive = this.isKopyalaActive;
+        snapshot.isSunuDegisTokusActive = this.isSunuDegisTokusActive;
+        snapshot.isSunuDegisBunuTokusActive = this.isSunuDegisBunuTokusActive;
+
+        snapshot.playerCount = playerCount;
+        snapshot.currentPlayer = currentPlayerNo;
+        snapshot.turnCounter = this.turnCounter;
+        snapshot.timestamp = DateTime.UtcNow.Ticks;
+        snapshot.snapshotVersion = ++localSnapshotVersion;
+
+        // 4. Card Master Lookup (Required for server to know kind/value of IDs)
+        if (CardInteraction.cardLookup != null)
+        {
+            var lookupEntries = new List<CardLookupEntry>();
+            foreach (var kvp in CardInteraction.cardLookup)
+            {
+                if (kvp.Value != null)
+                {
+                    int[] cardData = kvp.Value.GetCardID();
+                    if (cardData != null && cardData.Length >= 2)
+                    {
+                        lookupEntries.Add(new CardLookupEntry
+                        {
+                            cardId = kvp.Key,
+                            kind = cardData[0],
+                            value = cardData[1]
+                        });
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[KopyalaYapıştırLogs] CaptureVisualSnapshot: skipping card {kvp.Key} because its cardID is null or empty!");
+                    }
+                }
+            }
+            snapshot.cardLookup = lookupEntries.ToArray();
+        }
+
+        return snapshot;
+    }
+
+    [ContextMenu("Print Captured Snapshot")]
+    public void PrintCapturedSnapshot()
+    {
+        SerializableGameState snapshot = CaptureVisualSnapshot();
+        Debug.Log($"[MIGRATION] Captured Snapshot v{snapshot.snapshotVersion}");
+        Debug.Log($"[MIGRATION] Center cards: {string.Join(", ", snapshot.center.ToList())}");
+        snapshot.hands.PrintAll();
+    }
+
+    /// <summary>
+    /// Checks if a card is in a scoring pool to prevent over-rendering visual effects.
+    /// </summary>
+    private bool IsCardInScoringPool(CardInteraction targetCard)
+    {
+        if (targetCard == null) return false;
+
+        Transform t = targetCard.transform;
+        while (t != null)
+        {
+            if (playerPoolTransforms != null && playerPoolTransforms.Contains(t))
+                return true;
+            if (playerPiştiPoolTransforms != null && playerPiştiPoolTransforms.Contains(t))
+                return true;
+
+            if (deckController != null)
+            {
+                if (deckController.playerPoolTransforms != null && deckController.playerPoolTransforms.Contains(t))
+                    return true;
+                if (deckController.playerPiştiPoolTransforms != null && deckController.playerPiştiPoolTransforms.Contains(t))
+                    return true;
+            }
+            t = t.parent;
+        }
+        return false;
     }
 
     /// <summary>
@@ -5912,27 +6209,44 @@ public class GameManager : MonoBehaviour
         foreach (var kvp in copiedCards)
         {
             string targetCardID = kvp.Key;
-            string sourceCardID = kvp.Value;
             
-            Debug.Log($"[GameManager] Restoring copied card: {targetCardID} <- {sourceCardID}");
-            
-            // Find the target and source cards
-            if (CardInteraction.cardLookup.TryGetValue(targetCardID, out var targetCard) &&
-                CardInteraction.cardLookup.TryGetValue(sourceCardID, out var sourceCard))
+            // Resolve transitive copy chains (e.g. A copies B, B copies C -> target copies C)
+            string ultimateSourceID = targetCardID;
+            int depth = 0;
+            while (copiedCards.TryGetValue(ultimateSourceID, out string nextSourceID) && depth < 10)
             {
-                // Restore the visual appearance
-                int[] newCardID = sourceCard.GetCardID();
-                Sprite newSprite = sourceCard.GetComponent<SpriteRenderer>().sprite;
+                ultimateSourceID = nextSourceID;
+                depth++;
+            }
+            
+            Debug.Log($"[GameManager] Restoring copied card: {targetCardID} <- {kvp.Value} (Ultimate Source: {ultimateSourceID}, depth: {depth})");
+            
+            // Find target and ultimate source cards
+            if (CardInteraction.cardLookup.TryGetValue(targetCardID, out var targetCard) &&
+                CardInteraction.cardLookup.TryGetValue(ultimateSourceID, out var sourceCard))
+            {
+                // Retrieve original identity backups, falling back to current attributes if unset
+                int[] newCardID = (sourceCard.originalCardID != null && sourceCard.originalCardID.Length >= 2) ? (int[])sourceCard.originalCardID.Clone() : sourceCard.GetCardID();
+                Sprite newSprite = (sourceCard.originalSprite != null) ? sourceCard.originalSprite : sourceCard.GetComponent<SpriteRenderer>().sprite;
                 
-                // Apply the visual change
+                // Store original card data if target doesn't have it yet, before mutating target values
+                targetCard.StoreOriginalCardData();
+                
+                // Restore visual and logical copy attributes
                 targetCard.SetCardIDAndSprite(newCardID, newSprite);
                 targetCard.activePowerEffect = sourceCard.activePowerEffect;
                 
-                Debug.Log($"[GameManager] Successfully restored copied card {targetCardID} to look like {sourceCardID}");
+                // Restore power effect visuals on the copied target card if active, universally to all 52 cards
+                if (targetCard.activePowerEffect != "none")
+                {
+                    CopyEffectVisuals(targetCard, true);
+                }
+                
+                Debug.Log($"[GameManager] Successfully restored copied card {targetCardID} using ultimate source {ultimateSourceID}");
             }
             else
             {
-                Debug.LogWarning($"[GameManager] Could not find cards for copied mapping: {targetCardID} <- {sourceCardID}");
+                Debug.LogWarning($"[GameManager] Could not find cards for copied mapping: {targetCardID} <- {ultimateSourceID}");
             }
         }
         
@@ -5946,32 +6260,28 @@ public class GameManager : MonoBehaviour
     {
         if (cardPowerEffects == null) return;
 
-        foreach (var kvp in cardPowerEffects)
+        // Iterate on a copied list to prevent InvalidOperationException if nested methods modify cardPowerEffects
+        foreach (var kvp in new List<KeyValuePair<string, string>>(cardPowerEffects))
         {
             string cardUniqueID = kvp.Key;
             string powerEffect = kvp.Value;
 
             if (CardInteraction.cardLookup.TryGetValue(cardUniqueID, out var cardInteraction))
             {
-                cardInteraction.activePowerEffect = powerEffect;
-
                 switch (powerEffect)
                 {
                     case "Kapkaç":
-                        // Set card value to 11 (Jack)
-                        int[] cardID = cardInteraction.GetCardID();
-                        cardID[1] = 11;
-                        cardInteraction.SetCardID(cardID);
-                        // Note: Visual effects will be handled by the card's existing logic
+                        // Apply both logical and instant visual state universally to all 52 cards
+                        OnKapkacCardChanged(cardUniqueID, true);
                         break;
 
                     case "YandımAnam":
-                        // Set card value to 0
-                        cardInteraction.SetCardValue(0);
-                        // Note: Visual effects will be handled by the card's existing logic
+                        // Apply both logical and instant visual state universally to all 52 cards
+                        OnYandimAnamCardChanged(cardUniqueID, true);
                         break;
 
                     default:
+                        cardInteraction.activePowerEffect = powerEffect;
                         Debug.LogWarning($"Unknown power effect: {powerEffect} for card {cardUniqueID}");
                         break;
                 }
@@ -5981,6 +6291,118 @@ public class GameManager : MonoBehaviour
                 Debug.LogWarning($"Card {cardUniqueID} not found in cardLookup when applying power effect {powerEffect}");
             }
         }
+    }
+
+    /// <summary>
+    /// Unified pipeline to reconstruct all card identities and power visuals deterministically.
+    /// This is the SINGLE SOURCE OF TRUTH for visual reconstruction on reconnected/migrated clients.
+    /// </summary>
+    public void ReconstructPowerVisuals(SerializableGameState snapshot)
+    {
+        Debug.LogError($"[KopyalaYapıştırLogs] [Visual Reconstruction] Starting unified power visual reconstruction... CardLookup Count: {CardInteraction.cardLookup.Count}");
+
+        // STEP 1: Pristine Slate
+        int resetCount = 0;
+        foreach (var kvp in CardInteraction.cardLookup)
+        {
+            var card = kvp.Value;
+            if (card != null)
+            {
+                card.ResetToOriginalPristineState();
+                ResetVisuals(card);
+                resetCount++;
+            }
+        }
+        Debug.Log($"[KopyalaYapıştırLogs] [Visual Reconstruction] Step 1: Cleared active effects and restored original cards for {resetCount} cards.");
+
+        // STEP 2: Base Identity Resolution (Kopyala Yapıştır)
+        var copiedCards = snapshot.copiedCardMap.ToDictionary();
+        if (copiedCards != null && copiedCards.Count > 0)
+        {
+            Debug.Log($"[KopyalaYapıştırLogs] [Visual Reconstruction] Step 2: Restoring copied card identities for {copiedCards.Count} cards");
+            foreach (var kvp in copiedCards)
+            {
+                string targetCardID = kvp.Key;
+                string mappedSourceID = kvp.Value;
+                
+                // Resolve transitive copy chains
+                string ultimateSourceID = targetCardID;
+                int depth = 0;
+                while (copiedCards.TryGetValue(ultimateSourceID, out string nextSourceID) && depth < 10)
+                {
+                    ultimateSourceID = nextSourceID;
+                    depth++;
+                }
+
+                bool hasTarget = CardInteraction.cardLookup.TryGetValue(targetCardID, out var targetCard);
+                bool hasSource = CardInteraction.cardLookup.TryGetValue(ultimateSourceID, out var sourceCard);
+
+                if (hasTarget && hasSource)
+                {
+                    int[] baseCardID = (sourceCard.originalCardID != null && sourceCard.originalCardID.Length >= 2) ? (int[])sourceCard.originalCardID.Clone() : sourceCard.GetCardID();
+                    Sprite baseSprite = (sourceCard.originalSprite != null) ? sourceCard.originalSprite : sourceCard.GetComponent<SpriteRenderer>().sprite;
+
+                    targetCard.StoreOriginalCardData();
+                    targetCard.SetCardIDAndSprite(baseCardID, baseSprite);
+                    targetCard.activePowerEffect = "none";
+                    
+                    Debug.LogError($"[KopyalaYapıştırLogs] [Visual Reconstruction] Copy SUCCESS: {targetCardID} <- {ultimateSourceID} (Mapped: {mappedSourceID}, Identity restored to: {baseCardID[0]}_{baseCardID[1]})");
+                }
+                else
+                {
+                    Debug.LogError($"[KopyalaYapıştırLogs] [Visual Reconstruction] Copy FAILED! Target found: {hasTarget} ({targetCardID}), Source found: {hasSource} ({ultimateSourceID}). Current cardLookup count: {CardInteraction.cardLookup.Count}");
+                    if (!hasTarget) Debug.LogWarning($"[KopyalaYapıştırLogs] [Visual Reconstruction] Missing target card in cardLookup: {targetCardID}");
+                    if (!hasSource) Debug.LogWarning($"[KopyalaYapıştırLogs] [Visual Reconstruction] Missing source card in cardLookup: {ultimateSourceID}");
+                }
+            }
+        }
+        else
+        {
+            Debug.Log("[KopyalaYapıştırLogs] [Visual Reconstruction] Step 2: No copied cards found in snapshot.copiedCardMap");
+        }
+
+        // STEP 3: Status Alterations (Kapkaç, YandımAnam)
+        var powerEffects = snapshot.cardPowerEffects.ToDictionary();
+        if (powerEffects != null && powerEffects.Count > 0)
+        {
+            Debug.Log($"[KopyalaYapıştırLogs] [Visual Reconstruction] Step 3: Reconstructing active power effects for {powerEffects.Count} cards");
+            foreach (var kvp in powerEffects)
+            {
+                string cardUniqueID = kvp.Key;
+                string powerEffect = kvp.Value;
+
+                if (CardInteraction.cardLookup.TryGetValue(cardUniqueID, out var cardInteraction))
+                {
+                    Debug.LogError($"[KopyalaYapıştırLogs] [Visual Reconstruction] Applying power effect overlay: {powerEffect} on card: {cardUniqueID}");
+                    switch (powerEffect)
+                    {
+                        case "Kapkaç":
+                            OnKapkacCardChanged(cardUniqueID, true);
+                            break;
+
+                        case "YandımAnam":
+                        case "Yandım Anam":
+                            OnYandimAnamCardChanged(cardUniqueID, true);
+                            break;
+
+                        default:
+                            cardInteraction.activePowerEffect = powerEffect;
+                            Debug.LogWarning($"[KopyalaYapıştırLogs] [Visual Reconstruction] Unknown power effect: {powerEffect} on {cardUniqueID}");
+                            break;
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning($"[KopyalaYapıştırLogs] [Visual Reconstruction] Power effect card not found in cardLookup: {cardUniqueID} (effect: {powerEffect})");
+                }
+            }
+        }
+        else
+        {
+            Debug.Log("[KopyalaYapıştırLogs] [Visual Reconstruction] Step 3: No active power effects found in snapshot.cardPowerEffects");
+        }
+
+        Debug.LogError("[KopyalaYapıştırLogs] [Visual Reconstruction] Unified power visual reconstruction completed successfully.");
     }
 
     public Dictionary<string, string> GetCardPowerEffectsSnapshot()
@@ -6620,6 +7042,24 @@ public class GameManager : MonoBehaviour
     private void RestorePlayerNumberFromPrefs()
     {
         Debug.LogError($"[PLAYER NUMBER] ===== RESTORING PLAYER NUMBER FROM PREFS =====");
+        
+        // If the deck controller already has a valid seat assigned in-memory (e.g., from prior active gameplay),
+        // do not overwrite it with shared PlayerPrefs which could be corrupted by multiple local testing instances.
+        if (deckController != null && deckController.thisPlayerNumber >= 0)
+        {
+            int savedNumber = deckController.thisPlayerNumber;
+            Debug.Log($"[PLAYER NUMBER] DeckController already has valid in-memory player number {savedNumber}. Skipping PlayerPrefs restore to prevent multi-client seat corruption.");
+            
+            // Announce player number to server so it rebinds playerClientIds with the new client ID
+            if (networkRelay != null)
+            {
+                networkRelay.AnnounceReconnectedPlayerNumberServerRPC(savedNumber);
+                Debug.LogError($"[PLAYER NUMBER] Announced in-memory player number {savedNumber} to server for client-ID rebinding");
+            }
+            Debug.LogError($"[PLAYER NUMBER] ===== END RESTORING PLAYER NUMBER =====");
+            return;
+        }
+
         Debug.LogError($"[PLAYER NUMBER] PlayerPrefs.HasKey('SavedPlayerSeat'): {PlayerPrefs.HasKey("SavedPlayerSeat")}");
         
         if (PlayerPrefs.HasKey("SavedPlayerSeat"))

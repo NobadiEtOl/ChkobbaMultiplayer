@@ -44,6 +44,7 @@ public class Server : NetworkBehaviour
     [SerializeField] private GameNetworkRelay networkRelay; // Reference to the GameNetworkRelay script
     private Dictionary<int, List<string>> playersHandCardsIDs;//Dictionary containing all the players' hands
     private Dictionary<int, List<string>> playersPooledCardsIDs;//Dictionary containing all the players' pools
+    private Dictionary<int, List<string>> playersPiştiPoolCardsIDs;//Dictionary containing all the players' pişti pools
     private Dictionary<string, int[]> deckCardsDict; // replaces deckCardsIDs
     public Dictionary<string, int[]> centerCardsDict; // replaces centerCardsIDs
     public Dictionary<string, int[]> allCardLookup = new Dictionary<string, int[]>();
@@ -79,6 +80,7 @@ public class Server : NetworkBehaviour
     
     // Server.cs
     private Dictionary<string, string> copiedCardMap = new Dictionary<string, string>();
+    public List<string> firstThreeDealtCardIds = new List<string>();
     private bool oynayamazsinPending = false;
     private int oynayamazsinActivatedBy = -1;
     private HashSet<ulong> dealCenterFinishedClients = new HashSet<ulong>();
@@ -89,6 +91,37 @@ public class Server : NetworkBehaviour
 
     // PLAYER-CLIENT MAPPING: Map player numbers to client IDs for move validation
     public Dictionary<int, ulong> playerClientIds = new Dictionary<int, ulong>();
+
+    private Dictionary<int, int> playerGolds = new Dictionary<int, int>();
+    private Dictionary<int, List<string>> playerSuperPowers = new Dictionary<int, List<string>>();
+
+    [Serializable]
+    public class PlayerGoldEntry
+    {
+        public int playerNo;
+        public int gold;
+    }
+
+    [Serializable]
+    public class PlayerPowersEntry
+    {
+        public int playerNo;
+        public List<string> powers;
+    }
+
+    public void UpdatePlayerGold(int playerNo, int gold)
+    {
+        playerGolds[playerNo] = gold;
+        Debug.Log($"[Server] Updated player {playerNo} gold to {gold}");
+        PersistServerTruthsToSession();
+    }
+
+    public void UpdatePlayerPowers(int playerNo, List<string> powers)
+    {
+        playerSuperPowers[playerNo] = new List<string>(powers);
+        Debug.Log($"[Server] Updated player {playerNo} powers count: {powers.Count}");
+        PersistServerTruthsToSession();
+    }
 
     // TURN TIMER: Coroutine-based timer to auto-skip turns
     private Coroutine activeTurnTimerCoroutine;
@@ -232,12 +265,158 @@ public class Server : NetworkBehaviour
         }
     }
 
+    [Serializable]
+    private class ServerTruthsPayload
+    {
+        public int seed;
+        public int[] points;
+        public int[] pistiCounts;
+        public int turnCounter;
+        public int roundCount;
+        public int lastPlayerToCapture;
+        public int currentPlayer;
+        public int startingPlayerNo;
+        public List<PlayerGoldEntry> playerGolds;
+        public List<PlayerPowersEntry> playerSuperPowers;
+    }
+
+    private string SerializeServerTruths()
+    {
+        var goldsList = new List<PlayerGoldEntry>();
+        if (this.playerGolds != null)
+        {
+            foreach (var kvp in this.playerGolds)
+            {
+                goldsList.Add(new PlayerGoldEntry { playerNo = kvp.Key, gold = kvp.Value });
+            }
+        }
+
+        var powersList = new List<PlayerPowersEntry>();
+        if (this.playerSuperPowers != null)
+        {
+            foreach (var kvp in this.playerSuperPowers)
+            {
+                powersList.Add(new PlayerPowersEntry { playerNo = kvp.Key, powers = new List<string>(kvp.Value) });
+            }
+        }
+
+        var payload = new ServerTruthsPayload
+        {
+            seed = this.seed,
+            points = this.points ?? new int[0],
+            pistiCounts = this.piştiCounts ?? new int[0],
+            turnCounter = this.turnCounter,
+            roundCount = this.roundCount,
+            lastPlayerToCapture = this.lastPlayerToCapture,
+            currentPlayer = this.currentPlayer,
+            startingPlayerNo = this.startingPlayerNo,
+            playerGolds = goldsList,
+            playerSuperPowers = powersList
+        };
+        return JsonUtility.ToJson(payload);
+    }
+
+    private bool isTruthsDirty = false;
+    private bool isPersistenceTaskActive = false;
+    private float lastPersistenceTime = 0f;
+    private const float PersistenceCooldown = 2.0f;
+
+    public void PersistServerTruthsToSession()
+    {
+        isTruthsDirty = true;
+        
+        // If already waiting for cooldown or task is running, do nothing; 
+        // the dirty flag ensures it will run again soon.
+        if (isPersistenceTaskActive) return;
+
+        float timeSinceLast = Time.time - lastPersistenceTime;
+        if (timeSinceLast >= PersistenceCooldown)
+        {
+            StartCoroutine(PersistTruthsRoutine());
+        }
+        else
+        {
+            // Schedule it to run after the remaining cooldown
+            float delay = PersistenceCooldown - timeSinceLast;
+            Invoke("TriggerDelayedPersistence", delay);
+        }
+    }
+
+    private void TriggerDelayedPersistence()
+    {
+        if (isTruthsDirty && !isPersistenceTaskActive)
+        {
+            StartCoroutine(PersistTruthsRoutine());
+        }
+    }
+
+    private IEnumerator PersistTruthsRoutine()
+    {
+        if (!isTruthsDirty || isPersistenceTaskActive) yield break;
+
+        isPersistenceTaskActive = true;
+        isTruthsDirty = false;
+        lastPersistenceTime = Time.time;
+
+        if (networkManagerUI != null && networkManagerUI.CurrentSession != null && networkManagerUI.CurrentSession.IsHost)
+        {
+            string json = SerializeServerTruths();
+            var hostSession = networkManagerUI.CurrentSession.AsHost();
+            hostSession.SetProperty("GAME_META", new SessionProperty(json, VisibilityPropertyOptions.Public));
+            
+            var task = hostSession.SavePropertiesAsync();
+            // Wrap the Task in a WaitUntil for the Coroutine
+            yield return new WaitUntil(() => task.IsCompleted);
+
+            if (task.IsFaulted)
+            {
+                Debug.LogError($"[SERVER_TRUTHS] Failed to persist GAME_META: {task.Exception.Message}");
+                // On failure, mark as dirty to retry next cycle
+                isTruthsDirty = true;
+            }
+            else
+            {
+                Debug.Log($"[SERVER_TRUTHS] Persisted to session: {json}");
+            }
+        }
+
+        isPersistenceTaskActive = false;
+        
+        // Final check: if it became dirty while we were saving, trigger again after cooldown
+        if (isTruthsDirty)
+        {
+            Invoke("TriggerDelayedPersistence", PersistenceCooldown);
+        }
+    }
+
     public bool TryHandleSeatReclaim(int playerNo, ulong clientId, string claimantPlayerId)
     {
+        Dictionary<int, SeatOwnerInfo> seatMap = LoadSeatMapFromSession();
+
+        // Server-authoritative seat resolution: if the seat number is invalid or not yet known by client,
+        // search the session's seatMap to resolve the seat that matches the claimant's persistent Player ID.
         if (playerNo < 0 || playerNo >= playerCount)
         {
-            Debug.LogWarning($"[RECLAIM] Reject seat reclaim: invalid seat {playerNo}.");
-            return false;
+            int foundSeat = -1;
+            foreach (var kvp in seatMap)
+            {
+                if (kvp.Value.OwnerPlayerId == claimantPlayerId)
+                {
+                    foundSeat = kvp.Key;
+                    break;
+                }
+            }
+
+            if (foundSeat != -1)
+            {
+                playerNo = foundSeat;
+                Debug.Log($"[RECLAIM] Auto-resolved seat {playerNo} for claimant '{claimantPlayerId}' via seatMap lookup.");
+            }
+            else
+            {
+                Debug.LogWarning($"[RECLAIM] Reject seat reclaim: claimant '{claimantPlayerId}' not found in seatMap.");
+                return false;
+            }
         }
 
         if (string.IsNullOrEmpty(claimantPlayerId))
@@ -246,7 +425,6 @@ public class Server : NetworkBehaviour
             return false;
         }
 
-        Dictionary<int, SeatOwnerInfo> seatMap = LoadSeatMapFromSession();
         if (seatMap.TryGetValue(playerNo, out SeatOwnerInfo ownerInfo))
         {
             if (!string.IsNullOrEmpty(ownerInfo.OwnerPlayerId) && ownerInfo.OwnerPlayerId != claimantPlayerId)
@@ -262,6 +440,13 @@ public class Server : NetworkBehaviour
 
         seatMap[playerNo] = new SeatOwnerInfo(claimantPlayerId, clientId);
         PersistSeatMapToSessionAsync(seatMap);
+
+        // Inform the reconnected client of their authorized/reclaimed seat number
+        if (networkRelay != null)
+        {
+            networkRelay.GetPlayerNumberClientRPC(clientId, playerNo);
+            Debug.Log($"[RECLAIM] Sent GetPlayerNumberClientRPC to client {clientId} with resolved seat {playerNo}");
+        }
 
         HandleReconnectJoin(clientId);
         return true;
@@ -368,6 +553,10 @@ private const float RECONNECT_TIMEOUT = 15f;
             centerCardsDict = null;
             playersHandCardsIDs = null;
             playersPooledCardsIDs = null;
+            playersPiştiPoolCardsIDs = null;
+
+            playerGolds.Clear();
+            playerSuperPowers.Clear();
 
             // CRITICAL: Reset allCardLookup for NEW GAME - this clears all power effects!
             if (allCardLookup != null)
@@ -395,6 +584,7 @@ private const float RECONNECT_TIMEOUT = 15f;
         singleDebuggingMode = false;
         winnerPrintFlag = false;
         copiedCardMap.Clear();
+        firstThreeDealtCardIds.Clear();
         zaferPuaniPoints.Clear();
         bombedCards.Clear();
         
@@ -446,6 +636,7 @@ private const float RECONNECT_TIMEOUT = 15f;
         centerCardsDict = null;
         playersHandCardsIDs = null;
         playersPooledCardsIDs = null;
+        playersPiştiPoolCardsIDs = null;
         seed = 0; // Optionally keep or randomize for each round
         turnCounter = 0;
         currentPlayer = 0;
@@ -649,6 +840,7 @@ private const float RECONNECT_TIMEOUT = 15f;
         
         // REDO SYSTEM: Save initial game state after cards are dealt
         Invoke("SaveInitialGameStateForRedo", 4f); // After cards are dealt
+        PersistServerTruthsToSession();
     }
 
     public void CallUpdateCurrentPlayer()
@@ -846,10 +1038,12 @@ private void ServerStart()
     private void InitializePlayerPools()
     {
         playersPooledCardsIDs = new Dictionary<int, List<string>>();
+        playersPiştiPoolCardsIDs = new Dictionary<int, List<string>>();
 
         for (int i = 0; i < playerCount; i++)
         {
             playersPooledCardsIDs[i] = new List<string>();
+            playersPiştiPoolCardsIDs[i] = new List<string>();
         }
     }
 
@@ -909,6 +1103,18 @@ private void ServerStart()
             var kvp = deckEnum.Current;
             centerCardsDict[kvp.Key] = kvp.Value;
         }
+
+        firstThreeDealtCardIds.Clear();
+        int firstThreeCount = 0;
+        foreach (var key in centerCardsDict.Keys)
+        {
+            if (firstThreeCount < 3)
+            {
+                firstThreeDealtCardIds.Add(key);
+            }
+            firstThreeCount++;
+        }
+
         // Remove from deck
         foreach (var key in centerCardsDict.Keys)
         {
@@ -956,6 +1162,23 @@ private void ServerStart()
                 }
                 PlayerPişti(currentPlayer, jPistiFlag);
                 piştiPlayer = currentPlayer;
+
+                // RECONSTRUCTION FIX: Track pişti cards in playersPiştiPoolCardsIDs
+                if (playersPiştiPoolCardsIDs == null)
+                {
+                    playersPiştiPoolCardsIDs = new Dictionary<int, List<string>>();
+                }
+                if (!playersPiştiPoolCardsIDs.ContainsKey(playerNumber))
+                {
+                    playersPiştiPoolCardsIDs[playerNumber] = new List<string>();
+                }
+                foreach (var uniqueId in discardedDict.Keys)
+                {
+                    if (!playersPiştiPoolCardsIDs[playerNumber].Contains(uniqueId))
+                    {
+                        playersPiştiPoolCardsIDs[playerNumber].Add(uniqueId);
+                    }
+                }
             }
         }
 
@@ -1159,6 +1382,7 @@ private void ServerStart()
         currentPlayer = (currentPlayer + 1) % playerCount;
 
         networkRelay.UpdateCurrentPlayerClientRPC(currentPlayer, turnCounter);
+        PersistServerTruthsToSession();
 
         // Bot system: Check if it's the bot's turn
         bool isBotTurn = IsBotTurn();
@@ -1273,10 +1497,19 @@ private void ServerStart()
                 }
 
                 int[] cardID;
-                if (copiedCardMap.ContainsKey(card))
-                    cardID = allCardLookup[copiedCardMap[card]];
-                else
+                if (allCardLookup.ContainsKey(card) && (allCardLookup[card][1] == 11 || allCardLookup[card][1] == 0))
+                {
+                    // Directly use modified card value (Kapkaç or Yandım Anam)
                     cardID = allCardLookup[card];
+                }
+                else if (copiedCardMap.ContainsKey(card))
+                {
+                    cardID = allCardLookup[copiedCardMap[card]];
+                }
+                else
+                {
+                    cardID = allCardLookup[card];
+                }
                 int kind = cardID[0];
                 int value = cardID[1];
 
@@ -1563,6 +1796,11 @@ private void ServerStart()
         SaveCurrentGameStateForRedo();
         isProcessingMove = true;
         
+        // Track the initial pending states before any processing clears them
+        bool wasOynayamazsinPending = oynayamazsinPending;
+        bool wasVerZehriPending = verZehriPending;
+        bool wasKutsalDestePending = kutsalDestePending;
+        
         // === MOVE CHAIN TRACKING ===
         // Initialize variables needed for both hybrid power activation and regular card play
         int[] selectedHandCard = allCardLookup[selectedHandCardUniqueID];
@@ -1591,28 +1829,22 @@ private void ServerStart()
         
         if (verZehriPending)
         {
-            verZehriActive = true;
             verZehriPending = false;
             
             // CRITICAL: Record BOTH the power activation AND the card play together as ONE move
             MoveChainIntegrator.TrackHybridPowerTrueActivation(verZehriActivatedBy, "Ver Zehri", selectedHandCardUniqueID, selectedHandCard, capturedCardIds, sumValue);
-            
-            networkRelay.SetVerZehriActiveClientRPC(true); // Notify clients to start effect
             verZehriActivatedBy = -1; // Reset
-            Debug.Log($"[Server] Ver Zehri effect activated when Player {playerNumber} played a card");
+            Debug.Log($"[Server] Ver Zehri pending state cleared, move tracked. Activation delayed until end of turn.");
         }
         
         if (kutsalDestePending)
         {
-            kutsalDesteActive = true;
             kutsalDestePending = false;
             
             // CRITICAL: Record BOTH the power activation AND the card play together as ONE move
             MoveChainIntegrator.TrackHybridPowerTrueActivation(kutsalDesteActivatedBy, "Kutsal Deste", selectedHandCardUniqueID, selectedHandCard, capturedCardIds, sumValue);
-            
-            networkRelay.SetKutsalDesteActiveClientRPC(true); // Notify clients to start effect
             kutsalDesteActivatedBy = -1; // Reset
-            Debug.Log($"[Server] Kutsal Deste effect activated when Player {playerNumber} played a card");
+            Debug.Log($"[Server] Kutsal Deste pending state cleared, move tracked. Activation delayed until end of turn.");
         }
         
         // Oynayamazsın: force this card to be blocked (add to center, no capture)
@@ -1633,7 +1865,7 @@ private void ServerStart()
             // This is a capture move
             // NOTE: Card play is already recorded by TrackHybridPowerTrueActivation if a hybrid power was pending
             // Only record here if NO hybrid power was pending
-            if (!oynayamazsinPending && !verZehriPending && !kutsalDestePending)
+            if (!wasOynayamazsinPending && !wasVerZehriPending && !wasKutsalDestePending)
             {
                 MoveChainIntegrator.TrackServerCardPlay(playerNumber, selectedHandCardUniqueID, selectedHandCard, capturedCardIds, sumValue);
             }
@@ -1681,7 +1913,7 @@ private void ServerStart()
             // This is a play to center move
             // NOTE: Card play is already recorded by TrackHybridPowerTrueActivation if a hybrid power was pending
             // Only record here if NO hybrid power was pending
-            if (!oynayamazsinPending && !verZehriPending && !kutsalDestePending)
+            if (!wasOynayamazsinPending && !wasVerZehriPending && !wasKutsalDestePending)
             {
                 MoveChainIntegrator.TrackServerCardPlay(playerNumber, selectedHandCardUniqueID, selectedHandCard, new string[0], sumValue);
             }
@@ -1695,6 +1927,22 @@ private void ServerStart()
                 Debug.Log($"[Server] ADD TO CENTER: Removed card {selectedHandCardUniqueID} from player {playerNumber} hand: {removed}");
             }
         }
+
+        // Truly activate the newly triggered hybrid powers for the NEXT turn
+        if (wasVerZehriPending)
+        {
+            verZehriActive = true;
+            networkRelay.SetVerZehriActiveClientRPC(true); // Notify clients to start effect
+            Debug.Log($"[Server] Ver Zehri is now active for future moves.");
+        }
+        
+        if (wasKutsalDestePending)
+        {
+            kutsalDesteActive = true;
+            networkRelay.SetKutsalDesteActiveClientRPC(true); // Notify clients to start effect
+            Debug.Log($"[Server] Kutsal Deste is now active for future moves.");
+        }
+
         // Cancel any running turn timer (valid move received)
         if (activeTurnTimerCoroutine != null)
         {
@@ -1827,15 +2075,41 @@ private void ServerStart()
 
     public void HandleMigratedHostSelfBind(int playerNo, ulong clientId)
     {
-        if (playerClientIds.ContainsKey(playerNo) && playerClientIds[playerNo] != clientId)
+        Debug.Log($"[MIGRATION] HandleMigratedHostSelfBind started for Seat {playerNo}, Client ID {clientId}");
+
+        // 1. Sweep & Unbind: Remove stale ClientID mappings to avoid duplicate ID collisions
+        List<int> seatsWithSameClientId = new List<int>();
+        foreach (var kvp in playerClientIds)
         {
-            Debug.LogError($"[Server] Seat {playerNo} already owned by another client! Migration bind rejected.");
-            return;
+            if (kvp.Value == clientId && kvp.Key != playerNo)
+            {
+                seatsWithSameClientId.Add(kvp.Key);
+            }
         }
+        foreach (int seat in seatsWithSameClientId)
+        {
+            playerClientIds.Remove(seat);
+            Debug.Log($"[MIGRATION] Unbound stale ClientID {clientId} from Seat {seat} to prevent mapping collisions.");
+        }
+
+        // 2. Clear Target Seat: Remove old network bindings from our target slot
+        if (playerClientIds.ContainsKey(playerNo))
+        {
+            playerClientIds.Remove(playerNo);
+            Debug.Log($"[MIGRATION] Cleared old Client ID mapping for target Seat {playerNo}.");
+        }
+
+        // 3. Bind: Rebind the new host client ID to their logical seat
         Debug.Log($"[Server] HandleMigratedHostSelfBind: seat {playerNo} bound to new host {clientId}");
         RebindPlayerClientId(playerNo, clientId);
         
-        // Host is never a bot, but for consistency:
+        // Assert client mapping consistency
+        if (playerClientIds.Values.Distinct().Count() != playerClientIds.Count)
+        {
+            Debug.LogError($"[MIGRATION CRITICAL] Duplicate Client IDs mapped to different seats inside playerClientIds!");
+        }
+
+        // Host is never a bot, remove bot control to be safe:
         RemoveBotFromSeat(playerNo);
 
         if (!countedClients.Contains(clientId))
@@ -1843,7 +2117,15 @@ private void ServerStart()
             countedClients.Add(clientId);
             connectedPlayerCount++;
         }
-        // Skips all client-side reset/reconnect RPCs as the host is already in sync
+        
+        // Persist updated seat map to session so clients can find the new host info
+        Dictionary<int, SeatOwnerInfo> seatMap = LoadSeatMapFromSession();
+        if (seatMap.ContainsKey(playerNo))
+        {
+            var oldInfo = seatMap[playerNo];
+            seatMap[playerNo] = new SeatOwnerInfo(oldInfo.OwnerPlayerId, clientId);
+            PersistSeatMapToSessionAsync(seatMap);
+        }
     }
 
     /// <summary>
@@ -1860,6 +2142,8 @@ private void ServerStart()
         countedClients.Clear();
         disconnectedClients.Clear();
         playerClientIds.Clear();
+        playerGolds.Clear();
+        playerSuperPowers.Clear();
         connectedPlayerCount = 0;
         PlayerPrefs.DeleteKey("HostMigrated");
         PlayerPrefs.Save();
@@ -1932,6 +2216,21 @@ private void ServerStart()
         {
             Debug.LogWarning($"[Server] AnotherPlayerConnected: Client {clientId} is already in reconnecting set - ignoring duplicate notification");
             return;
+        }
+
+        bool isMigrating = networkManagerUI != null && networkManagerUI.IsMigrating;
+
+        // If this is the local host client spawning during a migration,
+        // completely skip new-player setup and client-RPC handshakes!
+        if (isMigrating && clientId == NetworkManager.Singleton.LocalClientId)
+        {
+            Debug.Log($"[MIGRATION] AnotherPlayerConnected: Host client {clientId} connected during migration. Skipping seat assignment.");
+            if (!countedClients.Contains(clientId))
+            {
+                countedClients.Add(clientId);
+                connectedPlayerCount++;
+            }
+            return; // Exit early!
         }
         
         // RECONNECTION DETECTION: Game is "in progress" if cards have been set up.
@@ -2286,6 +2585,7 @@ private void ServerStart()
         if (centerCardsDict != null) centerCardsDict.Clear();
         if (playersHandCardsIDs != null) playersHandCardsIDs.Clear();
         if (playersPooledCardsIDs != null) playersPooledCardsIDs.Clear();
+        if (playersPiştiPoolCardsIDs != null) playersPiştiPoolCardsIDs.Clear();
         
         // Reset bot system if active
         if (botPlayerActive)
@@ -2474,6 +2774,7 @@ private void ServerStart()
     public void RegisterCopiedCard(string targetUniqueID, string sourceUniqueID)
     {
         copiedCardMap[targetUniqueID] = sourceUniqueID;
+        Debug.Log($"[KopyalaYapıştırLogs] [Server] RegisterCopiedCard authoritatively saved mapping: {targetUniqueID} -> {sourceUniqueID}");
     }
 
     public List<string> GetPlayerHand(int playerNo)
@@ -2837,6 +3138,7 @@ private void ServerStart()
         }
 
         networkRelay.UpdateScoreDisplayClientRPC(points[0], points[1]);
+        PersistServerTruthsToSession();
     }
 
 
@@ -2847,8 +3149,12 @@ private void ServerStart()
         endTestFlag = true;
         // Ensure player pools are initialized
         playersPooledCardsIDs = new Dictionary<int, List<string>>();
+        playersPiştiPoolCardsIDs = new Dictionary<int, List<string>>();
         for (int i = 0; i < playerCount; i++)
+        {
             playersPooledCardsIDs[i] = new List<string>();
+            playersPiştiPoolCardsIDs[i] = new List<string>();
+        }
 
         // Get all card IDs
         List<string> allCardIDs = new List<string>(allCardLookup.Keys);
@@ -2933,6 +3239,7 @@ private void ServerStart()
             }
         }
         snapshot.center = new SerializableStringList(centerList);
+        snapshot.firstThreeDealtCardIds = new SerializableStringList(firstThreeDealtCardIds ?? new List<string>());
 
         // Player hands
         snapshot.hands = new SerializableDictionary();
@@ -2958,11 +3265,21 @@ private void ServerStart()
             snapshot.pools = new SerializableDictionary(poolsDict);
         }
 
-        // Pişti pools (you may need to add this tracking to server)
+        // Pişti pools
         snapshot.pistiPools = new SerializableDictionary();
-        // TODO: If you track pişti pools separately on server, add here
-        // For now, empty dictionary
-        snapshot.pistiPools = new SerializableDictionary(new Dictionary<int, List<string>>());
+        if (playersPiştiPoolCardsIDs != null)
+        {
+            var pistiPoolsDict = new Dictionary<int, List<string>>();
+            foreach (var kvp in playersPiştiPoolCardsIDs)
+            {
+                pistiPoolsDict[kvp.Key] = new List<string>(kvp.Value);
+            }
+            snapshot.pistiPools = new SerializableDictionary(pistiPoolsDict);
+        }
+        else
+        {
+            snapshot.pistiPools = new SerializableDictionary(new Dictionary<int, List<string>>());
+        }
 
         // Bomb stack (cards outside normal game flow)
         snapshot.bombStack = new SerializableStringList(bombedCards ?? new List<string>());
@@ -2981,6 +3298,7 @@ private void ServerStart()
 
         // Active effects and flags
         snapshot.copiedCardMap = new SerializableStringDictionary(copiedCardMap ?? new Dictionary<string, string>());
+        Debug.Log($"[KopyalaYapıştırLogs] [Server] CaptureMigrationSnapshot: serialized copiedCardMap with {(copiedCardMap != null ? copiedCardMap.Count : 0)} mappings into state snapshot.");
         snapshot.oynayamazsinActive = oynayamazsinPending; // Use your actual flag
         snapshot.isYapamazsınActive = isYapamazsınActive;
         snapshot.verZehriActive = verZehriActive;
@@ -3015,7 +3333,9 @@ private void ServerStart()
         }
 
         // Optional: Player gold (leave empty for now since it's client-managed)
-        snapshot.playerGold = new SerializableDictionary(new Dictionary<int, List<string>>());
+        snapshot.playerGold = new SerializableIntDictionary(playerGolds);
+
+        snapshot.playerSuperPowers = new SerializableDictionary(playerSuperPowers);
 
         // Card master lookup - required for re-host so ApplyGameStateToServer can rebuild centerCardsDict
         if (allCardLookup != null && allCardLookup.Count > 0)
@@ -3114,11 +3434,20 @@ if (hasCurrentState && snapshot.snapshotVersion > 0 && snapshot.snapshotVersion 
         this.turnCounter = snapshot.turnCounter;
         this.roundCount = snapshot.roundCount;
         this.startingPlayerNo = snapshot.startingPlayerNo;
+
         this.seed = snapshot.seed; // FIX: Restore seed for consistent deck across migration
         this.lastPlayerToCapture = snapshot.lastPlayerToCapture;
         this.readyToEndTurnCounter = snapshot.readyToEndTurnCounter;
         this.timer = snapshot.turnTimerElapsed;
         this.turnTime = snapshot.turnTimeLimit;
+
+        if (firstThreeDealtCardIds == null) firstThreeDealtCardIds = new List<string>();
+        firstThreeDealtCardIds.Clear();
+        var snapshotFirstThree = snapshot.firstThreeDealtCardIds.ToList();
+        if (snapshotFirstThree != null)
+        {
+            firstThreeDealtCardIds.AddRange(snapshotFirstThree);
+        }
 
         // Restore allCardLookup first so other card rebuilds work
         if (snapshot.cardLookup != null && snapshot.cardLookup.Length > 0)
@@ -3135,12 +3464,66 @@ if (hasCurrentState && snapshot.snapshotVersion > 0 && snapshot.snapshotVersion 
         // Rebuild dictionaries from snapshot
         if (deckCardsDict == null) deckCardsDict = new Dictionary<string, int[]>();
         deckCardsDict.Clear();
-        foreach (string cardId in snapshot.deck.ToList())
+
+        List<string> snapshotDeck = snapshot.deck.ToList();
+        if (snapshotDeck.Count > 0)
         {
-            if (allCardLookup != null && allCardLookup.ContainsKey(cardId))
+            foreach (string cardId in snapshotDeck)
             {
-                deckCardsDict[cardId] = allCardLookup[cardId];
+                if (allCardLookup != null && allCardLookup.ContainsKey(cardId))
+                {
+                    deckCardsDict[cardId] = allCardLookup[cardId];
+                }
             }
+        }
+        else if (snapshot.seed != 0 && allCardLookup != null && allCardLookup.Count > 0)
+        {
+            // HYBRID RECONSTRUCTION: Rebuild deck from seed and subtract dealt cards
+            Debug.Log($"[MIGRATION] Reconstructing deck from seed {snapshot.seed}...");
+            
+            // 1. Create a list of all cards in the master lookup, sorted by ID numeric suffix
+            // This ensures the order is identical to the initial SaveAllCards() call.
+            var fullDeckList = allCardLookup.Keys
+                .OrderBy(id => {
+                    if (id.StartsWith("card_") && int.TryParse(id.Substring(5), out int num)) return num;
+                    return 999;
+                })
+                .ToList();
+            
+            // 2. Shuffle it with the same algorithm as SuffleCards(seed)
+            System.Random rng = new System.Random(snapshot.seed);
+            int count = fullDeckList.Count;
+            for (int i = 0; i < count - 1; i++)
+            {
+                int r = rng.Next(i, count);
+                string temp = fullDeckList[i];
+                fullDeckList[i] = fullDeckList[r];
+                fullDeckList[r] = temp;
+            }
+
+            // 3. Identify all cards currently "in play"
+            var cardsInPlay = new HashSet<string>();
+            foreach (var cardId in snapshot.center.ToList()) cardsInPlay.Add(cardId);
+            foreach (var cardId in snapshot.bombStack.ToList()) cardsInPlay.Add(cardId);
+            
+            var handsDict = snapshot.hands.ToDictionary();
+            foreach (var list in handsDict.Values) { foreach (var cardId in list) cardsInPlay.Add(cardId); }
+            
+            var poolsDict = snapshot.pools.ToDictionary();
+            foreach (var list in poolsDict.Values) { foreach (var cardId in list) cardsInPlay.Add(cardId); }
+            
+            var pistiPoolsDict = snapshot.pistiPools.ToDictionary();
+            foreach (var list in pistiPoolsDict.Values) { foreach (var cardId in list) cardsInPlay.Add(cardId); }
+
+            // 4. Populate deckCardsDict with cards NOT in play, preserving shuffled order
+            foreach (string cardId in fullDeckList)
+            {
+                if (!cardsInPlay.Contains(cardId))
+                {
+                    deckCardsDict[cardId] = allCardLookup[cardId];
+                }
+            }
+            Debug.Log($"[MIGRATION] Deck reconstructed. Cards in play: {cardsInPlay.Count}, Remaining in deck: {deckCardsDict.Count}");
         }
 
         if (centerCardsDict == null) centerCardsDict = new Dictionary<string, int[]>();
@@ -3170,6 +3553,14 @@ if (hasCurrentState && snapshot.snapshotVersion > 0 && snapshot.snapshotVersion 
             playersPooledCardsIDs[kvp.Key] = kvp.Value;
         }
 
+        if (playersPiştiPoolCardsIDs == null) playersPiştiPoolCardsIDs = new Dictionary<int, List<string>>();
+        playersPiştiPoolCardsIDs.Clear();
+        var pistiPoolsToApply = snapshot.pistiPools.ToDictionary();
+        foreach (var kvp in pistiPoolsToApply)
+        {
+            playersPiştiPoolCardsIDs[kvp.Key] = kvp.Value;
+        }
+
         // Restore bot-controlled players
         botControlledPlayers.Clear();
         if (snapshot.botControlledPlayers.items != null)
@@ -3192,6 +3583,7 @@ if (hasCurrentState && snapshot.snapshotVersion > 0 && snapshot.snapshotVersion 
 
         // Apply effects and flags
         copiedCardMap = snapshot.copiedCardMap.ToDictionary();
+        Debug.Log($"[KopyalaYapıştırLogs] [Server] RestoreFromSnapshot: deserialized copiedCardMap with {(copiedCardMap != null ? copiedCardMap.Count : 0)} mappings from snapshot.");
         isYapamazsınActive = snapshot.isYapamazsınActive;
         verZehriActive = snapshot.verZehriActive;
         kutsalDesteActive = snapshot.kutsalDesteActive;
@@ -3204,6 +3596,9 @@ if (hasCurrentState && snapshot.snapshotVersion > 0 && snapshot.snapshotVersion 
         // Apply scores
         points = snapshot.points.ToArray();
         piştiCounts = snapshot.pistiCounts.ToArray();
+
+        playerGolds = snapshot.playerGold.ToDictionary();
+        playerSuperPowers = snapshot.playerSuperPowers.ToDictionary();
 
         Debug.Log($"[Server] Applied game state snapshot version {snapshot.snapshotVersion} to server");
     }
@@ -3229,7 +3624,66 @@ if (hasCurrentState && snapshot.snapshotVersion > 0 && snapshot.snapshotVersion 
         ApplyGameStateToServer(snapshot);
         currentGameState = snapshot;
         hasCurrentState = true;
+
+        // Seat binding: Restore playerClientIds from SEAT_MAP in session
+        try
+        {
+            var seatMap = LoadSeatMapFromSession();
+            foreach (var entry in seatMap)
+            {
+                if (entry.Value.ClientId != 0)
+                {
+                    playerClientIds[entry.Key] = entry.Value.ClientId;
+                    Debug.Log($"[MIGRATION] Seat {entry.Key} restored to ClientID {entry.Value.ClientId}");
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[MIGRATION] Failed to restore seat mapping: {e.Message}");
+        }
+
+        ValidateTotalCardCount();
+
+        // MIGRATION TURN RESUMPTION: Broadcast turn state to clients and resume turn timer / bot logic
+        CallUpdateCurrentPlayer();
+        if (isActiveHost)
+        {
+            if (activeTurnTimerCoroutine != null) StopCoroutine(activeTurnTimerCoroutine);
+            bool isBotTurn = IsBotTurn();
+            if (!isBotTurn)
+            {
+                activeTurnTimerCoroutine = StartCoroutine(TurnTimerCoroutine(currentPlayer));
+                Debug.Log($"[MIGRATION] Resumed turn timer for player {currentPlayer}");
+            }
+        }
+
         return true;
+    }
+
+    private void ValidateTotalCardCount()
+    {
+        int total = 0;
+        if (deckCardsDict != null) total += deckCardsDict.Count;
+        if (centerCardsDict != null) total += centerCardsDict.Count;
+        
+        if (playersHandCardsIDs != null)
+        {
+            foreach (var list in playersHandCardsIDs.Values) total += list.Count;
+        }
+        
+        if (playersPooledCardsIDs != null)
+        {
+            foreach (var list in playersPooledCardsIDs.Values) total += list.Count;
+        }
+        
+        if (bombedCards != null) total += bombedCards.Count;
+
+        Debug.Log($"[MIGRATION] Consistency validation: {total} / 52 cards accounted for.");
+        if (total != 52)
+        {
+            Debug.LogWarning($"[MIGRATION] Card count mismatch! Expected 52, found {total}. This may cause gameplay issues.");
+        }
     }
 
     private bool IsSnapshotValidForRestore(SerializableGameState snapshot, out string validationError)

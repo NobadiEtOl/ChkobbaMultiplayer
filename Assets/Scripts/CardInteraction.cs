@@ -21,6 +21,7 @@ public class CardInteraction : MonoBehaviour
     public static Dictionary<string, CardInteraction> cardLookup = new Dictionary<string, CardInteraction>();
     // In CardInteraction.cs
     public string uniqueCardInstanceID; // e.g., a GUID
+    public bool isFirstThreeDealtCard = false;
     private static Color baseCardIndicatorColor;
     // --- Card selection restriction system ---
     private static bool restrictToOwnHand = true;
@@ -685,13 +686,13 @@ public class CardInteraction : MonoBehaviour
     }
 
     // Add at the top of the class:
-    private int[] originalCardID = null;
-    private Sprite originalSprite = null;
+    [System.NonSerialized] public int[] originalCardID = null;
+    [System.NonSerialized] public Sprite originalSprite = null;
 
     // Call this in InitializeCard() after setting cardID and sprite:
     public void StoreOriginalCardData()
     {
-        if (originalCardID == null)
+        if (originalCardID == null || originalCardID.Length < 2)
             originalCardID = (int[])cardID.Clone();
         if (originalSprite == null)
             originalSprite = GetComponent<SpriteRenderer>().sprite;
@@ -713,10 +714,41 @@ public class CardInteraction : MonoBehaviour
         // This ensures visual effects remain while not interfering with cards that don't have effects
         if (activePowerEffect == "none" && originalSprite != null)
         {
-            GetComponent<SpriteRenderer>().sprite = originalSprite;
+            SpriteRenderer sr = GetComponent<SpriteRenderer>();
+            if (sr != null)
+            {
+                sr.sprite = originalSprite;
+            }
         }
         
         Debug.Log($"[CardInteraction] Card values preserved - Current value: {cardID[1]}, Power effect: {activePowerEffect}");
+    }
+
+    /// <summary>
+    /// Hard resets the card's value, sprite, and active power effect status to pristine original backups.
+    /// </summary>
+    public void ResetToOriginalPristineState()
+    {
+        if (originalCardID != null && originalCardID.Length >= 2)
+        {
+            cardID = (int[])originalCardID.Clone();
+            gameObject.tag = cardID[0] + "_" + cardID[1];
+        }
+        else
+        {
+            Debug.LogWarning($"[KopyalaYapıştırLogs] ResetToOriginalPristineState: originalCardID is null or empty for {gameObject.name}");
+        }
+
+        SpriteRenderer sr = GetComponent<SpriteRenderer>();
+        if (sr != null)
+        {
+            if (originalSprite != null)
+            {
+                sr.sprite = originalSprite;
+            }
+            sr.color = Color.white;
+        }
+        activePowerEffect = "none";
     }
     
     /// <summary>

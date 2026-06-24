@@ -351,6 +351,20 @@ public class GameNetworkRelay : NetworkBehaviour
 
     //ServerRPC
     [ServerRpc(RequireOwnership = false)]
+    public void SyncGoldAndPowersServerRPC(int playerNo, int gold, string[] powers)
+    {
+        if (Server.Singleton != null)
+        {
+            Server.Singleton.UpdatePlayerGold(playerNo, gold);
+            Server.Singleton.UpdatePlayerPowers(playerNo, new List<string>(powers));
+        }
+        else
+        {
+            Debug.LogWarning("[GameNetworkRelay] SyncGoldAndPowersServerRPC called but Server.Singleton is null");
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
     public void NotifyDealCenterFinishedServerRPC(ulong clientId)
     {
         server.OnClientDealCenterFinished(clientId);
@@ -388,7 +402,7 @@ public class GameNetworkRelay : NetworkBehaviour
     {
         if (!ValidatePowerCaller(out int callerPlayerNo, rpcParams)) return;
 
-        Debug.Log($"[GameNetworkRelay] KopyalaYapistirServerRPC called - Target: {targetUniqueID}, Source: {sourceUniqueID}, Time: {Time.time}");
+        Debug.Log($"[KopyalaYapıştırLogs] [Server] KopyalaYapistirServerRPC called - Caller Player: {callerPlayerNo}, Target: {targetUniqueID}, Source: {sourceUniqueID}, Time: {Time.time}");
 
         // Completing Kopyala Yapıştır ends interactive selection, so stop power timer and resume turn timer.
         if (server != null)
@@ -400,20 +414,23 @@ public class GameNetworkRelay : NetworkBehaviour
         if (Server.Singleton != null && Server.Singleton.allCardLookup.ContainsKey(sourceUniqueID) && Server.Singleton.allCardLookup.ContainsKey(targetUniqueID))
         {
             var sourceID = Server.Singleton.allCardLookup[sourceUniqueID];
-            Debug.Log($"[GameNetworkRelay] Updating server card data - Target card [{targetUniqueID}] will become [{sourceID[0]}, {sourceID[1]}]");
+            Debug.Log($"[KopyalaYapıştırLogs] [Server] Updating authoritative card data - Target card [{targetUniqueID}] will copy [{sourceID[0]}, {sourceID[1]}]");
             Server.Singleton.allCardLookup[targetUniqueID][0] = sourceID[0]; // kind
             Server.Singleton.allCardLookup[targetUniqueID][1] = sourceID[1]; // value
+            
+            // Register copy mapping on the server so it is serialized in game state snapshots
+            Server.Singleton.RegisterCopiedCard(targetUniqueID, sourceUniqueID);
         }
         else
         {
-            Debug.LogWarning($"[GameNetworkRelay] KopyalaYapistirServerRPC - Card lookup failed - Source exists: {Server.Singleton?.allCardLookup.ContainsKey(sourceUniqueID)}, Target exists: {Server.Singleton?.allCardLookup.ContainsKey(targetUniqueID)}");
+            Debug.LogWarning($"[KopyalaYapıştırLogs] [Server] KopyalaYapistirServerRPC - Card lookup failed on Server! Source exists: {Server.Singleton?.allCardLookup.ContainsKey(sourceUniqueID)}, Target exists: {Server.Singleton?.allCardLookup.ContainsKey(targetUniqueID)}");
         }
         
         // Notify all clients to update visuals and local cardID
-        Debug.Log($"[GameNetworkRelay] Broadcasting KopyalaYapistirClientRPC to all clients");
+        Debug.Log($"[KopyalaYapıştırLogs] [Server] Broadcasting KopyalaYapistirClientRPC to all clients");
         ShowcaseSuperPowerClientRPC("Kopyala Yapıştır");
         KopyalaYapistirClientRPC(targetUniqueID, sourceUniqueID);
-        Debug.Log($"[GameNetworkRelay] KopyalaYapistirServerRPC complete");
+        Debug.Log($"[KopyalaYapıştırLogs] [Server] KopyalaYapistirServerRPC completed successfully");
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -440,10 +457,13 @@ public class GameNetworkRelay : NetworkBehaviour
         }
 
         // SIMPLIFIED ZAFER PUANI: Add 1 point to the player/team who activated Kapkaç
+        // Commented out as points should only be gained at the end of the round when cards are evaluated.
+        /*
         if (Server.Singleton != null)
         {
             Server.Singleton.AddZaferPuaniPoint(callerPlayerNo, 1);
         }
+        */
 
         ShowcaseSuperPowerClientRPC("Kapkaç");
         KapkacCardChangedClientRPC(cardUniqueID);
@@ -1156,4 +1176,35 @@ public class GameNetworkRelay : NetworkBehaviour
     }
 
 
+}
+
+namespace Unity.Netcode
+{
+    public static class NetworkSerializationExtensions
+    {
+        public static void WriteValueSafe(this FastBufferWriter writer, in string[] value)
+        {
+            if (value == null)
+            {
+                writer.WriteValueSafe(0);
+                return;
+            }
+            writer.WriteValueSafe(value.Length);
+            for (int i = 0; i < value.Length; i++)
+            {
+                writer.WriteValueSafe(value[i] ?? string.Empty);
+            }
+        }
+
+        public static void ReadValueSafe(this FastBufferReader reader, out string[] value)
+        {
+            reader.ReadValueSafe(out int length);
+            value = new string[length];
+            for (int i = 0; i < length; i++)
+            {
+                reader.ReadValueSafe(out string element);
+                value[i] = element;
+            }
+        }
+    }
 }

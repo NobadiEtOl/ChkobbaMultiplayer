@@ -29,9 +29,20 @@ public struct SerializableDictionary : INetworkSerializable
     public Dictionary<int, List<string>> ToDictionary()
     {
         Dictionary<int, List<string>> dictionary = new Dictionary<int, List<string>>();
+        
+        if (keys == null || values == null) return dictionary;
+
         for (int i = 0; i < keys.Count; i++)
         {
-            dictionary[keys[i]] = new List<string>(values[i]);
+            if (i < values.Count)
+            {
+                List<string> list = values[i] ?? new List<string>();
+                dictionary[keys[i]] = new List<string>(list);
+            }
+            else
+            {
+                dictionary[keys[i]] = new List<string>();
+            }
         }
         return dictionary;
     }
