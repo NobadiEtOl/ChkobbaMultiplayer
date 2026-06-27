@@ -6,13 +6,10 @@ using UnityEngine;
 public class ProfileScript : MonoBehaviour
 {
     [SerializeReference] public Sprite[] cardBackSprites;
-    [SerializeReference] private Sprite[] profilePicSprites;
     [SerializeField]private GameObject cardBackShowcase;
-    [SerializeField] private GameObject profilePicShowcase;
     [SerializeField]private InputField playerNameInputField;
     [SerializeField]private GameObject[] exampleCards = new GameObject[4];
     public int cardBackIndex;
-    public int profilePicIndex;
     private int total1v1MatchCount;
     private int total1v1MatchWinCount;
     [SerializeField]private Text text1v1MatchCount;
@@ -21,7 +18,6 @@ public class ProfileScript : MonoBehaviour
     private int total2v2MatchWinCount;
     private string playerName;
     public int cardBackCounter;
-    public int profilePicCounter;  
 
     // Start is called before the first frame update
     void Start()
@@ -30,7 +26,6 @@ public class ProfileScript : MonoBehaviour
         // Load the saved cardBackIndex or use 0 as the default
         cardBackIndex = PlayerPrefs.GetInt("CardBackIndex", 0);
         playerName = PlayerPrefs.GetString("PlayerName", "Player");
-        profilePicIndex = PlayerPrefs.GetInt("ProfilePicIndex", 0);
         LoadMatchCounts();
 
         playerNameInputField.text = playerName;
@@ -42,7 +37,6 @@ public class ProfileScript : MonoBehaviour
         }
 
         cardBackShowcase.GetComponent<Image>().sprite = cardBackSprites[cardBackIndex];
-        profilePicShowcase.GetComponent<Image>().sprite = profilePicSprites[profilePicIndex];
     }
 
     private void LoadMatchCounts()
@@ -71,23 +65,14 @@ public class ProfileScript : MonoBehaviour
         cardBackShowcase.GetComponent<Image>().sprite = cardBackSprites[(cardBackIndex + cardBackCounter + cardBackSprites.Length) % cardBackSprites.Length];
     }
 
-    public void OnProfilePicChangeNext()
-    {
-        profilePicCounter = (profilePicCounter + 1) % profilePicSprites.Length;
-        profilePicShowcase.GetComponent<Image>().sprite = profilePicSprites[(profilePicIndex + profilePicCounter) % profilePicSprites.Length];
-    }
-
-    public void OnProfilePicChangePrevious()
-    {
-        profilePicCounter = (profilePicCounter - 1 + profilePicSprites.Length) % profilePicSprites.Length;
-        profilePicShowcase.GetComponent<Image>().sprite = profilePicSprites[(profilePicIndex + profilePicCounter + profilePicSprites.Length) % profilePicSprites.Length];
-    }
-
     public void OnSaveConfirm()
     {
         UpdateCardBack();
         UpdatePlayerName();
-        UpdateProfilePic();  
+        if (AvatarCustomization.Instance != null)
+        {
+            AvatarCustomization.Instance.SaveCustomization();
+        }
     }
 
     public void UpdateCardBack()
@@ -115,20 +100,6 @@ public class ProfileScript : MonoBehaviour
         PlayerPrefs.Save(); // Ensure the data is written to disk
     }
 
-    public void UpdateProfilePic()
-    {
-        profilePicIndex = (profilePicIndex + profilePicCounter) % profilePicSprites.Length;
-        profilePicShowcase.GetComponent<Image>().sprite = profilePicSprites[profilePicIndex];
-        SaveProfilePicIndex();
-        profilePicCounter = 0;
-    }
-
-    public void SaveProfilePicIndex()
-    {
-        PlayerPrefs.SetInt("ProfilePicIndex", profilePicIndex);
-        PlayerPrefs.Save();
-    }
-
     public void ResetCardBackShowcase()
     {
         // Reset the card back showcase to the default sprite
@@ -138,9 +109,10 @@ public class ProfileScript : MonoBehaviour
 
     public void ResetProfilePicShowcase()
     {
-        // Reset the profile picture showcase to the default sprite
-        profilePicCounter = 0;
-        profilePicShowcase.GetComponent<Image>().sprite = profilePicSprites[profilePicIndex];
+        if (AvatarCustomization.Instance != null)
+        {
+            AvatarCustomization.Instance.ResetToSaved();
+        }
     }
 
     [ContextMenu("Reset Increment1v1MatchCount")]

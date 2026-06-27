@@ -1670,7 +1670,11 @@ public class GameManager : MonoBehaviour
 
                 GameObject capturedCard = Instantiate(cardBack, Vector3.zero, Quaternion.identity);
 
-                capturedCard.transform.SetParent(playerPoolTransforms[playerNumber]);
+                int relativePoolIdx = (playerNumber - deckController.thisPlayerNumber + deckController.playerCount) % deckController.playerCount;
+
+                int poolIndex = deckController.GetPoolIndex(relativePoolIdx);
+
+                capturedCard.transform.SetParent(playerPoolTransforms[poolIndex]);
 
                 capturedCard.transform.localPosition = Vector3.zero;
 
@@ -2172,6 +2176,11 @@ public class GameManager : MonoBehaviour
 
         }
 
+        if (SideManager.Instance != null)
+        {
+            SideManager.Instance.UpdatePoints(point0, point1);
+        }
+
     }
 
     /// <summary>
@@ -2332,11 +2341,11 @@ public class GameManager : MonoBehaviour
 
         pointTexts.Add(GameObject.Find("PlayerPointText1").GetComponent<Text>());
 
-        GameObject.Find("PlayerPointText1").GetComponent<Text>().text = "0 ";
+        GameObject.Find("PlayerPointText1").GetComponent<Text>().text = "0";
 
         pointTexts.Add(GameObject.Find("PlayerPointText2").GetComponent<Text>());
 
-        GameObject.Find("PlayerPointText2").GetComponent<Text>().text = "0 ";
+        GameObject.Find("PlayerPointText2").GetComponent<Text>().text = "0";
 
 
 
@@ -2690,19 +2699,11 @@ public class GameManager : MonoBehaviour
 
         playerPoolTransforms.Add(GameObject.Find("PlayerPool2").GetComponent<Transform>());
 
-        playerPoolTransforms.Add(GameObject.Find("PlayerPool3").GetComponent<Transform>());
-
-        playerPoolTransforms.Add(GameObject.Find("PlayerPool4").GetComponent<Transform>());
-
 
 
         playerPiştiPoolTransforms.Add(GameObject.Find("PlayerPiştiPool1").GetComponent<Transform>());
 
         playerPiştiPoolTransforms.Add(GameObject.Find("PlayerPiştiPool2").GetComponent<Transform>());
-
-        playerPiştiPoolTransforms.Add(GameObject.Find("PlayerPiştiPool3").GetComponent<Transform>());
-
-        playerPiştiPoolTransforms.Add(GameObject.Find("PlayerPiştiPool4").GetComponent<Transform>());
 
 
 
@@ -6063,32 +6064,43 @@ public class GameManager : MonoBehaviour
         }
 
         // Pools Audit
-        for (int absSeat = 0; absSeat < playerCount; absSeat++)
-        {
-            int transformIdx = GetTransformIndexForSeat(absSeat, mySeat, playerCount, deckController.playerPoolTransforms.Count);
-            if (transformIdx < 0 || transformIdx >= deckController.playerPoolTransforms.Count) continue;
-            Transform poolTransform = deckController.playerPoolTransforms[transformIdx];
-            if (poolTransform == null) continue;
+        int absSeatSide0 = mySeat;
+        int absSeatSide1 = (mySeat + 1) % playerCount;
 
-            foreach (Transform child in poolTransform)
+        if (deckController.playerPoolTransforms != null && deckController.playerPoolTransforms.Count > 0 && deckController.playerPoolTransforms[0] != null)
+        {
+            foreach (Transform child in deckController.playerPoolTransforms[0])
             {
                 CardInteraction ci = child.GetComponent<CardInteraction>();
-                if (ci != null && !string.IsNullOrEmpty(ci.uniqueCardInstanceID)) playerPools[absSeat].Add(ci.uniqueCardInstanceID);
+                if (ci != null && !string.IsNullOrEmpty(ci.uniqueCardInstanceID)) playerPools[absSeatSide0].Add(ci.uniqueCardInstanceID);
+            }
+        }
+
+        if (deckController.playerPoolTransforms != null && deckController.playerPoolTransforms.Count > 1 && deckController.playerPoolTransforms[1] != null)
+        {
+            foreach (Transform child in deckController.playerPoolTransforms[1])
+            {
+                CardInteraction ci = child.GetComponent<CardInteraction>();
+                if (ci != null && !string.IsNullOrEmpty(ci.uniqueCardInstanceID)) playerPools[absSeatSide1].Add(ci.uniqueCardInstanceID);
             }
         }
 
         // PistiPools Audit
-        for (int absSeat = 0; absSeat < playerCount; absSeat++)
+        if (deckController.playerPiştiPoolTransforms != null && deckController.playerPiştiPoolTransforms.Count > 0 && deckController.playerPiştiPoolTransforms[0] != null)
         {
-            int transformIdx = GetTransformIndexForSeat(absSeat, mySeat, playerCount, deckController.playerPiştiPoolTransforms.Count);
-            if (transformIdx < 0 || transformIdx >= deckController.playerPiştiPoolTransforms.Count) continue;
-            Transform pistiTransform = deckController.playerPiştiPoolTransforms[transformIdx];
-            if (pistiTransform == null) continue;
-
-            foreach (Transform child in pistiTransform)
+            foreach (Transform child in deckController.playerPiştiPoolTransforms[0])
             {
                 CardInteraction ci = child.GetComponent<CardInteraction>();
-                if (ci != null && !string.IsNullOrEmpty(ci.uniqueCardInstanceID)) playerPistiPools[absSeat].Add(ci.uniqueCardInstanceID);
+                if (ci != null && !string.IsNullOrEmpty(ci.uniqueCardInstanceID)) playerPistiPools[absSeatSide0].Add(ci.uniqueCardInstanceID);
+            }
+        }
+
+        if (deckController.playerPiştiPoolTransforms != null && deckController.playerPiştiPoolTransforms.Count > 1 && deckController.playerPiştiPoolTransforms[1] != null)
+        {
+            foreach (Transform child in deckController.playerPiştiPoolTransforms[1])
+            {
+                CardInteraction ci = child.GetComponent<CardInteraction>();
+                if (ci != null && !string.IsNullOrEmpty(ci.uniqueCardInstanceID)) playerPistiPools[absSeatSide1].Add(ci.uniqueCardInstanceID);
             }
         }
         

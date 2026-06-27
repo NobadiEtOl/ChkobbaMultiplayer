@@ -1,0 +1,910 @@
+fileFormatVersion: 2
+guid: fe75e370fed5e4940b4cde8ad7ea2d79
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -8992041026283776379
+    second: Portrait-Girl-export_0
+  - first:
+      213: -248308894526628416
+    second: Portrait-Girl-export_1
+  - first:
+      213: -4801501447120423021
+    second: Portrait-Girl-export_2
+  - first:
+      213: 4098233785457297718
+    second: Portrait-Girl-export_3
+  - first:
+      213: -1513331071263219633
+    second: Portrait-Girl-export_4
+  - first:
+      213: 8204216710243312781
+    second: Portrait-Girl-export_5
+  - first:
+      213: -6126239347039662700
+    second: Portrait-Girl-export_6
+  - first:
+      213: -5999759598036250812
+    second: Portrait-Girl-export_7
+  - first:
+      213: 9120241753589595403
+    second: Portrait-Girl-export_8
+  - first:
+      213: 8166189429584060979
+    second: Portrait-Girl-export_9
+  - first:
+      213: 911854180115551271
+    second: Portrait-Girl-export_10
+  - first:
+      213: 3498057422914759927
+    second: Portrait-Girl-export_11
+  - first:
+      213: 8280097892592731062
+    second: Portrait-Girl-export_12
+  - first:
+      213: -4453467188262235863
+    second: Portrait-Girl-export_13
+  - first:
+      213: 1066097251861945375
+    second: Portrait-Girl-export_14
+  - first:
+      213: 8412277311588337469
+    second: Portrait-Girl-export_15
+  - first:
+      213: -6627385543606684854
+    second: Portrait-Girl-export_16
+  - first:
+      213: -4141512072432445641
+    second: Portrait-Girl-export_17
+  - first:
+      213: -3668082800594988837
+    second: Portrait-Girl-export_18
+  - first:
+      213: 3421894616977107047
+    second: Portrait-Girl-export_19
+  - first:
+      213: 6152215909019794307
+    second: Portrait-Girl-export_20
+  - first:
+      213: 5745817996315582366
+    second: Portrait-Girl-export_21
+  - first:
+      213: 8353723393569884626
+    second: Portrait-Girl-export_22
+  - first:
+      213: -1900690316137641609
+    second: Portrait-Girl-export_23
+  - first:
+      213: 6184945739308326735
+    second: Portrait-Girl-export_24
+  - first:
+      213: -335764347200485048
+    second: Portrait-Girl-export_25
+  - first:
+      213: 5658347295197750822
+    second: Portrait-Girl-export_26
+  - first:
+      213: 3883441911148265210
+    second: Portrait-Girl-export_27
+  - first:
+      213: 4679425637008344441
+    second: Portrait-Girl-export_28
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: iOS
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Portrait-Girl-export_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 127
+        width: 28
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 586dd96145ad53380800000000000000
+      internalID: -8992041026283776379
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_1
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 95
+        width: 28
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0cd9b234064dd8cf0800000000000000
+      internalID: -248308894526628416
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_2
+      rect:
+        serializedVersion: 2
+        x: 31
+        y: 127
+        width: 29
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 397fcdf8fd3ad5db0800000000000000
+      internalID: -4801501447120423021
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_3
+      rect:
+        serializedVersion: 2
+        x: 31
+        y: 95
+        width: 29
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 639cfac1ae9dfd830800000000000000
+      internalID: 4098233785457297718
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_4
+      rect:
+        serializedVersion: 2
+        x: 63
+        y: 127
+        width: 29
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f406bcd98619ffae0800000000000000
+      internalID: -1513331071263219633
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_5
+      rect:
+        serializedVersion: 2
+        x: 63
+        y: 95
+        width: 29
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d84606251ab3bd170800000000000000
+      internalID: 8204216710243312781
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_6
+      rect:
+        serializedVersion: 2
+        x: 95
+        y: 127
+        width: 29
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 49d0ea6a5c93bfaa0800000000000000
+      internalID: -6126239347039662700
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_7
+      rect:
+        serializedVersion: 2
+        x: 95
+        y: 95
+        width: 29
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 44f0f450f629cbca0800000000000000
+      internalID: -5999759598036250812
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_8
+      rect:
+        serializedVersion: 2
+        x: 127
+        y: 127
+        width: 29
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b0db464cd8b919e70800000000000000
+      internalID: 9120241753589595403
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_9
+      rect:
+        serializedVersion: 2
+        x: 127
+        y: 95
+        width: 29
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 33268e61502245170800000000000000
+      internalID: 8166189429584060979
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_10
+      rect:
+        serializedVersion: 2
+        x: 159
+        y: 127
+        width: 29
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 7241ebcab8e87ac00800000000000000
+      internalID: 911854180115551271
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_11
+      rect:
+        serializedVersion: 2
+        x: 159
+        y: 95
+        width: 29
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 7fca0c051b89b8030800000000000000
+      internalID: 3498057422914759927
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_12
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 63
+        width: 28
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6b34379d921d8e270800000000000000
+      internalID: 8280097892592731062
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_13
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 31
+        width: 28
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 92195c0103b1232c0800000000000000
+      internalID: -4453467188262235863
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_14
+      rect:
+        serializedVersion: 2
+        x: 31
+        y: 63
+        width: 29
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f1c50495dc98bce00800000000000000
+      internalID: 1066097251861945375
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_15
+      rect:
+        serializedVersion: 2
+        x: 31
+        y: 31
+        width: 29
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d370d4d05a96eb470800000000000000
+      internalID: 8412277311588337469
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_16
+      rect:
+        serializedVersion: 2
+        x: 63
+        y: 63
+        width: 29
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a43b3c326fbc604a0800000000000000
+      internalID: -6627385543606684854
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_17
+      rect:
+        serializedVersion: 2
+        x: 63
+        y: 31
+        width: 29
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 7371ca976b46686c0800000000000000
+      internalID: -4141512072432445641
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_18
+      rect:
+        serializedVersion: 2
+        x: 95
+        y: 63
+        width: 29
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: bd0d0df802a581dc0800000000000000
+      internalID: -3668082800594988837
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_19
+      rect:
+        serializedVersion: 2
+        x: 95
+        y: 31
+        width: 29
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 768edbf26030d7f20800000000000000
+      internalID: 3421894616977107047
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_20
+      rect:
+        serializedVersion: 2
+        x: 127
+        y: 63
+        width: 29
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 38bb1aef5cf016550800000000000000
+      internalID: 6152215909019794307
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_21
+      rect:
+        serializedVersion: 2
+        x: 127
+        y: 31
+        width: 29
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e9fdf66660f3dbf40800000000000000
+      internalID: 5745817996315582366
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_22
+      rect:
+        serializedVersion: 2
+        x: 159
+        y: 63
+        width: 29
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2d98a91aa236ee370800000000000000
+      internalID: 8353723393569884626
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_23
+      rect:
+        serializedVersion: 2
+        x: 159
+        y: 31
+        width: 29
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 779479e4a346f95e0800000000000000
+      internalID: -1900690316137641609
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_24
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 28
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f4fd982716755d550800000000000000
+      internalID: 6184945739308326735
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_25
+      rect:
+        serializedVersion: 2
+        x: 31
+        y: 0
+        width: 29
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 849cfdcea10275bf0800000000000000
+      internalID: -335764347200485048
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_26
+      rect:
+        serializedVersion: 2
+        x: 63
+        y: 0
+        width: 29
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 626ed02c2ec768e40800000000000000
+      internalID: 5658347295197750822
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_27
+      rect:
+        serializedVersion: 2
+        x: 95
+        y: 0
+        width: 29
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: afe3bd3c7d1c4e530800000000000000
+      internalID: 3883441911148265210
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Portrait-Girl-export_28
+      rect:
+        serializedVersion: 2
+        x: 127
+        y: 0
+        width: 29
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9750dbef2d8a0f040800000000000000
+      internalID: 4679425637008344441
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      Portrait-Girl-export_0: -8992041026283776379
+      Portrait-Girl-export_1: -248308894526628416
+      Portrait-Girl-export_10: 911854180115551271
+      Portrait-Girl-export_11: 3498057422914759927
+      Portrait-Girl-export_12: 8280097892592731062
+      Portrait-Girl-export_13: -4453467188262235863
+      Portrait-Girl-export_14: 1066097251861945375
+      Portrait-Girl-export_15: 8412277311588337469
+      Portrait-Girl-export_16: -6627385543606684854
+      Portrait-Girl-export_17: -4141512072432445641
+      Portrait-Girl-export_18: -3668082800594988837
+      Portrait-Girl-export_19: 3421894616977107047
+      Portrait-Girl-export_2: -4801501447120423021
+      Portrait-Girl-export_20: 6152215909019794307
+      Portrait-Girl-export_21: 5745817996315582366
+      Portrait-Girl-export_22: 8353723393569884626
+      Portrait-Girl-export_23: -1900690316137641609
+      Portrait-Girl-export_24: 6184945739308326735
+      Portrait-Girl-export_25: -335764347200485048
+      Portrait-Girl-export_26: 5658347295197750822
+      Portrait-Girl-export_27: 3883441911148265210
+      Portrait-Girl-export_28: 4679425637008344441
+      Portrait-Girl-export_3: 4098233785457297718
+      Portrait-Girl-export_4: -1513331071263219633
+      Portrait-Girl-export_5: 8204216710243312781
+      Portrait-Girl-export_6: -6126239347039662700
+      Portrait-Girl-export_7: -5999759598036250812
+      Portrait-Girl-export_8: 9120241753589595403
+      Portrait-Girl-export_9: 8166189429584060979
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

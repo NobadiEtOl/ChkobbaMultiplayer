@@ -149,6 +149,14 @@ public class Server : NetworkBehaviour
     }
 
     /// <summary>
+    /// Checks if a specific player seat is controlled by a bot.
+    /// </summary>
+    public bool IsBotControlled(int seat)
+    {
+        return botControlledPlayers != null && botControlledPlayers.Contains(seat);
+    }
+
+    /// <summary>
     /// Rebinds a player slot to a new client ID after reconnection.
     /// Called when a reconnecting client announces their player number via ServerRPC.
     /// </summary>

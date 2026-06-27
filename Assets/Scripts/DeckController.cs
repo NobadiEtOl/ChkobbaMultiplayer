@@ -385,9 +385,9 @@ public class DeckController : MonoBehaviour
 
                 cardObjects.Add(tempCardObject);
 
-                tempCardObject.transform.parent = playerHandTransforms[GetPoolIndex(relativeIndex)].transform;
+                tempCardObject.transform.parent = playerHandTransforms[GetHandIndex(relativeIndex)].transform;
 
-                var playerHandTransform = playerHandTransforms[GetPoolIndex(relativeIndex)];
+                var playerHandTransform = playerHandTransforms[GetHandIndex(relativeIndex)];
                 Vector3 basePos = playerHandTransform.position;
                 Vector3 centerRotation = playerHandTransform.rotation.eulerAngles;
                 Vector3 offset = Vector3.zero;
@@ -484,9 +484,9 @@ public class DeckController : MonoBehaviour
 
                 cardObjects.Add(tempCardObject);
 
-                tempCardObject.transform.parent = playerHandTransforms[GetPoolIndex(relativeIndex)].transform;
+                tempCardObject.transform.parent = playerHandTransforms[GetHandIndex(relativeIndex)].transform;
 
-                var playerHandTransform = playerHandTransforms[GetPoolIndex(relativeIndex)];
+                var playerHandTransform = playerHandTransforms[GetHandIndex(relativeIndex)];
                 Vector3 basePos = playerHandTransform.position;
                 Vector3 centerRotation = playerHandTransform.rotation.eulerAngles;
                 Vector3 offset = Vector3.zero;
@@ -1168,13 +1168,10 @@ public class DeckController : MonoBehaviour
         }
 
         Vector3 targetScale = new Vector3(normalScale, normalScale, normalScale);
-        int counter = 0;
         foreach (Transform child in ownHand)
         {
-            // First two children are helper pools, not hand cards.
-            if (counter <= 1)
+            if (child != null && (child.name.Contains("Pool") || child.name.Contains("Pişti")))
             {
-                counter++;
                 continue;
             }
 
@@ -1182,8 +1179,6 @@ public class DeckController : MonoBehaviour
             {
                 StartCoroutine(MoveCardPositionAndScaleOnly(child.gameObject, child.position, targetScale));
             }
-
-            counter++;
         }
     }
 
@@ -1215,12 +1210,12 @@ public class DeckController : MonoBehaviour
 
         // Get all the cards that are children of the current player's hand
         var playerCards = new List<GameObject>();
-        int counter = 0;
         foreach (Transform child in currentPlayerHand)
         {
-            //Each hand has 2 child for normal and pişti pools
-            if (counter > 1) playerCards.Add(child.gameObject);
-            counter++;
+            if (child != null && !(child.name.Contains("Pool") || child.name.Contains("Pişti")))
+            {
+                playerCards.Add(child.gameObject);
+            }
         }
 
         int totalCards = playerCards.Count;
@@ -1285,12 +1280,12 @@ public class DeckController : MonoBehaviour
 
         // Get all the cards that are children of the current player's hand
         var playerCards = new List<GameObject>();
-        int counter = 0;
         foreach (Transform child in currentPlayerHand)
         {
-            //Each hand has 2 child for normal and pişti pools
-            if (counter > 1) playerCards.Add(child.gameObject);
-            counter++;
+            if (child != null && !(child.name.Contains("Pool") || child.name.Contains("Pişti")))
+            {
+                playerCards.Add(child.gameObject);
+            }
         }
 
         int totalCards = playerCards.Count;
@@ -1936,23 +1931,29 @@ public class DeckController : MonoBehaviour
         Vector3 leftWorld = Camera.main.ScreenToWorldPoint(leftScreen);
         Vector3 rightWorld = Camera.main.ScreenToWorldPoint(rightScreen);
 
-        // My team: player 0 and 2
+        // My team: Side 0 (pool index 0)
         List<GameObject> myTeamPiştiCards = new List<GameObject>();
         List<GameObject> myTeamPointCards = new List<GameObject>();
-        foreach (int idx in new int[] { GetPoolIndex(0), GetPoolIndex(2) })
+        if (playerPiştiPoolTransforms.Count > 0 && playerPiştiPoolTransforms[0] != null)
         {
-            foreach (Transform t in playerPiştiPoolTransforms[idx]) myTeamPiştiCards.Add(t.gameObject);
-            foreach (Transform t in playerPoolTransforms[idx])
+            foreach (Transform t in playerPiştiPoolTransforms[0]) myTeamPiştiCards.Add(t.gameObject);
+        }
+        if (playerPoolTransforms.Count > 0 && playerPoolTransforms[0] != null)
+        {
+            foreach (Transform t in playerPoolTransforms[0])
                 if (IsPointCard(t.gameObject)) myTeamPointCards.Add(t.gameObject);
         }
 
-        // Opponent team: player 1 and 3
+        // Opponent team: Side 1 (pool index 1)
         List<GameObject> oppTeamPiştiCards = new List<GameObject>();
         List<GameObject> oppTeamPointCards = new List<GameObject>();
-        foreach (int idx in new int[] { GetPoolIndex(1), GetPoolIndex(3) })
+        if (playerPiştiPoolTransforms.Count > 1 && playerPiştiPoolTransforms[1] != null)
         {
-            foreach (Transform t in playerPiştiPoolTransforms[idx]) oppTeamPiştiCards.Add(t.gameObject);
-            foreach (Transform t in playerPoolTransforms[idx])
+            foreach (Transform t in playerPiştiPoolTransforms[1]) oppTeamPiştiCards.Add(t.gameObject);
+        }
+        if (playerPoolTransforms.Count > 1 && playerPoolTransforms[1] != null)
+        {
+            foreach (Transform t in playerPoolTransforms[1])
                 if (IsPointCard(t.gameObject)) oppTeamPointCards.Add(t.gameObject);
         }
 
@@ -2178,6 +2179,11 @@ public class DeckController : MonoBehaviour
         PlayerPrefs.SetInt("SavedPlayerSeat", playerNumber);
         PlayerPrefs.Save();
         Debug.LogError($"[PLAYER NUMBER] Saved player number {playerNumber} to PlayerPrefs (SavedPlayerSeat) for reconnection");
+
+        if (SideManager.Instance != null)
+        {
+            SideManager.Instance.UpdateAllSides();
+        }
     }
 
     /// <summary>
@@ -2269,7 +2275,7 @@ public class DeckController : MonoBehaviour
         }
 
 
-        BuildPoolMoveListsAndMoveCards(playerPoolTransforms[GetPoolIndex(relativePoolIndex)].position, cardObjects, 10, relativePoolIndex, false, true);
+        BuildPoolMoveListsAndMoveCards(playerPoolTransforms[GetPoolIndex(relativePoolIndex)].position, cardObjects, 10, GetPoolIndex(relativePoolIndex), false, true);
     }
 
     public void MoveCardsToPlayerPool(List<GameObject> cardObjects, int playerNumber, bool piştiFlag)
@@ -2323,20 +2329,32 @@ public class DeckController : MonoBehaviour
         yield return null;
     }
 
-    private int GetPoolIndex(int relativePoolIndex)
+    public int GetPoolIndex(int relativePoolIndex)
     {
-        int poolIndex = 0;
+        if (relativePoolIndex == 0 || relativePoolIndex == 2)
+        {
+            return 0;
+        }
+        else
+        {
+            return 1;
+        }
+    }
+
+    public int GetHandIndex(int relativeIndex)
+    {
+        int handIndex = 0;
         if (playerCount == 4)
         {
-            poolIndex = relativePoolIndex;
+            handIndex = relativeIndex;
         }
         else if (playerCount == 2)
         {
-            if (relativePoolIndex == 0) poolIndex = 0;
-            else if (relativePoolIndex == 1) poolIndex = 2;
+            if (relativeIndex == 0) handIndex = 0;
+            else if (relativeIndex == 1) handIndex = 2;
         }
 
-        return poolIndex;
+        return handIndex;
     }
 
     public void GetPlayerCount(int playerC, bool isReconnection = false)
@@ -2429,7 +2447,7 @@ public class DeckController : MonoBehaviour
         bool isMine = thisPlayerNumber == opponentPlayerNo;
 
         // Get the hand transform for the opponent in my perspective
-        Transform handTransform = playerHandTransforms[GetPoolIndex(relativeIndex)];
+        Transform handTransform = playerHandTransforms[GetHandIndex(relativeIndex)];
 
         // Get the card GameObject at the specified index
         if (handTransform.childCount <= cardIndex + 2) // +2 for pool/extra children
@@ -2462,7 +2480,7 @@ public class DeckController : MonoBehaviour
         bool isMine = thisPlayerNumber == opponentPlayerNo;
 
         // Get the hand transform for the opponent in my perspective
-        Transform handTransform = playerHandTransforms[GetPoolIndex(relativeIndex)];
+        Transform handTransform = playerHandTransforms[GetHandIndex(relativeIndex)];
 
 
         // Skip pool/extra children if needed
@@ -2646,7 +2664,7 @@ public class DeckController : MonoBehaviour
         int relativeIndex = (absolutePlayerNo - myNo + playerCount) % playerCount;
 
         // Get the hand transform for the opponent in my perspective
-        Transform handTransform = playerHandTransforms[GetPoolIndex(relativeIndex)];
+        Transform handTransform = playerHandTransforms[GetHandIndex(relativeIndex)];
 
         // Count only the actual hand cards (skip pool/extra children if needed)
         List<Transform> handCards = new List<Transform>();
@@ -2821,8 +2839,8 @@ public class DeckController : MonoBehaviour
         int relA = (playerANo - thisPlayerNumber + playerCount) % playerCount;
         int relB = (playerBNo - thisPlayerNumber + playerCount) % playerCount;
 
-        Transform handA = playerHandTransforms[GetPoolIndex(relA)];
-        Transform handB = playerHandTransforms[GetPoolIndex(relB)];
+        Transform handA = playerHandTransforms[GetHandIndex(relA)];
+        Transform handB = playerHandTransforms[GetHandIndex(relB)];
 
         if (!CardInteraction.cardLookup.TryGetValue(cardAID, out var cardAInteraction) ||
             !CardInteraction.cardLookup.TryGetValue(cardBID, out var cardBInteraction))
@@ -2943,7 +2961,7 @@ public class DeckController : MonoBehaviour
         int myNo = thisPlayerNumber;
         int playerCount = this.playerCount;
         int relativeIndex = (absolutePlayerNo - myNo + playerCount) % playerCount;
-        Transform handTransform = playerHandTransforms[GetPoolIndex(relativeIndex)];
+        Transform handTransform = playerHandTransforms[GetHandIndex(relativeIndex)];
         List<string> handCardIDs = new List<string>();
         int actualIndex = 0;
         foreach (Transform child in handTransform)
@@ -2971,8 +2989,8 @@ public class DeckController : MonoBehaviour
         int relA = (playerANo - thisPlayerNumber + playerCount) % playerCount;
         int relB = (playerBNo - thisPlayerNumber + playerCount) % playerCount;
 
-        Transform handA = playerHandTransforms[GetPoolIndex(relA)];
-        Transform handB = playerHandTransforms[GetPoolIndex(relB)];
+        Transform handA = playerHandTransforms[GetHandIndex(relA)];
+        Transform handB = playerHandTransforms[GetHandIndex(relB)];
 
         GameObject cardAObj = CardInteraction.cardLookup[cardAID].gameObject;
         GameObject cardBObj = CardInteraction.cardLookup[cardBID].gameObject;
@@ -3083,13 +3101,24 @@ public class DeckController : MonoBehaviour
             return;
         }
 
+        // Aggregate cards by target poolIndex
+        Dictionary<int, List<string>> aggregatedPools = new Dictionary<int, List<string>>();
         foreach (var kvp in playersPooledCardsIDs)
         {
-            int playerNo = kvp.Key;
+            int relSeat = kvp.Key;
+            int poolIndex = GetPoolIndex(relSeat);
+            if (!aggregatedPools.ContainsKey(poolIndex))
+            {
+                aggregatedPools[poolIndex] = new List<string>();
+            }
+            aggregatedPools[poolIndex].AddRange(kvp.Value);
+        }
+
+        foreach (var kvp in aggregatedPools)
+        {
+            int poolIndex = kvp.Key;
             List<string> cardIDs = kvp.Value;
 
-            // Get the correct pool transform for this player
-            int poolIndex = GetPoolIndex(playerNo);
             Transform poolTransform = playerPoolTransforms[poolIndex];
 
             // Re-sync the layout offset counters based on the count of rebuilt pool cards
@@ -3134,13 +3163,24 @@ public class DeckController : MonoBehaviour
             return;
         }
 
+        // Aggregate pişti cards by target poolIndex
+        Dictionary<int, List<string>> aggregatedPistiPools = new Dictionary<int, List<string>>();
         foreach (var kvp in playersPistiCardsIDs)
         {
-            int playerNo = kvp.Key;
+            int relSeat = kvp.Key;
+            int poolIndex = GetPoolIndex(relSeat);
+            if (!aggregatedPistiPools.ContainsKey(poolIndex))
+            {
+                aggregatedPistiPools[poolIndex] = new List<string>();
+            }
+            aggregatedPistiPools[poolIndex].AddRange(kvp.Value);
+        }
+
+        foreach (var kvp in aggregatedPistiPools)
+        {
+            int poolIndex = kvp.Key;
             List<string> cardIDs = kvp.Value;
 
-            // Get the correct pişti pool transform for this player
-            int poolIndex = GetPoolIndex(playerNo);
             Transform pistiTransform = playerPiştiPoolTransforms[poolIndex];
 
             for (int i = 0; i < cardIDs.Count; i++)
@@ -3201,7 +3241,7 @@ public class DeckController : MonoBehaviour
             int playerNo = kvp.Key;
             List<string> cardIDs = kvp.Value;
 
-            int handIndex = GetPoolIndex(playerNo); // Use your existing logic
+            int handIndex = GetHandIndex(playerNo); // Use your existing logic
             Transform handTransform = playerHandTransforms[handIndex];
 
             foreach (string cardID in cardIDs)

@@ -2,7 +2,7 @@
   "dependencies": {
     "com.boxqkrtm.ide.cursor": "https://github.com/boxqkrtm/com.unity.ide.cursor.git",
     "com.qiaozhilei.easy-text-effects": "https://github.com/LeiQiaoZhi/Easy-Text-Effects-for-Unity.git",
-    "com.unity.ai.assistant": "2.12.0-pre.2",
+    "com.unity.ai.assistant": "2.13.0-pre.2",
     "com.unity.ai.inference": "2.6.1",
     "com.unity.animation.rigging": "1.3.0",
     "com.unity.collab-proxy": "2.9.3",
