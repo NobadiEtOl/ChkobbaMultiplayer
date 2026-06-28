@@ -300,6 +300,13 @@ public class GameManager : MonoBehaviour
 
     private List<Text> pointTexts = new List<Text>();
 
+    private int lastAuthoritativeScore0 = 0;
+    private int lastAuthoritativeScore1 = 0;
+    private int lastP1SelfPointReduction = 0;
+    private int lastP2SelfPointReduction = 0;
+    private int lastP1OppPointReduction = 0;
+    private int lastP2OppPointReduction = 0;
+
     private CanvasGroup superPowerTextGroup;
 
     private TextMeshProUGUI superPowerText;
@@ -2118,77 +2125,103 @@ public class GameManager : MonoBehaviour
 
 
 
-    private void UpdatePointText(int point0, int point1)
-
+    public void SyncVisualScores(int score0, int score1, int p1Self = 0, int p2Self = 0, int p1Opp = 0, int p2Opp = 0)
     {
+        UpdatePointText(score0, score1, p1Self, p2Self, p1Opp, p2Opp);
+    }
 
-            if (pointTexts == null)
-            {
-                pointTexts = new List<Text>();
-            }
+    private void UpdatePointText(int point0, int point1, int p1Self = 0, int p2Self = 0, int p1Opp = 0, int p2Opp = 0)
+    {
+        lastAuthoritativeScore0 = point0;
+        lastAuthoritativeScore1 = point1;
+        lastP1SelfPointReduction = p1Self;
+        lastP2SelfPointReduction = p2Self;
+        lastP1OppPointReduction = p1Opp;
+        lastP2OppPointReduction = p2Opp;
 
-            if (pointTexts.Count < 2)
-            {
-                var pointText1Obj = GameObject.Find("PlayerPointText1");
-                var pointText2Obj = GameObject.Find("PlayerPointText2");
-                if (pointText1Obj != null && pointText2Obj != null)
-                {
-                    pointTexts.Clear();
-                    pointTexts.Add(pointText1Obj.GetComponent<Text>());
-                    pointTexts.Add(pointText2Obj.GetComponent<Text>());
-                }
-                else
-                {
-                    Debug.LogWarning($"[GameManager] UpdatePointText skipped: score text objects not found. point0={point0}, point1={point1}");
-                    return;
-                }
-            }
+        RenderScoreBoardVisuals();
+    }
 
-        if (deckController.thisPlayerNumber == 0 || deckController.thisPlayerNumber == 2)
-
+    public void RenderScoreBoardVisuals()
+    {
+        if (pointTexts == null)
         {
-
-            pointTexts[0].text = point0.ToString();
-
-            pointTexts[1].text = point1.ToString();
-
-            var tally0 = GameObject.Find("TallyContainer")?.GetComponent<TallyMarkDisplay>();
-            var tally1 = GameObject.Find("TallyContainer1")?.GetComponent<TallyMarkDisplay>();
-            tally0?.UpdateTallyDisplay(point0);
-            tally1?.UpdateTallyDisplay(point1);
-
+            pointTexts = new List<Text>();
         }
 
-
-
-        else if (deckController.thisPlayerNumber == 1 || deckController.thisPlayerNumber == 3)
-
+        if (pointTexts.Count < 2)
         {
+            var pointText1Obj = GameObject.Find("PlayerPointText1");
+            var pointText2Obj = GameObject.Find("PlayerPointText2");
+            if (pointText1Obj != null && pointText2Obj != null)
+            {
+                pointTexts.Clear();
+                pointTexts.Add(pointText1Obj.GetComponent<Text>());
+                pointTexts.Add(pointText2Obj.GetComponent<Text>());
+            }
+            else
+            {
+                Debug.LogWarning($"[GameManager] RenderScoreBoardVisuals skipped: score text objects not found. Score: {lastAuthoritativeScore0}-{lastAuthoritativeScore1}");
+                return;
+            }
+        }
 
-            pointTexts[1].text = point0.ToString();
+        int displayedScore0 = lastAuthoritativeScore0;
+        int displayedScore1 = lastAuthoritativeScore1;
 
-            pointTexts[0].text = point1.ToString();
+        int playerSeat = deckController != null ? deckController.thisPlayerNumber : -1;
+
+        // Apply side-specific fake point reductions based on team perspective
+        if (playerSeat == 0 || playerSeat == 2) // Team 0 (p1side)
+        {
+            displayedScore0 -= lastP1SelfPointReduction;
+            displayedScore1 -= lastP2OppPointReduction; // Hide Team 1's closed cards from Team 0
+        }
+        else if (playerSeat == 1 || playerSeat == 3) // Team 1 (p2side)
+        {
+            displayedScore0 -= lastP1OppPointReduction; // Hide Team 0's closed cards from Team 1
+            displayedScore1 -= lastP2SelfPointReduction;
+        }
+
+        if (playerSeat == 0 || playerSeat == 2)
+        {
+            pointTexts[0].text = displayedScore0.ToString();
+            pointTexts[1].text = displayedScore1.ToString();
 
             var tally0 = GameObject.Find("TallyContainer")?.GetComponent<TallyMarkDisplay>();
             var tally1 = GameObject.Find("TallyContainer1")?.GetComponent<TallyMarkDisplay>();
-            tally0?.UpdateTallyDisplay(point1);
-            tally1?.UpdateTallyDisplay(point0);
+            tally0?.UpdateTallyDisplay(displayedScore0);
+            tally1?.UpdateTallyDisplay(displayedScore1);
+        }
+        else if (playerSeat == 1 || playerSeat == 3)
+        {
+            pointTexts[1].text = displayedScore0.ToString();
+            pointTexts[0].text = displayedScore1.ToString();
 
+            var tally0 = GameObject.Find("TallyContainer")?.GetComponent<TallyMarkDisplay>();
+            var tally1 = GameObject.Find("TallyContainer1")?.GetComponent<TallyMarkDisplay>();
+            tally0?.UpdateTallyDisplay(displayedScore1);
+            tally1?.UpdateTallyDisplay(displayedScore0);
+        }
+        else
+        {
+            // Default fallback if seat is not assigned
+            pointTexts[0].text = displayedScore0.ToString();
+            pointTexts[1].text = displayedScore1.ToString();
         }
 
         if (SideManager.Instance != null)
         {
-            SideManager.Instance.UpdatePoints(point0, point1);
+            SideManager.Instance.UpdatePoints(displayedScore0, displayedScore1);
         }
-
     }
 
     /// <summary>
     /// Applies live score updates received from server during gameplay.
     /// </summary>
-    public void ApplyLiveScoreUpdate(int point0, int point1)
+    public void ApplyLiveScoreUpdate(int point0, int point1, int p1Self = 0, int p2Self = 0, int p1Opp = 0, int p2Opp = 0)
     {
-        UpdatePointText(point0, point1);
+        UpdatePointText(point0, point1, p1Self, p2Self, p1Opp, p2Opp);
     }
 
 
@@ -5570,6 +5603,20 @@ public class GameManager : MonoBehaviour
         
         Debug.Log($"[GameManager] Applied server game state - currentPlayer: {currentPlayerNo}, turnCounter: {turnCounter}, roundCount: {roundCount}");
         
+        // Update points display instantly from the snapshot during reconnection or host migration resync
+        if (snapshot.points.items != null && snapshot.points.items.Length >= 2)
+        {
+            UpdatePointText(
+                snapshot.points.items[0], 
+                snapshot.points.items[1],
+                snapshot.p1side_selfFakePointReduction,
+                snapshot.p2side_selfFakePointReduction,
+                snapshot.p1side_oppFakePointReduction,
+                snapshot.p2side_oppFakePointReduction
+            );
+            Debug.Log($"[GameManager] Applied points and fake reductions from snapshot during resync: {snapshot.points.items[0]} - {snapshot.points.items[1]} (Reductions: {snapshot.p1side_selfFakePointReduction}, {snapshot.p2side_selfFakePointReduction}, {snapshot.p1side_oppFakePointReduction}, {snapshot.p2side_oppFakePointReduction})");
+        }
+
         // The server will handle sending the updated current player via existing RPC
         // We just need to trust that the snapshot is correct
     }

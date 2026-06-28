@@ -81,6 +81,10 @@ public class Server : NetworkBehaviour
     // Server.cs
     private Dictionary<string, string> copiedCardMap = new Dictionary<string, string>();
     public List<string> firstThreeDealtCardIds = new List<string>();
+    public int p1side_selfFakePointReduction = 0;
+    public int p2side_selfFakePointReduction = 0;
+    public int p1side_oppFakePointReduction = 0;
+    public int p2side_oppFakePointReduction = 0;
     private bool oynayamazsinPending = false;
     private int oynayamazsinActivatedBy = -1;
     private HashSet<ulong> dealCenterFinishedClients = new HashSet<ulong>();
@@ -1189,6 +1193,9 @@ private void ServerStart()
                 }
             }
         }
+
+        // Trigger immediate live score recalculation and update UI instantly on card capture
+        BroadcastLiveScoreUpdate();
 
         //networkRelay.PrintPlayerPoolsClientRPC(new SerializableDictionary(playersPooledCardsIDs), piştiPlayer);
     }
@@ -3133,7 +3140,151 @@ private void ServerStart()
         BroadcastLiveScoreUpdate();
     }
 
-    private void BroadcastLiveScoreUpdate()
+    public void RecalculateLivePoints(out int livePoints0, out int livePoints1)
+    {
+        livePoints0 = (points != null && points.Length >= 1) ? points[0] : 0;
+        livePoints1 = (points != null && points.Length >= 2) ? points[1] : 0;
+
+        if (playersPooledCardsIDs == null) return;
+
+        Dictionary<int, List<string>> pooledCards;
+        if (playerCount == 4)
+        {
+            pooledCards = new Dictionary<int, List<string>>();
+            List<string> pool0 = new List<string>();
+            List<string> pool1 = new List<string>();
+            if (playersPooledCardsIDs.ContainsKey(0) && playersPooledCardsIDs[0] != null) pool0.AddRange(playersPooledCardsIDs[0]);
+            if (playersPooledCardsIDs.ContainsKey(2) && playersPooledCardsIDs[2] != null) pool0.AddRange(playersPooledCardsIDs[2]);
+            if (playersPooledCardsIDs.ContainsKey(1) && playersPooledCardsIDs[1] != null) pool1.AddRange(playersPooledCardsIDs[1]);
+            if (playersPooledCardsIDs.ContainsKey(3) && playersPooledCardsIDs[3] != null) pool1.AddRange(playersPooledCardsIDs[3]);
+            pooledCards[0] = pool0;
+            pooledCards[1] = pool1;
+        }
+        else
+        {
+            pooledCards = playersPooledCardsIDs;
+        }
+
+        foreach (var kvp in pooledCards)
+        {
+            int playerID = kvp.Key;
+            List<string> cardList = kvp.Value;
+            if (cardList == null) continue;
+
+            List<string> controlCardList = new List<string>();
+            foreach (var card in cardList)
+            {
+                if (controlCardList.Contains(card)) continue;
+                controlCardList.Add(card);
+
+                int[] cardID = null;
+                if (allCardLookup != null && allCardLookup.ContainsKey(card))
+                {
+                    if (allCardLookup[card][1] == 11 || allCardLookup[card][1] == 0)
+                    {
+                        cardID = allCardLookup[card];
+                    }
+                    else if (copiedCardMap != null && copiedCardMap.ContainsKey(card))
+                    {
+                        string copiedCard = copiedCardMap[card];
+                        cardID = (allCardLookup.ContainsKey(copiedCard)) ? allCardLookup[copiedCard] : allCardLookup[card];
+                    }
+                    else
+                    {
+                        cardID = allCardLookup[card];
+                    }
+                }
+
+                if (cardID == null) continue;
+
+                int kind = cardID[0];
+                int value = cardID[1];
+
+                int gainedPoints = 0;
+                if (value == 1) gainedPoints = 1;
+                else if (value == 11) gainedPoints = 1;
+                else if (kind == 1 && value == 2) gainedPoints = 2;
+                else if (kind == 2 && value == 10) gainedPoints = 3;
+
+                if (playerID == 0) livePoints0 += gainedPoints;
+                else if (playerID == 1) livePoints1 += gainedPoints;
+            }
+        }
+    }
+
+    public int CalculatePoolClosedCardPoints(int teamNo)
+    {
+        if (playersPooledCardsIDs == null || firstThreeDealtCardIds == null || firstThreeDealtCardIds.Count == 0) return 0;
+
+        List<string> poolCards = new List<string>();
+        if (playerCount == 4)
+        {
+            if (teamNo == 0)
+            {
+                if (playersPooledCardsIDs.ContainsKey(0) && playersPooledCardsIDs[0] != null) poolCards.AddRange(playersPooledCardsIDs[0]);
+                if (playersPooledCardsIDs.ContainsKey(2) && playersPooledCardsIDs[2] != null) poolCards.AddRange(playersPooledCardsIDs[2]);
+            }
+            else if (teamNo == 1)
+            {
+                if (playersPooledCardsIDs.ContainsKey(1) && playersPooledCardsIDs[1] != null) poolCards.AddRange(playersPooledCardsIDs[1]);
+                if (playersPooledCardsIDs.ContainsKey(3) && playersPooledCardsIDs[3] != null) poolCards.AddRange(playersPooledCardsIDs[3]);
+            }
+        }
+        else
+        {
+            if (playersPooledCardsIDs.ContainsKey(teamNo) && playersPooledCardsIDs[teamNo] != null)
+            {
+                poolCards.AddRange(playersPooledCardsIDs[teamNo]);
+            }
+        }
+
+        int closedPoints = 0;
+        List<string> controlList = new List<string>();
+        foreach (var card in poolCards)
+        {
+            if (controlList.Contains(card)) continue;
+            controlList.Add(card);
+
+            if (firstThreeDealtCardIds.Contains(card))
+            {
+                int[] cardID = null;
+                if (allCardLookup != null && allCardLookup.ContainsKey(card))
+                {
+                    if (allCardLookup[card][1] == 11 || allCardLookup[card][1] == 0)
+                    {
+                        cardID = allCardLookup[card];
+                    }
+                    else if (copiedCardMap != null && copiedCardMap.ContainsKey(card))
+                    {
+                        string copiedCard = copiedCardMap[card];
+                        cardID = (allCardLookup.ContainsKey(copiedCard)) ? allCardLookup[copiedCard] : allCardLookup[card];
+                    }
+                    else
+                    {
+                        cardID = allCardLookup[card];
+                    }
+                }
+
+                if (cardID != null)
+                {
+                    int kind = cardID[0];
+                    int value = cardID[1];
+
+                    int gainedPoints = 0;
+                    if (value == 1) gainedPoints = 1;
+                    else if (value == 11) gainedPoints = 1;
+                    else if (kind == 1 && value == 2) gainedPoints = 2;
+                    else if (kind == 2 && value == 10) gainedPoints = 3;
+
+                    closedPoints += gainedPoints;
+                }
+            }
+        }
+
+        return closedPoints;
+    }
+
+    public void BroadcastLiveScoreUpdate()
     {
         if (networkRelay == null)
         {
@@ -3145,7 +3296,22 @@ private void ServerStart()
             return;
         }
 
-        networkRelay.UpdateScoreDisplayClientRPC(points[0], points[1]);
+        RecalculateLivePoints(out int livePoints0, out int livePoints1);
+
+        // Calculate visual fake score reductions for closed point cards currently in team pools
+        p1side_selfFakePointReduction = 0; // Extensible
+        p2side_selfFakePointReduction = 0; // Extensible
+        p1side_oppFakePointReduction = CalculatePoolClosedCardPoints(0);
+        p2side_oppFakePointReduction = CalculatePoolClosedCardPoints(1);
+
+        networkRelay.UpdateScoreDisplayClientRPC(
+            livePoints0, 
+            livePoints1, 
+            p1side_selfFakePointReduction, 
+            p2side_selfFakePointReduction, 
+            p1side_oppFakePointReduction, 
+            p2side_oppFakePointReduction
+        );
         PersistServerTruthsToSession();
     }
 
@@ -3295,6 +3461,12 @@ private void ServerStart()
         // Scores and counts
         snapshot.points = new SerializableIntArray(points ?? new int[playerCount]);
         snapshot.pistiCounts = new SerializableIntArray(piştiCounts ?? new int[playerCount]);
+
+        // Perspective Point Reductions
+        snapshot.p1side_selfFakePointReduction = p1side_selfFakePointReduction;
+        snapshot.p2side_selfFakePointReduction = p2side_selfFakePointReduction;
+        snapshot.p1side_oppFakePointReduction = p1side_oppFakePointReduction;
+        snapshot.p2side_oppFakePointReduction = p2side_oppFakePointReduction;
 
         // Bot-controlled players
         var botList = new List<int>();
@@ -3605,6 +3777,12 @@ if (hasCurrentState && snapshot.snapshotVersion > 0 && snapshot.snapshotVersion 
         points = snapshot.points.ToArray();
         piştiCounts = snapshot.pistiCounts.ToArray();
 
+        // Restore perspective reductions
+        p1side_selfFakePointReduction = snapshot.p1side_selfFakePointReduction;
+        p2side_selfFakePointReduction = snapshot.p2side_selfFakePointReduction;
+        p1side_oppFakePointReduction = snapshot.p1side_oppFakePointReduction;
+        p2side_oppFakePointReduction = snapshot.p2side_oppFakePointReduction;
+
         playerGolds = snapshot.playerGold.ToDictionary();
         playerSuperPowers = snapshot.playerSuperPowers.ToDictionary();
 
@@ -3655,6 +3833,7 @@ if (hasCurrentState && snapshot.snapshotVersion > 0 && snapshot.snapshotVersion 
 
         // MIGRATION TURN RESUMPTION: Broadcast turn state to clients and resume turn timer / bot logic
         CallUpdateCurrentPlayer();
+        BroadcastLiveScoreUpdate();
         if (isActiveHost)
         {
             if (activeTurnTimerCoroutine != null) StopCoroutine(activeTurnTimerCoroutine);

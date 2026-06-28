@@ -24,6 +24,12 @@ public class ElHolderScript : MonoBehaviour
     [SerializeField] private Color turnIndicationColor = Color.green;
     [SerializeField] private float color3AnimationSpeed = 0.5f;
 
+    [Header("Side Background Indication")]
+    [SerializeField] private UnityEngine.UI.Image side1Background;
+    [SerializeField] private UnityEngine.UI.Image side2Background;
+
+    private Color originalSideColor3;
+
     void Start()
     {
         if (LocalInstance == null)
@@ -59,6 +65,20 @@ public class ElHolderScript : MonoBehaviour
         // Apply the assigned material to frame objects only
         Debug.Log($"ElHolderScript: Found {handObjects.Count} hand objects and {frameObjects.Count} frame objects");
         ApplyFrameMaterial();
+
+        // Clone the materials so they can change independently at runtime
+        if (side1Background != null && side1Background.material != null)
+        {
+            side1Background.material = Instantiate(side1Background.material);
+            if (side1Background.material.HasProperty("_Color3"))
+            {
+                originalSideColor3 = side1Background.material.GetColor("_Color3");
+            }
+        }
+        if (side2Background != null && side2Background.material != null)
+        {
+            side2Background.material = Instantiate(side2Background.material);
+        }
     }
 
     private int GetHandIndex(int playerNumber)
@@ -199,6 +219,7 @@ public class ElHolderScript : MonoBehaviour
         {
             TurnActionFalse(i);
             TokenActionFalse(i);
+            UpdateSideBackgroundTurn(i, false);
         }
         currentActivePlayer = -1;
     }
@@ -440,6 +461,9 @@ public class ElHolderScript : MonoBehaviour
         // Set Color3 to green for turn indication
         SetFrameColor3ToGreen(frameIndex);
         StartCoroutine(FadeFrameColor3Intensity(frameIndex, activePlayerIntensity, fadeDuration));
+
+        // Smoothly light up the corresponding side background
+        UpdateSideBackgroundTurn(playerNumber, true);
     }
 
 
@@ -452,6 +476,37 @@ public class ElHolderScript : MonoBehaviour
         // Reset Color3 back to original
         ResetFrameColor3ToOriginal(frameIndex);
         StartCoroutine(FadeFrameColor3IntensityToOriginal(frameIndex, fadeDuration));
+
+        // Smoothly dim the corresponding side background
+        UpdateSideBackgroundTurn(playerNumber, false);
+    }
+
+    private void UpdateSideBackgroundTurn(int playerNumber, bool active)
+    {
+        UnityEngine.UI.Image targetSide = null;
+
+        // Map Player index to Side Background (0 & 2 -> Side 1, 1 & 3 -> Side 2)
+        if (playerNumber == 0 || playerNumber == 2)
+        {
+            targetSide = side1Background;
+        }
+        else if (playerNumber == 1 || playerNumber == 3)
+        {
+            targetSide = side2Background;
+        }
+
+        if (targetSide != null && targetSide.material != null)
+        {
+            // Kill active tweens to prevent conflicts
+            targetSide.material.DOKill();
+
+            float targetIntensity = active ? activePlayerIntensity : inactivePlayerIntensity;
+            Color targetColor = active ? turnIndicationColor : originalSideColor3;
+
+            // Transition the material properties smoothly matching the frames!
+            targetSide.material.DOColor(targetColor, "_Color3", fadeDuration);
+            targetSide.material.DOFloat(targetIntensity, "_Color3Intensity", fadeDuration);
+        }
     }
 
     private IEnumerator FadeFrameColor3Intensity(int frameIndex, float targetIntensity, float duration)

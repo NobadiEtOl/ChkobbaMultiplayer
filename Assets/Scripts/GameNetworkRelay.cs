@@ -138,11 +138,11 @@ public class GameNetworkRelay : NetworkBehaviour
     }
 
     [ClientRpc(RequireOwnership = false)]
-    public void UpdateScoreDisplayClientRPC(int point0, int point1)
+    public void UpdateScoreDisplayClientRPC(int point0, int point1, int p1Self = 0, int p2Self = 0, int p1Opp = 0, int p2Opp = 0)
     {
         if (GameManager.LocalInstance != null)
         {
-            GameManager.LocalInstance.ApplyLiveScoreUpdate(point0, point1);
+            GameManager.LocalInstance.ApplyLiveScoreUpdate(point0, point1, p1Self, p2Self, p1Opp, p2Opp);
         }
         else
         {
@@ -385,6 +385,7 @@ public class GameNetworkRelay : NetworkBehaviour
         if (Server.Singleton != null && Server.Singleton.allCardLookup.ContainsKey(cardUniqueID))
         {
             Server.Singleton.allCardLookup[cardUniqueID][1] = 0; // Set value to 0
+            Server.Singleton.BroadcastLiveScoreUpdate(); // Update scoreboard instantly!
         }
         ShowcaseSuperPowerClientRPC("Yandım Anam");
         YandimAnamCardChangedClientRPC(cardUniqueID);
@@ -420,6 +421,9 @@ public class GameNetworkRelay : NetworkBehaviour
             
             // Register copy mapping on the server so it is serialized in game state snapshots
             Server.Singleton.RegisterCopiedCard(targetUniqueID, sourceUniqueID);
+            
+            // Broadcast live score update to show copied points instantly!
+            Server.Singleton.BroadcastLiveScoreUpdate();
         }
         else
         {
@@ -818,6 +822,9 @@ public class GameNetworkRelay : NetworkBehaviour
         
         // Trigger desync check
         TriggerDesyncCheckForReconnectedClientClientRPC(trustedClientId);
+
+        // Authoritatively broadcast the live calculated score to update the reconnected player's UI immediately!
+        server.BroadcastLiveScoreUpdate();
     }
 
     [ServerRpc(RequireOwnership = false)]

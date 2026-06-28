@@ -2098,9 +2098,8 @@ public class DeckController : MonoBehaviour
             positions.Add(position);
             Quaternion rotation = Quaternion.Euler(tempRotation.x - 90, tempRotation.y, tempRotation.z + UnityEngine.Random.Range(170f, 190f));
             rotations.Add(rotation);
-            // CRITICAL FIX: Use smaller scale for captured cards moving to pools of players other than player 1
-            // Player 1 (local player) cards should remain at normal size, others should be smaller
-            int targetScale = (poolIndex == 0) ? initialScale : normalScale; // Use initialScale for player 1, normalScale for others
+            // Always use smaller normal scale for all captured cards
+            int targetScale = normalScale;
             scales.Add(new Vector3(targetScale, targetScale, targetScale));
 
             if (piştiFlag)
@@ -3139,8 +3138,8 @@ public class DeckController : MonoBehaviour
                     Vector3 tempRotation = poolTransform.rotation.eulerAngles;
                     cardObj.transform.rotation = Quaternion.Euler(tempRotation.x - 90, tempRotation.y, tempRotation.z + UnityEngine.Random.Range(170f, 190f));
 
-                    // Scaled based on whether it is local player (poolIndex == 0) or opponent
-                    int targetScale = (poolIndex == 0) ? initialScale : normalScale;
+                    // Always use normal scale
+                    int targetScale = normalScale;
                     cardObj.transform.localScale = new Vector3(targetScale, targetScale, targetScale);
                 }
                 else
@@ -3192,7 +3191,7 @@ public class DeckController : MonoBehaviour
                     cardObj.transform.SetParent(pistiTransform, false);
 
                     Vector3 tempRotation = pistiTransform.rotation.eulerAngles;
-                    int targetScale = (poolIndex == 0) ? initialScale : normalScale;
+                    int targetScale = normalScale;
                     cardObj.transform.localScale = new Vector3(targetScale, targetScale, targetScale);
 
                     // Re-connection fix: Set world position and world rotation directly

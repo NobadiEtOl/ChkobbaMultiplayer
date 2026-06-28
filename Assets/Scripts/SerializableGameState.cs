@@ -46,6 +46,10 @@ public struct SerializableGameState : INetworkSerializable
     // Scores and counts
     public SerializableIntArray points;
     public SerializableIntArray pistiCounts;
+    public int p1side_selfFakePointReduction;
+    public int p2side_selfFakePointReduction;
+    public int p1side_oppFakePointReduction;
+    public int p2side_oppFakePointReduction;
 
     // Active effects and flags
     public SerializableStringDictionary copiedCardMap; // Dictionary<string, string>
@@ -110,6 +114,10 @@ public struct SerializableGameState : INetworkSerializable
 
         serializer.SerializeValue(ref points);
         serializer.SerializeValue(ref pistiCounts);
+        serializer.SerializeValue(ref p1side_selfFakePointReduction);
+        serializer.SerializeValue(ref p2side_selfFakePointReduction);
+        serializer.SerializeValue(ref p1side_oppFakePointReduction);
+        serializer.SerializeValue(ref p2side_oppFakePointReduction);
 
         serializer.SerializeValue(ref copiedCardMap);
         serializer.SerializeValue(ref oynayamazsinActive);
