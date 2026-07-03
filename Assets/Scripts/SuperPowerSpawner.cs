@@ -32,7 +32,7 @@ public class SuperPowerSpawner : MonoBehaviour
     [Header("Gold System")]
     [SerializeField] private TextMeshProUGUI goldDisplayText; // Gold display text
     [SerializeField] private int startingGold = 20; // Starting gold amount
-    [SerializeField] private int maxGold = 100; // Maximum gold cap
+    [SerializeField] private int maxGold = 15; // Maximum gold cap
     
     [Header("Gold Popup Animation")]
     [SerializeField] private Transform goldPopupLocation;
@@ -116,7 +116,7 @@ public class SuperPowerSpawner : MonoBehaviour
 
     public void SetGold(int amount)
     {
-        currentGold = amount;
+        currentGold = Mathf.Min(amount, maxGold);
         UpdateGoldDisplay();
         NotifyServerOfGoldAndPowers();
     }
@@ -1459,77 +1459,85 @@ public class SuperPowerSpawner : MonoBehaviour
     }
 
     [ContextMenu("Ready to Spawn Super Powers")]
-    // Add new parameters to ReadyToSpawnSuperPowers and SpawnSuperPower
-    public void ReadyToSpawnSuperPowers(int numberOfSuperPowersToSpawn = 2, Vector3? spawnOrigin = null, float spawnScale = 150f, int coinAmount = -1)
+    /// <summary>
+    /// Spawns multiple powers with inverse-weighted random selection.
+    /// Higher rarityMultiplier = lower probability of being selected.
+    /// Each power costs 1 gold.
+    /// </summary>
+    public void ReadyToSpawnSuperPowers(int numberOfSuperPowersToSpawn = 2, Vector3? spawnOrigin = null, float spawnScale = 150f, int costMode = 1)
     {
-        StartCoroutine(ReadyToSpawnSuperPower(numberOfSuperPowersToSpawn, spawnOrigin, spawnScale, coinAmount));
+        StartCoroutine(ReadyToSpawnSuperPower(numberOfSuperPowersToSpawn, spawnOrigin, spawnScale, costMode));
     }
 
-    private IEnumerator ReadyToSpawnSuperPower(int numberOfSuperPowersToSpawn, Vector3? spawnOrigin, float spawnScale, int coinAmount)
+    private IEnumerator ReadyToSpawnSuperPower(int numberOfSuperPowersToSpawn, Vector3? spawnOrigin, float spawnScale, int costMode)
     {
         yield return new WaitForSeconds(1f);
         for (int i = 0; i < numberOfSuperPowersToSpawn; i++)
         {
-            StartCoroutine(SpawnSuperPower(GetWeightedRandomSuperPower(coinAmount), spawnOrigin, spawnScale));
+            StartCoroutine(SpawnSuperPower(GetInverseWeightedRandomSuperPower(costMode), spawnOrigin, spawnScale));
             yield return new WaitForSeconds(0.5f);
         }
     }
 
-    private SuperPower GetWeightedRandomSuperPower(int coinAmount)
+    /// <summary>
+    /// Selects a random power using inverse-weighted probability based on rarityMultiplier,
+    /// boosted by costMode. Powers in the matching tier get a 5x weight boost.
+    /// Tier 4 (ZaferPuani) is never boosted. Disabled powers are excluded.
+    /// </summary>
+    private SuperPower GetInverseWeightedRandomSuperPower(int costMode = 1)
     {
         if (superPowerPrefabs.Count == 0)
-            return null;
-
-        // If coinAmount is not set, fallback to uniform random
-        if (coinAmount < 0)
-            return GetRandomSuperPower();
-
-        // Use unique powers from superPowerPrefabs.Keys
-        List<SuperPower> allPowers = new List<SuperPower>(superPowerPrefabs.Keys);
-        List<SuperPower> matchingPowers = new List<SuperPower>();
-
-        Debug.Log($"[SuperPowerSpawner] Searching for powers with rarity multiplier matching coinAmount={coinAmount}:");
-        
-        // Find all powers where rarity multiplier exactly matches the coin amount
-        for (int i = 0; i < allPowers.Count; i++)
         {
-            var power = allPowers[i];
-            int rarity = power.rarityMultiplier;
-            Debug.Log($"  Power: {power.name}, Rarity: {rarity}, Match: {rarity == coinAmount}");
-            
-            if (rarity == coinAmount)
+            Debug.LogWarning("[SuperPowerSpawner] No super powers available to spawn.");
+            return null;
+        }
+
+        const float boostMultiplier = 5f;
+        List<SuperPower> allPowers = new List<SuperPower>(superPowerPrefabs.Keys);
+
+        // Exclude disabled powers
+        List<SuperPower> activePowers = new List<SuperPower>();
+        foreach (var p in allPowers)
+            if (p.isPowerEnabled) activePowers.Add(p);
+
+        if (activePowers.Count == 0)
+        {
+            Debug.LogWarning("[SuperPowerSpawner] No active powers available.");
+            return null;
+        }
+
+        // Calculate weights: base = 1/rarity, boosted if tier matches mode (tiers 1-3 only)
+        List<float> weights = new List<float>();
+        float totalWeight = 0f;
+
+        for (int i = 0; i < activePowers.Count; i++)
+        {
+            float weight = 1f / activePowers[i].rarityMultiplier;
+            if (activePowers[i].powerCostTier == costMode && costMode >= 1 && costMode <= 3)
+                weight *= boostMultiplier;
+            weights.Add(weight);
+            totalWeight += weight;
+        }
+
+        // Pick a random value in [0, totalWeight)
+        float randomValue = Random.Range(0f, totalWeight);
+        float cumulativeWeight = 0f;
+
+        for (int i = 0; i < activePowers.Count; i++)
+        {
+            cumulativeWeight += weights[i];
+            if (randomValue < cumulativeWeight)
             {
-                matchingPowers.Add(power);
+                SuperPower selectedPower = activePowers[i];
+                Debug.Log($"[SuperPowerSpawner] Mode {costMode} selection: {selectedPower.name} (tier: {selectedPower.powerCostTier}, weight: {weights[i]:F4})");
+                return selectedPower;
             }
         }
 
-        // If we found matching powers, randomly select one
-        if (matchingPowers.Count > 0)
-        {
-            int randomIndex = Random.Range(0, matchingPowers.Count);
-            SuperPower selectedPower = matchingPowers[randomIndex];
-            Debug.Log($"[SuperPowerSpawner] Found {matchingPowers.Count} matching power(s). Selected: {selectedPower.name}");
-            return selectedPower;
-        }
-        
-        // No exact match found - fallback to random power
-        Debug.LogWarning($"[SuperPowerSpawner] No power found with rarity multiplier matching coinAmount={coinAmount}. Selecting random power as fallback.");
-        return GetRandomSuperPower();
-    }
-
-    private SuperPower GetRandomSuperPower()
-    {
-        if (superPowerPrefabs.Count == 0)
-        {
-            Debug.LogWarning("No super powers available to spawn.");
-            return null;
-        }
-        
-        // Use unique powers from superPowerPrefabs.Keys instead of pooled superPowerList
-        List<SuperPower> uniquePowers = new List<SuperPower>(superPowerPrefabs.Keys);
-        int randomIndex = Random.Range(0, uniquePowers.Count);
-        Debug.Log($"[SuperPowerSpawner] Uniform random selection: index={randomIndex}, power={uniquePowers[randomIndex].name}");
-        return uniquePowers[randomIndex];
+        // Fallback (should rarely happen due to floating point precision)
+        SuperPower fallbackPower = activePowers[activePowers.Count - 1];
+        Debug.LogWarning($"[SuperPowerSpawner] Weighted selection fallback: {fallbackPower.name}");
+        return fallbackPower;
     }
 
     // Update SpawnSuperPower to accept origin and scale
@@ -1876,20 +1884,19 @@ public class SuperPowerSpawner : MonoBehaviour
     /// </summary>
     public int CalculateNewGoldValue(int capturingCardValue, int centerCardCount)
     {
-        // Formula: capturing card value + n(n+1)/2 where n = center card count
-        int centerBonus = (centerCardCount * (centerCardCount + 1)) / 2;
-        int totalGold = capturingCardValue + centerBonus;
+        // Formula: Gold equals total number of cards in capture pile (center cards + capturing card)
+        int totalGold = centerCardCount + 1;
         
-        Debug.Log($"[SuperPowerSpawner] New gold calculation: Card value {capturingCardValue} + Center bonus {centerBonus} (n={centerCardCount}) = {totalGold}");
+        Debug.Log($"[SuperPowerSpawner] New gold calculation: {centerCardCount} center cards + 1 capturing card = {totalGold} gold");
         return totalGold;
     }
     
     /// <summary>
-    /// Calculates the center cards bonus using the formula n(n+1)/2
+    /// Calculates the total cards bonus (center cards + capturing card)
     /// </summary>
     public int CalculateCenterCardsBonus(int centerCardCount)
     {
-        return (centerCardCount * (centerCardCount + 1)) / 2;
+        return centerCardCount + 1;
     }
     
     /// <summary>
@@ -1925,9 +1932,9 @@ public class SuperPowerSpawner : MonoBehaviour
         
         // Calculate gold using new formula
         int totalGold = CalculateNewGoldValue(capturingCardValue, centerCardCount);
-        int centerBonus = CalculateCenterCardsBonus(centerCardCount);
+        int totalCardsInCapture = centerCardCount + 1;  // Center cards + capturing card
         
-        Debug.Log($"[SuperPowerSpawner] Capture: Card value {capturingCardValue}, Center count {centerCardCount}, Center bonus {centerBonus}, Total gold {totalGold}");
+        Debug.Log($"[SuperPowerSpawner] Capture: Center count {centerCardCount}, Total cards captured {totalCardsInCapture}, Total gold {totalGold}");
         
         // In 2v2 mode, we need to share gold with teammate
         if (Is2v2Mode())
@@ -3080,10 +3087,9 @@ public class SuperPowerSpawner : MonoBehaviour
             int expected = testCase[2];
             
             int calculated = CalculateNewGoldValue(cardValue, centerCount);
-            int centerBonus = CalculateCenterCardsBonus(centerCount);
             
             Debug.Log($"Card Value: {cardValue}, Center Count: {centerCount}");
-            Debug.Log($"Center Bonus: {centerBonus}, Total: {calculated}, Expected: {expected}");
+            Debug.Log($"Total: {calculated}, Expected: {expected}");
             Debug.Log($"Result: {(calculated == expected ? "PASS" : "FAIL")}");
             Debug.Log("---");
         }

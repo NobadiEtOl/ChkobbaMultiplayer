@@ -1,0 +1,5 @@
+C:/Users/kilic/Documents/GitHub/ChkobbaMultiplayer/.utmp/RelWithDebInfo/495d3i20/armeabi-v7a/CMakeFiles/edit_cache.dir
+C:/Users/kilic/Documents/GitHub/ChkobbaMultiplayer/.utmp/RelWithDebInfo/495d3i20/armeabi-v7a/CMakeFiles/rebuild_cache.dir
+C:/Users/kilic/Documents/GitHub/ChkobbaMultiplayer/.utmp/RelWithDebInfo/495d3i20/armeabi-v7a/FramePacing/CMakeFiles/swappywrapper.dir
+C:/Users/kilic/Documents/GitHub/ChkobbaMultiplayer/.utmp/RelWithDebInfo/495d3i20/armeabi-v7a/FramePacing/CMakeFiles/edit_cache.dir
+C:/Users/kilic/Documents/GitHub/ChkobbaMultiplayer/.utmp/RelWithDebInfo/495d3i20/armeabi-v7a/FramePacing/CMakeFiles/rebuild_cache.dir

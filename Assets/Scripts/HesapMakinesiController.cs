@@ -51,6 +51,8 @@ public class HesapMakinesiController : MonoBehaviour
     private string currentExpression = "";
     private bool lastWasOperator = false;
     private bool lastWasNumber = false;
+    // Cost mode for power draw tier selection (1 = Tier1 boosted, 2 = Tier2 boosted, 3 = Tier3 boosted)
+    private int selectedCostMode = 1;
     
     // Token data structure - using KeseController's TokenData
     // [System.Serializable]
@@ -156,6 +158,9 @@ public class HesapMakinesiController : MonoBehaviour
         
         // Clear calculator when opened
         ClearCalculator();
+
+        // Also activate the menu
+        ActivateMenuWithExistingAnimation();
     }
     
 
@@ -179,6 +184,9 @@ public class HesapMakinesiController : MonoBehaviour
         Debug.Log("HesapMakinesiController: Manually opening hesap makinesi!");
         hasMovedToReachPoint = true;
         MoveToReachPoint();
+
+        // Also activate the menu
+        ActivateMenuWithExistingAnimation();
     }
     
     /// <summary>
@@ -190,6 +198,22 @@ public class HesapMakinesiController : MonoBehaviour
         Debug.Log("HesapMakinesiController: Manually closing hesap makinesi!");
         hasMovedToReachPoint = false;
         MoveToStartingPosition();
+    }
+
+    /// <summary>
+    /// Activates the menu in InfoBox alongside the calculator using existing animation
+    /// </summary>
+    private void ActivateMenuWithExistingAnimation()
+    {
+        MenuController menuController = FindObjectOfType<MenuController>();
+        if (menuController != null)
+        {
+            if (SuperPowerSpawner.LocalInstance != null && (!SuperPowerSpawner.LocalInstance.isInfoBoxOpen || !SuperPowerSpawner.LocalInstance.isMenuPageOpen))
+            {
+                Debug.Log("[HesapMakinesiController] Activating menu alongside hesap makinesi");
+                menuController.ShowTokenMenu();
+            }
+        }
     }
     
     // ===== CALCULATOR METHODS =====
@@ -552,14 +576,28 @@ public class HesapMakinesiController : MonoBehaviour
         KeseController keseController = FindObjectOfType<KeseController>();
         if (keseController != null)
         {
-            keseController.SetCoinTokenData(tokens);
-            Debug.Log($"HesapMakinesiController: Sent {tokens.Count} token types to KeseController");
+            keseController.SetCoinTokenData(tokens, selectedCostMode);
+            Debug.Log($"HesapMakinesiController: Sent {tokens.Count} token types to KeseController (costMode: {selectedCostMode})");
         }
         else
         {
             Debug.LogWarning("HesapMakinesiController: KeseController not found in scene!");
         }
     }
+
+    /// <summary>
+    /// Sets the cost mode for power tier selection. Called by UI buttons.
+    /// Mode 1: Tier 1 powers boosted (costs 1 gold each).
+    /// Mode 2: Tier 2 powers boosted (costs 2 gold each).
+    /// Mode 3: Tier 3 powers boosted (costs 3 gold each).
+    /// </summary>
+    public void SetCostMode(int mode)
+    {
+        selectedCostMode = Mathf.Clamp(mode, 1, 3);
+        Debug.Log($"[HesapMakinesiController] Cost mode set to {selectedCostMode}");
+    }
+
+    public int GetSelectedCostMode() => selectedCostMode;
     
     /// <summary>
     /// Gets the current calculator result (can be called from other scripts)

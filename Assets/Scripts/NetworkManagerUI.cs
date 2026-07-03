@@ -185,6 +185,19 @@ public class NetworkManagerUI : MonoBehaviour
         {
             NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
             NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
+
+            // Platform auto-configuration for WebSockets vs UDP/DTLS
+            var transport = NetworkManager.Singleton.NetworkConfig.NetworkTransport;
+            var utp = transport as UnityTransport;
+            if (utp != null)
+            {
+                #if UNITY_WEBGL && !UNITY_EDITOR
+                utp.UseWebSockets = true;
+                #else
+                utp.UseWebSockets = false;
+                #endif
+                Debug.Log($"[NetworkManagerUI] Auto-configured UnityTransport UseWebSockets to: {utp.UseWebSockets}");
+            }
         }
         await EnsureServicesReady();
         

@@ -3590,10 +3590,10 @@ private void ServerStart()
     /// <summary>
     /// Applies a game state snapshot to the server's internal state
     /// </summary>
-    public void ApplyGameStateToServer(SerializableGameState snapshot)
+    public void ApplyGameStateToServer(SerializableGameState snapshot, bool bypassStaleCheck = false)
     {
         // STALE SNAPSHOT GUARD: Reject snapshots that are older than current tracked state
-if (hasCurrentState && snapshot.snapshotVersion > 0 && snapshot.snapshotVersion <= currentGameState.snapshotVersion)
+        if (!bypassStaleCheck && hasCurrentState && snapshot.snapshotVersion > 0 && snapshot.snapshotVersion <= currentGameState.snapshotVersion)
         {
             Debug.LogWarning($"[Server] ApplyGameStateToServer: Rejecting stale snapshot v{snapshot.snapshotVersion} (current is v{currentGameState.snapshotVersion})");
             return;
@@ -3941,7 +3941,7 @@ if (hasCurrentState && snapshot.snapshotVersion > 0 && snapshot.snapshotVersion 
         Debug.Log($"[Server] Redo Bot Status - botPlayerActive: {botPlayerActive}, botPlayerNumber: {botPlayerNumber}, currentPlayer: {currentPlayer}");
         
         // Apply the previous state to server
-        ApplyGameStateToServer(previousGameState);
+        ApplyGameStateToServer(previousGameState, true);
         
         // Initialize client confirmation tracking for redo
         redoSceneReconstructionClients.Clear();
@@ -3989,7 +3989,7 @@ if (hasCurrentState && snapshot.snapshotVersion > 0 && snapshot.snapshotVersion 
         Debug.Log($"[Server] Redo Bot Status - botPlayerActive: {botPlayerActive}, botPlayerNumber: {botPlayerNumber}, currentPlayer: {currentPlayer}");
         
         // Apply the pre-previous state to server
-        ApplyGameStateToServer(prePreviousGameState);
+        ApplyGameStateToServer(prePreviousGameState, true);
         
         // Initialize client confirmation tracking for redo
         redoSceneReconstructionClients.Clear();

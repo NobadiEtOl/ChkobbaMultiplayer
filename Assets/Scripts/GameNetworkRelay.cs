@@ -525,6 +525,63 @@ public class GameNetworkRelay : NetworkBehaviour
         UseSunuDegisTokusClientRPC(firstOwnerPlayerNo, secondOwnerPlayerNo, firstHandCardID, secondHandCardID);
     }
 
+    /// <summary>
+    /// ServerRPC for non-host players to request a correction/undo from the host
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void SendCorrectionRequestToHostServerRPC(ServerRpcParams rpcParams = default)
+    {
+        Debug.Log("[GameNetworkRelay] Received correction request from non-host player");
+        
+        // Get the calling client's player number
+        ulong callerClientId = rpcParams.Receive.SenderClientId;
+        int callerPlayerNo = server.GetPlayerNoForClient(callerClientId);
+        
+        if (callerPlayerNo == -1)
+        {
+            Debug.LogWarning("[GameNetworkRelay] Could not determine player number for correction request caller");
+            return;
+        }
+        
+        // Make sure the caller is NOT the host
+        if (callerPlayerNo == 0)
+        {
+            Debug.LogWarning("[GameNetworkRelay] Host tried to send correction request (should use undo directly) - ignoring");
+            return;
+        }
+        
+        Debug.Log($"[GameNetworkRelay] Non-host player {callerPlayerNo} requested correction - notifying host");
+        
+        // Broadcast the correction request widget to the host
+        NotifyHostOfCorrectionRequestClientRPC();
+    }
+
+    /// <summary>
+    /// ClientRPC to notify all clients that a correction request widget should be shown on the host
+    /// </summary>
+    [ClientRpc(RequireOwnership = false)]
+    public void NotifyHostOfCorrectionRequestClientRPC()
+    {
+        Debug.Log("[GameNetworkRelay] Broadcasting correction request notification");
+        
+        // Check if this is the host
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsHost)
+        {
+            Debug.Log("[GameNetworkRelay] This is the host - showing correction request widget");
+            
+            // Get reference to MainUIScript and show the widget
+            MainUIScript mainUI = FindObjectOfType<MainUIScript>();
+            if (mainUI != null)
+            {
+                mainUI.ShowCorrectionRequestWidgetOnHost();
+            }
+            else
+            {
+                Debug.LogError("[GameNetworkRelay] MainUIScript not found - cannot show correction widget");
+            }
+        }
+    }
+
     // --- Power Duration Timer RPCs ---
 
     /// <summary>Pauses the server turn timer so it doesn't expire during interactive power selection.</summary>

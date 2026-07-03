@@ -258,7 +258,7 @@ public class KeseController : MonoBehaviour
                 // Let the button handle its own click event
                 // Don't close the calculator
             }
-            else if (!IsPointerOverHesapMakinesi(screenPos))
+            else if (!IsPointerOverHesapMakinesi(screenPos) && !IsPointerOverInfoBox(screenPos))
                 OnOtherClickDetected();
         }
         else if (Input.GetMouseButton(0))
@@ -289,7 +289,7 @@ public class KeseController : MonoBehaviour
                     // Let the button handle its own click event
                     // Don't close the calculator
                 }
-                else if (!IsPointerOverHesapMakinesi(screenPos))
+                else if (!IsPointerOverHesapMakinesi(screenPos) && !IsPointerOverInfoBox(screenPos))
                     OnOtherClickDetected();
                 break;
             case TouchPhase.Moved:
@@ -303,6 +303,51 @@ public class KeseController : MonoBehaviour
                     OnCoinTouchUp();
                 break;
         }
+    }
+
+    /// <summary>
+    /// Checks if the pointer is over the InfoBox or any of its menu/token elements.
+    /// </summary>
+    private bool IsPointerOverInfoBox(Vector3 screenPos)
+    {
+        // 1. Check EventSystem for standard UI elements (e.g., buttons, scrollbar, etc.)
+        if (UnityEngine.EventSystems.EventSystem.current != null && 
+            UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
+        {
+            return true;
+        }
+
+        // 2. Perform a raycast to check for 3D/2D physical elements of the InfoBox/Menu
+        if (Camera.main == null) return false;
+        Ray ray = Camera.main.ScreenPointToRay(screenPos);
+        RaycastHit[] hits = Physics.RaycastAll(ray);
+        
+        GameObject infoBoxBg = GameObject.Find("InfoBoxBackGroundPanel");
+
+        foreach (RaycastHit hit in hits)
+        {
+            GameObject hitObj = hit.collider.gameObject;
+            
+            // Check if we hit a Token
+            if (hitObj.CompareTag("Token") || hitObj.name.Contains("Token"))
+            {
+                return true;
+            }
+
+            // Check if we hit the top-level InfoBoxBackGroundPanel or any of its descendants
+            if (infoBoxBg != null && (hitObj == infoBoxBg || hitObj.transform.IsChildOf(infoBoxBg.transform)))
+            {
+                return true;
+            }
+
+            // Check if we hit other potential scroll display elements by name
+            if (hitObj.name == "DisplayBackgroundPanel" || hitObj.name == "TokenDisplayArea")
+            {
+                return true;
+            }
+        }
+        
+        return false;
     }
 
     /// <summary>
@@ -369,6 +414,13 @@ public class KeseController : MonoBehaviour
         {
             Debug.Log("[KeseController] Something else was clicked, closing kese");
             MoveKeseToStartingPosition();
+        }
+
+        // Close InfoBox (menu) as well if it is currently open
+        if (SuperPowerSpawner.LocalInstance != null && SuperPowerSpawner.LocalInstance.isInfoBoxOpen)
+        {
+            Debug.Log("[KeseController] Something else was clicked, closing InfoBox menu");
+            SuperPowerSpawner.LocalInstance.StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
         }
     }
     
@@ -545,8 +597,8 @@ public class KeseController : MonoBehaviour
             }
             else
             {
-                // Use default behavior
-                SuperPowerSpawner.LocalInstance.ReadyToSpawnSuperPowers(1, spawnOrigin, spawnScale, coinAmount);
+                // Use default behavior - spawn 1 power, cost mode 1
+                SuperPowerSpawner.LocalInstance.ReadyToSpawnSuperPowers(1, spawnOrigin, spawnScale, selectedCostMode);
             }
         }
         
@@ -780,15 +832,19 @@ public class KeseController : MonoBehaviour
         PlayPageChangeAnimation();
     }
 
+    private int selectedCostMode = 1;
+
     /// <summary>
-    /// Receives token data from HesapMakinesiController
+    /// Receives token data and cost mode from HesapMakinesiController.
+    /// costMode 1/2/3 boosts draws toward that tier; Tier 4 (ZaferPuani) is never boosted.
     /// </summary>
-    public void SetCoinTokenData(List<TokenData> tokens)
+    public void SetCoinTokenData(List<TokenData> tokens, int costMode = 1)
     {
         coinTokenData.Clear();
         coinTokenData.AddRange(tokens);
-        
-        Debug.Log($"[KeseController] Received token data: {tokens.Count} token types");
+        selectedCostMode = costMode;
+
+        Debug.Log($"[KeseController] Received token data: {tokens.Count} token types, costMode: {costMode}");
         foreach (var token in tokens)
         {
             Debug.Log($"[KeseController] Token: {token.count}x {token.value} value");
@@ -810,6 +866,8 @@ public class KeseController : MonoBehaviour
     
     /// <summary>
     /// Spawns tokens based on calculator data
+    /// Each token costs 1 gold, regardless of token value.
+    /// Powers are drawn with inverse-weighted randomness based on rarityMultiplier.
     /// </summary>
     private void SpawnTokensFromCalculatorData(Vector3 spawnOrigin, float spawnScale)
     {
@@ -817,35 +875,31 @@ public class KeseController : MonoBehaviour
         
         Debug.Log($"[KeseController] Spawning tokens from calculator data");
         
-        // Calculate total cost
-        int totalCost = 0;
+        // Calculate total number of tokens to spawn
+        int totalTokenCount = 0;
         foreach (var token in coinTokenData)
         {
-            totalCost += token.value * token.count;
+            totalTokenCount += token.count;
         }
         
+        // Each power costs 1 gold
+        int totalGoldCost = totalTokenCount;
+        
         // Check if player has enough gold
-        if (SuperPowerSpawner.LocalInstance.HasEnoughGold(totalCost))
+        if (SuperPowerSpawner.LocalInstance.HasEnoughGold(totalGoldCost))
         {
-            // Spend the gold
-            SuperPowerSpawner.LocalInstance.SpendGold(totalCost);
+            // Spend the gold (1 per power)
+            SuperPowerSpawner.LocalInstance.SpendGold(totalGoldCost);
             
-            // Spawn the tokens
-            foreach (var token in coinTokenData)
-            {
-                for (int i = 0; i < token.count; i++)
-                {
-                    // Spawn each token with its specific value
-                    SuperPowerSpawner.LocalInstance.ReadyToSpawnSuperPowers(1, spawnOrigin, spawnScale, token.value);
-                }
-            }
+            // Spawn all powers with mode-boosted inverse-weighted random selection
+            SuperPowerSpawner.LocalInstance.ReadyToSpawnSuperPowers(totalTokenCount, spawnOrigin, spawnScale, selectedCostMode);
             
-            Debug.Log($"[KeseController] Successfully spent {totalCost} gold and spawned tokens");
+            Debug.Log($"[KeseController] Successfully spent {totalGoldCost} gold and spawned {totalTokenCount} powers");
         }
         else
         {
             // Not enough gold - return coin to start
-            Debug.Log($"[KeseController] Insufficient gold! Need {totalCost}, have {SuperPowerSpawner.LocalInstance.GetCurrentGold()}");
+            Debug.Log($"[KeseController] Insufficient gold! Need {totalGoldCost}, have {SuperPowerSpawner.LocalInstance.GetCurrentGold()}");
             ReturnCoin();
         }
         

@@ -26,10 +26,24 @@ public class MainUIScript : MonoBehaviour
     
     private Coroutine joinCodeAnimationCoroutine;
     
+    [SerializeField] private BreathingAnimation settingButtonBreathing;
+    [SerializeField] private BreathingAnimation undoButtonBreathing;
+
     // Start is called before the first frame update
     void Start()
     {
         InitializeVolumeSliders();
+        
+        // Auto-assign if not set (fallback)
+        if (settingButtonBreathing == null)
+        {
+            GameObject sb = GameObject.Find("UICanvas/SettingButton");
+            if (sb != null) settingButtonBreathing = sb.GetComponent<BreathingAnimation>();
+        }
+        if (undoButtonBreathing == null)
+        {
+            if (undoButton != null) undoButtonBreathing = undoButton.GetComponent<BreathingAnimation>();
+        }
     }
 
     // Update is called once per frame
@@ -99,6 +113,15 @@ public class MainUIScript : MonoBehaviour
         settingsPopup.SetActive(false);
         startingScreenUI.SetActive(true);
         //UpdateUndoButtonVisibility(); // Deactivate undo button when settings popup is closed
+    }
+
+    /// <summary>
+    /// Public method to be connected to the Undo/BirHamleGeriAl button's onClick event in Inspector
+    /// This is the entry point for the undo button
+    /// </summary>
+    public void OnUndoButtonPressedFromUI()
+    {
+        OnUndoButtonClicked();
     }
 
     public void OnLeaveGameButtonClicked()
@@ -633,27 +656,141 @@ public class MainUIScript : MonoBehaviour
     }
 
     /// <summary>
-    /// Updates the undo button visibility based on main screen state and host status
+    /// Updates the undo button visibility based on main screen state
+    /// Now shows for all players - behavior differs based on host status
     /// </summary>
     private void UpdateUndoButtonVisibility()
     {
         if (undoButton != null)
         {
-            // Undo button is active when:
-            // 1. Main screen is NOT active (i.e., when in game)
-            // 2. It's the host's game scene
+            // Undo button is active when in game, for all players
+            // For non-hosts, it will send a correction request to the host
             bool isInGame = !mainScreen.activeSelf;
-            bool isHost = DeckController.LocalInstance.thisPlayerNumber == 0;
-            bool shouldShowUndoButton = isInGame && isHost;
             
-            undoButton.SetActive(shouldShowUndoButton);
+            undoButton.SetActive(isInGame);
             
-            Debug.Log($"[MainUIScript] Undo button {(shouldShowUndoButton ? "shown" : "hidden")} - In game: {isInGame}, Is host: {isHost}");
+            Debug.Log($"[MainUIScript] Undo button {(isInGame ? "shown" : "hidden")} - In game: {isInGame}");
         }
         else
         {
             Debug.LogWarning("[MainUIScript] Undo button is not assigned!");
         }
+    }
+
+    /// <summary>
+    /// Handles the undo button click for both host and non-host players
+    /// </summary>
+    public void OnUndoButtonClicked()
+    {
+        if (DeckController.LocalInstance == null)
+        {
+            Debug.LogWarning("[MainUIScript] DeckController.LocalInstance is null - cannot process undo");
+            return;
+        }
+
+        bool isHost = NetworkManager.Singleton.IsHost;
+
+        if (isHost)
+        {
+            Debug.Log("[MainUIScript] Host pressed undo button - performing undo action");
+            // Host behavior: Execute the actual undo
+            PerformActualUndo();
+
+            // Stop breathing animations when host acts on the request
+            if (settingButtonBreathing != null) settingButtonBreathing.StopAnimation();
+            if (undoButtonBreathing != null) undoButtonBreathing.StopAnimation();
+        }
+        else
+        {
+            Debug.Log("[MainUIScript] Non-host player pressed undo button - sending correction request to host");
+            // Non-host behavior: Send correction request to host
+            SendCorrectionRequestToHost();
+        }
+    }
+
+    /// <summary>
+    /// Performs the actual undo action (host only)
+    /// </summary>
+    private void PerformActualUndo()
+    {
+        Debug.Log("[MainUIScript] Performing undo - delegating to GameManager");
+        
+        if (GameManager.LocalInstance != null)
+        {
+            GameManager.LocalInstance.RequestRedoToPreviousState();
+        }
+        else
+        {
+            Debug.LogError("[MainUIScript] GameManager.LocalInstance is null - cannot perform undo");
+        }
+    }
+
+    /// <summary>
+    /// Sends a correction request to the host when a non-host player presses the undo button
+    /// </summary>
+    private void SendCorrectionRequestToHost()
+    {
+        Debug.Log("[MainUIScript] Non-host player sending correction request to host...");
+        
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient)
+        {
+            // Send RPC to host via GameNetworkRelay
+            GameNetworkRelay relay = FindObjectOfType<GameNetworkRelay>();
+            if (relay != null)
+            {
+                relay.SendCorrectionRequestToHostServerRPC();
+                Debug.Log("[MainUIScript] Correction request RPC sent to host");
+                
+                // Show local widget indicating request was sent
+                ShowLocalCorrectionRequestSentWidget();
+            }
+            else
+            {
+                Debug.LogError("[MainUIScript] GameNetworkRelay not found - cannot send correction request");
+            }
+        }
+        else
+        {
+            Debug.LogWarning("[MainUIScript] Not connected to network - cannot send correction request");
+        }
+    }
+
+    /// <summary>
+    /// Shows widget on non-host player's device indicating correction request was sent
+    /// </summary>
+    private void ShowLocalCorrectionRequestSentWidget()
+    {
+        Debug.Log("[MainUIScript] Showing 'correction request sent' widget on non-host device...");
+        
+        string message = "Düzeltme talebi masa sahibine bildirildi";
+        Debug.Log($"[MainUIScript] CORRECTION REQUEST SENT: {message}");
+        
+        if (UIFeedbackManager.Instance != null)
+        {
+            UIFeedbackManager.Instance.ShowFeedback(message);
+        }
+    }
+
+    /// <summary>
+    /// Shows the correction request widget on the host's device
+    /// This is called via RPC when a non-host player requests a correction
+    /// </summary>
+    public void ShowCorrectionRequestWidgetOnHost()
+    {
+        Debug.Log("[MainUIScript] Showing correction request widget on host device...");
+        
+        string message = "Başka bir oyuncu düzeltme talep ediyor";
+        Debug.Log($"[MainUIScript] CORRECTION REQUEST RECEIVED: {message}");
+        
+        if (UIFeedbackManager.Instance != null)
+        {
+            // Show for a slightly longer duration on the host device
+            UIFeedbackManager.Instance.ShowFeedback(message, 3.0f);
+        }
+
+        // Start breathing animations on host buttons to draw attention
+        if (settingButtonBreathing != null) settingButtonBreathing.StartAnimation();
+        if (undoButtonBreathing != null) undoButtonBreathing.StartAnimation();
     }
 
     /// <summary>

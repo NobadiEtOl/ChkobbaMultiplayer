@@ -33,7 +33,7 @@ public class UIFeedbackManager : MonoBehaviour
         }
     }
 
-    public void ShowFeedback(string message)
+    public void ShowFeedback(string message, float? customDuration = null)
     {
         if (feedbackCanvasGroup == null || feedbackText == null)
         {
@@ -42,10 +42,10 @@ public class UIFeedbackManager : MonoBehaviour
         }
 
         if (currentCoroutine != null) StopCoroutine(currentCoroutine);
-        currentCoroutine = StartCoroutine(FeedbackSequence(message));
+        currentCoroutine = StartCoroutine(FeedbackSequence(message, customDuration ?? displayDuration));
     }
 
-    private IEnumerator FeedbackSequence(string message)
+    private IEnumerator FeedbackSequence(string message, float duration)
     {
         feedbackText.text = message;
         feedbackCanvasGroup.gameObject.SetActive(true);
@@ -60,7 +60,7 @@ public class UIFeedbackManager : MonoBehaviour
         }
         feedbackCanvasGroup.alpha = 1;
 
-        yield return new WaitForSeconds(displayDuration);
+        yield return new WaitForSeconds(duration);
 
         // Fade out
         elapsed = 0;
