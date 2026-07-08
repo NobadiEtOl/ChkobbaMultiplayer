@@ -66,12 +66,23 @@ public class MenuController : MonoBehaviour
     [SerializeField] private float scrollDeceleration = 0.95f;
     [SerializeField] private float maxScrollDistance = 10f;
     [SerializeField] private float bounceBackForce = 5f;
-    
+
+    [Header("Filter Settings")]
+    [SerializeField] private Button tier1FilterButton;
+    [SerializeField] private Button tier2FilterButton;
+    [SerializeField] private Button tier3FilterButton;
+    [SerializeField] private GameObject filterButtonContainer;
+    [SerializeField] private Color normalFilterColor = Color.white;
+    [SerializeField] private Color selectedFilterColor = new Color(0.7f, 0.7f, 0.7f);
+
     // Private variables
     private List<TokenMenuData> tokenDataList = new List<TokenMenuData>();
     private List<GameObject> instantiatedTokens = new List<GameObject>();
+    private List<GameObject> instantiatedTextElements = new List<GameObject>();
     private bool isMenuActive = false;
     private bool menuInitialized = false;
+    private int maxDisplayIndex = 0; // Track the highest display index (includes tier separators)
+    private int currentFilterTier = -1; // -1 means Show All
     
     // Scroll variables
     private bool isDragging = false;
@@ -100,8 +111,30 @@ public class MenuController : MonoBehaviour
         
         // Setup open button click handler
         SetupOpenButtonClickHandler();
+        
+        // Setup filter button click handlers
+        SetupFilterButtonClickHandler();
     }
     
+    private void SetupFilterButtonClickHandler()
+    {
+        if (tier1FilterButton != null)
+        {
+            tier1FilterButton.onClick.RemoveAllListeners();
+            tier1FilterButton.onClick.AddListener(() => OnTierButtonClicked(1));
+        }
+        if (tier2FilterButton != null)
+        {
+            tier2FilterButton.onClick.RemoveAllListeners();
+            tier2FilterButton.onClick.AddListener(() => OnTierButtonClicked(2));
+        }
+        if (tier3FilterButton != null)
+        {
+            tier3FilterButton.onClick.RemoveAllListeners();
+            tier3FilterButton.onClick.AddListener(() => OnTierButtonClicked(3));
+        }
+    }
+
     private IEnumerator WaitForSuperPowerSpawnerAndInitialize()
     {
         Debug.Log("[MenuController] Waiting for SuperPowerSpawner.LocalInstance...");
@@ -125,6 +158,7 @@ public class MenuController : MonoBehaviour
         }
         
         LoadTokenData();
+        SortTokensByTier();
         CreateTokensInSceneContainer();
         SetMenuActive(false);
         Debug.Log("[MenuController] Scene-based menu initialized successfully");
@@ -398,13 +432,33 @@ public class MenuController : MonoBehaviour
             if (spriteRenderer != null) tokenSprite = spriteRenderer.sprite;
             else if (imageComponent != null) tokenSprite = imageComponent.sprite;
             
-            TokenMenuData tokenData = new TokenMenuData(tokenSprite, power.name, power.rarityMultiplier, power, tokenPrefab);
+            TokenMenuData tokenData = new TokenMenuData(tokenSprite, power.name, power.powerCostTier, power, tokenPrefab);
             tokenDataList.Add(tokenData);
             
-            Debug.Log($"[MenuController] Added token: {power.name} (rarity: {power.rarityMultiplier})");
+            Debug.Log($"[MenuController] Added token: {power.name} (cost tier: {power.powerCostTier})");
         }
         
         Debug.Log($"[MenuController] Total tokens loaded: {tokenDataList.Count}");
+    }
+    
+    private void SortTokensByTier()
+    {
+        // Sort tokens by powerCostTier (stored in rarity field) in ascending order
+        tokenDataList.Sort((a, b) => a.rarity.CompareTo(b.rarity));
+        
+        // Log the sorted order with tier separators for clarity
+        Debug.Log("[MenuController] === TOKENS SORTED BY TIER ===");
+        int currentTier = -1;
+        for (int i = 0; i < tokenDataList.Count; i++)
+        {
+            if (tokenDataList[i].rarity != currentTier)
+            {
+                currentTier = tokenDataList[i].rarity;
+                Debug.Log($"\n--- TIER {currentTier} ---");
+            }
+            Debug.Log($"  [{i}] {tokenDataList[i].tokenName}");
+        }
+        Debug.Log("[MenuController] === END OF TIER SORT ===\n");
     }
     
     private void CreateAllTokens()
@@ -412,20 +466,94 @@ public class MenuController : MonoBehaviour
         // Clear any existing tokens
         ClearAllTokens();
         
-        if (tokenDataList.Count == 0)
+        // Filter the list based on currentFilterTier
+        List<TokenMenuData> filteredList;
+        if (currentFilterTier == -1)
         {
-            Debug.LogWarning("[MenuController] No tokens to create!");
+            filteredList = tokenDataList;
+        }
+        else
+        {
+            filteredList = tokenDataList.FindAll(t => t.rarity == currentFilterTier);
+        }
+
+        if (filteredList.Count == 0)
+        {
+            Debug.LogWarning("[MenuController] No tokens to create for current filter!");
             return;
         }
         
-        Debug.Log($"[MenuController] Creating {tokenDataList.Count} token GameObjects");
+        Debug.Log($"[MenuController] Creating {filteredList.Count} token GameObjects (Tier Filter: {currentFilterTier})");
         
-        for (int i = 0; i < tokenDataList.Count; i++)
+        int currentTier = -1;
+        int displayIndex = 0; // Track display index including separators
+        maxDisplayIndex = 0; // Reset max display index
+        
+        for (int i = 0; i < filteredList.Count; i++)
         {
-            CreateToken3D(tokenDataList[i], i);
+            // Check if tier changed - add separator
+            if (filteredList[i].rarity != currentTier)
+            {
+                currentTier = filteredList[i].rarity;
+                
+                // Create tier header separator
+                if (i > 0) // Don't add separator before first tier
+                {
+                    displayIndex++; // Add spacing for separator
+                    Debug.Log($"[MenuController] Added tier separator before Tier {currentTier}");
+                }
+            }
+            
+            CreateToken3D(filteredList[i], displayIndex);
+            displayIndex++;
         }
         
-        Debug.Log($"[MenuController] Created {instantiatedTokens.Count} token GameObjects");
+        // Store the maximum display index for scroll calculations
+        maxDisplayIndex = displayIndex > 0 ? displayIndex - 1 : 0;
+        Debug.Log($"[MenuController] Created {instantiatedTokens.Count} token GameObjects. Max display index: {maxDisplayIndex}");
+    }
+
+    public void OnTierButtonClicked(int tier)
+    {
+        if (tier == currentFilterTier) return;
+        
+        if (SuperPowerSpawner.LocalInstance != null)
+        {
+            StartCoroutine(SuperPowerSpawner.LocalInstance.SwitchMenuTierWithAnimation(() => SetFilterAndRefresh(tier)));
+        }
+        else
+        {
+            SetFilterAndRefresh(tier);
+        }
+    }
+
+    public void SetFilterAndRefresh(int tier)
+    {
+        currentFilterTier = tier;
+        ClearAllTokens();
+        CreateAllTokens();
+        UpdateFilterButtonVisuals();
+        
+        // Reset scroll position when switching tiers
+        currentScrollOffset = 0f;
+        if (scrollContainer != null)
+        {
+            Vector3 resetPosition = scrollContainer.transform.localPosition;
+            resetPosition.y = 0f;
+            scrollContainer.transform.localPosition = resetPosition;
+        }
+    }
+
+    private void UpdateFilterButtonVisuals()
+    {
+        if (tier1FilterButton != null && tier1FilterButton.image != null)
+            tier1FilterButton.image.color = (currentFilterTier == 1) ? selectedFilterColor : normalFilterColor;
+            
+        if (tier2FilterButton != null && tier2FilterButton.image != null)
+            tier2FilterButton.image.color = (currentFilterTier == 2) ? selectedFilterColor : normalFilterColor;
+            
+        if (tier3FilterButton != null && tier3FilterButton.image != null)
+            tier3FilterButton.image.color = (currentFilterTier == 3) ? selectedFilterColor : normalFilterColor;
     }
     
     private void CreateToken3D(TokenMenuData tokenData, int index)
@@ -588,8 +716,13 @@ public class MenuController : MonoBehaviour
             Debug.LogError("[MenuController] TokenDisplayArea is null, cannot set active state!");
         }
         
-        isMenuActive = active;
+        if (filterButtonContainer != null)
+        {
+            filterButtonContainer.SetActive(active);
+        }
         
+        isMenuActive = active;
+
         // Reset scroll position when activating
         if (active)
         {
@@ -637,11 +770,19 @@ public class MenuController : MonoBehaviour
     
     private void ClearAllTokens()
     {
+        // Clear token GameObjects
         foreach (GameObject token in instantiatedTokens)
         {
             if (token != null) DestroyImmediate(token);
         }
         instantiatedTokens.Clear();
+        
+        // Clear text elements (name and rarity texts)
+        foreach (GameObject textElement in instantiatedTextElements)
+        {
+            if (textElement != null) DestroyImmediate(textElement);
+        }
+        instantiatedTextElements.Clear();
     }
     
     [ContextMenu("Close Token Menu")]
@@ -754,9 +895,9 @@ public class MenuController : MonoBehaviour
         // Get display area bounds
         float displayHeight = GetDisplayAreaHeight();
         
-        // Calculate total content height based on number of tokens
-        int tokenCount = instantiatedTokens.Count;
-        float totalContentHeight = tokenCount * rowHeight;
+        // Calculate total content height based on maximum display index (includes tier separators)
+        // We use maxDisplayIndex + 1 to account for all positioned rows
+        float totalContentHeight = (maxDisplayIndex + 1) * rowHeight;
         
         // Calculate how much we can scroll
         float scrollableDistance = Mathf.Max(0f, totalContentHeight - displayHeight);
@@ -779,7 +920,7 @@ public class MenuController : MonoBehaviour
             maxScroll = scrollableDistance;  // Bottom boundary (last token)
         }
         
-        //Debug.Log($"[MenuController] Scroll limits calculated: tokenCount={tokenCount}, displayHeight={displayHeight}, totalContentHeight={totalContentHeight}, scrollableDistance={scrollableDistance}, limits=[{minScroll}, {maxScroll}]");
+        Debug.Log($"[MenuController] Scroll limits calculated: maxDisplayIndex={maxDisplayIndex}, displayHeight={displayHeight}, totalContentHeight={totalContentHeight}, scrollableDistance={scrollableDistance}, limits=[{minScroll}, {maxScroll}]");
     }
     
     private float GetDisplayAreaHeight()
@@ -1065,6 +1206,10 @@ public class MenuController : MonoBehaviour
         
         TextFollower rarityFollower = rarityTextObj.AddComponent<TextFollower>();
         rarityFollower.Initialize(tokenInstance, textMaskCanvas, tokenToNameSpacing + nameToRaritySpacing, scaleFactor);
+        
+        // Track text elements for cleanup when switching tiers
+        instantiatedTextElements.Add(nameTextObj);
+        instantiatedTextElements.Add(rarityTextObj);
     }
     
     private void CreateTokenText(TokenMenuData tokenData, GameObject tokenInstance, int index)
@@ -1121,6 +1266,10 @@ public class MenuController : MonoBehaviour
         WorldTextFollower rarityFollower = rarityTextObj.AddComponent<WorldTextFollower>();
         rarityFollower.Initialize(tokenInstance, textMaskCanvas, tokenToNameSpacing + nameToRaritySpacing, 0f);
         
+        // Track text elements for cleanup when switching tiers
+        instantiatedTextElements.Add(nameTextObj);
+        instantiatedTextElements.Add(rarityTextObj);
+        
         Debug.Log($"[MenuController] Created world-positioned text for: {tokenData.tokenName}");
     }
     
@@ -1132,9 +1281,17 @@ public class MenuController : MonoBehaviour
             yield break;
         }
 
+        // Reset filter to -1 (Show All) when opening menu
+        currentFilterTier = -1;
+        UpdateFilterButtonVisuals();
+
         // If menu page is already open, keep it open and ensure menu visuals stay active.
         if (SuperPowerSpawner.LocalInstance.isInfoBoxOpen && SuperPowerSpawner.LocalInstance.isMenuPageOpen)
         {
+            // Re-create tokens to reflect the reset filter if needed
+            // However, usually it's better to clear and recreate if we want to ensure "Show All"
+            CreateAllTokens();
+            
             SetMenuActive(true);
             Debug.Log("[MenuController] Menu page already open in InfoBox, keeping it open");
             yield break;
@@ -1163,6 +1320,9 @@ public class MenuController : MonoBehaviour
         // Open InfoBox with proper animation (same as token behavior)
         yield return StartCoroutine(SuperPowerSpawner.LocalInstance.OpenInfoBox(menuToken));
         
+        // Ensure tokens are created with the reset filter
+        CreateAllTokens();
+
         // Now show our menu
         SetMenuActive(true);
         

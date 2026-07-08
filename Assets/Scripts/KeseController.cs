@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
@@ -17,6 +18,13 @@ public class KeseController : MonoBehaviour
     [Header("Idle Animation")]
     public Sprite[] animationFrames;
     public float frameRate = 10f;
+
+    [Header("Jitter Animation")]
+    [SerializeField] private float moveAmplitudeX = 0.5f;
+    [SerializeField] private float moveAmplitudeZ = 0.3f;
+    [SerializeField] private float jitterFrameRate = 10f;
+    private float jitterTimer = 0f;
+    private int currentJitterFrame = 0;
 
     [Header("Page Change Animation")]
     public Sprite[] pageChangeFrames;
@@ -44,9 +52,9 @@ public class KeseController : MonoBehaviour
     [SerializeField] private Ease moveEase = Ease.OutQuad;
     
     [Header("Kese Movement")]
-    [SerializeField] private Transform keseReachPoint; // The position where kese appears when active
-    [SerializeField] private float keseMoveSpeed = 2f;
+    [SerializeField] private float keseMoveSpeed = 0.25f;
     [SerializeField] private Ease keseMoveEase = Ease.OutQuad;
+    private Transform keseReachPoint; // Retrieved from ScreenEdgePositionAdjuster
 
     [SerializeField] private GameObject currentCoin;
     private bool isDraggingCoin = false;
@@ -119,6 +127,30 @@ public class KeseController : MonoBehaviour
 
     void Start()
     {
+        // Get reach points from ScreenEdgePositionAdjuster (centralized source)
+        ScreenEdgePositionAdjuster screenEdgeAdjuster = FindObjectOfType<ScreenEdgePositionAdjuster>();
+        if (screenEdgeAdjuster != null)
+        {
+            keseReachPoint = screenEdgeAdjuster.GetReachPointTransform("Kese");
+            if (keseReachPoint == null)
+            {
+                Debug.LogError("[KeseController] Could not find group 'Kese' in ScreenEdgePositionAdjuster!");
+            }
+
+            // Get the return/starting position from the outside reach point
+            keseStartingPosition = screenEdgeAdjuster.GetOutsideReachPointPosition("Kese");
+            if (keseStartingPosition == Vector3.zero)
+            {
+                Debug.LogWarning("[KeseController] Could not find group 'Kese' in ScreenEdgePositionAdjuster. Using current position as fallback.");
+                keseStartingPosition = transform.position;
+            }
+        }
+        else
+        {
+            Debug.LogError("[KeseController] ScreenEdgePositionAdjuster not found in scene!");
+            keseStartingPosition = transform.position;
+        }
+        
         img = GetComponent<Image>();
         currentFrame = 0;
         timer = 0f;
@@ -128,9 +160,6 @@ public class KeseController : MonoBehaviour
             handOriginalScale = rightHandObject.transform.localScale;
             handOriginalRotation = rightHandObject.transform.localRotation;
         }
-
-        // Store kese starting position (like infobox and hesap makinesi)
-        keseStartingPosition = transform.position;
         
         // Ensure kese starts at starting position
         transform.position = keseStartingPosition;
@@ -142,6 +171,9 @@ public class KeseController : MonoBehaviour
 
     void Update()
     {
+        // Update jitter animation
+        UpdateJitterAnimation();
+
         // Don't play idle animation if page change is playing or if it's disabled
         if (isPlayingPageChange || !isIdleAnimationEnabled) return;
 
@@ -201,6 +233,39 @@ public class KeseController : MonoBehaviour
     }
 
     /// <summary>
+    /// Updates the jitter movement animation around the reach point
+    /// </summary>
+    private void UpdateJitterAnimation()
+    {
+        // Only jitter when at reach point and not currently sliding/moving
+        if (isKeseAtReachPoint && !isKeseMoving && jitterFrameRate > 0)
+        {
+            jitterTimer += Time.deltaTime;
+            float frameInterval = 1f / jitterFrameRate;
+            int newFrame = Mathf.FloorToInt(jitterTimer / frameInterval);
+            
+            if (newFrame != currentJitterFrame)
+            {
+                currentJitterFrame = newFrame;
+                float randomOffsetX = Random.Range(-moveAmplitudeX, moveAmplitudeX);
+                float randomOffsetZ = Random.Range(-moveAmplitudeZ, moveAmplitudeZ);
+                
+                // Jitter around the kese reach point position
+                Vector3 basePos = keseReachPoint != null ? keseReachPoint.position : transform.position;
+                transform.position = basePos + new Vector3(randomOffsetX, 0f, randomOffsetZ);
+            }
+        }
+        else if (!isKeseAtReachPoint && !isKeseMoving)
+        {
+            // Stop jitter and stay exactly at starting position when closed
+            if (transform.position != keseStartingPosition)
+            {
+                transform.position = keseStartingPosition;
+            }
+        }
+    }
+
+    /// <summary>
     /// Handles idle animation frame switching.
     /// </summary>
     private void PlayIdleAnimation_Internal()
@@ -253,11 +318,6 @@ public class KeseController : MonoBehaviour
             Vector3 screenPos = Input.mousePosition;
             if (IsPointerOverCoin(screenPos))
                 OnCoinTouchDown(screenPos);
-            else if (IsPointerOverCalculatorButton(screenPos))
-            {
-                // Let the button handle its own click event
-                // Don't close the calculator
-            }
             else if (!IsPointerOverHesapMakinesi(screenPos) && !IsPointerOverInfoBox(screenPos))
                 OnOtherClickDetected();
         }
@@ -284,11 +344,6 @@ public class KeseController : MonoBehaviour
             case TouchPhase.Began:
                 if (IsPointerOverCoin(screenPos))
                     OnCoinTouchDown(screenPos);
-                else if (IsPointerOverCalculatorButton(screenPos))
-                {
-                    // Let the button handle its own click event
-                    // Don't close the calculator
-                }
                 else if (!IsPointerOverHesapMakinesi(screenPos) && !IsPointerOverInfoBox(screenPos))
                     OnOtherClickDetected();
                 break;
@@ -307,43 +362,80 @@ public class KeseController : MonoBehaviour
 
     /// <summary>
     /// Checks if the pointer is over the InfoBox or any of its menu/token elements.
+    /// Only returns true if we're over InfoBox/Menu UI specifically, NOT other UI elements.
     /// </summary>
     private bool IsPointerOverInfoBox(Vector3 screenPos)
     {
-        // 1. Check EventSystem for standard UI elements (e.g., buttons, scrollbar, etc.)
-        if (UnityEngine.EventSystems.EventSystem.current != null && 
-            UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
+        // First, use 3D raycasts to check for physical elements
+        if (Camera.main != null)
         {
-            return true;
+            Ray ray = Camera.main.ScreenPointToRay(screenPos);
+            RaycastHit[] hits = Physics.RaycastAll(ray);
+            
+            GameObject infoBoxBg = GameObject.Find("InfoBoxBackGroundPanel");
+            GameObject menuBg = GameObject.Find("DisplayBackgroundPanel");
+
+            foreach (RaycastHit hit in hits)
+            {
+                GameObject hitObj = hit.collider.gameObject;
+                
+                // Check if we hit a Token (Super Power tokens)
+                if (hitObj.CompareTag("Token") || hitObj.name.Contains("Token"))
+                {
+                    Debug.Log("[KeseController] Click detected on Token");
+                    return true;
+                }
+
+                // Check if we hit the top-level InfoBoxBackGroundPanel or any of its descendants
+                if (infoBoxBg != null && (hitObj == infoBoxBg || hitObj.transform.IsChildOf(infoBoxBg.transform)))
+                {
+                    Debug.Log("[KeseController] Click detected on InfoBox or its child");
+                    return true;
+                }
+
+                // Check if we hit the menu background panel or any of its descendants
+                if (menuBg != null && (hitObj == menuBg || hitObj.transform.IsChildOf(menuBg.transform)))
+                {
+                    Debug.Log("[KeseController] Click detected on Menu display area");
+                    return true;
+                }
+
+                // Check for other potential scroll display elements by name
+                if (hitObj.name == "DisplayBackgroundPanel" || hitObj.name == "TokenDisplayArea" || hitObj.name == "ScrollContainer")
+                {
+                    Debug.Log("[KeseController] Click detected on menu scroll element");
+                    return true;
+                }
+            }
         }
 
-        // 2. Perform a raycast to check for 3D/2D physical elements of the InfoBox/Menu
-        if (Camera.main == null) return false;
-        Ray ray = Camera.main.ScreenPointToRay(screenPos);
-        RaycastHit[] hits = Physics.RaycastAll(ray);
-        
-        GameObject infoBoxBg = GameObject.Find("InfoBoxBackGroundPanel");
-
-        foreach (RaycastHit hit in hits)
+        // Second, check if we're over InfoBox/Menu UI canvas elements using EventSystem
+        // But ONLY check canvases that are part of the InfoBox or Menu
+        if (EventSystem.current != null)
         {
-            GameObject hitObj = hit.collider.gameObject;
+            GameObject infoBoxBg = GameObject.Find("InfoBoxBackGroundPanel");
             
-            // Check if we hit a Token
-            if (hitObj.CompareTag("Token") || hitObj.name.Contains("Token"))
+            // If we found the InfoBox background, check if click is over its canvas UI
+            if (infoBoxBg != null)
             {
-                return true;
-            }
-
-            // Check if we hit the top-level InfoBoxBackGroundPanel or any of its descendants
-            if (infoBoxBg != null && (hitObj == infoBoxBg || hitObj.transform.IsChildOf(infoBoxBg.transform)))
-            {
-                return true;
-            }
-
-            // Check if we hit other potential scroll display elements by name
-            if (hitObj.name == "DisplayBackgroundPanel" || hitObj.name == "TokenDisplayArea")
-            {
-                return true;
+                Canvas infoBoxCanvas = infoBoxBg.GetComponentInChildren<Canvas>();
+                if (infoBoxCanvas != null)
+                {
+                    GraphicRaycaster raycaster = infoBoxCanvas.GetComponent<GraphicRaycaster>();
+                    if (raycaster != null)
+                    {
+                        var pointerData = new PointerEventData(EventSystem.current);
+                        pointerData.position = screenPos;
+                        var results = new List<RaycastResult>();
+                        raycaster.Raycast(pointerData, results);
+                        
+                        if (results.Count > 0)
+                        {
+                            Debug.Log("[KeseController] Click detected on InfoBox canvas UI");
+                            return true;
+                        }
+                    }
+                }
             }
         }
         
@@ -356,6 +448,7 @@ public class KeseController : MonoBehaviour
     private bool IsPointerOverCoin(Vector3 screenPos)
     {
         if (currentCoin == null) return false;
+        if (Camera.main == null) return false;
         Ray ray = Camera.main.ScreenPointToRay(screenPos);
         RaycastHit hit;
         if (Physics.Raycast(ray, out hit))
@@ -399,69 +492,72 @@ public class KeseController : MonoBehaviour
     }
     
     /// <summary>
-    /// Called when something other than the coin is clicked
+    /// Called when something other than the coin, hesap makinesi, or infobox is clicked
+    /// Closes both hesap makinesi and infobox while keeping them open if they were clicked
     /// </summary>
     private void OnOtherClickDetected()
     {
-        if (hesapMakinesiController != null)
+        Debug.Log("[KeseController] Click detected on something else - closing hesap makinesi and infobox");
+        
+        // Close hesap makinesi if it's open
+        if (hesapMakinesiController != null && hesapMakinesiController.IsAtReachPoint())
         {
-            Debug.Log("[KeseController] Something else was clicked, force closing hesap makinesi");
+            Debug.Log("[KeseController] Hesap makinesi is open, closing it");
             hesapMakinesiController.ForceClose();
         }
         
-        // Also close kese when something else is clicked
+        // Close kese when something else is clicked
         if (isKeseAtReachPoint)
         {
-            Debug.Log("[KeseController] Something else was clicked, closing kese");
+            Debug.Log("[KeseController] Kese is at reach point, closing it");
             MoveKeseToStartingPosition();
         }
 
-        // Close InfoBox (menu) as well if it is currently open
+        // Close InfoBox (menu) if it is currently open
         if (SuperPowerSpawner.LocalInstance != null && SuperPowerSpawner.LocalInstance.isInfoBoxOpen)
         {
-            Debug.Log("[KeseController] Something else was clicked, closing InfoBox menu");
+            Debug.Log("[KeseController] InfoBox is open, closing it");
             SuperPowerSpawner.LocalInstance.StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
         }
     }
     
     /// <summary>
-    /// Checks if the pointer is over the hesap makinesi
+    /// Checks if the pointer is over the hesap makinesi (improved to check all colliders)
     /// </summary>
     private bool IsPointerOverHesapMakinesi(Vector3 screenPos)
     {
         if (hesapMakinesiController == null) return false;
+        if (Camera.main == null) return false;
         
-        Ray ray = Camera.main.ScreenPointToRay(screenPos);
-        RaycastHit hit;
-        if (Physics.Raycast(ray, out hit))
-        {
-            // Check if the hit object is the hesap makinesi
-            if (hit.collider.gameObject == hesapMakinesiController.gameObject)
-                return true;
-        }
-        return false;
-    }
-    
-    /// <summary>
-    /// Checks if the pointer is over any calculator button
-    /// </summary>
-    private bool IsPointerOverCalculatorButton(Vector3 screenPos)
-    {
-        if (hesapMakinesiController == null) return false;
-        
+        // Raycast from camera to check if we hit the hesap makinesi or any of its child colliders
         Ray ray = Camera.main.ScreenPointToRay(screenPos);
         RaycastHit[] hits = Physics.RaycastAll(ray);
         
+        GameObject hesapMakinesiGameObject = hesapMakinesiController.gameObject;
+        
+        // Check all hits to see if any belong to the hesap makinesi or its children
         foreach (RaycastHit hit in hits)
         {
-            // Check if the hit object is a calculator button
-            if (hesapMakinesiController.IsPointerOverCalculatorButton(hit.collider.gameObject))
+            GameObject hitObj = hit.collider.gameObject;
+            
+            // Direct hit on the hesap makinesi itself
+            if (hitObj == hesapMakinesiGameObject)
             {
+                Debug.Log("[KeseController] Click detected on Hesap Makinesi");
+                return true;
+            }
+            
+            // Hit on a child of the hesap makinesi
+            if (hitObj.transform.IsChildOf(hesapMakinesiGameObject.transform))
+            {
+                Debug.Log("[KeseController] Click detected on Hesap Makinesi child");
                 return true;
             }
         }
+        
         return false;
     }
+
 
     // --- COIN DRAG & BUY SUPERPOWER SYSTEM ---
 
@@ -867,7 +963,7 @@ public class KeseController : MonoBehaviour
     /// <summary>
     /// Spawns tokens based on calculator data
     /// Each token costs 1 gold, regardless of token value.
-    /// Powers are drawn with inverse-weighted randomness based on rarityMultiplier.
+    /// Powers are drawn with cost-tier-weighted randomness.
     /// </summary>
     private void SpawnTokensFromCalculatorData(Vector3 spawnOrigin, float spawnScale)
     {

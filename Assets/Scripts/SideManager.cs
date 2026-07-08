@@ -60,11 +60,12 @@ public class SideManager : MonoBehaviour
     private void Start()
     {
         UpdateAllSides();
+        SetupLocalEmoteTrigger(); // Ensure trigger is set up even if network isn't ready
     }
 
     /// <summary>
     /// Synchronizes point display on both side panels dynamically.
-    /// </summary>
+/// </summary>
     public void UpdatePoints(int point0, int point1)
     {
         if (DeckController.LocalInstance == null) return;
@@ -118,10 +119,72 @@ public class SideManager : MonoBehaviour
 
         // Configure Side 1 (Opponent Team Side)
         ConfigureSide1(localPlayerNo, is2v2, playerMap);
+
+        // Add Emote click listener to local player slot
+        SetupLocalEmoteTrigger();
+    }
+
+    private void SetupLocalEmoteTrigger()
+    {
+        Debug.Log("[SideManager] Initializing local emote trigger setup...");
+        
+        if (side0LocalTeam.PlayerBackground1 != null)
+        {
+            GameObject background = side0LocalTeam.PlayerBackground1;
+            Debug.Log("[SideManager] Target object for emote trigger (Background): " + background.name);
+
+            // 1. Add/Get Button component
+            UnityEngine.UI.Button btn = background.GetComponent<UnityEngine.UI.Button>();
+            if (btn == null)
+            {
+                btn = background.AddComponent<UnityEngine.UI.Button>();
+                Debug.Log("[SideManager] Added new Button component to " + background.name);
+            }
+
+            // 2. Ensure it has an Image component to receive raycasts and set it as target graphic
+            UnityEngine.UI.Image img = background.GetComponent<UnityEngine.UI.Image>();
+            if (img != null)
+            {
+                img.raycastTarget = true;
+                btn.targetGraphic = img;
+            }
+
+            // 3. Clear existing listeners and add the new one
+            btn.onClick.RemoveAllListeners();
+            btn.onClick.AddListener(() => {
+                Debug.Log("[SideManager] >>> AVATAR BACKGROUND CLICK REGISTERED! <<<");
+                if (EmoteManager.Instance != null)
+                {
+                    EmoteManager.Instance.RequestEmote();
+                }
+                else
+                {
+                    Debug.LogError("[SideManager] EmoteManager.Instance is NULL. Click ignored.");
+                }
+            });
+            
+            Debug.Log("[SideManager] Emote trigger setup complete and listener attached to background.");
+        }
+        else
+        {
+            Debug.LogError("[SideManager] PlayerBackground1 is NULL. Cannot setup emote trigger.");
+        }
+    }
+
+    public GameObject GetPlayerSlotParent(int sideIndex, int slotIndex)
+    {
+        if (sideIndex == 0)
+        {
+            return slotIndex == 1 ? side0LocalTeam.PlayerSlot1.PlayerSlotParent : side0LocalTeam.PlayerSlot2.PlayerSlotParent;
+        }
+        else
+        {
+            return slotIndex == 1 ? side1OpponentTeam.PlayerSlot1.PlayerSlotParent : side1OpponentTeam.PlayerSlot2.PlayerSlotParent;
+        }
     }
 
     private void ConfigureSide0(int localPlayerNo, bool is2v2, Dictionary<int, Player> playerMap)
-    {
+{
         // Handle backgrounds activation
         if (side0LocalTeam.PlayerBackground1 != null)
         {

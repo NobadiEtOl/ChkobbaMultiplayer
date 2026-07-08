@@ -7,7 +7,6 @@ public abstract class SuperPower : ScriptableObject
 {
     public string name;
     public string description;
-    public int rarityMultiplier;
     // Cost tier used for mode-based draw weighting. 1/2/3 = selectable tiers, 4 = special (never boosted).
     public int powerCostTier;
     // When false, this power is excluded from the draw pool entirely.
@@ -38,7 +37,6 @@ public class UcundanGözAt : SuperPower
     {
         name = "Ucundan Göz At";
         description = "Rakibin rastgele bir kartını gör";
-        rarityMultiplier = 5;
         powerCostTier = 1;
         isPowerEnabled = true;
     }
@@ -57,7 +55,6 @@ public class Oynayamazsın : SuperPower
     {
         name = "Oynayamazsın";
         description = "Oynanan kartı bir tur için kapatılamaz yap";
-        rarityMultiplier = 12;
         powerCostTier = 1;
         isPowerEnabled = false;
     }
@@ -79,7 +76,6 @@ public class DeğişTokuş : SuperPower
     {
         name = "Değiş Tokuş";
         description = "Bir kartını rakibin elindeki rastgele bir kartla değiştir";
-        rarityMultiplier = 7;
         powerCostTier = 1;
         isPowerEnabled = true;
     }
@@ -103,7 +99,6 @@ public class Kapkaç : SuperPower
     {
         name = "Kapkaç";
         description = "Değiştirmek için bir kart seç. Seçilen kart Sahte Vale'ye dönüşür";
-        rarityMultiplier = 15;
         powerCostTier = 2;
         isPowerEnabled = true;
     }
@@ -128,7 +123,6 @@ public class ValeArar : SuperPower
     {
         name = "Vale Arar";
         description = "Tur boyunca Valeleri görmeni sağlar";
-        rarityMultiplier = 100;
         powerCostTier = 3;
         isPowerEnabled = true;
     }
@@ -153,7 +147,6 @@ public class KopyalaYapistir : SuperPower
     {
         name = "Kopyala Yapıştır";
         description = "Bir kartı kopyala, başka bir kartın üzerine yapıştır";
-        rarityMultiplier = 20;
         powerCostTier = 3;
         isPowerEnabled = true;
     }
@@ -172,7 +165,6 @@ public class BayaBayaBak : SuperPower
     {
         name = "Baya Baya Bak";
         description = "Bir rakibin tüm kartlarını gör";
-        rarityMultiplier = 17;
         powerCostTier = 2;
         isPowerEnabled = true;
     }
@@ -202,7 +194,6 @@ public class Bomba : SuperPower
     {
         name = "Bomba";
         description = "Ortadaki kartların hepsini patlat";
-        rarityMultiplier = 18;
         powerCostTier = 1;
         isPowerEnabled = true;
     }
@@ -221,7 +212,6 @@ public class Yapamazsın : SuperPower
     {
         name = "Yapamazsın";
         description = "Bir sonraki oynanan süper gücü gizlice engelle";
-        rarityMultiplier = 22;
         powerCostTier = 1;
         isPowerEnabled = false;
     }
@@ -240,7 +230,6 @@ public class VerZehri : SuperPower
     {
         name = "Ver Zehri";
         description = "Ortayı zehirle. Zehirli desteyi kapatan taraf ortadaki kart sayısı kadar puan kaybeder";
-        rarityMultiplier = 25;
         powerCostTier = 2;
         isPowerEnabled = true;
     }
@@ -263,7 +252,6 @@ public class KutsalDeste : SuperPower
     {
         name = "Kutsal Deste";
         description = "Ortayı kutsa. Zehirli desteyi kapatan taraf ortadaki kart sayısı kadar puan kazanır";
-        rarityMultiplier = 25;
         powerCostTier = 3;
         isPowerEnabled = true;
     }
@@ -286,7 +274,6 @@ public class BuDahaİyi : SuperPower
     {
         name = "Bu Daha İyi";
         description = "Bir kart seç ve ortadaki kartla değiştir";
-        rarityMultiplier = 20;
         powerCostTier = 2;
         isPowerEnabled = true;
     }
@@ -312,7 +299,6 @@ public class SunuDegisTokus : SuperPower
     {
         name = "Şunu Değiş Tokuş";
         description = "Adım 1: herhangi bir el kartı seç. Adım 2: farklı bir el kartı seç. Seçtiğin iki kart yer değiştirir";
-        rarityMultiplier = 14;
         powerCostTier = 2;
         isPowerEnabled = true;
     }
@@ -334,7 +320,6 @@ public class SunuDegisBunuTokus : SuperPower
     {
         name = "Şunu Değiş Bunu Tokuş";
         description = "Tüm karlarını sırayla değiş tokuş";
-        rarityMultiplier = 22;
         powerCostTier = 3;
         isPowerEnabled = true;
     }
@@ -365,7 +350,6 @@ public class ZaferPuani : SuperPower
     {
         name = "Zafer Puanı";
         description = "Kullanınca 5 puan kazan";
-        rarityMultiplier = 67;
         powerCostTier = 4;
         isPowerEnabled = true;
     }
@@ -396,7 +380,6 @@ public class YandımAnam : SuperPower
     {
         name = "Yandım Anam";
         description = "Değiştirmek için bir kart seç. Seçilen kart yanar ve sadece başka yanık kartlarca kapatılabilir.";
-        rarityMultiplier = 19;
         powerCostTier = 1;
         isPowerEnabled = true;
     }

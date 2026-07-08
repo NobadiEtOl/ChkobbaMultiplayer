@@ -7,50 +7,55 @@ using UnityEngine.UI;
 
 public class HesapMakinesiController : MonoBehaviour
 {
-    [Header("Idle Animation")]
-    [SerializeField] private Sprite[] idleAnimationFrames;
-    [SerializeField] private float idleFrameRate = 10f;
+    [Header("Idle Movement Animation")]
+    [SerializeField] private float moveAmplitudeX = 0.5f;
+    [SerializeField] private float moveAmplitudeZ = 0.3f;
+    [SerializeField] private float idleFrameRate = 10f; // Frames per second
     
     [Header("Movement")]
-    [SerializeField] private Transform reachPoint;
-    [SerializeField] private float moveSpeed = 2f;
+    [SerializeField] private float moveSpeed = 0.25f;
     [SerializeField] private Ease moveEase = Ease.OutQuad;
     
     [Header("Coin Interaction")]
     [SerializeField] private float coinDistanceThreshold = 1f; // Distance from start to trigger movement
     
-    [Header("Calculator UI")]
-    [SerializeField] private TextMeshProUGUI displayText; // Calculator screen
-    [SerializeField] private TextMeshProUGUI equalsButtonText; // = button text
-    [SerializeField] private TextMeshProUGUI coinDisplayText; // = button text
-    [SerializeField] private Button[] numberButtons; // Buttons 0-9
-    [SerializeField] private Button multiplyButton; // x button
-    [SerializeField] private Button addButton; // + button
-    [SerializeField] private Button clearButton; // C button
-    [SerializeField] private Button equalsButton; // = button
+    [Header("UI Displays")]
+    [SerializeField] private TextMeshProUGUI tableCoinAmountDisplay; // Shows gold amount at table
+    [SerializeField] private TextMeshProUGUI hesapMakinesiCoinAmountDisplay; // Shows gold amount in calculator
+    [SerializeField] private Transform tableSelectedModeDisplay; // Container for mode stars at table
+    [SerializeField] private Transform hesapMakinesiSelectedModeDisplay; // Container for mode stars in calculator
+    [SerializeField] private Sprite filledStarSprite; // Filled star sprite for mode display
+    [SerializeField] private Sprite emptyStarSprite; // Empty star sprite for mode display
+
+    [Header("Cost Tier UI")]
+    [SerializeField] private UnityEngine.UI.Button[] costTierButtons;
+    [SerializeField] private Color pushedInColor = new Color(0.7f, 0.7f, 0.7f, 1f);
+    [SerializeField] private Color normalColor = Color.white;
+    [SerializeField] private Vector2 starSize = new Vector2(0.5f, 0.5f);
     
-    // Store all calculator buttons for detection
-    private List<Button> allCalculatorButtons = new List<Button>();
+    // Star references - two groups of 3 stars each
+    private List<UnityEngine.UI.Image> tableStars = new List<UnityEngine.UI.Image>();
+    private List<UnityEngine.UI.Image> hesapMakinesiStars = new List<UnityEngine.UI.Image>();
     
     // Private variables
-    private SpriteRenderer spriteRenderer;
     private Vector3 startingPosition;
-    private int currentFrame = 0;
-    private float timer = 0f;
+    private Vector3 startingPositionForAnimation;
     private bool isMoving = false;
     private bool isAtReachPoint = false;
     private Sequence moveSequence;
+    private Transform reachPoint; // Retrieved from ScreenEdgePositionAdjuster
+    private ScreenEdgePositionAdjuster screenEdgeAdjuster;
     
     // Coin tracking
     private GameObject currentCoin;
     private Vector3 coinStartPosition;
     private bool hasMovedToReachPoint = false;
     
-    // Calculator variables
-    private string currentInput = "";
-    private string currentExpression = "";
-    private bool lastWasOperator = false;
-    private bool lastWasNumber = false;
+    // Animation tracking
+    private float animationTimer = 0f;
+    private int currentAnimationFrame = 0;
+    private int totalAnimationFrames = 0;
+    
     // Cost mode for power draw tier selection (1 = Tier1 boosted, 2 = Tier2 boosted, 3 = Tier3 boosted)
     private int selectedCostMode = 1;
     
@@ -70,22 +75,49 @@ public class HesapMakinesiController : MonoBehaviour
     
     void Start()
     {
-        // Get the SpriteRenderer component for sprite animation
-        spriteRenderer = GetComponent<SpriteRenderer>();
-        if (spriteRenderer == null)
+        Debug.Log("[HesapMakinesiController] Start() called - initializing positioning");
+        
+        // Get reach points from ScreenEdgePositionAdjuster (centralized source)
+        screenEdgeAdjuster = FindObjectOfType<ScreenEdgePositionAdjuster>();
+        if (screenEdgeAdjuster != null)
         {
-            //Debug.LogError("HesapMakinesiController: No SpriteRenderer component found!");
-            return;
+            Debug.Log("[HesapMakinesiController] ScreenEdgePositionAdjuster found in scene");
+            
+            reachPoint = screenEdgeAdjuster.GetReachPointTransform("HesapMakinesi");
+            if (reachPoint == null)
+            {
+                Debug.LogError("[HesapMakinesiController] Could not find group 'HesapMakinesi' in ScreenEdgePositionAdjuster!");
+            }
+            else
+            {
+                Debug.Log($"[HesapMakinesiController] Successfully retrieved reachPoint at position: {reachPoint.position}");
+            }
+
+            // Get the return/starting position from the outside reach point
+            Debug.Log("[HesapMakinesiController] Attempting to retrieve outside reach point for group 'HesapMakinesi'...");
+            startingPosition = screenEdgeAdjuster.GetOutsideReachPointPosition("HesapMakinesi");
+            Debug.Log($"[HesapMakinesiController] Retrieved startingPosition: {startingPosition}");
+            Debug.Log($"[HesapMakinesiController] Is it zero vector? {startingPosition == Vector3.zero}");
+            
+            if (startingPosition == Vector3.zero)
+            {
+                Debug.LogWarning("[HesapMakinesiController] Could not find 'HesapMakinesiOutlineReachPoint' in ScreenEdgePositionAdjuster. Using current position as fallback.");
+                startingPosition = transform.position;
+                Debug.Log($"[HesapMakinesiController] Falling back to current transform position: {startingPosition}");
+            }
+        }
+        else
+        {
+            Debug.LogError("[HesapMakinesiController] ScreenEdgePositionAdjuster not found in scene!");
+            startingPosition = transform.position;
+            Debug.Log($"[HesapMakinesiController] Fallback: Using current transform position: {startingPosition}");
         }
         
-        // Store the starting position
-        startingPosition = transform.position;
-        
-        // Set initial sprite
-        if (idleAnimationFrames != null && idleAnimationFrames.Length > 0)
-        {
-            spriteRenderer.sprite = idleAnimationFrames[0];
-        }
+        Debug.Log($"[HesapMakinesiController] Final startingPosition set to: {startingPosition}");
+        // Store the starting position for animation purposes
+        startingPositionForAnimation = startingPosition;
+        Debug.Log($"[HesapMakinesiController] startingPositionForAnimation set to: {startingPositionForAnimation}");
+        Debug.Log("[HesapMakinesiController] Initial transform position: " + transform.position);
         
         // Find the coin in the scene
         FindCoinInScene();
@@ -96,30 +128,53 @@ public class HesapMakinesiController : MonoBehaviour
             coinStartPosition = currentCoin.transform.position;
         }
         
-        // Setup calculator
-        SetupCalculator();
+        // Initialize UI with default cost mode 1
+        UpdateModeDisplays();
+        UpdateButtonVisuals();
+        
+        // Initialize coin displays with 0 gold at game start
+        UpdateCoinAmountDisplays(0);
     }
     
     void Update()
     {
-        // Play idle animation
-        PlayIdleAnimation();
+        // Update idle movement animation
+        UpdateIdleMovement();
     }
     
     /// <summary>
-    /// Plays the idle animation by cycling through the sprite frames
+    /// Updates the idle movement animation (jitter) around the target position
     /// </summary>
-    private void PlayIdleAnimation()
+    private void UpdateIdleMovement()
     {
-        if (idleAnimationFrames == null || idleAnimationFrames.Length == 0) return;
-        
-        timer += Time.deltaTime;
-        if (timer >= 1f / idleFrameRate)
+        // Only jitter when at reach point and not currently sliding/moving
+        if (isAtReachPoint && !isMoving && idleFrameRate > 0)
         {
-            currentFrame = (currentFrame + 1) % idleAnimationFrames.Length;
-            if (spriteRenderer != null)
-                spriteRenderer.sprite = idleAnimationFrames[currentFrame];
-            timer = 0f;
+            animationTimer += Time.deltaTime;
+            float frameInterval = 1f / idleFrameRate;
+            
+            int newFrame = Mathf.FloorToInt(animationTimer / frameInterval);
+            
+            if (newFrame != currentAnimationFrame)
+            {
+                currentAnimationFrame = newFrame;
+                
+                float randomOffsetX = Random.Range(-moveAmplitudeX, moveAmplitudeX);
+                float randomOffsetZ = Random.Range(-moveAmplitudeZ, moveAmplitudeZ);
+                
+                // Jitter around the reach point position
+                Vector3 basePos = reachPoint != null ? reachPoint.position : transform.position;
+                Vector3 newIdlePos = basePos + new Vector3(randomOffsetX, 0f, randomOffsetZ);
+                transform.position = newIdlePos;
+            }
+        }
+        else if (!isAtReachPoint && !isMoving)
+        {
+            // Stop jitter and stay at starting position when closed
+            if (transform.position != startingPosition)
+            {
+                transform.position = startingPosition;
+            }
         }
     }
     
@@ -155,9 +210,6 @@ public class HesapMakinesiController : MonoBehaviour
         //Debug.Log("HesapMakinesiController: Quick drop detected! Moving to reach point");
         hasMovedToReachPoint = true;
         MoveToReachPoint();
-        
-        // Clear calculator when opened
-        ClearCalculator();
 
         // Also activate the menu
         ActivateMenuWithExistingAnimation();
@@ -216,355 +268,201 @@ public class HesapMakinesiController : MonoBehaviour
         }
     }
     
-    // ===== CALCULATOR METHODS =====
+    // ===== COST MODE METHODS =====
+    
+    public void SetCostMode(int mode)
+    {
+        selectedCostMode = Mathf.Clamp(mode, 1, 3);
+        Debug.Log($"[HesapMakinesiController] Cost mode set to {selectedCostMode}");
+        UpdateModeDisplays();
+        UpdateButtonVisuals();
+    }
     
     /// <summary>
-    /// Sets up the calculator buttons and initial state
+    /// Public method to select cost tier 1 (called from button onClick)
     /// </summary>
-    private void SetupCalculator()
+    public void SelectCostMode1() => SetCostMode(1);
+    
+    /// <summary>
+    /// Public method to select cost tier 2 (called from button onClick)
+    /// </summary>
+    public void SelectCostMode2() => SetCostMode(2);
+    
+    /// <summary>
+    /// Public method to select cost tier 3 (called from button onClick)
+    /// </summary>
+    public void SelectCostMode3() => SetCostMode(3);
+
+    private void UpdateButtonVisuals()
     {
-        // Setup number buttons (0-9)
-        if (numberButtons != null && numberButtons.Length >= 10)
+        if (costTierButtons == null || costTierButtons.Length == 0) return;
+
+        for (int i = 0; i < costTierButtons.Length; i++)
         {
-            for (int i = 0; i < 10; i++)
+            if (costTierButtons[i] == null) continue;
+
+            UnityEngine.UI.Image btnImage = costTierButtons[i].GetComponent<UnityEngine.UI.Image>();
+            if (btnImage != null)
             {
-                int number = i; // Capture the value for the lambda
-                if (numberButtons[i] != null)
-                {
-                    numberButtons[i].onClick.AddListener(() => OnNumberPressed(number));
-                    allCalculatorButtons.Add(numberButtons[i]);
-                }
+                // Mode is 1-indexed (1, 2, 3), array is 0-indexed
+                bool isSelected = (i + 1 == selectedCostMode);
+                btnImage.color = isSelected ? pushedInColor : normalColor;
+                
+                // Scale for "pushed" look
+                costTierButtons[i].transform.localScale = isSelected ? new Vector3(0.9f, 0.9f, 1f) : Vector3.one;
             }
         }
-        
-        // Setup operator buttons
-        if (multiplyButton != null)
+    }
+
+    public int GetSelectedCostMode() => selectedCostMode;
+    
+    /// <summary>
+    /// Gets a reference to a specific star in the table display (0-2)
+    /// </summary>
+    public UnityEngine.UI.Image GetTableStar(int index)
+    {
+        if (index < 0 || index >= tableStars.Count)
         {
-            multiplyButton.onClick.AddListener(OnClearPressed);
-            allCalculatorButtons.Add(multiplyButton);
+            Debug.LogWarning($"[HesapMakinesiController] Table star index {index} is out of range (0-2).");
+            return null;
         }
-        if (addButton != null)
-        {
-            addButton.onClick.AddListener(OnClearPressed);
-            allCalculatorButtons.Add(addButton);
-        }
-        if (clearButton != null)
-        {
-            clearButton.onClick.AddListener(OnClearPressed);
-            allCalculatorButtons.Add(clearButton);
-        }
-        if (equalsButton != null)
-        {
-            equalsButton.onClick.AddListener(OnEqualsPressed);
-            allCalculatorButtons.Add(equalsButton);
-        }
-        
-        // Initialize display
-        UpdateDisplay();
+        return tableStars[index];
     }
     
     /// <summary>
-    /// Called when a number button is pressed
+    /// Gets a reference to a specific star in the hesap makinesi display (0-2)
     /// </summary>
-    private void OnNumberPressed(int number)
+    public UnityEngine.UI.Image GetHesapMakinesiStar(int index)
     {
-        Debug.Log($"HesapMakinesiController: Number {number} pressed");
-        
-        // Add number to current input
-        currentInput += number.ToString();
-        currentExpression += number.ToString();
-        
-        lastWasNumber = true;
-        lastWasOperator = false;
-        
-        UpdateDisplay();
-        UpdateEqualsText();
+        if (index < 0 || index >= hesapMakinesiStars.Count)
+        {
+            Debug.LogWarning($"[HesapMakinesiController] Hesap makinesi star index {index} is out of range (0-2).");
+            return null;
+        }
+        return hesapMakinesiStars[index];
     }
     
     /// <summary>
-    /// Called when multiply (x) button is pressed
+    /// Gets all table stars as a list
     /// </summary>
-    private void OnMultiplyPressed()
+    public List<UnityEngine.UI.Image> GetTableStars() => tableStars;
+    
+    /// <summary>
+    /// Gets all hesap makinesi stars as a list
+    /// </summary>
+    public List<UnityEngine.UI.Image> GetHesapMakinesiStars() => hesapMakinesiStars;
+    
+    /// <summary>
+    /// Updates both mode display UIs (table and calculator) to show 1, 2, or 3 stars
+    /// </summary>
+    private void UpdateModeDisplays()
     {
-        Debug.Log("HesapMakinesiController: Multiply (x) button pressed");
+        UpdateModeDisplay(tableSelectedModeDisplay, starSize, tableStars);
+        UpdateModeDisplay(hesapMakinesiSelectedModeDisplay, starSize * 2f, hesapMakinesiStars);
+    }
+    
+    /// <summary>
+    /// Updates a specific mode display container to show 3 stars with filled/empty based on cost mode
+    /// </summary>
+    private void UpdateModeDisplay(Transform displayContainer, Vector2 targetSize, List<UnityEngine.UI.Image> starList)
+    {
+        if (displayContainer == null) return;
         
-        // Only allow multiply if last input was a number
-        if (lastWasNumber && !lastWasOperator)
+        // Clear the list and rebuild references
+        starList.Clear();
+        
+        // Always ensure exactly 3 stars exist
+        if (displayContainer.childCount == 0)
         {
-            currentExpression += " x ";
-            lastWasOperator = true;
-            lastWasNumber = false;
-            UpdateDisplay();
-            UpdateEqualsText();
+            if (filledStarSprite == null || emptyStarSprite == null)
+            {
+                Debug.LogError("[HesapMakinesiController] Filled and empty star sprites must be assigned!");
+                return;
+            }
+            
+            for (int i = 0; i < 3; i++)
+            {
+                GameObject starObj = new GameObject("Star_" + (i + 1), typeof(RectTransform), typeof(UnityEngine.UI.Image), typeof(UnityEngine.UI.LayoutElement));
+                starObj.transform.SetParent(displayContainer, false);
+                
+                UnityEngine.UI.Image img = starObj.GetComponent<UnityEngine.UI.Image>();
+                img.preserveAspect = true;
+                img.raycastTarget = false;
+                
+                RectTransform rt = starObj.GetComponent<RectTransform>();
+                rt.sizeDelta = targetSize;
+                
+                UnityEngine.UI.LayoutElement le = starObj.GetComponent<UnityEngine.UI.LayoutElement>();
+                le.preferredWidth = targetSize.x;
+                le.preferredHeight = targetSize.y;
+                
+                starList.Add(img);
+            }
         }
         else
         {
-            Debug.Log("HesapMakinesiController: Invalid input - cannot use x after operator");
-            UpdateEqualsText();
+            // Rebuild list from existing children
+            for (int i = 0; i < displayContainer.childCount; i++)
+            {
+                Transform child = displayContainer.GetChild(i);
+                UnityEngine.UI.Image img = child.GetComponent<UnityEngine.UI.Image>();
+                if (img != null) 
+                {
+                    starList.Add(img);
+                }
+            }
         }
-    }
-    
-    /// <summary>
-    /// Called when add (+) button is pressed
-    /// </summary>
-    private void OnAddPressed()
-    {
-        Debug.Log("HesapMakinesiController: Add (+) button pressed");
         
-        // Only allow add if last input was a number
-        if (lastWasNumber && !lastWasOperator)
+        if (starList.Count != 3)
         {
-            currentExpression += " + ";
-            lastWasOperator = true;
-            lastWasNumber = false;
-            UpdateDisplay();
-            UpdateEqualsText();
-        }
-        else
-        {
-            Debug.Log("HesapMakinesiController: Invalid input - cannot use + after operator");
-            UpdateEqualsText();
-        }
-    }
-    
-    /// <summary>
-    /// Called when clear (C) button is pressed
-    /// </summary>
-    public void OnClearPressed()
-    {
-        Debug.Log("HesapMakinesiController: Clear (C) button pressed");
-        
-        ClearCalculator();
-        UpdateEqualsText();
-    }
-    
-    /// <summary>
-    /// Clears the calculator display and resets all variables
-    /// </summary>
-    private void ClearCalculator()
-    {
-        currentInput = "";
-        currentExpression = "";
-        lastWasOperator = false;
-        lastWasNumber = false;
-        
-        UpdateDisplay();
-        UpdateEqualsText();
-    }
-    
-    /// <summary>
-    /// Called when equals (=) button is pressed
-    /// </summary>
-    private void OnEqualsPressed()
-    {
-        Debug.Log("HesapMakinesiController: Equals (=) button pressed");
-        
-        if (string.IsNullOrEmpty(currentExpression))
-        {
-            Debug.Log("HesapMakinesiController: No expression to calculate");
-            UpdateEqualsText();
+            Debug.LogWarning($"[HesapMakinesiController] Mode display container should have exactly 3 stars but has {starList.Count}.");
             return;
         }
         
-        int totalValue = CalculateTotalValue();
-        Debug.Log($"HesapMakinesiController: Calculated total value: {totalValue}");
-        
-        // Update equals button text
-        if (equalsButtonText != null)
+        // Set first N stars to filled (based on selectedCostMode), rest to empty
+        // Ensure ALL stars are always active and visible
+        for (int i = 0; i < 3; i++)
         {
-            equalsButtonText.text = $"= {totalValue}";
-            coinDisplayText.text = $"{currentExpression}";
+            // Always activate the star
+            starList[i].gameObject.SetActive(true);
+            
+            // Set sprite based on cost mode
+            if (i < selectedCostMode)
+            {
+                starList[i].sprite = filledStarSprite;
+            }
+            else
+            {
+                starList[i].sprite = emptyStarSprite;
+            }
+            
+            // Ensure size is set
+            RectTransform rt = starList[i].GetComponent<RectTransform>();
+            if (rt != null)
+            {
+                rt.sizeDelta = targetSize;
+            }
         }
         
-        // Here you can add logic to use the totalValue for token spawning
-        // For example, call a method to spawn tokens with this value
-        OnCalculatorResult(totalValue);
-        ForceClose();
+        Debug.Log($"[HesapMakinesiController] Updated mode display: {selectedCostMode} filled stars, {3 - selectedCostMode} empty stars");
     }
     
     /// <summary>
-    /// Calculates the total value from the current expression
+    /// Updates both coin amount displays with current player gold
     /// </summary>
-    private int CalculateTotalValue()
+    public void UpdateCoinAmountDisplays(int goldAmount)
     {
-        if (string.IsNullOrEmpty(currentExpression))
-            return 0;
-        
-        try
+        if (tableCoinAmountDisplay != null)
         {
-            // Parse the expression: "10 x 2 + 15" -> calculate (10*2) + 15
-            string[] parts = currentExpression.Split(' ');
-            List<int> numbers = new List<int>();
-            List<string> operators = new List<string>();
-            
-            // First pass: collect all numbers and operators
-            for (int i = 0; i < parts.Length; i++)
-            {
-                string part = parts[i].Trim();
-                
-                if (int.TryParse(part, out int number))
-                {
-                    numbers.Add(number);
-                }
-                else if (part == "x" || part == "+")
-                {
-                    operators.Add(part);
-                }
-            }
-            
-            // Second pass: handle multiplication first (operator precedence)
-            for (int i = 0; i < operators.Count; i++)
-            {
-                if (operators[i] == "x")
-                {
-                    // Multiply the current number with the next number
-                    numbers[i] *= numbers[i + 1];
-                    numbers.RemoveAt(i + 1);
-                    operators.RemoveAt(i);
-                    i--; // Recheck this position since we removed an element
-                }
-            }
-            
-            // Third pass: handle addition
-            int total = numbers[0];
-            for (int i = 0; i < operators.Count; i++)
-            {
-                if (operators[i] == "+")
-                {
-                    total += numbers[i + 1];
-                }
-            }
-            
-            return total;
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"HesapMakinesiController: Error calculating expression: {e.Message}");
-            return 0;
-        }
-    }
-    
-    /// <summary>
-    /// Updates the display text with current expression
-    /// </summary>
-    private void UpdateDisplay()
-    {
-        if (displayText != null)
-        {
-            displayText.text = currentExpression;
-        }
-    }
-    
-    /// <summary>
-    /// Updates the equals button text with calculated result or "geçersiz"
-    /// </summary>
-    private void UpdateEqualsText()
-    {
-        if (equalsButtonText == null) return;
-        
-        if (string.IsNullOrEmpty(currentExpression))
-        {
-            equalsButtonText.text = "=";
-            return;
+            tableCoinAmountDisplay.text = goldAmount.ToString();
         }
         
-        // Check if the expression ends with an operator (invalid)
-        if (currentExpression.Trim().EndsWith("x") || currentExpression.Trim().EndsWith("+"))
+        if (hesapMakinesiCoinAmountDisplay != null)
         {
-            equalsButtonText.text = "= xxx";
-            return;
+            hesapMakinesiCoinAmountDisplay.text = goldAmount.ToString();
         }
         
-        // Try to calculate the result
-        try
-        {
-            int result = CalculateTotalValue();
-            equalsButtonText.text = $"= {result}";
-        }
-        catch
-        {
-            equalsButtonText.text = "= geçersiz";
-        }
-    }
-    
-    /// <summary>
-    /// Called when calculator calculation is complete
-    /// </summary>
-    private void OnCalculatorResult(int totalValue)
-    {
-        Debug.Log($"HesapMakinesiController: Calculator result ready - Total Value: {totalValue}");
-        
-        // Parse the expression to get token information
-        List<KeseController.TokenData> tokens = ParseExpressionToTokens(currentExpression);
-        
-        // Send token data to KeseController
-        if (tokens.Count > 0)
-        {
-            SendTokenDataToKeseController(tokens);
-        }
-    }
-    
-    /// <summary>
-    /// Parses the expression to extract token information
-    /// Example: "10 x 2 + 5 x 3" -> [TokenData(10,2), TokenData(5,3)]
-    /// </summary>
-    private List<KeseController.TokenData> ParseExpressionToTokens(string expression)
-    {
-        List<KeseController.TokenData> tokens = new List<KeseController.TokenData>();
-        
-        if (string.IsNullOrEmpty(expression))
-            return tokens;
-        
-        try
-        {
-            string[] parts = expression.Split(' ');
-            int currentValue = 0;
-            int currentCount = 1;
-            
-            for (int i = 0; i < parts.Length; i++)
-            {
-                string part = parts[i].Trim();
-                
-                if (int.TryParse(part, out int number))
-                {
-                    if (i == 0 || (i > 0 && parts[i - 1].Trim() == "+"))
-                    {
-                        // This is a new value (either first number or after +)
-                        currentValue = number;
-                        currentCount = 1;
-                    }
-                }
-                else if (part == "x")
-                {
-                    // Next number will be the count for current value
-                    if (i + 1 < parts.Length && int.TryParse(parts[i + 1].Trim(), out int count))
-                    {
-                        currentCount = count;
-                        i++; // Skip the count number in next iteration
-                    }
-                }
-                else if (part == "+")
-                {
-                    // Add the current token data and prepare for next
-                    if (currentValue > 0)
-                    {
-                        tokens.Add(new KeseController.TokenData(currentValue, currentCount));
-                    }
-                }
-            }
-            
-            // Add the last token data
-            if (currentValue > 0)
-            {
-                tokens.Add(new KeseController.TokenData(currentValue, currentCount));
-            }
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"HesapMakinesiController: Error parsing expression to tokens: {e.Message}");
-        }
-        
-        return tokens;
+        Debug.Log($"[HesapMakinesiController] Updated coin displays: {goldAmount} gold");
     }
     
     /// <summary>
@@ -584,93 +482,40 @@ public class HesapMakinesiController : MonoBehaviour
             Debug.LogWarning("HesapMakinesiController: KeseController not found in scene!");
         }
     }
-
-    /// <summary>
-    /// Sets the cost mode for power tier selection. Called by UI buttons.
-    /// Mode 1: Tier 1 powers boosted (costs 1 gold each).
-    /// Mode 2: Tier 2 powers boosted (costs 2 gold each).
-    /// Mode 3: Tier 3 powers boosted (costs 3 gold each).
-    /// </summary>
-    public void SetCostMode(int mode)
-    {
-        selectedCostMode = Mathf.Clamp(mode, 1, 3);
-        Debug.Log($"[HesapMakinesiController] Cost mode set to {selectedCostMode}");
-    }
-
-    public int GetSelectedCostMode() => selectedCostMode;
-    
-    /// <summary>
-    /// Gets the current calculator result (can be called from other scripts)
-    /// </summary>
-    public int GetCurrentCalculatorResult()
-    {
-        return CalculateTotalValue();
-    }
-    
-    /// <summary>
-    /// Gets the current expression string (for debugging)
-    /// </summary>
-    public string GetCurrentExpression()
-    {
-        return currentExpression;
-    }
-    
-    /// <summary>
-    /// Checks if the given GameObject is a calculator button
-    /// Called by KeseController to determine if a click should close the calculator
-    /// </summary>
-    public bool IsPointerOverCalculatorButton(GameObject hitObject)
-    {
-        if (hitObject == null) return false;
-        
-        // Check if the hit object is any of our calculator buttons
-        foreach (Button button in allCalculatorButtons)
-        {
-            if (button != null)
-            {
-                // Check if the hit object is the button itself
-                if (button.gameObject == hitObject)
-                {
-                    return true;
-                }
-                
-                // Check if the hit object is a child of the button
-                if (hitObject.transform.IsChildOf(button.transform))
-                {
-                    return true;
-                }
-            }
-        }
-        
-        return false;
-    }
-    
-
-    
-
     
     /// <summary>
     /// Moves the hesap makinesi from starting position to reach point
     /// </summary>
     public void MoveToReachPoint()
     {
-        if (isMoving || reachPoint == null) return;
+        if (isMoving || reachPoint == null)
+        {
+            Debug.Log($"[HesapMakinesiController] MoveToReachPoint: Cannot move - isMoving={isMoving}, reachPoint={reachPoint}");
+            return;
+        }
         
-        Debug.Log("HesapMakinesiController: Moving to reach point");
+        Debug.Log($"[HesapMakinesiController] MoveToReachPoint: Starting movement from {transform.position} to {reachPoint.position}");
         
         // Kill any existing movement sequence
         if (moveSequence != null)
+        {
+            Debug.Log("[HesapMakinesiController] MoveToReachPoint: Killing existing movement sequence");
             moveSequence.Kill();
+        }
         
         isMoving = true;
         isAtReachPoint = true;
+        animationTimer = 0f; // Reset animation timer
+        currentAnimationFrame = 0;
+        
+        Debug.Log($"[HesapMakinesiController] MoveToReachPoint: Set isAtReachPoint=true, isMoving=true, starting DOTween animation");
         
         // Create movement sequence
         moveSequence = DOTween.Sequence();
         moveSequence.Append(transform.DOMove(reachPoint.position, moveSpeed).SetEase(moveEase));
         moveSequence.OnComplete(() => {
             isMoving = false;
-            Debug.Log("HesapMakinesiController: Reached target position");
+            Debug.Log($"[HesapMakinesiController] MoveToReachPoint: COMPLETED - Now at {transform.position}");
         });
     }
     
@@ -679,23 +524,34 @@ public class HesapMakinesiController : MonoBehaviour
     /// </summary>
     public void MoveToStartingPosition()
     {
-        if (isMoving) return;
+        if (isMoving)
+        {
+            Debug.Log($"[HesapMakinesiController] MoveToStartingPosition: Cannot move - already isMoving=true");
+            return;
+        }
         
-        Debug.Log("HesapMakinesiController: Moving to starting position");
+        Debug.Log($"[HesapMakinesiController] MoveToStartingPosition: Starting movement from {transform.position} to {startingPosition}");
         
         // Kill any existing movement sequence
         if (moveSequence != null)
+        {
+            Debug.Log("[HesapMakinesiController] MoveToStartingPosition: Killing existing movement sequence");
             moveSequence.Kill();
+        }
         
         isMoving = true;
         isAtReachPoint = false;
+        animationTimer = 0f; // Reset animation timer
+        currentAnimationFrame = 0;
+        
+        Debug.Log($"[HesapMakinesiController] MoveToStartingPosition: Set isAtReachPoint=false, isMoving=true, starting DOTween animation");
         
         // Create movement sequence
         moveSequence = DOTween.Sequence();
         moveSequence.Append(transform.DOMove(startingPosition, moveSpeed).SetEase(moveEase));
         moveSequence.OnComplete(() => {
             isMoving = false;
-            Debug.Log("HesapMakinesiController: Returned to starting position");
+            Debug.Log($"[HesapMakinesiController] MoveToStartingPosition: COMPLETED - Now at {transform.position}");
         });
     }
     

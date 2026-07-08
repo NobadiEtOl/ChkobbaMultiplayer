@@ -8,9 +8,9 @@ using TMPro;
 public class SuperPowerSpawner : MonoBehaviour
 {
     [SerializeField] private Transform infoBoxOriginalPosition; // Original position stored at Start
-    [SerializeField] private GameObject infoBoxReachPoint;
     public static SuperPowerSpawner LocalInstance { get; private set; }
     public bool isDisconnectingCleanUp = false;
+    private Transform infoBoxReachPoint; // Retrieved from ScreenEdgePositionAdjuster
     [SerializeField] private List<GameObject> superPowerTokens = new List<GameObject>();
     private Dictionary<SuperPower, GameObject> superPowerPrefabs = new Dictionary<SuperPower, GameObject>();
     private List<SuperPower> superPowerList = new List<SuperPower>(); // Now contains unique powers only (no pre-pooling)
@@ -57,7 +57,7 @@ public class SuperPowerSpawner : MonoBehaviour
 
     
     [Header("InfoBox Animation Settings")]
-    [SerializeField] private float animationDuration = 0.5f; // Duration of the movement animation
+    [SerializeField] private float animationDuration = 0.25f; // Duration of the movement animation
     [SerializeField] private float infoChangeDelay = 0.25f; // Delay before info changes (to match page change animation transition)
     [SerializeField] private float fadeDuration = 0.15f; // Duration of fade in/out animations
     [SerializeField] private float buttonFadeDuration = 0.3f; // Duration of button fade animations
@@ -175,34 +175,44 @@ public class SuperPowerSpawner : MonoBehaviour
 
     void Start()
     {
+        // Get reach points from ScreenEdgePositionAdjuster (centralized source)
+        ScreenEdgePositionAdjuster screenEdgeAdjuster = FindObjectOfType<ScreenEdgePositionAdjuster>();
+        if (screenEdgeAdjuster != null)
+        {
+            infoBoxReachPoint = screenEdgeAdjuster.GetReachPointTransform("InfoBox");
+            if (infoBoxReachPoint == null)
+            {
+                Debug.LogError("[SuperPowerSpawner] Could not find group 'InfoBox' in ScreenEdgePositionAdjuster!");
+            }
+
+            // Get the original position from ScreenEdgePositionAdjuster
+            infoBoxOriginalPosition = screenEdgeAdjuster.GetOutsideReachPointTransform("InfoBox");
+            if (infoBoxOriginalPosition == null)
+            {
+                Debug.LogWarning("[SuperPowerSpawner] Could not find group 'InfoBox' outside reach point in ScreenEdgePositionAdjuster. InfoBox positioning may fail.");
+            }
+        }
+        else
+        {
+            Debug.LogError("[SuperPowerSpawner] ScreenEdgePositionAdjuster not found in scene!");
+        }
+
         // Validate UI elements are properly initialized
         if (backgroundPanel == null || infoBoxCanvas == null || nameText == null || 
             descriptionText == null || activateButton == null || falseActivateButton == null || closeButton == null)
         {
             Debug.LogError("[SuperPowerSpawner] One or more UI elements are null after initialization. Attempting to re-initialize...");
             GetUIElements();
-            
-            // Check again after re-initialization
-            if (backgroundPanel == null || infoBoxCanvas == null || nameText == null || 
-                descriptionText == null || activateButton == null || falseActivateButton == null || closeButton == null)
-            {
-                Debug.LogError("[SuperPowerSpawner] UI elements still null after re-initialization. InfoBox functionality will be disabled.");
-                return;
-            }
         }
-        
+
         // Validate reach point
         if (infoBoxReachPoint == null)
         {
             Debug.LogWarning("[SuperPowerSpawner] infoBoxReachPoint is not assigned! InfoBox will not animate to reach point.");
         }
-        else
-        {
-            Debug.Log($"[SuperPowerSpawner] Reach point position: {infoBoxReachPoint.transform.position}");
-        }
         
         // Initialize InfoBox state (closed but active)
-        if (backgroundPanel != null)
+        if (backgroundPanel != null && infoBoxOriginalPosition != null)
         {
             // Ensure InfoBox is active but positioned at original (off-screen) position
             backgroundPanel.SetActive(true);
@@ -638,8 +648,8 @@ public class SuperPowerSpawner : MonoBehaviour
             // Animate to reach point
             if (infoBoxReachPoint != null)
             {
-                Debug.Log($"[SuperPowerSpawner] Starting animation to reach point: {infoBoxReachPoint.transform.position}");
-                currentAnimationCoroutine = StartCoroutine(AnimateInfoBoxPosition(infoBoxReachPoint.transform.position));
+                Debug.Log($"[SuperPowerSpawner] Starting animation to reach point: {infoBoxReachPoint.position}");
+                currentAnimationCoroutine = StartCoroutine(AnimateInfoBoxPosition(infoBoxReachPoint.position));
                 yield return currentAnimationCoroutine;
                 currentAnimationCoroutine = null;
                 Debug.Log("[SuperPowerSpawner] Animation to reach point completed");
@@ -676,7 +686,7 @@ public class SuperPowerSpawner : MonoBehaviour
             // Position at reach point if available, otherwise at original position
             if (infoBoxReachPoint != null)
             {
-                backgroundPanel.transform.position = infoBoxReachPoint.transform.position;
+                backgroundPanel.transform.position = infoBoxReachPoint.position;
             }
             else
             {
@@ -1089,6 +1099,36 @@ public class SuperPowerSpawner : MonoBehaviour
         isMenuPageOpen = false; // Reset menu page flag when InfoBox is closed
     }
 
+    public void TriggerPageChange()
+    {
+        if (backgroundPanel != null)
+        {
+            UIFrameAnimator frameAnimator = backgroundPanel.GetComponent<UIFrameAnimator>();
+            if (frameAnimator != null)
+            {
+                frameAnimator.TriggerPageChange();
+            }
+        }
+    }
+
+    public IEnumerator SwitchMenuTierWithAnimation(System.Action updateAction)
+    {
+        TriggerPageChange();
+        
+        CanvasGroup canvasGroup = GetOrAddCanvasGroup(infoBoxCanvas);
+        if (canvasGroup != null)
+        {
+            yield return StartCoroutine(FadeCanvasGroups(new CanvasGroup[] { canvasGroup }, 0f, fadeDuration));
+        }
+
+        updateAction?.Invoke();
+
+        if (canvasGroup != null)
+        {
+            yield return StartCoroutine(FadeCanvasGroups(new CanvasGroup[] { canvasGroup }, 1f, fadeDuration));
+        }
+    }
+
     /// <summary>
     /// Immediately close the info box without animation (used for initialization or quick switches)
     /// </summary>
@@ -1460,8 +1500,8 @@ public class SuperPowerSpawner : MonoBehaviour
 
     [ContextMenu("Ready to Spawn Super Powers")]
     /// <summary>
-    /// Spawns multiple powers with inverse-weighted random selection.
-    /// Higher rarityMultiplier = lower probability of being selected.
+    /// Spawns multiple powers with cost-tier-weighted random selection.
+    /// Lower powerCostTier = higher probability of being selected.
     /// Each power costs 1 gold.
     /// </summary>
     public void ReadyToSpawnSuperPowers(int numberOfSuperPowersToSpawn = 2, Vector3? spawnOrigin = null, float spawnScale = 150f, int costMode = 1)
@@ -1480,7 +1520,7 @@ public class SuperPowerSpawner : MonoBehaviour
     }
 
     /// <summary>
-    /// Selects a random power using inverse-weighted probability based on rarityMultiplier,
+    /// Selects a random power using cost-tier-weighted probability,
     /// boosted by costMode. Powers in the matching tier get a 5x weight boost.
     /// Tier 4 (ZaferPuani) is never boosted. Disabled powers are excluded.
     /// </summary>
@@ -1506,13 +1546,13 @@ public class SuperPowerSpawner : MonoBehaviour
             return null;
         }
 
-        // Calculate weights: base = 1/rarity, boosted if tier matches mode (tiers 1-3 only)
+        // Calculate weights: base = 1/powerCostTier, boosted if tier matches mode (tiers 1-3 only)
         List<float> weights = new List<float>();
         float totalWeight = 0f;
 
         for (int i = 0; i < activePowers.Count; i++)
         {
-            float weight = 1f / activePowers[i].rarityMultiplier;
+            float weight = 1f / activePowers[i].powerCostTier;
             if (activePowers[i].powerCostTier == costMode && costMode >= 1 && costMode <= 3)
                 weight *= boostMultiplier;
             weights.Add(weight);
@@ -2064,7 +2104,7 @@ public class SuperPowerSpawner : MonoBehaviour
             if (power != null)
             {
                 tokenData.Add((tokenPrefab, power));
-                Debug.Log($"[SuperPowerSpawner] Added token data: {tokenPrefab.name} -> {power.name} (rarity: {power.rarityMultiplier})");
+                Debug.Log($"[SuperPowerSpawner] Added token data: {tokenPrefab.name} -> {power.name} (cost tier: {power.powerCostTier})");
             }
         }
         
@@ -2813,7 +2853,7 @@ public class SuperPowerSpawner : MonoBehaviour
         for (int i = 0; i < uniquePowers.Count; i++)
         {
             var power = uniquePowers[i];
-            Debug.Log($"  {i}: {power.name} (rarity: {power.rarityMultiplier}) - {power.description}");
+            Debug.Log($"  {i}: {power.name} (cost tier: {power.powerCostTier}) - {power.description}");
         }
         
         Debug.Log($"[SuperPowerSpawner] Available prefabs ({superPowerPrefabs.Count}):");
@@ -2895,7 +2935,7 @@ public class SuperPowerSpawner : MonoBehaviour
             
             if (powerExists)
             {
-                Debug.Log($"✅ {powerName} - FOUND (rarity: {foundPower.rarityMultiplier})");
+                Debug.Log($"✅ {powerName} - FOUND (cost tier: {foundPower.powerCostTier})");
             }
             else
             {
@@ -3266,7 +3306,9 @@ public class SuperPowerSpawner : MonoBehaviour
         while (infoBoxAnimationQueue.Count > 0)
         {
             IEnumerator anim = infoBoxAnimationQueue.Dequeue();
-            yield return StartCoroutine(anim);
+            // Start the animation coroutine and wait for it
+            Coroutine animCoroutine = StartCoroutine(anim);
+            yield return animCoroutine;
             yield return null; // Wait a frame before next animation
         }
         isInfoBoxAnimationRunning = false;

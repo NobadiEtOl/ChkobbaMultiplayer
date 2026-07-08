@@ -419,21 +419,10 @@ public class NetworkManagerUI : MonoBehaviour
         await EnsureServicesReady();
         try
         {
-            var queryOptions = new QuerySessionsOptions 
-            {
-                FilterOptions = new List<FilterOption> 
-                {
-                    new FilterOption(FilterField.MaxPlayers, playerCount.ToString(), FilterOperation.Equal),
-                    new FilterOption(FilterField.AvailableSlots, "0", FilterOperation.Greater)
-                }
-            };
-            var queryResponse = await MultiplayerService.Instance.QuerySessionsAsync(queryOptions);
-            if (queryResponse.Sessions.Count > 0)
-            {
-                currentSession = await MultiplayerService.Instance.JoinSessionByIdAsync(queryResponse.Sessions[0].Id);
-                isInGame = true;
-            }
-            else await StartHostWithRelay(playerCount, false, true);
+            // For quickplay with bot mode enabled, directly start a bot game without querying other sessions
+            // This ensures that when the player wants to debug with bots, they always get a bot opponent
+            Debug.Log("[NetworkManagerUI] QuickPlay: Starting bot game directly without querying for other players.");
+            await StartHostWithRelay(playerCount, false, true);
         }
         catch (Exception e) { Debug.LogError($"[NetworkManagerUI] QuickPlay failed: {e.Message}"); if (mainUIScript != null) mainUIScript.OnDisconnectDetected(); }
     }

@@ -481,15 +481,15 @@ public class Server : NetworkBehaviour
         botControlledPlayers.Add(seat);
         Debug.Log($"[BOT] Assigned bot filler to seat {seat}.");
 
-        if (botPlayer != null)
+        if (GetBotPlayer() != null)
         {
-            botPlayer.ActivateBot();
+            GetBotPlayer().ActivateBot();
         }
 
-        if (currentPlayer == seat && isActiveHost && botPlayer != null)
+        if (currentPlayer == seat && isActiveHost && GetBotPlayer() != null)
         {
             Debug.Log($"[BOT] Seat {seat} is current turn; triggering bot takeover.");
-            botPlayer.OnBotTurn(seat);
+            GetBotPlayer().OnBotTurn(seat);
         }
     }
 
@@ -508,9 +508,9 @@ public class Server : NetworkBehaviour
 
         Debug.Log($"[BOT] Removed bot filler from seat {seat}.");
 
-        if (botControlledPlayers.Count == 0 && !isBotModeEnabled && botPlayer != null)
+        if (botControlledPlayers.Count == 0 && !isBotModeEnabled && GetBotPlayer() != null)
         {
-            botPlayer.DeactivateBot();
+            GetBotPlayer().DeactivateBot();
             Debug.Log("[BOT] No filler seats left; bot deactivated.");
         }
     }
@@ -670,9 +670,9 @@ private const float RECONNECT_TIMEOUT = 15f;
         }
         
         // Reset BotPlayer for new round
-        if (botPlayer != null && botPlayerActive)
+        if (GetBotPlayer() != null && botPlayerActive)
         {
-            botPlayer.ResetForNewRound();
+            GetBotPlayer().ResetForNewRound();
         }
         
         // Reset connection tracking
@@ -697,6 +697,19 @@ private const float RECONNECT_TIMEOUT = 15f;
         // NOTE: Network event subscription moved to SubscribeToNetworkEvents() to avoid double subscription
     }
     // Start is called before the first frame update
+    /// <summary>
+    /// Lazy-loads the BotPlayer reference on demand.
+    /// Ensures BotPlayer.Awake() has run before we try to access the singleton.
+    /// </summary>
+    private BotPlayer GetBotPlayer()
+    {
+        if (botPlayer == null)
+        {
+            botPlayer = BotPlayer.Instance;
+        }
+        return botPlayer;
+    }
+
     void Start()
     {
         print("server.cs start");
@@ -708,9 +721,6 @@ private const float RECONNECT_TIMEOUT = 15f;
         // Initialize NetworkManagerUI reference
         networkManagerUI = FindObjectOfType<NetworkManagerUI>();
         
-        // Initialize BotPlayer reference
-        botPlayer = BotPlayer.Instance;
-
         // AUTHENTIC HOST CHECK: If we are starting as server, we are the active host
         if (IsServer) isActiveHost = true;
         
@@ -797,9 +807,9 @@ private const float RECONNECT_TIMEOUT = 15f;
             }
             
             // Activate the BotPlayer
-            if (botPlayer != null)
+            if (GetBotPlayer() != null)
             {
-                botPlayer.ActivateBot();
+                GetBotPlayer().ActivateBot();
             }
         }
         else
@@ -807,9 +817,9 @@ private const float RECONNECT_TIMEOUT = 15f;
             botPlayerActive = false;
             
             // Deactivate the BotPlayer
-            if (botPlayer != null)
+            if (GetBotPlayer() != null)
             {
-                botPlayer.DeactivateBot();
+                GetBotPlayer().DeactivateBot();
             }
         }
 
@@ -864,9 +874,9 @@ private const float RECONNECT_TIMEOUT = 15f;
         if (isBotTurn && isActiveHost)
         {
             Debug.Log($"[Server] It's bot's turn at game start (player {currentPlayer}), notifying BotPlayer");
-            if (botPlayer != null)
+            if (GetBotPlayer() != null)
             {
-                botPlayer.OnBotTurn(currentPlayer);
+                GetBotPlayer().OnBotTurn(currentPlayer);
             }
         }
 }
@@ -1406,9 +1416,9 @@ private void ServerStart()
             if (isActiveHost)
             {
                 Debug.Log($"[Server] It's bot's turn (player {currentPlayer}), notifying BotPlayer");
-                if (botPlayer != null)
+                if (GetBotPlayer() != null)
                 {
-                    botPlayer.OnBotTurn(currentPlayer);
+                    GetBotPlayer().OnBotTurn(currentPlayer);
                 }
             }
         }
@@ -4095,10 +4105,10 @@ private void ServerStart()
         Debug.Log($"[Server] Triggering bot move after redo completion");
         
         bool isBotTurn = IsBotTurn();
-        if (isBotTurn && botPlayer != null && isActiveHost)
+        if (isBotTurn && GetBotPlayer() != null && isActiveHost)
         {
             Debug.Log($"[Server] Bot is active and it's bot's turn - calling OnBotTurn() for player {currentPlayer}");
-            botPlayer.OnBotTurn(currentPlayer);
+            GetBotPlayer().OnBotTurn(currentPlayer);
         }
 else
         {
@@ -4260,9 +4270,9 @@ else
             }
             
             // Deactivate the BotPlayer
-            if (botPlayer != null)
+            if (GetBotPlayer() != null)
             {
-                botPlayer.DeactivateBot();
+                GetBotPlayer().DeactivateBot();
             }
             
             Debug.Log("[Server] Bot deactivated due to bot mode being disabled");
@@ -4289,9 +4299,9 @@ else
             }
             
             // Deactivate the BotPlayer
-            if (botPlayer != null)
+            if (GetBotPlayer() != null)
             {
-                botPlayer.DeactivateBot();
+                GetBotPlayer().DeactivateBot();
             }
             
             Debug.Log("[Server] Bot deactivated due to bot mode being disabled");
@@ -4497,10 +4507,10 @@ else
     [ContextMenu("Force Bot Move")]
     public void ForceBotMove()
     {
-        if (botPlayerActive && botPlayer != null)
+        if (botPlayerActive && GetBotPlayer() != null)
         {
             Debug.Log("[Server] Forcing bot move via context menu");
-            botPlayer.ForceBotMove();
+            GetBotPlayer().ForceBotMove();
         }
         else
         {

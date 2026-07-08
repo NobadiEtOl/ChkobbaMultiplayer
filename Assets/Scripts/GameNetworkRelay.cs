@@ -1141,10 +1141,35 @@ public class GameNetworkRelay : NetworkBehaviour
             Debug.LogError("[GameNetworkRelay] GameManager.LocalInstance is null - cannot apply redo state");
         }
     }
+
+    // --- Emote System RPCs ---
+
+    [ServerRpc(RequireOwnership = false)]
+    public void SendEmoteServerRPC(int playerNo, string emoji)
+    {
+        // Broadcast to all clients
+        ShowEmoteClientRPC(playerNo, emoji);
+    }
+
+    [ClientRpc(RequireOwnership = false)]
+    public void ShowEmoteClientRPC(int playerNo, string emoji)
+    {
+        if (EmoteManager.Instance != null)
+        {
+            int localPlayerNo = DeckController.LocalInstance != null ? DeckController.LocalInstance.thisPlayerNumber : -1;
+            // Only show if it's NOT our own emote
+            if (playerNo != localPlayerNo)
+            {
+                EmoteManager.Instance.ShowEmote(playerNo, emoji);
+            }
+        }
+    }
+    
+    // --- End Emote System RPCs ---
     
     /// <summary>
     /// Server RPC for clients to request redo to previous state
-    /// </summary>
+/// </summary>
     [ServerRpc(RequireOwnership = false)]
     public void RequestRedoToPreviousStateServerRPC()
     {
