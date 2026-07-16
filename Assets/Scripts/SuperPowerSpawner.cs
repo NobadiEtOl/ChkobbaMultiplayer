@@ -1504,18 +1504,23 @@ public class SuperPowerSpawner : MonoBehaviour
     /// Lower powerCostTier = higher probability of being selected.
     /// Each power costs 1 gold.
     /// </summary>
-    public void ReadyToSpawnSuperPowers(int numberOfSuperPowersToSpawn = 2, Vector3? spawnOrigin = null, float spawnScale = 150f, int costMode = 1)
+    public void ReadyToSpawnSuperPowers(int numberOfSuperPowersToSpawn = 2, Vector3? spawnOrigin = null, float spawnScale = 150f, int costMode = 1, bool skipInitialDelay = false)
     {
-        StartCoroutine(ReadyToSpawnSuperPower(numberOfSuperPowersToSpawn, spawnOrigin, spawnScale, costMode));
+        StartCoroutine(ReadyToSpawnSuperPower(numberOfSuperPowersToSpawn, spawnOrigin, spawnScale, costMode, skipInitialDelay));
     }
 
-    private IEnumerator ReadyToSpawnSuperPower(int numberOfSuperPowersToSpawn, Vector3? spawnOrigin, float spawnScale, int costMode)
+    private IEnumerator ReadyToSpawnSuperPower(int numberOfSuperPowersToSpawn, Vector3? spawnOrigin, float spawnScale, int costMode, bool skipInitialDelay)
     {
-        yield return new WaitForSeconds(1f);
+        if (!skipInitialDelay)
+            yield return new WaitForSeconds(1f);
+
         for (int i = 0; i < numberOfSuperPowersToSpawn; i++)
         {
-            StartCoroutine(SpawnSuperPower(GetInverseWeightedRandomSuperPower(costMode), spawnOrigin, spawnScale));
-            yield return new WaitForSeconds(0.5f);
+            StartCoroutine(SpawnSuperPower(GetInverseWeightedRandomSuperPower(costMode), spawnOrigin, spawnScale, skipInitialDelay));
+            if (!skipInitialDelay)
+                yield return new WaitForSeconds(0.5f);
+            else
+                yield return null; // Small gap if multiple are spawned fast
         }
     }
 
@@ -1581,7 +1586,7 @@ public class SuperPowerSpawner : MonoBehaviour
     }
 
     // Update SpawnSuperPower to accept origin and scale
-    private IEnumerator SpawnSuperPower(SuperPower superPower, Vector3? spawnOrigin, float spawnScale)
+    private IEnumerator SpawnSuperPower(SuperPower superPower, Vector3? spawnOrigin, float spawnScale, bool skipInitialDelay = false)
     {
         if (superPower == null)
         {
@@ -1599,7 +1604,8 @@ public class SuperPowerSpawner : MonoBehaviour
         spawnedSuperPowers.Add(placeholder);
         UpdateTokenPositions();
 
-        yield return new WaitForSeconds(1f);
+        if (!skipInitialDelay)
+            yield return new WaitForSeconds(1f);
 
         if (superPowerPrefabs.TryGetValue(superPower, out GameObject prefab))
         {

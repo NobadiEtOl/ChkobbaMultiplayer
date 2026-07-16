@@ -502,6 +502,7 @@ public class CardInteraction : MonoBehaviour
                 {
                     // Player's own card and their turn - allow play
                     Debug.Log("[CardInteraction] Invoking OnCardsPlayed for hand card - valid turn");
+                    GameManager.AddToDebugLog($"[SingleplayerCardPlay] OnCardsPlayed event invoked for card: {this.uniqueCardInstanceID}");
                     StopAutoRotate(); // Stop auto-rotation when the card is played
                     
                     OnCardsPlayed?.Invoke(this.uniqueCardInstanceID, this.gameObject, GameManager.currentPlayerNo);
@@ -906,7 +907,14 @@ public class CardInteraction : MonoBehaviour
             Debug.Log($"[CardSelection] Cannot select {gameObject.name} - not a player hand card");
             return false;
         }
-        
+
+        // Singleplayer: block hand card selection when it is not the player's turn
+        if (SinglePlayerModeController.Instance != null && SinglePlayerModeController.IsGameRunning && !SinglePlayerModeController.IsPlayerTurn)
+        {
+            Debug.Log($"[CardSelection] Cannot select {gameObject.name} - singleplayer: not player's turn");
+            return false;
+        }
+
         // Check if showcase is active (allows selection from all player hands)
         bool isShowcaseActive = DeckController.LocalInstance != null && DeckController.LocalInstance.isShowcaseAllActive;
         

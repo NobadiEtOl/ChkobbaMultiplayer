@@ -272,6 +272,8 @@ public class GameManager : MonoBehaviour
 
     public GameNetworkRelay networkRelay;
 
+    private IMoveProcessor moveProcessor;
+
     //Card Variables
 
     [SerializeField] public GameObject cardBack;
@@ -585,6 +587,8 @@ public class GameManager : MonoBehaviour
 
         InitialGameManagerSetUp();//Identifies and assigns necessary variables and calls other functions
 
+        InitializeMoveProcessor();
+
 
 
         SuperPowerSpawner.LocalInstance.InitializeSuperPowers(); // Initialize super powers
@@ -601,6 +605,29 @@ public class GameManager : MonoBehaviour
     }
 
 
+
+    private void InitializeMoveProcessor()
+    {
+        if (SinglePlayerModeController.Instance != null)
+        {
+            moveProcessor = new SingleplayerMoveProcessor(SinglePlayerModeController.Instance);
+        }
+        else if (networkRelay != null)
+        {
+            moveProcessor = new MultiplayerMoveProcessor(networkRelay);
+        }
+        else
+        {
+            moveProcessor = null;
+            Debug.LogError("[IMoveProcessor] Could not initialize: SinglePlayerModeController and networkRelay are both null.");
+        }
+
+        if (moveProcessor != null)
+        {
+            Debug.Log($"[IMoveProcessor] Initialized: mode={moveProcessor.ModeName}");
+            AddToDebugLog($"[IMoveProcessor] Initialized: mode={moveProcessor.ModeName}");
+        }
+    }
 
     public void NotifyConnection()
     {
@@ -902,10 +929,12 @@ public class GameManager : MonoBehaviour
 
         if (alreadySubbed) return;
 
+        Debug.Log("oluyor");
+
         foreach (var cardInteraction in cardInteractionsScripts)
 
         {
-
+            Debug.Log("oluyor");
             cardInteraction.OnCardSelected += CardSelected;
 
             cardInteraction.OnCardsPlayed += CardsPlayed;
@@ -1203,6 +1232,8 @@ public class GameManager : MonoBehaviour
     private void CardsPlayed(string cardID, GameObject cardObject, int playerNumber)
 
     {
+        AddToDebugLog($"[SingleplayerCardPlay] ===== CARD PLAY FLOW START =====");
+        AddToDebugLog($"[SingleplayerCardPlay] CardsPlayed event listener triggered: cardID={cardID}, playerNumber={playerNumber}");
 
         AddToDebugLog($"[GameManager] CardsPlayed called with cardID: {cardID}, playerNumber: {playerNumber}");
 
@@ -1210,7 +1241,7 @@ public class GameManager : MonoBehaviour
 
         AddToDebugLog($"[GameManager] CardInteraction.currentlySelectedCard at start of CardsPlayed: {CardInteraction.currentlySelectedCard?.gameObject.name}");
 
-        
+        Debug.Log($"[GameManager] movePlayedLocally at start of CardsPlayed: {movePlayedLocally}");
 
         // Check if player can play on their turn
 
@@ -1239,7 +1270,7 @@ public class GameManager : MonoBehaviour
         AddToDebugLog($"[GameManager] Player can play - proceeding with move validation");
 
         
-
+        Debug.Log($"[GameManager] currentSelectedHandCard before CheckIfLegal: {currentSelectedHandCard}");
         CheckIfLegal(playerNumber);
 
     }
@@ -1289,22 +1320,7 @@ public class GameManager : MonoBehaviour
 
 
 
-        Dictionary<string, int[]> cardsToRemove = new Dictionary<string, int[]>();
-
-
-
-        // Iterate over the selected center cards and add them to the removal list
-
-        foreach (var cardToBeRemoved in centerCards)
-
-        {
-
-            cardsToRemove.Add(cardToBeRemoved.Key, cardToBeRemoved.Value);
-
-        }
-
-
-
+        // serializableCard is created per-processor; kept here only for the debug log below
         SerializableCard serializableCard = new SerializableCard(centerCards);
 
 
@@ -1383,43 +1399,27 @@ public class GameManager : MonoBehaviour
 
 
 
-        AddToDebugLog($"[GameManager] About to call SendMoveToServerRPC");
+        AddToDebugLog($"[GameManager] center cards count: {serializableCard.ToDictionary().Count}, movePlayedLocally: {movePlayedLocally}");
 
-        AddToDebugLog($"[GameManager] currentSelectedHandCard before RPC call: {currentSelectedHandCard}");
+        AddToDebugLog($"[IMoveProcessor] Mode={moveProcessor?.ModeName ?? "null"}, IsActive={moveProcessor?.IsActive}");
 
-        AddToDebugLog($"[GameManager] movePlayedLocally before RPC call: {movePlayedLocally}");
+        if (moveProcessor != null && moveProcessor.IsActive)
+        {
+            AddToDebugLog($"[IMoveProcessor] Routing to {moveProcessor.ModeName} processor");
+            hasAlreadySentRPC = true;
+            moveProcessor.ProcessCardPlay(currentSelectedHandCard, centerCards, sumValue, cardValue, playerNumber);
+            CardInteraction.currentlySelectedCard = null;
+            SetCurrentSelectedHandCardNull();
+            if (moveProcessor.ModeName == "Multiplayer")
+            {
+                SuperPowerSpawner.LocalInstance.CheckIfBackgroundPanelOpen();
+            }
+            EndGameplayActionIfTagStartsWith("CardPlay", $"{moveProcessor.ModeName} move processed");
+            return;
+        }
 
-        AddToDebugLog($"[GameManager] serializableCard contains {serializableCard.ToDictionary().Count} cards");
-
-        hasAlreadySentRPC = true;
-
-        AddToDebugLog($"[GameManager] Set hasAlreadySentRPC to true");
-
-        networkRelay.PauseTurnTimerForPowerServerRPC();
-
-        AddToDebugLog($"[GameManager] PauseTurnTimerForPowerServerRPC sent before move RPC");
-
-        networkRelay.SendMoveToServerRPC(currentSelectedHandCard, serializableCard, playerNumber, sumValue);
-
-        AddToDebugLog($"[GameManager] SendMoveToServerRPC completed");
-
-        AddToDebugLog($"[GameManager] currentSelectedHandCard after RPC call: {currentSelectedHandCard}");
-
-        AddToDebugLog($"[GameManager] About to set CardInteraction.currentlySelectedCard to null");
-
-        CardInteraction.currentlySelectedCard = null;
-
-        AddToDebugLog($"[GameManager] About to call SetCurrentSelectedHandCardNull()");
-
-        SetCurrentSelectedHandCardNull();
-
-        AddToDebugLog($"[GameManager] About to call SuperPowerSpawner.CheckIfBackgroundPanelOpen()");
-
-        SuperPowerSpawner.LocalInstance.CheckIfBackgroundPanelOpen();
-
-        
-
-        AddToDebugLog($"[GameManager] CheckIfLegal completed successfully");
+        AddToDebugLogError("[IMoveProcessor] No active move processor! Cannot process move.");
+        EndGameplayActionIfTagStartsWith("CardPlay", "Move processor unavailable");
 
 
 
@@ -1628,6 +1628,16 @@ public class GameManager : MonoBehaviour
     private void CardAddedToCenter()
 
     {
+        // Singleplayer mode: route to SinglePlayerModeController for validation and animation
+        if (SinglePlayerModeController.Instance != null && SinglePlayerModeController.IsGameRunning && SinglePlayerModeController.IsPlayerTurn)
+        {
+            AddToDebugLog("[GameManager] Singleplayer: routing add-to-center to SinglePlayerModeController");
+            int[] cardKindValue = CardInteraction.cardLookup.TryGetValue(currentSelectedHandCard, out var ci) ? ci.GetCardID() : null;
+            // NOTE: Do NOT remove card from myCards here - let ProcessPlayerAddToCenter handle it during animation
+            SinglePlayerModeController.Instance.ProcessPlayerAddToCenter(currentSelectedHandCard, cardKindValue);
+            currentSelectedHandCard = null;
+            return;
+        }
 
         networkRelay.AddCenterCardServerRPC(currentSelectedHandCard, CardInteraction.cardLookup[currentSelectedHandCard].GetCardID());
 

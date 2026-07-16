@@ -24,6 +24,12 @@ public class MainUIScript : MonoBehaviour
     [SerializeField] private GameObject currentModeYellow;
     [SerializeField] private GameObject mainScreen;
     
+    // Single Player Mode UI References
+    [SerializeField] private GameObject runSettingsPanel;
+    [SerializeField] private TMP_InputField seedInputField;
+    [SerializeField] private TMP_Dropdown deckClassDropdown;
+    [SerializeField] private Button startSinglePlayerButton;
+    
     private Coroutine joinCodeAnimationCoroutine;
     
     [SerializeField] private BreathingAnimation settingButtonBreathing;
@@ -43,6 +49,18 @@ public class MainUIScript : MonoBehaviour
         if (undoButtonBreathing == null)
         {
             if (undoButton != null) undoButtonBreathing = undoButton.GetComponent<BreathingAnimation>();
+        }
+
+        // Wire up single player button if assigned
+        if (startSinglePlayerButton != null)
+        {
+            startSinglePlayerButton.onClick.AddListener(OnStartSinglePlayerButtonClicked);
+        }
+
+        // Ensure deck class dropdown has at least one option
+        if (deckClassDropdown != null && deckClassDropdown.options.Count == 0)
+        {
+            deckClassDropdown.AddOptions(new List<string> { "Balanced" });
         }
     }
 
@@ -114,6 +132,90 @@ public class MainUIScript : MonoBehaviour
         startingScreenUI.SetActive(true);
         //UpdateUndoButtonVisibility(); // Deactivate undo button when settings popup is closed
     }
+
+    // ===== SINGLE PLAYER MODE =====
+
+    /// <summary>
+    /// Called when the Start Single Player button is pressed in the run settings panel.
+    /// Reads the seed and deck class, then launches the single player run.
+    /// </summary>
+    public void OnStartSinglePlayerButtonClicked()
+    {
+        Debug.Log("[MainUIScript] Start Single Player button clicked");
+
+        // Validate inputs
+        if (seedInputField == null || deckClassDropdown == null)
+        {
+            Debug.LogError("[MainUIScript] Run settings panel references not assigned!");
+            return;
+        }
+
+        // Parse seed (if empty, use random)
+        int seed = 0;
+        if (!string.IsNullOrEmpty(seedInputField.text))
+        {
+            if (!int.TryParse(seedInputField.text, out seed))
+            {
+                Debug.LogWarning("[MainUIScript] Invalid seed input, using random seed");
+                seed = new System.Random().Next();
+            }
+        }
+        else
+        {
+            seed = new System.Random().Next();
+        }
+
+        // Get deck class (default to first option if not set)
+        string deckClassName = deckClassDropdown.options.Count > 0 
+            ? deckClassDropdown.options[deckClassDropdown.value].text 
+            : "Balanced";
+
+        Debug.Log($"[MainUIScript] Starting single player with seed={seed}, deckClass={deckClassName}");
+
+        // Close quickplay UI
+        if (quickPlayUI != null) quickPlayUI.SetActive(false);
+        if (runSettingsPanel != null) runSettingsPanel.SetActive(false);
+
+        // Launch the single player run
+        if (SinglePlayerModeController.Instance != null)
+        {
+            SinglePlayerModeController.Instance.StartNewRun(seed, deckClassName);
+        }
+        else
+        {
+            Debug.LogError("[MainUIScript] SinglePlayerModeController not found in scene!");
+        }
+    }
+
+    /// <summary>
+    /// Called when the Close button is pressed in the run settings panel.
+    /// Returns to the quickplay selection screen.
+    /// </summary>
+    public void OnRunSettingsCloseButtonClicked()
+    {
+        Debug.Log("[MainUIScript] Run Settings Close Button Clicked");
+        if (runSettingsPanel != null) runSettingsPanel.SetActive(false);
+        if (quickPlayUI != null) quickPlayUI.SetActive(true);
+    }
+
+    /// <summary>
+    /// Opens the run settings panel for single player mode.
+    /// Called by NetworkManagerUI when 1v1 quickplay button is clicked.
+    /// </summary>
+    public void ShowRunSettingsPanel()
+    {
+        Debug.Log("[MainUIScript] Showing run settings panel");
+        if (runSettingsPanel != null)
+        {
+            runSettingsPanel.SetActive(true);
+        }
+        else
+        {
+            Debug.LogWarning("[MainUIScript] Run settings panel not assigned in inspector!");
+        }
+    }
+
+    // ===== END SINGLE PLAYER MODE =====
 
     /// <summary>
     /// Public method to be connected to the Undo/BirHamleGeriAl button's onClick event in Inspector

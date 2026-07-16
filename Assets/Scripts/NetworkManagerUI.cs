@@ -737,9 +737,32 @@ public class NetworkManagerUI : MonoBehaviour
         clientButton.onClick.AddListener(async () => await StartNewClient(inputField != null ? inputField.text : string.Empty));
         hostTwoPlayerButton.onClick.AddListener(async () => await StartNewHost(2, true));
         hostFourPlayerButton.onClick.AddListener(async () => await StartNewHost(4, true));
-        quickPlayTwoPlayerButton.onClick.AddListener(async () => await FindLobbiesAndStartHostIfNoneExist(2));
+        // 1v1 quickplay now opens single player mode instead of bot mode
+        quickPlayTwoPlayerButton.onClick.AddListener(OnSinglePlayerQuickPlayButtonClicked);
         quickPlayFourPlayerButton.onClick.AddListener(async () => await FindLobbiesAndStartHostIfNoneExist(4));
         if (returnToMainMenuButton != null) returnToMainMenuButton.onClick.AddListener(OnReturnToMainMenuButtonClicked);
+    }
+
+    /// <summary>
+    /// Called when the 1v1 Quickplay button is pressed.
+    /// Opens the single player run settings panel instead of launching a bot game directly.
+    /// </summary>
+    private void OnSinglePlayerQuickPlayButtonClicked()
+    {
+        Debug.Log("[NetworkManagerUI] 1v1 Quickplay button clicked - opening single player run settings panel");
+        
+        // Get reference to MainUIScript to open run settings panel
+        MainUIScript mainUI = FindObjectOfType<MainUIScript>();
+        if (mainUI != null)
+        {
+            // The run settings panel should already be part of quickPlayUI structure
+            // MainUIScript will handle opening it
+            mainUI.ShowRunSettingsPanel();
+        }
+        else
+        {
+            Debug.LogError("[NetworkManagerUI] MainUIScript not found!");
+        }
     }
 
     private void ConfigureTransport(UnityTransport utp, Allocation allocation)

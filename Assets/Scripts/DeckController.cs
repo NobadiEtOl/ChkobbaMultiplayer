@@ -636,7 +636,14 @@ public class DeckController : MonoBehaviour
         foreach (string cardID in selectedCards)
         {
             GameObject tempCardObject = CardInteraction.cardLookup[cardID].gameObject;
+            
+            // CRITICAL FIX: Save world position BEFORE reparenting
+            Vector3 cardWorldPosition = tempCardObject.transform.position;
+            
             tempCardObject.transform.parent = null;
+            
+            // CRITICAL FIX: Restore world position after reparenting
+            tempCardObject.transform.position = cardWorldPosition;
 
             if (cardID == playedCard)
             {
@@ -703,7 +710,19 @@ public class DeckController : MonoBehaviour
 
     public IEnumerator PlayHandCardToCenter(string uniqueCardID, int[] cardID, bool isDiscarded = false)
     {
+        GameManager.AddToDebugLog($"[SingleplayerCardPlay] PlayHandCardToCenter START: cardID={uniqueCardID}, isDiscarded={isDiscarded}");
+        if (CardInteraction.cardLookup == null)
+        {
+            GameManager.AddToDebugLog("[SingleplayerCardPlay][Diag] cardLookup is NULL in PlayHandCardToCenter");
+            yield break;
+        }
+        if (!CardInteraction.cardLookup.ContainsKey(uniqueCardID))
+        {
+            GameManager.AddToDebugLog($"[SingleplayerCardPlay][Diag] cardLookup MISSING key for {uniqueCardID}");
+            yield break;
+        }
         GameObject placedCard = CardInteraction.cardLookup[uniqueCardID].gameObject;
+        GameManager.AddToDebugLog($"[SingleplayerCardPlay][Diag] placedCard resolved: {(placedCard != null ? placedCard.name : "NULL")}");
         List<Vector3> positions = new List<Vector3>();
         List<GameObject> cardObjects = new List<GameObject>();
         List<Quaternion> rotations = new List<Quaternion>();
@@ -719,11 +738,21 @@ public class DeckController : MonoBehaviour
                 placedInteraction.KillAllTweens();
             }
 
+            // CRITICAL FIX: Save world position BEFORE reparenting
+            // This prevents the card from jumping when parent changes
+            Vector3 currentWorldPosition = placedCard.transform.position;
+
             Vector3 centerPosition = centerTransform.position;
             Vector3 centerRotation = centerTransform.rotation.eulerAngles;
 
             rotations.Add(Quaternion.Euler(centerRotation.x + 180, centerRotation.y, UnityEngine.Random.Range(-12, 12)));
+            
+            // Change parent
             placedCard.transform.parent = centerTransform;
+            
+            // CRITICAL FIX: Restore world position after reparenting
+            // This ensures the card stays where it was dragged instead of jumping
+            placedCard.transform.position = currentWorldPosition;
 
             // Use centerTransform for positioning
             positions.Add(new Vector3(centerPosition.x, centerPosition.y + 10 * GameManager.LocalInstance.centerCardsObjects.Count, centerPosition.z));
@@ -732,11 +761,35 @@ public class DeckController : MonoBehaviour
             gameManager.centerCards.Add(uniqueCardID, cardID);
             gameManager.centerCardsObjects.Add(placedCard);
             cardObjects.Add(placedCard);
+            GameManager.AddToDebugLog($"[SingleplayerCardPlay][Diag] Added card to animation lists. currentWorldPos={currentWorldPosition}, targetPos={positions[positions.Count - 1]}, parentNow={placedCard.transform.parent?.name}");
+        }
+        else
+        {
+            GameManager.AddToDebugLog($"[SingleplayerCardPlay][Diag] placedCard is NULL for {uniqueCardID} before animation setup");
         }
 
-        AudioManager.Instance.PlayAudio(3, 1, false);
+        GameManager.AddToDebugLog($"[SingleplayerCardPlay][Diag] Pre-chain counts: cardObjects={cardObjects.Count}, positions={positions.Count}, rotations={rotations.Count}, scales={scales.Count}, centerCardsObjects={gameManager.centerCardsObjects.Count}");
+
+        if (cardObjects.Count == 0 || positions.Count == 0 || rotations.Count == 0 || scales.Count == 0)
+        {
+            GameManager.AddToDebugLog("[SingleplayerCardPlay][Diag] Aborting animation chain due to empty/misaligned lists");
+            UpdateCurrentPlayerHandLayout();
+            yield break;
+        }
+
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayAudio(3, 1, false);
+            GameManager.AddToDebugLog("[SingleplayerCardPlay][Diag] AudioManager.PlayAudio succeeded");
+        }
+        else
+        {
+            GameManager.AddToDebugLog("[SingleplayerCardPlay][Diag] AudioManager.Instance is NULL; skipping PlayAudio");
+        }
+        GameManager.AddToDebugLog($"[SingleplayerCardPlay] PlayHandCardToCenter: Starting animation chain with {cardObjects.Count} cards");
         if (isDiscarded) yield return StartCoroutine(ChainMoveCardsCoroutine(positions, cardObjects, 10, rotations, scales));
         else yield return StartCoroutine(ChainMoveCards(positions, cardObjects, 10, rotations, scales, true));
+        GameManager.AddToDebugLog($"[SingleplayerCardPlay] PlayHandCardToCenter: Animation complete, updating hand layout");
         UpdateCurrentPlayerHandLayout();
     }
 
@@ -2051,12 +2104,25 @@ public class DeckController : MonoBehaviour
 
     private IEnumerator MoveCardCoroutine(Vector3 endPos, GameObject cardObject, float speedMultiplier, Quaternion rotation, Vector3 scale)
     {
+        if (cardObject == null)
+        {
+            GameManager.AddToDebugLog("[SingleplayerCardPlay][Diag] MoveCardCoroutine received NULL cardObject");
+            yield break;
+        }
+
+        Vector3 startPos = cardObject.transform.position;
+        Quaternion startRot = cardObject.transform.rotation;
+        Vector3 startScale = cardObject.transform.localScale;
+        GameManager.AddToDebugLog($"[SingleplayerCardPlay][Diag] MoveCardCoroutine start: card={cardObject.name}, active={cardObject.activeInHierarchy}, parent={cardObject.transform.parent?.name}, startPos={startPos}, endPos={endPos}, speedMultiplier={speedMultiplier}, isInstantMode={isInstantMode}");
+
         // If instant mode (reconnection), teleport immediately
         if (isInstantMode)
         {
+            GameManager.AddToDebugLog($"[SingleplayerCardPlay] MoveCardCoroutine: Instant mode - teleporting {cardObject.name} to {endPos}");
             cardObject.transform.position = endPos;
             cardObject.transform.rotation = rotation;
             cardObject.transform.localScale = scale;
+            GameManager.AddToDebugLog($"[SingleplayerCardPlay][Diag] Instant mode applied: finalPos={cardObject.transform.position}, finalRot={cardObject.transform.rotation.eulerAngles}, finalScale={cardObject.transform.localScale}");
             yield return null;
         }
         else
@@ -2069,6 +2135,7 @@ public class DeckController : MonoBehaviour
             }*/
 
             float duration = 1f/speedMultiplier; // Adjust as needed
+            GameManager.AddToDebugLog($"[SingleplayerCardPlay] MoveCardCoroutine: Animating {cardObject.name} with duration={duration}s to endPos={endPos}");
 
             // Create a DOTween sequence for position, rotation, and scale
             DG.Tweening.Sequence moveSeq = DOTween.Sequence();
@@ -2076,13 +2143,25 @@ public class DeckController : MonoBehaviour
             moveSeq.Join(cardObject.transform.DORotateQuaternion(rotation, duration));
             moveSeq.Join(cardObject.transform.DOScale(scale, duration));
 
+            if (moveSeq == null)
+            {
+                GameManager.AddToDebugLog($"[SingleplayerCardPlay][Diag] moveSeq is NULL for {cardObject.name}");
+                yield break;
+            }
+
+            GameManager.AddToDebugLog($"[SingleplayerCardPlay][Diag] moveSeq created: active={moveSeq.active}, playing={moveSeq.IsPlaying()}, complete={moveSeq.IsComplete()}, duration={moveSeq.Duration()}");
+
             yield return moveSeq.WaitForCompletion();
+            GameManager.AddToDebugLog($"[SingleplayerCardPlay] MoveCardCoroutine: Animation complete for {cardObject.name}");
+            GameManager.AddToDebugLog($"[SingleplayerCardPlay][Diag] MoveCardCoroutine end: card={cardObject.name}, finalPos={cardObject.transform.position}, expectedEnd={endPos}, delta={(cardObject.transform.position - endPos)}");
         }
     }
 
     public IEnumerator ChainMoveCards(List<Vector3> positions, List<GameObject> cardObject, float speed, List<Quaternion> rotations, List<Vector3> scales, bool endTurnFlag = false, bool lastMove = false, bool updateFlag = true)
     {
+        GameManager.AddToDebugLog($"[SingleplayerCardPlay] ChainMoveCards: Starting with {cardObject.Count} cards, speed={speed}");
         yield return StartCoroutine(ChainMoveCardsCoroutine(positions, cardObject, speed, rotations, scales));
+        GameManager.AddToDebugLog($"[SingleplayerCardPlay] ChainMoveCards: Coroutine complete");
         if (lastMove) AllCardsShowcase();
         if (endTurnFlag) gameManager.TellServerTurnEnded();
     }
@@ -2156,10 +2235,28 @@ public class DeckController : MonoBehaviour
 
     private IEnumerator ChainMoveCardsCoroutine(List<Vector3> positions, List<GameObject> cardObjects, float speed, List<Quaternion> rotations, List<Vector3> scales)
     {
+        GameManager.AddToDebugLog($"[SingleplayerCardPlay] ChainMoveCardsCoroutine: Processing {cardObjects.Count} cards sequentially");
+        if (positions == null || cardObjects == null || rotations == null || scales == null)
+        {
+            GameManager.AddToDebugLog("[SingleplayerCardPlay][Diag] ChainMoveCardsCoroutine received NULL list(s)");
+            yield break;
+        }
+        if (positions.Count != cardObjects.Count || rotations.Count != cardObjects.Count || scales.Count != cardObjects.Count)
+        {
+            GameManager.AddToDebugLog($"[SingleplayerCardPlay][Diag] List count mismatch: positions={positions.Count}, cardObjects={cardObjects.Count}, rotations={rotations.Count}, scales={scales.Count}");
+            yield break;
+        }
         //if(cardObjects.Count<20)yield return new WaitForSeconds(2f - (cardObjects.Count*0.1f));
         //else yield return new WaitForSeconds(0.2f);
         for (int i = 0; i < cardObjects.Count; i++)
         {
+            GameManager.AddToDebugLog($"[SingleplayerCardPlay] ChainMoveCardsCoroutine: Animating card {i+1}/{cardObjects.Count}");
+            if (cardObjects[i] == null)
+            {
+                GameManager.AddToDebugLog($"[SingleplayerCardPlay][Diag] cardObjects[{i}] is NULL");
+                continue;
+            }
+            GameManager.AddToDebugLog($"[SingleplayerCardPlay][Diag] Card[{i}]={cardObjects[i].name}, parent={cardObjects[i].transform.parent?.name}, target={positions[i]}");
             // Play card deal sound effect for each individual card movement
             if (soundEffectsController != null)
             {
@@ -2168,6 +2265,7 @@ public class DeckController : MonoBehaviour
             
             yield return StartCoroutine(MoveCardCoroutine(positions[i], cardObjects[i], speed + (i * 0.25f), rotations[i], scales[i]));
         }
+        GameManager.AddToDebugLog($"[SingleplayerCardPlay] ChainMoveCardsCoroutine: All {cardObjects.Count} cards animated");
     }
     public void SetPlayerNumber(int playerNumber)
     {
