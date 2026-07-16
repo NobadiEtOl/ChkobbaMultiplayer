@@ -734,6 +734,9 @@ public class SinglePlayerModeController : MonoBehaviour
                 isDeckInitializedForRound = true;
             }
 
+            // Keep a lookup before dealing because DealFromDeck removes dealt cards from deckCardsDict.
+            Dictionary<string, int[]> dealtCardValueLookup = new Dictionary<string, int[]>(deckCardsDict);
+
             yield return StartCoroutine(deckController.DeckStart());
             Debug.Log("[SinglePlayerModeController] Deck ready");
 
@@ -744,9 +747,9 @@ public class SinglePlayerModeController : MonoBehaviour
             foreach (string id in playerHands[1])
                 opponentHandList.Add(id);
 
-            // Build local center mirror from dealt center IDs
+            // Build local center mirror from dealt center IDs (including the initial 4 center cards).
             foreach (string id in centerCardIDs)
-                if (deckCardsDict.TryGetValue(id, out int[] val))
+                if (dealtCardValueLookup.TryGetValue(id, out int[] val))
                     localCenterCards[id] = val;
 
             // cardsRemainingInDeck is whatever is left after dealing
@@ -1385,5 +1388,133 @@ public class SinglePlayerModeController : MonoBehaviour
             deckClassName = currentRunConfig.deckClassName,
             timestamp = DateTime.Now.Ticks
         };
+    }
+
+    // ===== SUPERPOWER ACTIVATION LOGIC (IPowerProcessor) =====
+
+    public void ExecutePeekOpponentCard()
+    {
+        if (opponentHandList.Count == 0) return;
+        int cardIndex = UnityEngine.Random.Range(0, opponentHandList.Count);
+        GameManager.LocalInstance.OnPeekOpponentCardSynced(1, cardIndex);
+    }
+
+    public void ExecuteBayaBayaBak()
+    {
+        GameManager.LocalInstance.OnBayaBayaBakSynced(1);
+    }
+
+    public void ExecuteSwapCardWithOpponent()
+    {
+        if (GameManager.LocalInstance.myCards == null || GameManager.LocalInstance.myCards.Count == 0 || opponentHandList.Count == 0) return;
+        string myCardId = GameManager.LocalInstance.myCards[UnityEngine.Random.Range(0, GameManager.LocalInstance.myCards.Count)];
+        string oppCardId = opponentHandList[UnityEngine.Random.Range(0, opponentHandList.Count)];
+        GameManager.LocalInstance.StartCoroutine(GameManager.LocalInstance.OnSunuDegisTokusSynced(0, 1, myCardId, oppCardId));
+    }
+
+    public void ExecuteValeArar()
+    {
+        GameManager.LocalInstance.ActivateValeArarPower();
+    }
+
+    public void ExecuteBomba()
+    {
+        GameManager.LocalInstance.OnBombaCenter();
+    }
+
+    public void ExecuteYapamazsın()
+    {
+        GameManager.LocalInstance.SetYapamazsınActive(true);
+    }
+
+    public void StartKapkacSelection()
+    {
+        Debug.Log("[SPMC] StartKapkacSelection - Singleplayer mode");
+    }
+
+    public void ExecuteKapkacOnCard(string cardId)
+    {
+        GameManager.LocalInstance.OnKapkacCardChanged(cardId);
+    }
+
+    public void StartYandimAnamSelection()
+    {
+        Debug.Log("[SPMC] StartYandimAnamSelection - Singleplayer mode");
+    }
+
+    public void ExecuteYandimAnamOnCard(string cardId)
+    {
+        GameManager.LocalInstance.OnYandimAnamCardChanged(cardId);
+    }
+
+    public void ExecuteBlockNextPlayer()
+    {
+        GameManager.LocalInstance.SetOynayamazsinActive(true);
+    }
+
+    public void StartKopyalaYapistirSelection()
+    {
+        Debug.Log("[SPMC] StartKopyalaYapistirSelection - Singleplayer mode");
+    }
+
+    public void ExecuteKopyalaYapistir(string targetId, string sourceId)
+    {
+        GameManager.LocalInstance.OnKopyalaYapistir(targetId, sourceId);
+    }
+
+    public void ExecuteVerZehri()
+    {
+        GameManager.LocalInstance.SetVerZehriActive(true);
+    }
+
+    public void ExecuteKutsalDeste()
+    {
+        GameManager.LocalInstance.SetKutsalDesteActive(true);
+    }
+
+    public void StartBuDahaIyiSelection()
+    {
+        Debug.Log("[SPMC] StartBuDahaIyiSelection - Singleplayer mode");
+    }
+
+    public void ExecuteBuDahaIyi(string handCardId, string topCenterCardId)
+    {
+        GameManager.LocalInstance.OnBuDahaIyiSynced(0, 0, handCardId, topCenterCardId);
+    }
+
+    public void StartSunuDegisTokusSelection()
+    {
+        Debug.Log("[SPMC] StartSunuDegisTokusSelection - Singleplayer mode");
+    }
+
+    public void ExecuteSunuDegisTokus(string myCardId, string oppCardId)
+    {
+        GameManager.LocalInstance.StartCoroutine(GameManager.LocalInstance.OnSunuDegisTokusSynced(0, 1, myCardId, oppCardId));
+    }
+
+    public void StartSunuDegisBunuTokusSelection()
+    {
+        Debug.Log("[SPMC] StartSunuDegisBunuTokusSelection - Singleplayer mode");
+    }
+
+    public void ExecuteSunuDegisBunuTokus(string[] myCards, string[] oppCards)
+    {
+        for (int i = 0; i < myCards.Length; i++)
+        {
+            bool isLast = (i == myCards.Length - 1);
+            GameManager.LocalInstance.EnqueueSunuDegisBunuTokusSwap(0, 1, myCards[i], oppCards[i], i, isLast);
+        }
+    }
+
+    public void ExecuteZaferPuani(int points)
+    {
+        Debug.Log($"[SPMC] ExecuteZaferPuani: {points} points earned.");
+        opponentHealth += points;
+        UpdateOpponentHealthDisplay();
+        
+        if (opponentHealth >= OPPONENT_HEALTH_PER_ROUND)
+        {
+            OnOpponentDefeated();
+        }
     }
 }

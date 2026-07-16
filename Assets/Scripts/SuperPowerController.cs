@@ -363,7 +363,7 @@ public class ZaferPuani : SuperPower
         
         // DIRECT POINT ADDITION: Add points immediately to the player/team
         int playerNumber = DeckController.LocalInstance.thisPlayerNumber;
-        GameManager.LocalInstance.networkRelay.ActivateZaferPuaniServerRPC(points);
+        GameManager.LocalInstance.PowerProcessor?.ExecuteZaferPuani(points);
         
         Debug.Log($"[ZaferPuani] POWER ACTIVATION COMPLETE - Added {points} points immediately to player {playerNumber}");
     }

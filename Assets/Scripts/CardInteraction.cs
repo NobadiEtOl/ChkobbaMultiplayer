@@ -244,7 +244,7 @@ public class CardInteraction : MonoBehaviour
                 }
                 
                 int playerNumber = DeckController.LocalInstance.thisPlayerNumber;
-                GameManager.LocalInstance.networkRelay.ActivateKapkacOnCardServerRPC(this.uniqueCardInstanceID);
+                GameManager.LocalInstance.PowerProcessor?.ExecuteKapkacOnCard(this.uniqueCardInstanceID);
 
                 if (DeckController.LocalInstance != null)
                 {

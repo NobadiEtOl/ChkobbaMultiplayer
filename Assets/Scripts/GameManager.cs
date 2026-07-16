@@ -273,6 +273,8 @@ public class GameManager : MonoBehaviour
     public GameNetworkRelay networkRelay;
 
     private IMoveProcessor moveProcessor;
+    private IPowerProcessor powerProcessor;
+    public IPowerProcessor PowerProcessor => powerProcessor;
 
     //Card Variables
 
@@ -611,14 +613,17 @@ public class GameManager : MonoBehaviour
         if (SinglePlayerModeController.Instance != null)
         {
             moveProcessor = new SingleplayerMoveProcessor(SinglePlayerModeController.Instance);
+            powerProcessor = new SingleplayerPowerProcessor(SinglePlayerModeController.Instance);
         }
         else if (networkRelay != null)
         {
             moveProcessor = new MultiplayerMoveProcessor(networkRelay);
+            powerProcessor = new MultiplayerPowerProcessor(networkRelay);
         }
         else
         {
             moveProcessor = null;
+            powerProcessor = null;
             Debug.LogError("[IMoveProcessor] Could not initialize: SinglePlayerModeController and networkRelay are both null.");
         }
 
@@ -626,6 +631,12 @@ public class GameManager : MonoBehaviour
         {
             Debug.Log($"[IMoveProcessor] Initialized: mode={moveProcessor.ModeName}");
             AddToDebugLog($"[IMoveProcessor] Initialized: mode={moveProcessor.ModeName}");
+        }
+
+        if (powerProcessor != null)
+        {
+            Debug.Log($"[IPowerProcessor] Initialized: type={powerProcessor.GetType().Name}");
+            AddToDebugLog($"[IPowerProcessor] Initialized: type={powerProcessor.GetType().Name}");
         }
     }
 
@@ -2765,61 +2776,30 @@ public class GameManager : MonoBehaviour
     /// </summary>
 
     public void UsePeekOpponentCardPower()
-
     {
-
         Debug.Log("Using Peek Opponent Card Power");
-
-        // Server picks the target opponent and card index for deterministic sync.
-
-        networkRelay.UsePeekOpponentCardPowerServerRPC();
-
+        powerProcessor?.ExecutePeekOpponentCard();
     }
-
-
-
-    /// <summary>
-
-    /// Called by the server to sync the peek effect to all clients.
-
-    /// </summary>
 
     public void OnPeekOpponentCardSynced(int opponentPlayerNo, int cardIndex)
-
     {
-
         deckController.PeekOpponentCard(opponentPlayerNo, cardIndex);
-
-
-
     }
-
-
 
     public void UseBayaBayaBakPower()
-
     {
-
         Debug.Log($"[GameManager] UseBayaBayaBakPower() called - Player: {deckController.thisPlayerNumber}, Time: {Time.time}");
+        DebugChainPrinter.LocalInstance?.TrackPowerUsage("BayaBayaBak", deckController.thisPlayerNumber, "Routing to processor");
+        DebugChainPrinter.LocalInstance?.TrackLocalAction("UseBayaBayaBakPower - routing to processor");
 
-        DebugChainPrinter.LocalInstance?.TrackPowerUsage("BayaBayaBak", deckController.thisPlayerNumber, "Sending to server - server will select target");
-        DebugChainPrinter.LocalInstance?.TrackLocalAction("UseBayaBayaBakPower - server will select opponent");
+        powerProcessor?.ExecuteBayaBayaBak();
 
-        // Server picks the target opponent for deterministic sync.
-        networkRelay.UseBayaBayaBakServerRPC();
-
-        Debug.Log($"[GameManager] UseBayaBayaBakPower() complete - Server will process the power");
-
+        Debug.Log($"[GameManager] UseBayaBayaBakPower() complete");
     }
 
-
-
     public void OnBayaBayaBakSynced(int opponentPlayerNo)
-
     {
-
         Debug.Log($"[GameManager] OnBayaBayaBakSynced() called - Opponent: {opponentPlayerNo}, Time: {Time.time}");
-
         
         // Track the power effect
         DebugChainPrinter.LocalInstance?.TrackLocalAction($"OnBayaBayaBakSynced received for opponent {opponentPlayerNo}");
@@ -2838,89 +2818,40 @@ public class GameManager : MonoBehaviour
         deckController.PeekOpponentCardAll(opponentPlayerNo);
 
         Debug.Log($"[GameManager] OnBayaBayaBakSynced() complete - Opponent cards revealed");
-
     }
-
-
-
-    /// <summary>
-
-    /// Returns a random opponent player number (not self or teammate in 2v2).
-
-    /// </summary>
 
     private int GetRandomOpponentPlayerNo()
-
     {
-
         List<int> possibleOpponents = new List<int>();
-
         int myNo = deckController.thisPlayerNumber;
-
         int playerCount = deckController.playerCount;
 
-
-
         if (playerCount == 2)
-
         {
-
             possibleOpponents.Add((myNo + 1) % 2);
-
         }
-
         else if (playerCount == 4)
-
         {
-
             // In 2v2, teammates are 0/2 and 1/3
-
             if (myNo == 0 || myNo == 2)
-
                 possibleOpponents.AddRange(new int[] { 1, 3 });
-
             else
-
                 possibleOpponents.AddRange(new int[] { 0, 2 });
-
         }
-
         return possibleOpponents[UnityEngine.Random.Range(0, possibleOpponents.Count)];
-
     }
 
-
-
-    /// <summary>
-
-    /// Activates the "swap a card with an opponent" super power locally and sends the move to the server.
-
-    /// </summary>
-
     public void UseSwapCardWithOpponentPower()
-
     {
-
-        Debug.Log("Using Swap Card With Opponent Power (server-authoritative random)");
-
-        int myPlayerNo = deckController.thisPlayerNumber;
-
-
+        Debug.Log("Using Swap Card With Opponent Power");
 
         if (myCards == null || myCards.Count == 0)
-
         {
-
             Debug.LogWarning("No cards in hand for DeğişTokuş!");
-
             return;
-
         }
 
-
-
-        networkRelay.UseRandomDegisTokusServerRPC();
-
+        powerProcessor?.ExecuteSwapCardWithOpponent();
     }
 
 
@@ -3755,11 +3686,8 @@ public class GameManager : MonoBehaviour
 
 
     public void ActivateBlockNextPlayerPower()
-
     {
-
-        networkRelay.ActivateOynayamazsinServerRPC();
-
+        powerProcessor?.ExecuteBlockNextPlayer();
     }
 
 
@@ -4192,12 +4120,7 @@ public class GameManager : MonoBehaviour
         activeSunuDegisTokusPowerName = powerName;
 
         // Pause the normal turn timer and start the power-selection timeout
-        if (networkRelay != null)
-        {
-            networkRelay.PauseTurnTimerForPowerServerRPC();
-            networkRelay.StartPowerDurationTimerServerRPC();
-            Debug.Log("[GameManager] Power selection: turn timer paused, power duration timer started");
-        }
+        powerProcessor?.StartSunuDegisTokusSelection();
         
         // All hand cards are selectable in this mode, so showcase every hand consistently.
         if (DeckController.LocalInstance != null)
@@ -5107,12 +5030,7 @@ public class GameManager : MonoBehaviour
         CardInteraction.currentlySelectedCard = null;
         SetCurrentSelectedHandCardNull();
 
-        if (networkRelay != null)
-        {
-            networkRelay.PauseTurnTimerForPowerServerRPC();
-            networkRelay.StartPowerDurationTimerServerRPC();
-            Debug.Log("[GameManager] Yandım Anam selection: turn timer paused, power duration timer started");
-        }
+        powerProcessor?.StartYandimAnamSelection();
 
         if (DeckController.LocalInstance != null)
         {
