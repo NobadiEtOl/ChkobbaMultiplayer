@@ -30,7 +30,6 @@ public class SuperPowerSpawner : MonoBehaviour
     private Button closeButton;
 
     [Header("Gold System")]
-    [SerializeField] private TextMeshProUGUI goldDisplayText; // Gold display text
     [SerializeField] private int startingGold = 20; // Starting gold amount
     [SerializeField] private int maxGold = 15; // Maximum gold cap
     
@@ -245,12 +244,7 @@ public class SuperPowerSpawner : MonoBehaviour
             }
         }
         
-        // Validate gold display text and popup location
-        if (goldDisplayText == null)
-        {
-            Debug.LogWarning("[SuperPowerSpawner] goldDisplayText is not assigned! Gold display will not work.");
-        }
-        
+        // Validate gold popup location
         if (goldPopupLocation == null)
         {
             Debug.LogWarning("[SuperPowerSpawner] goldPopupLocation is not assigned! Gold popups will use fallback positioning.");
@@ -1861,13 +1855,15 @@ public class SuperPowerSpawner : MonoBehaviour
     }
     
     /// <summary>
-    /// Updates the gold display text
+    /// Updates the gold display text via HesapMakinesiController
     /// </summary>
     private void UpdateGoldDisplay()
     {
-        if (goldDisplayText != null)
+        HesapMakinesiController hesapController = FindFirstObjectByType<HesapMakinesiController>();
+        if (hesapController != null)
         {
-            goldDisplayText.text = $"{currentGold}";
+            hesapController.UpdateCoinAmountDisplays(currentGold);
+            Debug.Log($"[SuperPowerSpawner] Updated gold display to {currentGold}");
         }
     }
     
@@ -2326,9 +2322,9 @@ public class SuperPowerSpawner : MonoBehaviour
     /// </summary>
     public void ShowGoldPopup(int goldAmount)
     {
-        if (goldPopupLocation == null && goldDisplayText == null)
+        if (goldPopupLocation == null)
         {
-            Debug.LogWarning("[SuperPowerSpawner] No goldPopupLocation or goldDisplayText assigned. Cannot show gold popup.");
+            Debug.LogWarning("[SuperPowerSpawner] No goldPopupLocation assigned. Cannot show gold popup.");
             return;
         }
         
@@ -2340,9 +2336,9 @@ public class SuperPowerSpawner : MonoBehaviour
     /// </summary>
     public void ShowTwoStageGoldPopup(int capturingCardValue, int centerCardCount)
     {
-        if (goldPopupLocation == null && goldDisplayText == null)
+        if (goldPopupLocation == null)
         {
-            Debug.LogWarning("[SuperPowerSpawner] No goldPopupLocation or goldDisplayText assigned. Cannot show gold popup.");
+            Debug.LogWarning("[SuperPowerSpawner] No goldPopupLocation assigned. Cannot show gold popup.");
             return;
         }
         
@@ -2511,9 +2507,7 @@ public class SuperPowerSpawner : MonoBehaviour
         // Use prefab if available, otherwise create from scratch
         if (goldPopupPrefab != null)
         {
-            // Use goldPopupLocation as parent if available, otherwise use goldDisplayText parent
-            Transform parentTransform = goldPopupLocation != null ? goldPopupLocation : 
-                                      (goldDisplayText != null ? goldDisplayText.transform.parent : null);
+            Transform parentTransform = goldPopupLocation;
             
             if (parentTransform == null)
             {
@@ -2528,9 +2522,7 @@ public class SuperPowerSpawner : MonoBehaviour
             // Create popup object from scratch
             popupObject = new GameObject("GoldPopup");
             
-            // Use goldPopupLocation as parent if available, otherwise use goldDisplayText parent
-            Transform parentTransform = goldPopupLocation != null ? goldPopupLocation : 
-                                      (goldDisplayText != null ? goldDisplayText.transform.parent : null);
+            Transform parentTransform = goldPopupLocation;
             
             if (parentTransform == null)
             {
@@ -2555,20 +2547,14 @@ public class SuperPowerSpawner : MonoBehaviour
             rectTransform.sizeDelta = new Vector2(100, 50);
         }
         
-        // Position at the goldPopupLocation if available, otherwise fallback to gold display position
+        // Position at the goldPopupLocation
         if (goldPopupLocation != null)
         {
             popupObject.transform.position = goldPopupLocation.position;
         }
-        else if (goldDisplayText != null)
-        {
-            // Fallback to original behavior
-            Vector3 goldDisplayPosition = goldDisplayText.transform.position;
-            popupObject.transform.position = goldDisplayPosition + Vector3.up * 50f;
-        }
         else
         {
-            Debug.LogWarning("[SuperPowerSpawner] No goldPopupLocation or goldDisplayText found. Popup will appear at origin.");
+            Debug.LogWarning("[SuperPowerSpawner] No goldPopupLocation found. Popup will appear at origin.");
             popupObject.transform.position = Vector3.zero;
         }
         

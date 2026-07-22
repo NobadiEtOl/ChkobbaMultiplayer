@@ -37,6 +37,10 @@ public class SideManager : MonoBehaviour
     [SerializeField] private SideUI side0LocalTeam; // Left or Bottom panel displaying local/friendly team details
     [SerializeField] private SideUI side1OpponentTeam; // Right or Top panel displaying opponent team details
 
+    [Header("Optional 3D Side Backgrounds")]
+    [SerializeField] private GameObject side0WorldBackground;
+    [SerializeField] private GameObject side1WorldBackground;
+
     [Header("Customization Sprite Assets (Must match AvatarCustomization arrays exactly)")]
     [SerializeField] private Sprite[] faceBaseSprites;
     [SerializeField] private Sprite[] hairSprites;
@@ -122,6 +126,38 @@ public class SideManager : MonoBehaviour
 
         // Add Emote click listener to local player slot
         SetupLocalEmoteTrigger();
+    }
+
+    public void SetSidesVisible(bool side0Visible, bool side1Visible)
+    {
+        SetWorldBackgroundsVisible(side0Visible, side1Visible);
+    }
+
+    public void SetWorldBackgroundsVisible(bool side0Visible, bool side1Visible)
+    {
+        // Keep side UI roots synchronized with side world background visibility.
+        SetSideVisible(side0LocalTeam, side0Visible);
+        SetSideVisible(side1OpponentTeam, side1Visible);
+
+        SetWorldBackgroundVisible(side0WorldBackground, side0Visible);
+        SetWorldBackgroundVisible(side1WorldBackground, side1Visible);
+    }
+
+    private void SetSideVisible(SideUI sideUI, bool isVisible)
+    {
+        if (sideUI.SidePanelParent != null)
+        {
+            sideUI.SidePanelParent.SetActive(isVisible);
+        }
+    }
+
+    private void SetWorldBackgroundVisible(GameObject worldBackground, bool isVisible)
+    {
+        if (worldBackground != null && worldBackground.activeSelf != isVisible)
+        {
+            worldBackground.SetActive(isVisible);
+            Debug.Log($"[SideManager] World background for {worldBackground.name} set to {(isVisible ? "active" : "inactive")}.");
+        }
     }
 
     private void SetupLocalEmoteTrigger()

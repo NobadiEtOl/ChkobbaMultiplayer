@@ -32,6 +32,16 @@ public class SinglePlayerModeController : MonoBehaviour
         public int activeJokerId; // Which joker chosen for this stage
     }
 
+    /// <summary>
+    /// Stores pre-calculated opponent info for this stage.
+    /// Calculated once at stage start, then reused for all 3 rounds in the stage.
+    /// </summary>
+    private class OpponentInfo
+    {
+        public int difficulty; // 0=Easy, 1=Normal, 2=Hard
+        public int maxHealth; // Pre-calculated health for this opponent
+    }
+
     // Run-wide state
     private SinglePlayerRunConfig currentRunConfig;
     private SinglePlayerRoundData currentRoundData;
@@ -41,8 +51,10 @@ public class SinglePlayerModeController : MonoBehaviour
     private int currentRoundInStage = 0; // Opponent fights completed within current stage
 
     // Opponent state
-    private int opponentHealth = 0; // Damage needed to defeat opponent
-    private const int OPPONENT_HEALTH_PER_ROUND = 20; // Opponent defeated when damage >= 20
+    private int opponentHealth = 0; // Damage accumulated against opponent this round
+    private int opponentMaxHealth = 20; // Max health for current opponent (pre-calculated for this round)
+    private const int OPPONENT_BASE_HEALTH = 2; // Base health before multipliers
+    private List<OpponentInfo> stageOpponentsInfo; // Pre-calculated info for all 3 opponents in current stage
 
     // Game loop references
     private OpponentBehaviorManager.OpponentBehaviorConfig currentOpponentBehaviorConfig;
@@ -52,13 +64,12 @@ public class SinglePlayerModeController : MonoBehaviour
 
     // UI references
     [SerializeField] private TextMeshProUGUI stageRoundDisplayText;
-    [SerializeField] private Image opponentHealthBarImage;
-    [SerializeField] private TextMeshProUGUI opponentHealthText;
     [SerializeField] private Transform jokerDisplayParent; // Assign joker overlay parent in Inspector
     
     // UI containers (for runtime creation)
     private List<JokerController.JokerDefinition> currentJokerOptions;
     private Canvas uiCanvas;
+    private OpponentHealthDisplay opponentHealthDisplay;
     
     // References needed for dealing
     private DeckController deckController;
@@ -83,6 +94,9 @@ public class SinglePlayerModeController : MonoBehaviour
     private Dictionary<string, int[]> localCenterCards = new Dictionary<string, int[]>();
     private int cardsRemainingInDeck = 0;
     private int handsDealtCount = 0; // Track number of hands dealt (max 6)
+    private bool awaitingRoundContinue = false;
+    [SerializeField] private GameObject roundEndScreenParent;
+    [SerializeField] private Button roundEndContinueButton;
 
     private void Awake()
     {
@@ -102,6 +116,16 @@ public class SinglePlayerModeController : MonoBehaviour
         
         // Create placeholder UI at runtime if it doesn't exist
         EnsureUIExists();
+
+        if (roundEndScreenParent != null)
+        {
+            // Deactivate roundEndScreenParent initially
+            roundEndScreenParent.gameObject.SetActive(false);
+        }
+        else
+        {
+            Debug.LogError("roundEndScreenParent is not assigned!");
+        }
     }
 
     /// <summary>
@@ -124,7 +148,7 @@ public class SinglePlayerModeController : MonoBehaviour
         }
 
         // Create stage display if not assigned
-        if (stageRoundDisplayText == null)
+        /*if (stageRoundDisplayText == null)
         {
             GameObject stageDisplayGO = new GameObject("StageDisplay");
             stageDisplayGO.transform.SetParent(uiCanvas.transform, false);
@@ -139,46 +163,27 @@ public class SinglePlayerModeController : MonoBehaviour
             
             Image bgImage = stageDisplayGO.AddComponent<Image>();
             bgImage.color = new Color(0.1f, 0.1f, 0.1f, 0.8f);
+        }*/
+
+        // Try to find the pre-existing OpponentHealthDisplay on the table first
+        if (opponentHealthDisplay == null)
+        {
+            opponentHealthDisplay = FindFirstObjectByType<OpponentHealthDisplay>(FindObjectsInactive.Include);
         }
 
-        // Create opponent health bar if not assigned
-        if (opponentHealthBarImage == null)
+        // Only create a new one as a fallback if none exists in the scene
+        if (opponentHealthDisplay == null)
         {
-            GameObject healthBarGO = new GameObject("OpponentHealthBar");
-            healthBarGO.transform.SetParent(uiCanvas.transform, false);
-            RectTransform healthRect = healthBarGO.AddComponent<RectTransform>();
-            healthRect.anchoredPosition = new Vector2(0, 200);
-            healthRect.sizeDelta = new Vector2(300, 40);
+            GameObject healthDisplayGO = new GameObject("OpponentHealthDisplay");
+            healthDisplayGO.transform.SetParent(uiCanvas.transform, false);
+            RectTransform healthDisplayRect = healthDisplayGO.AddComponent<RectTransform>();
+            healthDisplayRect.anchoredPosition = new Vector2(0, 200);
+            healthDisplayRect.sizeDelta = new Vector2(300, 60);
             
-            Image bgImage = healthBarGO.AddComponent<Image>();
-            bgImage.color = new Color(0.2f, 0.2f, 0.2f, 0.8f);
+            opponentHealthDisplay = healthDisplayGO.AddComponent<OpponentHealthDisplay>();
             
-            // Health fill
-            GameObject fillGO = new GameObject("Fill");
-            fillGO.transform.SetParent(healthBarGO.transform, false);
-            RectTransform fillRect = fillGO.AddComponent<RectTransform>();
-            fillRect.anchoredPosition = Vector2.zero;
-            fillRect.sizeDelta = Vector2.zero;
-            fillRect.anchorMin = Vector2.zero;
-            fillRect.anchorMax = Vector2.zero;
-            
-            opponentHealthBarImage = fillGO.AddComponent<Image>();
-            opponentHealthBarImage.color = new Color(1, 0, 0, 0.8f); // Red
-        }
-
-        // Create health text if not assigned
-        if (opponentHealthText == null)
-        {
-            GameObject healthTextGO = new GameObject("HealthText");
-            healthTextGO.transform.SetParent(uiCanvas.transform, false);
-            RectTransform healthTextRect = healthTextGO.AddComponent<RectTransform>();
-            healthTextRect.anchoredPosition = new Vector2(0, 200);
-            healthTextRect.sizeDelta = new Vector2(300, 40);
-            
-            opponentHealthText = healthTextGO.AddComponent<TextMeshProUGUI>();
-            opponentHealthText.text = "0/20";
-            opponentHealthText.alignment = TextAlignmentOptions.Center;
-            opponentHealthText.fontSize = 28;
+            // Start inactive - only show during singleplayer
+            healthDisplayGO.SetActive(false);
         }
     }
 
@@ -206,8 +211,95 @@ public class SinglePlayerModeController : MonoBehaviour
         // Register singleplayer participants in multiplayer systems
         RegisterSinglePlayerParticipants();
 
+        // Ensure side visibility is synchronized in singleplayer: side 0 on, side 1 off.
+        if (SideManager.Instance != null)
+        {
+            SideManager.Instance.SetSidesVisible(true, false);
+            SideManager.Instance.UpdateAllSides();
+        }
+
         // Start the first stage
         StartStage(0);
+    }
+
+    /// <summary>
+    /// Entry point: Resume a previously saved single player run.
+    /// Loads the saved progress from PlayerPrefs and restarts the game loop from that point.
+    /// Restores stage, difficulty, gold, joker, and all other run state.
+    /// </summary>
+    public void ResumeSavedRun()
+    {
+        Debug.Log($"\n=== [SinglePlayerModeController] RESUMING SAVED RUN ===\n");
+
+        // Load saved run progress from PlayerPrefs
+        var savedData = RunManager.LoadRunProgress();
+        if (savedData == null)
+        {
+            Debug.LogError("[SinglePlayerModeController] ResumeSavedRun: No saved run data found!");
+            return;
+        }
+
+        Debug.Log($"[SinglePlayerModeController] Loaded saved run: Stage {savedData.currentStage}, " +
+                  $"Opponent {savedData.currentOpponentDifficulty}, Gold {savedData.currentGold}");
+
+        // Restore run configuration (seed, deck class)
+        currentRunConfig = new SinglePlayerRunConfig
+        {
+            seed = savedData.seed,
+            deckClassName = savedData.deckClassName
+        };
+
+        // Reset game state but keep progression state
+        ResetForSingleplayerRun();
+
+        // Restore progression state from saved data
+        currentStage = savedData.currentStage;
+        currentOpponentDifficulty = savedData.currentOpponentDifficulty;
+
+        // Restore round data
+        if (currentRoundData == null) currentRoundData = new SinglePlayerRoundData();
+        currentRoundData.currentRound = savedData.currentRound;
+        currentRoundData.totalDamageDealt = savedData.totalDamageDealt;
+        currentRoundData.activeJokerId = savedData.activeJokerId;
+
+        // Disable UI screens to show game (same as StartNewRun)
+        DisableGameScreensForSinglePlayer();
+
+        // Initialize game scene
+        InitializeScene();
+
+        // Register singleplayer participants in multiplayer systems
+        RegisterSinglePlayerParticipants();
+
+        // Restore gold amount via SuperPowerSpawner
+        if (SuperPowerSpawner.LocalInstance != null)
+        {
+            SuperPowerSpawner.LocalInstance.SetGold(savedData.currentGold);
+            Debug.Log($"[SinglePlayerModeController] Restored gold: {savedData.currentGold}");
+        }
+        else
+        {
+            Debug.LogWarning("[SinglePlayerModeController] SuperPowerSpawner.LocalInstance not found - cannot restore gold");
+        }
+
+        // Ensure side visibility is synchronized in singleplayer: side 0 on, side 1 off.
+        if (SideManager.Instance != null)
+        {
+            SideManager.Instance.SetSidesVisible(true, false);
+            SideManager.Instance.UpdateAllSides();
+        }
+
+        // Restore the active joker for this run
+        if (savedData.activeJokerId >= 0)
+        {
+            JokerController.SetActiveJoker(savedData.activeJokerId);
+            Debug.Log($"[SinglePlayerModeController] Restored active joker: ID {savedData.activeJokerId}");
+        }
+
+        // Start at the saved stage and opponent
+        // We'll skip joker selection since it's already been chosen and saved
+        Debug.Log($"[SinglePlayerModeController] Resuming at Stage {currentStage}, Opponent {currentOpponentDifficulty + 1}/3");
+        StartCoroutine(StartRoundLoop(currentOpponentDifficulty));
     }
 
     /// <summary>
@@ -457,7 +549,63 @@ public class SinglePlayerModeController : MonoBehaviour
             Debug.LogWarning("[SinglePlayerModeController] ElHolderScript.LocalInstance not found");
         }
 
+        // 5. Opponent health display will be initialized when round starts with pre-calculated opponent max health
+        if (opponentHealthDisplay == null)
+        {
+            Debug.LogWarning("[SinglePlayerModeController] OpponentHealthDisplay not found - will be initialized at round start");
+        }
+        else
+        {
+            // Keep the component disabled until a round actually starts
+            opponentHealthDisplay.SetActive(false);
+            Debug.Log("[SinglePlayerModeController] OpponentHealthDisplay ready (will be activated at round start)");
+        }
+
         Debug.Log("[SinglePlayerModeController] === PLAYER REGISTRATION COMPLETE ===\n");
+    }
+
+    /// <summary>
+    /// Calculate opponent's max health based on current stage and difficulty.
+    /// Formula: BaseHealth × StageDifficultyMultiplier × DifficultyFactor
+    /// Easy: 1.0, Normal: 1.15, Hard: 1.35
+    /// </summary>
+    private int CalculateOpponentMaxHealth(int difficulty)
+    {
+        float difficultyFactor = difficulty switch
+        {
+            0 => 1.0f,   // Easy
+            1 => 1.15f,  // Normal
+            2 => 1.35f,  // Hard
+            _ => 1.0f
+        };
+
+        int calculatedHealth = Mathf.RoundToInt(OPPONENT_BASE_HEALTH * currentStageDifficultyMultiplier * difficultyFactor);
+        Debug.Log($"[SinglePlayerModeController] Calculated opponent health - Stage {currentStage}, Difficulty {difficulty} ({GetDifficultyName(difficulty)}): {OPPONENT_BASE_HEALTH} × {currentStageDifficultyMultiplier:F2} × {difficultyFactor:F2} = {calculatedHealth}");
+        return calculatedHealth;
+    }
+
+    /// <summary>
+    /// Pre-calculate health for all 3 opponents in this stage.
+    /// Called once at the start of StartRoundLoop before any rounds begin.
+    /// This allows displaying opponent info to the player before rounds start.
+    /// </summary>
+    private void CalculateStageOpponentsInfo()
+    {
+        Debug.Log($"[SinglePlayerModeController] === CALCULATING OPPONENT INFO FOR STAGE {currentStage} ===");
+
+        stageOpponentsInfo = new List<OpponentInfo>();
+        for (int difficulty = 0; difficulty < 3; difficulty++)
+        {
+            int maxHealth = CalculateOpponentMaxHealth(difficulty);
+            stageOpponentsInfo.Add(new OpponentInfo
+            {
+                difficulty = difficulty,
+                maxHealth = maxHealth
+            });
+            Debug.Log($"[SinglePlayerModeController] Stage {currentStage} Opponent {difficulty + 1}/3 ({GetDifficultyName(difficulty)}): MaxHealth = {maxHealth}");
+        }
+
+        Debug.Log($"[SinglePlayerModeController] === OPPONENT INFO CALCULATION COMPLETE ===");
     }
 
     // ===== LOOP RESET FUNCTIONS =====
@@ -475,6 +623,12 @@ public class SinglePlayerModeController : MonoBehaviour
         if (GameManager.LocalInstance != null)
             GameManager.LocalInstance.ResetForNewGame();
 
+        // Deactivate health display during reset
+        if (opponentHealthDisplay != null)
+        {
+            opponentHealthDisplay.SetActive(false);
+        }
+
         // Reset singleplayer progression
         currentStage = 0;
         currentRoundInStage = 0;
@@ -487,6 +641,7 @@ public class SinglePlayerModeController : MonoBehaviour
         isDeckInitializedForRound = false;
         deckCardsDict = null;
         roundIsWaiting = true;
+        awaitingRoundContinue = false;
 
         // Reset turn management
         IsPlayerTurn = false;
@@ -497,6 +652,12 @@ public class SinglePlayerModeController : MonoBehaviour
         opponentHandList.Clear();
         localCenterCards.Clear();
         cardsRemainingInDeck = 0;
+
+        // Reset gold for a fresh run
+        if (SuperPowerSpawner.LocalInstance != null)
+        {
+            SuperPowerSpawner.LocalInstance.ResetGoldToStarting();
+        }
 
         Debug.Log("[SinglePlayerModeController] Run reset complete");
     }
@@ -540,12 +701,34 @@ public class SinglePlayerModeController : MonoBehaviour
         currentRoundInStage++;
         currentOpponentDifficulty = opponentDifficulty;
 
-        // Reset opponent health and scores for a fresh fight
+        // Get pre-calculated max health for this opponent from stage info
+        if (stageOpponentsInfo != null && opponentDifficulty < stageOpponentsInfo.Count)
+        {
+            opponentMaxHealth = stageOpponentsInfo[opponentDifficulty].maxHealth;
+            Debug.Log($"[SinglePlayerModeController] Using pre-calculated opponent max health: {opponentMaxHealth}");
+        }
+        else
+        {
+            // Fallback if info not pre-calculated (shouldn't happen if flow is correct)
+            opponentMaxHealth = CalculateOpponentMaxHealth(opponentDifficulty);
+            Debug.LogWarning($"[SinglePlayerModeController] Fallback: calculated opponent max health: {opponentMaxHealth}");
+        }
+
+        // Reset opponent health to 0 (no damage dealt yet at round start)
         opponentHealth = 0;
         if (currentRoundData == null) currentRoundData = new SinglePlayerRoundData();
         currentRoundData.currentRound++;
         currentRoundData.totalDamageDealt = 0;
         currentRoundData.opponentDamageDealt = 0;
+
+        // Initialize opponent health display with the pre-calculated max health
+        // At round start, opponent health = 0 and display max health = pre-calculated value
+        if (opponentHealthDisplay != null)
+        {
+            opponentHealthDisplay.SetActive(true);
+            opponentHealthDisplay.InitializeHealthDisplay(opponentMaxHealth);
+            Debug.Log($"[SinglePlayerModeController] Initialized OpponentHealthDisplay: maxHealth={opponentMaxHealth}, currentHealth=0 (will show as full bar)");
+        }
 
         // Reset turn state — player always starts each round
         GameManager.currentPlayerNo = 0;
@@ -688,33 +871,55 @@ public class SinglePlayerModeController : MonoBehaviour
     /// <summary>
     /// STAGE LOOP: Manages the 3 opponents in this stage.
     /// Loops through difficulties 0 (Easy) → 1 (Normal) → 2 (Hard).
+    /// Each opponent battle automatically transitions to the next when defeated via CheckRoundEndConditions().
+    /// When all 3 are defeated, calls OnStageCleared() to advance to next stage.
     /// </summary>
     private IEnumerator StartRoundLoop(int startingDifficulty)
     {
-        Debug.Log($"[SinglePlayerModeController] === STAGE LOOP START ===");
+        Debug.Log($"[SinglePlayerModeController] === STAGE {currentStage} LOOP START ===");
+        Debug.Log($"[SinglePlayerModeController] Opponents: Easy → Normal → Hard");
+
+        // PRE-CALCULATE opponent info for all 3 opponents before any round starts
+        // This allows the UI to display opponent stats at stage start
+        CalculateStageOpponentsInfo();
 
         for (int difficulty = startingDifficulty; difficulty < 3; difficulty++)
         {
             currentOpponentDifficulty = difficulty;
             
+            Debug.Log($"[SinglePlayerModeController] >> Starting opponent {difficulty + 1}/3 ({GetDifficultyName(difficulty)}) in Stage {currentStage}");
+            
             // ROUND LOOP: Run a single opponent battle
             yield return StartCoroutine(StartRound(difficulty));
-            
-            // After round ends, check if we won (OnOpponentDefeated already increments difficulty)
-            // If all 3 opponents defeated, we exit this loop and stage clears
+
+            if (opponentHealth >= opponentMaxHealth)
+            {
+                Debug.Log($"[SinglePlayerModeController] << Opponent {difficulty + 1} defeated. Waiting for round-end continue...");
+                yield return new WaitUntil(() => awaitingRoundContinue);
+                awaitingRoundContinue = false;
+                continue;
+            }
+
+            if (!isGameRunning && !roundIsWaiting)
+            {
+                Debug.Log($"[SinglePlayerModeController] << Round ended without victory. Stopping stage loop.");
+                yield break;
+            }
         }
 
-        Debug.Log($"[SinglePlayerModeController] === STAGE LOOP COMPLETE - ALL OPPONENTS DEFEATED ===");
+        Debug.Log($"[SinglePlayerModeController] === STAGE {currentStage} LOOP COMPLETE - ALL OPPONENTS DEFEATED ===");
         OnStageCleared();
     }
 
     /// <summary>
     /// ROUND LOOP: Manages a single round with one opponent.
     /// Handles deck setup, initial deals, then drives the sequential turn loop.
+    /// When opponent is defeated or player loses, CheckRoundEndConditions() triggers automatic transition.
     /// </summary>
     private IEnumerator StartRound(int opponentDifficulty)
     {
-        Debug.Log($"\n>> ROUND START - Opponent #{opponentDifficulty + 1} ({GetDifficultyName(opponentDifficulty)})\n");
+        Debug.Log($"[SinglePlayerModeController] ┌─ ROUND START: Opponent #{opponentDifficulty + 1}/3 ({GetDifficultyName(opponentDifficulty)})");
+        Debug.Log($"[SinglePlayerModeController] │  Difficulty Multiplier: {currentStageDifficultyMultiplier:F2}x");
 
         ResetForRound(opponentDifficulty);
 
@@ -729,6 +934,7 @@ public class SinglePlayerModeController : MonoBehaviour
         {
             if (!isDeckInitializedForRound)
             {
+                Debug.Log($"[SinglePlayerModeController] │  Building fresh deck for stage {currentStage}");
                 BuildFreshDeck();
                 ShuffleDeck();
                 isDeckInitializedForRound = true;
@@ -738,7 +944,7 @@ public class SinglePlayerModeController : MonoBehaviour
             Dictionary<string, int[]> dealtCardValueLookup = new Dictionary<string, int[]>(deckCardsDict);
 
             yield return StartCoroutine(deckController.DeckStart());
-            Debug.Log("[SinglePlayerModeController] Deck ready");
+            Debug.Log("[SinglePlayerModeController] │  Deck ready");
 
             var (centerCardIDs, playerHands) = DealFromDeck(true);
             handsDealtCount = 1;
@@ -756,19 +962,22 @@ public class SinglePlayerModeController : MonoBehaviour
             cardsRemainingInDeck = deckCardsDict.Count;
 
             yield return StartCoroutine(deckController.DealCenter(centerCardIDs));
-            Debug.Log("[SinglePlayerModeController] Center cards dealt");
+            Debug.Log("[SinglePlayerModeController] │  Center cards dealt");
 
             deckController.DealPlayers(2, playerHands);
-            Debug.Log("[SinglePlayerModeController] Player hands dealt");
+            Debug.Log("[SinglePlayerModeController] │  Player hands dealt");
         }
 
         isGameRunning = true;
-        Debug.Log($"[SinglePlayerModeController] Round ready! Opponent has {OPPONENT_HEALTH_PER_ROUND} HP. Deck remaining: {cardsRemainingInDeck}");
+        Debug.Log($"[SinglePlayerModeController] │  Game Start: Opponent {opponentMaxHealth} HP | Deck: {cardsRemainingInDeck} remaining");
+        Debug.Log($"[SinglePlayerModeController] └─ Starting turn sequence...");
 
         // Drive sequential Player → Opponent → Player turns until round ends
+        // Round ends when CheckRoundEndConditions() detects opponent defeated or player defeated
         yield return StartCoroutine(GameTurnLoop());
 
-        Debug.Log("[SinglePlayerModeController] Round ended. Returning to stage loop.");
+        Debug.Log($"[SinglePlayerModeController] └─ ROUND END: Opponent Health = {opponentHealth}/{opponentMaxHealth}");
+        Debug.Log($"[SinglePlayerModeController] └─ Returning to stage loop for next opponent...");
     }
 
     /// <summary>
@@ -957,19 +1166,12 @@ public class SinglePlayerModeController : MonoBehaviour
         currentRoundData.totalDamageDealt += damageDealt;
         opponentHealth += damageDealt;
 
-        Debug.Log($"[DEBUG] Damage dealt: {damageDealt} | Total this round: {currentRoundData.totalDamageDealt} | Opponent HP: {opponentHealth}/{OPPONENT_HEALTH_PER_ROUND}\n");
+        Debug.Log($"[DEBUG] Damage dealt: {damageDealt} | Total this round: {currentRoundData.totalDamageDealt} | Opponent HP: {opponentHealth}/{opponentMaxHealth}\n");
 
         UpdateOpponentHealthDisplay();
 
         // Check if opponent defeated
-        if (opponentHealth >= OPPONENT_HEALTH_PER_ROUND)
-        {
-            OnOpponentDefeated();
-        }
-        else
-        {
-            Debug.Log($"[DEBUG] Opponent still has {OPPONENT_HEALTH_PER_ROUND - opponentHealth} HP remaining.\n");
-        }
+        CheckRoundEndConditions();
     }
 
     /// <summary>
@@ -997,8 +1199,8 @@ public class SinglePlayerModeController : MonoBehaviour
     public void DebugDefeatCurrentOpponent()
     {
         Debug.Log($"[DEBUG] Forcing opponent defeat!");
-        opponentHealth = OPPONENT_HEALTH_PER_ROUND;
-        OnOpponentDefeated();
+        opponentHealth = opponentMaxHealth;
+        CheckRoundEndConditions();
     }
 
     /// <summary>
@@ -1153,6 +1355,12 @@ public class SinglePlayerModeController : MonoBehaviour
                 GameManager.LocalInstance.myCards.Remove(cardId);
                 Debug.Log($"[SinglePlayerModeController] Removed {cardId} from player's hand after capture");
             }
+
+            // Trigger gold gain logic for capture (mirroring multiplayer flow)
+            if (SuperPowerSpawner.LocalInstance != null)
+            {
+                SuperPowerSpawner.LocalInstance.OnLocalCapture(cardId);
+            }
         }
 
         // Animate card play using DeckController (same as multiplayer)
@@ -1176,14 +1384,12 @@ public class SinglePlayerModeController : MonoBehaviour
         currentRoundData.totalDamageDealt += damageDealt;
         opponentHealth += damageDealt;
 
-        Debug.Log($"[SinglePlayerModeController] Damage: {damageDealt} | Total: {currentRoundData.totalDamageDealt} | Opponent HP: {opponentHealth}/{OPPONENT_HEALTH_PER_ROUND}");
+        Debug.Log($"[SinglePlayerModeController] Damage: {damageDealt} | Total: {currentRoundData.totalDamageDealt} | Opponent HP: {opponentHealth}/{opponentMaxHealth}");
 
         UpdateOpponentHealthDisplay();
 
-        if (opponentHealth >= OPPONENT_HEALTH_PER_ROUND)
-        {
-            OnOpponentDefeated();
-        }
+        // Check if opponent defeated and handle round transitions
+        CheckRoundEndConditions();
 
         playerMoveSignal = true; // Unblock WaitForPlayerInput after animation completes
     }
@@ -1269,17 +1475,50 @@ public class SinglePlayerModeController : MonoBehaviour
     }
 
     /// <summary>
-    /// Called when opponent is defeated (opponentHealth >= OPPONENT_HEALTH_PER_ROUND).
-    /// Signals round end - the round loop will check stage completion.
+    /// Check if the current round should end based on game state (opponent defeated or player defeated).
+    /// Called whenever opponent health changes to determine if round should end and trigger transitions.
+    /// Automatically handles transition to next round or next stage based on stage progress.
     /// </summary>
-    private void OnOpponentDefeated()
+    private void CheckRoundEndConditions()
     {
-        Debug.Log($"\n✓ OPPONENT DEFEATED! Stage {currentStage}, Opponent {currentOpponentDifficulty} ({GetDifficultyName(currentOpponentDifficulty)}) defeated.\n");
+        // Check 1: Is opponent defeated?
+        if (opponentHealth >= opponentMaxHealth)
+        {
+            Debug.Log($"\n╔════════════════════════════════╗");
+            Debug.Log($"║ ✓ OPPONENT {currentRoundInStage}/3 DEFEATED! ║");
+            Debug.Log($"║ Stage {currentStage} • Health {opponentHealth}/{opponentMaxHealth}   ║");
+            Debug.Log($"╚════════════════════════════════╝");
 
-        isGameRunning = false;
-        roundIsWaiting = false; // Signal round loop to exit
+            isGameRunning = false;
+            roundIsWaiting = false; // Signal GameTurnLoop to exit
+            awaitingRoundContinue = false;
 
-        RunManager.SaveRunProgress(BuildRunProgressData());
+            RunManager.SaveRunProgress(BuildRunProgressData());
+
+            ShowRoundEndScreen("Round Complete! Press Continue for the next opponent.");
+
+            // Determine next action based on stage progress
+            if (currentRoundInStage < 3) // More opponents in this stage (0-indexed: 0, 1, 2)
+            {
+                int remainingOpponents = 3 - currentRoundInStage;
+                Debug.Log($"[SinglePlayerModeController] {remainingOpponents} opponent(s) remaining in stage {currentStage}. Next round will start automatically.\n");
+                // The StartRoundLoop coroutine will automatically call StartRound with next difficulty
+                // which will call ResetForRound and begin the next opponent fight
+            }
+            else
+            {
+                // All 3 opponents in this stage defeated (currentRoundInStage == 3)
+                Debug.Log($"\n╔════════════════════════════════╗");
+                Debug.Log($"║ ✓✓ STAGE {currentStage} COMPLETE!    ║");
+                Debug.Log($"║ All 3 opponents defeated       ║");
+                Debug.Log($"╚════════════════════════════════╝\n");
+                // OnStageCleared will be called by StartRoundLoop when the difficulty loop ends
+            }
+            return;
+        }
+
+        // Check 2: Is player defeated? (checked in GameTurnLoop when both hands empty and no more deals)
+        // Player defeat is handled in GameTurnLoop's hand re-deal logic, not here
     }
 
     /// <summary>
@@ -1289,7 +1528,8 @@ public class SinglePlayerModeController : MonoBehaviour
     private void OnStageCleared()
     {
         Debug.Log($"\n╔════════════════════════════════╗");
-        Debug.Log($"║ STAGE {currentStage} CLEARED!          ║");
+        Debug.Log($"║  STAGE {currentStage} CLEARED!            ║");
+        Debug.Log($"║  Advancing to Stage {currentStage + 1}...            ║");
         Debug.Log($"╚════════════════════════════════╝\n");
 
         currentStage++;
@@ -1318,14 +1558,25 @@ public class SinglePlayerModeController : MonoBehaviour
 
     /// <summary>
     /// Called when player loses (deck empty before defeating opponent).
-    /// Signals round end.
+    /// Signals round end and shows loss UI.
     /// </summary>
     private void OnPlayerLost()
     {
-        Debug.Log($"[SinglePlayerModeController] Player lost at Stage {currentStage}, Opponent {currentOpponentDifficulty}");
+        Debug.Log($"\n╔════════════════════════════════╗");
+        Debug.Log($"║ ✗ PLAYER LOST                 ║");
+        Debug.Log($"║ Stage {currentStage} • Opponent {currentRoundInStage}/3   ║");
+        Debug.Log($"║ Deck exhausted before victory  ║");
+        Debug.Log($"╚════════════════════════════════╝\n");
 
         isGameRunning = false;
         roundIsWaiting = false; // Signal round loop to exit
+        awaitingRoundContinue = false;
+
+        // Deactivate health display
+        if (opponentHealthDisplay != null)
+        {
+            opponentHealthDisplay.SetActive(false);
+        }
 
         // Show loss screen with summary
         // TODO: Show UI with stage reached, opponent defeated count, etc.
@@ -1352,15 +1603,10 @@ public class SinglePlayerModeController : MonoBehaviour
     /// </summary>
     private void UpdateOpponentHealthDisplay()
     {
-        if (opponentHealthBarImage != null)
+        // Update health display slider
+        if (opponentHealthDisplay != null)
         {
-            float healthPercent = Mathf.Clamp01((float)opponentHealth / OPPONENT_HEALTH_PER_ROUND);
-            opponentHealthBarImage.fillAmount = healthPercent;
-        }
-
-        if (opponentHealthText != null)
-        {
-            opponentHealthText.text = $"{opponentHealth}/{OPPONENT_HEALTH_PER_ROUND}";
+            opponentHealthDisplay.UpdateHealth(opponentHealth);
         }
     }
 
@@ -1384,6 +1630,7 @@ public class SinglePlayerModeController : MonoBehaviour
             currentRound = currentRoundData?.currentRound ?? 0,
             totalDamageDealt = currentRoundData?.totalDamageDealt ?? 0,
             activeJokerId = currentRoundData?.activeJokerId ?? -1,
+            currentGold = SuperPowerSpawner.LocalInstance != null ? SuperPowerSpawner.LocalInstance.GetCurrentGold() : 0,
             seed = currentRunConfig.seed,
             deckClassName = currentRunConfig.deckClassName,
             timestamp = DateTime.Now.Ticks
@@ -1511,10 +1758,47 @@ public class SinglePlayerModeController : MonoBehaviour
         Debug.Log($"[SPMC] ExecuteZaferPuani: {points} points earned.");
         opponentHealth += points;
         UpdateOpponentHealthDisplay();
-        
-        if (opponentHealth >= OPPONENT_HEALTH_PER_ROUND)
-        {
-            OnOpponentDefeated();
-        }
+
+            CheckRoundEndConditions();
     }
+
+    /// <summary>
+    /// Show a simple transition screen at the end of a round.
+    /// Blocks progression until player presses Continue.
+    /// </summary>
+    private void ShowRoundEndScreen(string message)
+    {
+        awaitingRoundContinue = false;
+
+        if (roundEndScreenParent == null || roundEndContinueButton == null)
+        {
+            Debug.LogError("[SinglePlayerModeController] Round end UI references are not assigned.");
+            return;
+        }
+
+        roundEndScreenParent.SetActive(true);
+
+        roundEndContinueButton.onClick.RemoveAllListeners();
+        roundEndContinueButton.onClick.AddListener(ProceedToNextRound);
+    }
+
+    /// <summary>
+    /// Called when player presses Continue on the round end screen.
+    /// Decides whether to start next round or next stage.
+    /// </summary>
+    private void ProceedToNextRound()
+    {
+        if (roundEndScreenParent != null)
+        {
+            roundEndScreenParent.gameObject.SetActive(false);
+        }
+        else
+        {
+            Debug.LogError("roundEndScreenParent is not assigned!");
+        }
+
+        awaitingRoundContinue = true;
+    }
+
+
 }

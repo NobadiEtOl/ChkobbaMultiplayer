@@ -29,6 +29,7 @@ public class MainUIScript : MonoBehaviour
     [SerializeField] private TMP_InputField seedInputField;
     [SerializeField] private TMP_Dropdown deckClassDropdown;
     [SerializeField] private Button startSinglePlayerButton;
+    [SerializeField] private Button continueSavedRunButton; // Continue button for saved runs
     
     private Coroutine joinCodeAnimationCoroutine;
     
@@ -57,6 +58,14 @@ public class MainUIScript : MonoBehaviour
             startSinglePlayerButton.onClick.AddListener(OnStartSinglePlayerButtonClicked);
         }
 
+        // Wire up continue button if assigned
+        if (continueSavedRunButton != null)
+        {
+            continueSavedRunButton.onClick.AddListener(OnContinueSavedRunButtonClicked);
+            // Update visibility based on saved run status
+            UpdateContinueButtonVisibility();
+        }
+
         // Ensure deck class dropdown has at least one option
         if (deckClassDropdown != null && deckClassDropdown.options.Count == 0)
         {
@@ -74,6 +83,9 @@ public class MainUIScript : MonoBehaviour
     {
         quickPlayUI.SetActive(true);
         startingScreenUI.SetActive(false);
+        
+        // Update continue button visibility when quickplay UI is shown
+        UpdateContinueButtonVisibility();
     }
     public void OnCreateRoomButtonClicked()
     {
@@ -196,6 +208,56 @@ public class MainUIScript : MonoBehaviour
         Debug.Log("[MainUIScript] Run Settings Close Button Clicked");
         if (runSettingsPanel != null) runSettingsPanel.SetActive(false);
         if (quickPlayUI != null) quickPlayUI.SetActive(true);
+    }
+
+    /// <summary>
+    /// Called when the Continue Saved Run button is pressed.
+    /// Resumes the previously saved single player run.
+    /// </summary>
+    public void OnContinueSavedRunButtonClicked()
+    {
+        Debug.Log("[MainUIScript] Continue Saved Run button clicked");
+
+        // Check if there's actually a saved run
+        if (!RunManager.HasSavedRunProgress())
+        {
+            Debug.LogWarning("[MainUIScript] No saved run progress found! Cannot continue.");
+            return;
+        }
+
+        // Close quickplay UI
+        if (quickPlayUI != null) quickPlayUI.SetActive(false);
+
+        // Resume the saved run
+        if (SinglePlayerModeController.Instance != null)
+        {
+            SinglePlayerModeController.Instance.ResumeSavedRun();
+        }
+        else
+        {
+            Debug.LogError("[MainUIScript] SinglePlayerModeController not found in scene!");
+        }
+    }
+
+    /// <summary>
+    /// Update the visibility of the Continue button based on whether a saved run exists.
+    /// Called when quickplay UI is shown.
+    /// </summary>
+    private void UpdateContinueButtonVisibility()
+    {
+        if (continueSavedRunButton == null) return;
+
+        bool hasSavedRun = RunManager.HasSavedRunProgress();
+        continueSavedRunButton.gameObject.SetActive(hasSavedRun);
+
+        if (hasSavedRun)
+        {
+            Debug.Log("[MainUIScript] Saved run found - Continue button is visible");
+        }
+        else
+        {
+            Debug.Log("[MainUIScript] No saved run - Continue button is hidden");
+        }
     }
 
     /// <summary>

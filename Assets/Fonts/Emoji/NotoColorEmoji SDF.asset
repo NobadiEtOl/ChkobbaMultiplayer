@@ -135,6 +135,10 @@ MonoBehaviour:
       m_LigatureGlyphID: 1537
     - m_ComponentGlyphIDs: 100300001200000012020000
       m_LigatureGlyphID: 1919
+    - m_ComponentGlyphIDs: 0700000015000000
+      m_LigatureGlyphID: 1485
+    - m_ComponentGlyphIDs: 0600000015000000
+      m_LigatureGlyphID: 1484
     m_GlyphPairAdjustmentRecords: []
     m_MarkToBaseAdjustmentRecords: []
     m_MarkToMarkAdjustmentRecords: []
@@ -268,9 +272,9 @@ Material:
     - _OutlineWidth: 0
     - _PerspectiveFilter: 0.875
     - _Reflectivity: 10
-    - _ScaleRatioA: 1
-    - _ScaleRatioB: 1
-    - _ScaleRatioC: 1
+    - _ScaleRatioA: 0.9
+    - _ScaleRatioB: 0.73125
+    - _ScaleRatioC: 0.73125
     - _ScaleX: 1
     - _ScaleY: 1
     - _ShaderFlags: 0

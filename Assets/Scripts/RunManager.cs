@@ -15,8 +15,9 @@ public static class RunManager
         public int currentRound;              // Within the current opponent round
         public int totalDamageDealt;          // Cumulative opponent damage
         public int activeJokerId;             // Selected joker for this run
+        public int currentGold;               // Player's gold amount
         public int seed;                      // Deck seed
-        public string deckClassName;          // "Balanced", "Aggressive", etc.
+public string deckClassName;          // "Balanced", "Aggressive", etc.
         public long timestamp;                // Run start time
     }
 
@@ -26,8 +27,9 @@ public static class RunManager
     private const string KEY_ROUND = PLAYERPREFS_PREFIX + "CurrentRound";
     private const string KEY_TOTAL_DAMAGE = PLAYERPREFS_PREFIX + "TotalDamageDealt";
     private const string KEY_JOKER_ID = PLAYERPREFS_PREFIX + "ActiveJokerId";
+    private const string KEY_GOLD = PLAYERPREFS_PREFIX + "CurrentGold";
     private const string KEY_SEED = PLAYERPREFS_PREFIX + "Seed";
-    private const string KEY_DECK_CLASS = PLAYERPREFS_PREFIX + "DeckClass";
+private const string KEY_DECK_CLASS = PLAYERPREFS_PREFIX + "DeckClass";
     private const string KEY_TIMESTAMP = PLAYERPREFS_PREFIX + "Timestamp";
 
     /// <summary>
@@ -49,8 +51,9 @@ public static class RunManager
         PlayerPrefs.SetInt(KEY_ROUND, data.currentRound);
         PlayerPrefs.SetInt(KEY_TOTAL_DAMAGE, data.totalDamageDealt);
         PlayerPrefs.SetInt(KEY_JOKER_ID, data.activeJokerId);
+        PlayerPrefs.SetInt(KEY_GOLD, data.currentGold);
         PlayerPrefs.SetInt(KEY_SEED, data.seed);
-        PlayerPrefs.SetString(KEY_DECK_CLASS, data.deckClassName ?? "Balanced");
+PlayerPrefs.SetString(KEY_DECK_CLASS, data.deckClassName ?? "Balanced");
         PlayerPrefs.SetString(KEY_TIMESTAMP, data.timestamp.ToString());
 
         PlayerPrefs.Save();
@@ -79,6 +82,7 @@ public static class RunManager
                 currentRound = PlayerPrefs.GetInt(KEY_ROUND, 0),
                 totalDamageDealt = PlayerPrefs.GetInt(KEY_TOTAL_DAMAGE, 0),
                 activeJokerId = PlayerPrefs.GetInt(KEY_JOKER_ID, -1),
+                currentGold = PlayerPrefs.GetInt(KEY_GOLD, 0),
                 seed = PlayerPrefs.GetInt(KEY_SEED, 0),
                 deckClassName = PlayerPrefs.GetString(KEY_DECK_CLASS, "Balanced"),
                 timestamp = long.Parse(PlayerPrefs.GetString(KEY_TIMESTAMP, "0"))
@@ -109,8 +113,9 @@ public static class RunManager
         PlayerPrefs.DeleteKey(KEY_ROUND);
         PlayerPrefs.DeleteKey(KEY_TOTAL_DAMAGE);
         PlayerPrefs.DeleteKey(KEY_JOKER_ID);
+        PlayerPrefs.DeleteKey(KEY_GOLD);
         PlayerPrefs.DeleteKey(KEY_SEED);
-        PlayerPrefs.DeleteKey(KEY_DECK_CLASS);
+PlayerPrefs.DeleteKey(KEY_DECK_CLASS);
         PlayerPrefs.DeleteKey(KEY_TIMESTAMP);
 
         PlayerPrefs.Save();

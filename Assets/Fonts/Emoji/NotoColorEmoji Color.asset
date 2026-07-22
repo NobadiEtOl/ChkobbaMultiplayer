@@ -501,6 +501,10 @@ MonoBehaviour:
       m_LigatureGlyphID: 2293
     - m_ComponentGlyphIDs: 9000000012000000fd040000
       m_LigatureGlyphID: 3488
+    - m_ComponentGlyphIDs: 0700000015000000
+      m_LigatureGlyphID: 1485
+    - m_ComponentGlyphIDs: 0600000015000000
+      m_LigatureGlyphID: 1484
     m_GlyphPairAdjustmentRecords: []
     m_MarkToBaseAdjustmentRecords: []
     m_MarkToMarkAdjustmentRecords: []

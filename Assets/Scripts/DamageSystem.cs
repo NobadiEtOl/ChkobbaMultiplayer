@@ -202,6 +202,7 @@ public static class DamageSystem
         {
             modifiedDamage += jokerModifiers.pistiCaptureBonusDamage;
         }
+        
 
         // Round to nearest integer
         return Mathf.RoundToInt(modifiedDamage);
