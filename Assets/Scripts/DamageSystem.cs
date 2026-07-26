@@ -62,10 +62,7 @@ public static class DamageSystem
             // Check if any captured card is a Jack (value 11)
             bool hasJack = telemetry.capturedCardValues.Contains(11);
             int damage = hasJack ? damageAmount : 0;
-            
-            if (damage > 0)
-                Debug.Log($"[DamageSystem] Jack Capture: +{damage} damage");
-            
+                            
             return damage;
         }
     }
@@ -86,10 +83,7 @@ public static class DamageSystem
             // Check if there's at least one non-Jack card captured
             bool hasNormalCard = telemetry.capturedCardValues.Any(v => v != 11);
             int damage = hasNormalCard ? damageAmount : 0;
-            
-            if (damage > 0)
-                Debug.Log($"[DamageSystem] Normal Capture: +{damage} damage");
-            
+
             return damage;
         }
     }
@@ -110,10 +104,7 @@ public static class DamageSystem
             // Pişti without Jack
             bool isRegularPisti = telemetry.isPişti && !telemetry.isJackPişti;
             int damage = isRegularPisti ? damageAmount : 0;
-            
-            if (damage > 0)
-                Debug.Log($"[DamageSystem] Regular Pişti: +{damage} damage");
-            
+    
             return damage;
         }
     }
@@ -134,9 +125,7 @@ public static class DamageSystem
             // Both pişti AND jack pişti
             bool isJackPisti = telemetry.isPişti && telemetry.isJackPişti;
             int damage = isJackPisti ? damageAmount : 0;
-            
-            if (damage > 0)
-                Debug.Log($"[DamageSystem] Jack Pişti: +{damage} damage");
+                
             
             return damage;
         }
@@ -160,12 +149,12 @@ public static class DamageSystem
             baseDamage += conditionDamage;
         }
 
-        Debug.Log($"[DamageSystem] Base damage: {baseDamage}");
+        
 
         // Apply joker modifiers
         int modifiedDamage = ApplyJokerModifiers(baseDamage, telemetry, jokerModifiers);
 
-        Debug.Log($"[DamageSystem] Final damage after joker modifiers: {modifiedDamage}");
+        
 
         return modifiedDamage;
     }

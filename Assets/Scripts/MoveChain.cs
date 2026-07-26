@@ -49,14 +49,14 @@ public struct MoveChain : INetworkSerializable
         // Check version mismatch
         if (chainVersion != otherChain.chainVersion)
         {
-            Debug.LogWarning($"[MoveChain] Version mismatch: this={chainVersion}, other={otherChain.chainVersion}");
+            
             return ValidationResult.VersionMismatch;
         }
         
         // Check hash mismatch (quick check)
         if (chainHash != otherChain.chainHash)
         {
-            Debug.LogWarning($"[MoveChain] Hash mismatch detected");
+            
             
             // Find the specific move that mismatches
             var thisMoves = ToList();
@@ -68,7 +68,7 @@ public struct MoveChain : INetworkSerializable
                 if (!thisMoves[i].MatchesMove(otherMoves[i]))
                 {
                     firstMismatchIndex = i;
-                    Debug.LogError($"[MoveChain] First mismatch at move index {i}: {thisMoves[i].moveId} vs {otherMoves[i].moveId}");
+                    
                     return ValidationResult.MoveMismatch;
                 }
             }

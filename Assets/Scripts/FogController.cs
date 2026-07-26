@@ -26,7 +26,7 @@ public class FogController : MonoBehaviour
 
     public void StartFog()
     {
-        Debug.LogError("StartFog");
+        
         if (animator != null)
         {
             animator.enabled = true;
@@ -40,7 +40,7 @@ public class FogController : MonoBehaviour
     [ContextMenu("Stop Fog")]
     public void StopFog()
     {
-        Debug.Log("StopFog");
+        
         if (animator != null)
             animator.speed = 0f;
         if (fadeCoroutine != null) StopCoroutine(fadeCoroutine);

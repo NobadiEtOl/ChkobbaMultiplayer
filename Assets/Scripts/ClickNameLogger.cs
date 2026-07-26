@@ -11,7 +11,7 @@ public class ClickNameLogger : MonoBehaviour
         mainCamera = Camera.main;
         if (mainCamera == null)
         {
-            Debug.LogWarning("[ClickNameLogger] No Main Camera found in the scene.");
+            
         }
     }
 
@@ -39,7 +39,7 @@ public class ClickNameLogger : MonoBehaviour
 
             if (results.Count > 0)
             {
-                Debug.Log($"[ClickName] {results[0].gameObject.name}");
+                
                 return;
             }
         }
@@ -50,7 +50,7 @@ public class ClickNameLogger : MonoBehaviour
             Ray ray = mainCamera.ScreenPointToRay(screenPosition);
             if (Physics.Raycast(ray, out RaycastHit hit))
             {
-                Debug.Log($"[ClickName] {hit.collider.gameObject.name}");
+                
                 return;
             }
         }

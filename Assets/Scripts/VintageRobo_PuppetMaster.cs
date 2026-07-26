@@ -122,7 +122,7 @@ public class VintageRobo_PuppetMaster : MonoBehaviour
 
         if (puppetStrings == null)
         {
-            Debug.LogError("VintageRobo_PuppetMaster: No VintageRobo_PuppetStrings component found! Please assign it in the Inspector.");
+            
             enabled = false;
             return;
         }
@@ -181,7 +181,7 @@ public class VintageRobo_PuppetMaster : MonoBehaviour
 
         }
 
-        Debug.Log("All reach point connection points positioned directly above their target bones");
+        
     }
 
     private void CalculateTargetOffsets()
@@ -191,7 +191,7 @@ public class VintageRobo_PuppetMaster : MonoBehaviour
             // Skip if no IK target assigned
             if (hand.ikTarget == null)
             {
-                Debug.LogWarning($"Hand setup is missing IK Target! Please assign LeftHandTarget or RightHandTarget.");
+                
                 continue;
             }
             
@@ -207,7 +207,7 @@ public class VintageRobo_PuppetMaster : MonoBehaviour
             // Store this as the hand offset
             hand.handOffset = calculatedOffset;
             
-            Debug.Log($"Calculated IK target offset for {hand.ikTarget.name}: {calculatedOffset}");
+            
         }
     }
 
@@ -229,11 +229,11 @@ public class VintageRobo_PuppetMaster : MonoBehaviour
                 // Unparent from skeleton (set parent to null or to this component's transform)
                 reachPoint.SetParent(transform, true); // worldPositionStays = true
                 
-                Debug.Log($"Unparented {reachPoint.name} from skeleton hierarchy");
+                
             }
         }
         
-        Debug.Log($"Unparented {reachPointOriginalParents.Count} reach points from skeleton");
+        
     }
 
     private Vector3 CalculateConnectionPoint(Transform bone, float connectionPoint)
@@ -295,7 +295,7 @@ public class VintageRobo_PuppetMaster : MonoBehaviour
             }
         }
 
-        Debug.Log($"PuppetMaster: Cached original transforms for {originalPositions.Count} reach points");
+        
     }
 
     private void CacheTargetOriginalTransforms()
@@ -308,7 +308,7 @@ public class VintageRobo_PuppetMaster : MonoBehaviour
             }
         }
         
-        Debug.Log($"PuppetMaster: Cached original transforms for {hands.Count} IK targets");
+        
     }
 
     private void UpdateMasterFingers()
@@ -545,7 +545,7 @@ public class VintageRobo_PuppetMaster : MonoBehaviour
                 }
             }
 
-            Debug.Log($"Created {hand.connectionLines.Count} connection lines for {hand.hand.name}");
+            
         }
     }
 
@@ -702,7 +702,7 @@ public class VintageRobo_PuppetMaster : MonoBehaviour
             return field.GetValue(puppetStrings) as List<VintageRobo_PuppetStrings.PuppetString>;
         }
 
-        Debug.LogWarning("PuppetMaster: Could not access strings list from VintageRobo_PuppetStrings");
+        
         return new List<VintageRobo_PuppetStrings.PuppetString>();
     }
 
@@ -772,7 +772,7 @@ public class VintageRobo_PuppetMaster : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("Enter Play Mode to create connections");
+            
         }
     }
     

@@ -50,8 +50,7 @@ public class MultiplayerPowerProcessor : IPowerProcessor
 
     public void StartKapkacSelection()
     {
-        networkRelay.PauseTurnTimerForPowerServerRPC();
-        networkRelay.StartPowerDurationTimerServerRPC();
+        GameManager.LocalInstance.StartKapkacSelectionPower();
     }
 
     public void ExecuteKapkacOnCard(string cardId)
@@ -61,8 +60,7 @@ public class MultiplayerPowerProcessor : IPowerProcessor
 
     public void StartYandimAnamSelection()
     {
-        networkRelay.PauseTurnTimerForPowerServerRPC();
-        networkRelay.StartPowerDurationTimerServerRPC();
+        GameManager.LocalInstance.StartYandimAnamSelectionPower();
     }
 
     public void ExecuteYandimAnamOnCard(string cardId)
@@ -77,8 +75,7 @@ public class MultiplayerPowerProcessor : IPowerProcessor
 
     public void StartKopyalaYapistirSelection()
     {
-        networkRelay.PauseTurnTimerForPowerServerRPC();
-        networkRelay.StartPowerDurationTimerServerRPC();
+        GameManager.LocalInstance.StartKopyalaYapistirDualSelection(null);
     }
 
     public void ExecuteKopyalaYapistir(string targetId, string sourceId)
@@ -98,8 +95,7 @@ public class MultiplayerPowerProcessor : IPowerProcessor
 
     public void StartBuDahaIyiSelection()
     {
-        networkRelay.PauseTurnTimerForPowerServerRPC();
-        networkRelay.StartPowerDurationTimerServerRPC();
+        GameManager.LocalInstance.StartBuDahaIyiSelectionPower();
     }
 
     public void ExecuteBuDahaIyi(string handCardId, string topCenterCardId)
@@ -109,8 +105,7 @@ public class MultiplayerPowerProcessor : IPowerProcessor
 
     public void StartSunuDegisTokusSelection()
     {
-        networkRelay.PauseTurnTimerForPowerServerRPC();
-        networkRelay.StartPowerDurationTimerServerRPC();
+        GameManager.LocalInstance.StartSunuDegisTokusDualSelection(null, "Şunu Değiş Tokuş");
     }
 
     public void ExecuteSunuDegisTokus(string myCardId, string oppCardId)
@@ -120,8 +115,7 @@ public class MultiplayerPowerProcessor : IPowerProcessor
 
     public void StartSunuDegisBunuTokusSelection()
     {
-        networkRelay.PauseTurnTimerForPowerServerRPC();
-        networkRelay.StartPowerDurationTimerServerRPC();
+        GameManager.LocalInstance.ActivateSunuDegisBunuTokusPower();
     }
 
     public void ExecuteSunuDegisBunuTokus(string[] myCards, string[] oppCards)
@@ -144,5 +138,11 @@ public class MultiplayerPowerProcessor : IPowerProcessor
     public void ExecuteZaferPuani(int points)
     {
         networkRelay.ActivateZaferPuaniServerRPC(points);
+    }
+
+    public void OnGameStateMutated()
+    {
+        // Save game state for reconnection sync after power completion.
+        Server.Singleton?.SaveCurrentGameState();
     }
 }

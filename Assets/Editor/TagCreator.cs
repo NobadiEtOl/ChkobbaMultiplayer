@@ -16,7 +16,7 @@ public class TagCreator : MonoBehaviour
             }
         }
 
-        Debug.Log("Tags generated successfully!");
+        
     }
 
     private static void AddTag(string tag)

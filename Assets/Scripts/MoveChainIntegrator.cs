@@ -40,7 +40,7 @@ public class MoveChainIntegrator : MonoBehaviour
         SetupClientHooks();
         SetupSuperpowerHooks();
         
-        Debug.Log("[MoveChainIntegrator] Move chain integration initialized");
+        
     }
     
     void OnDestroy()
@@ -58,7 +58,7 @@ public class MoveChainIntegrator : MonoBehaviour
         // Check for power operation timeout
         if (isPowerOperationInProgress && Time.time - powerOperationStartTime > powerCompletionTimeout)
         {
-            Debug.LogWarning("[MoveChainIntegrator] Power operation timeout reached, resuming sync checks");
+            
             ResumeSyncChecks();
         }
         
@@ -66,12 +66,12 @@ public class MoveChainIntegrator : MonoBehaviour
         if (!isPowerOperationInProgress && Time.time - lastValidationTime > chainValidationInterval)
         {
             lastValidationTime = Time.time;
-            Debug.Log($"[MoveChainIntegrator] No power operations in progress, triggering validation");
+            
             TriggerPeriodicValidation();
         }
         else if (isPowerOperationInProgress)
         {
-            Debug.Log($"[MoveChainIntegrator] Power operations in progress, skipping validation. Active powers: {activePowers.Count}");
+            
         }
     }
     
@@ -89,15 +89,15 @@ public class MoveChainIntegrator : MonoBehaviour
         // Only validate if both chains have moves
         if (clientChain.chainVersion > 0 && serverChain.chainVersion > 0)
         {
-            Debug.Log($"[MoveChainIntegrator] Validating chains - Client v{clientChain.chainVersion} vs Server v{serverChain.chainVersion}");
+            
             
             var validationResult = clientChain.ValidateAgainst(serverChain, out int mismatchIndex);
             bool isValid = validationResult == MoveChain.ValidationResult.Valid;
             if (!isValid)
             {
-                Debug.LogError($"[MoveChainIntegrator] PERIODIC VALIDATION: Desync detected at move index {mismatchIndex}! Result: {validationResult}");
-                Debug.LogError($"[MoveChainIntegrator] Client chain moves: {clientChain.moves?.Length ?? 0}");
-                Debug.LogError($"[MoveChainIntegrator] Server chain moves: {serverChain.moves?.Length ?? 0}");
+                
+                
+                
                 
                 // Track the desync in debug chain
                 DebugChainPrinter.LocalInstance?.TrackLocalAction($"DESYNC DETECTED at move index {mismatchIndex}! Result: {validationResult}");
@@ -107,7 +107,7 @@ public class MoveChainIntegrator : MonoBehaviour
             }
             else
             {
-                Debug.Log($"[MoveChainIntegrator] Periodic validation: Chains in sync (Client: {clientChain.chainVersion}, Server: {serverChain.chainVersion})");
+                
                 
                 // Track successful validation
                 DebugChainPrinter.LocalInstance?.TrackMoveChain($"Chains in sync: Client v{clientChain.chainVersion} = Server v{serverChain.chainVersion}");
@@ -137,7 +137,7 @@ public class MoveChainIntegrator : MonoBehaviour
             serverTracker.OnDesyncDetected += OnServerDesyncDetected;
         }
         
-        Debug.Log("[MoveChainIntegrator] Server hooks established");
+        
     }
     
     /// <summary>
@@ -162,7 +162,7 @@ public class MoveChainIntegrator : MonoBehaviour
             clientTracker.OnDesyncDetected += OnClientDesyncDetected;
         }
         
-        Debug.Log("[MoveChainIntegrator] Client hooks established");
+        
     }
     
     /// <summary>
@@ -171,7 +171,7 @@ public class MoveChainIntegrator : MonoBehaviour
     private void SetupSuperpowerHooks()
     {
         // This will be called by the superpower tracking methods we'll add to existing scripts
-        Debug.Log("[MoveChainIntegrator] Superpower hooks ready");
+        
     }
     
     /// <summary>
@@ -179,13 +179,13 @@ public class MoveChainIntegrator : MonoBehaviour
     /// </summary>
     private void OnServerMoveRecorded(GameMove move)
     {
-        Debug.Log($"[MoveChainIntegrator] Server move recorded: {move.moveType} by P{move.playerNumber}");
+        
         
         // STEP 2: Update client chains after server has recorded the move
         if (MoveChainTracker.ClientInstance != null)
         {
             MoveChainTracker.ClientInstance.RecordMove(move);
-            Debug.Log($"[MoveChainIntegrator] Client chain synchronized with server move: {move.moveType} by P{move.playerNumber}");
+            
         }
         
         // Broadcast move to clients for validation
@@ -203,7 +203,7 @@ public class MoveChainIntegrator : MonoBehaviour
     /// </summary>
     private void OnClientMoveRecorded(GameMove move)
     {
-        Debug.Log($"[MoveChainIntegrator] Client move recorded: {move.moveType} by P{move.playerNumber}");
+        
         // Could send to server for validation if needed
     }
     
@@ -212,7 +212,7 @@ public class MoveChainIntegrator : MonoBehaviour
     /// </summary>
     private void OnServerDesyncDetected(int mismatchIndex)
     {
-        Debug.LogError($"[MoveChainIntegrator] Server detected desync at move index {mismatchIndex}");
+        
         
         // Trigger full state sync
         TriggerFullStateSync();
@@ -223,7 +223,7 @@ public class MoveChainIntegrator : MonoBehaviour
     /// </summary>
     private void OnClientDesyncDetected(int mismatchIndex)
     {
-        Debug.LogError($"[MoveChainIntegrator] Client detected desync at move index {mismatchIndex}");
+        
         
         // Track the desync in debug chain
         DebugChainPrinter.LocalInstance?.TrackLocalAction($"OnClientDesyncDetected called for move index {mismatchIndex}");
@@ -249,7 +249,7 @@ public class MoveChainIntegrator : MonoBehaviour
             if (networkRelay != null)
             {
                 networkRelay.ApplyGameStateClientRPC(gameState);
-                Debug.Log("[MoveChainIntegrator] Full state sync triggered by server");
+                
             }
         }
     }
@@ -263,7 +263,7 @@ public class MoveChainIntegrator : MonoBehaviour
         if (networkRelay != null)
         {
             networkRelay.RequestFullStateSyncServerRPC();
-            Debug.Log("[MoveChainIntegrator] Full state sync requested by client");
+            
         }
     }
     
@@ -274,7 +274,7 @@ public class MoveChainIntegrator : MonoBehaviour
     /// </summary>
     public static void TrackServerCardPlay(int playerNumber, string cardId, int[] cardData, string[] capturedCardIds, int sumValue)
     {
-        Debug.Log($"[MoveChainIntegrator] TrackServerCardPlay called: P{playerNumber} played {cardId}");
+        
         
         // Track in debug chain
         DebugChainPrinter.LocalInstance?.TrackLocalAction($"Server card play: {cardId} by P{playerNumber}");
@@ -287,12 +287,12 @@ public class MoveChainIntegrator : MonoBehaviour
         if (MoveChainTracker.ServerInstance != null)
         {
             MoveChainTracker.ServerInstance.RecordCardPlay(playerNumber, cardId, cardData, capturedCardIds, sumValue);
-            Debug.Log($"[MoveChainIntegrator] Server chain updated: Card play {cardId} by P{playerNumber}");
+            
         }
         
         // STEP 2: Ensure client chains are synchronized before proceeding
         ConfirmChainUpdatesComplete(() => {
-            Debug.Log($"[MoveChainIntegrator] Chain updates confirmed complete for card play {cardId} by P{playerNumber}");
+            
         });
     }
     
@@ -304,7 +304,7 @@ public class MoveChainIntegrator : MonoBehaviour
     /// </summary>
     public static void TrackSuperpowerActivation(int playerNumber, string superPowerName)
     {
-        Debug.Log($"[MoveChainIntegrator] TrackSuperpowerActivation called: {superPowerName} by P{playerNumber}");
+        
         
         // Track the activation in debug chain
         DebugChainPrinter.LocalInstance?.TrackLocalAction($"TrackSuperpowerActivation called: {superPowerName} by P{playerNumber}");
@@ -317,13 +317,13 @@ public class MoveChainIntegrator : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning($"[MoveChainIntegrator] LocalInstance is null! Cannot halt sync checks for {superPowerName}");
+            
         }
         
         // For hybrid powers, DON'T record on server chain yet - wait for true activation (handled by Server.cs)
         if (IsHybridPower(superPowerName))
         {
-            Debug.Log($"[MoveChainIntegrator] Hybrid power {superPowerName} activated - waiting for card play to record on chain");
+            
         }
         else
         {
@@ -331,11 +331,11 @@ public class MoveChainIntegrator : MonoBehaviour
             if (MoveChainTracker.ServerInstance != null)
             {
                 MoveChainTracker.ServerInstance.RecordSuperpowerActivation(playerNumber, superPowerName);
-                Debug.Log($"[MoveChainIntegrator] Server chain updated: {superPowerName} by P{playerNumber}");
+                
             }
         }
         
-        Debug.Log($"[MoveChainIntegrator] Power activation recorded: {superPowerName} by P{playerNumber}");
+        
     }
     
     /// <summary>
@@ -344,7 +344,7 @@ public class MoveChainIntegrator : MonoBehaviour
     /// </summary>
     public static void TrackHybridPowerTrueActivation(int playerNumber, string superPowerName, string cardId, int[] cardData, string[] capturedCardIds, int sumValue)
     {
-        Debug.Log($"[MoveChainIntegrator] TrackHybridPowerTrueActivation called: {superPowerName} by P{playerNumber} with card {cardId}");
+        
         
         // Track in debug chain
         DebugChainPrinter.LocalInstance?.TrackLocalAction($"Hybrid power true activation: {superPowerName} by P{playerNumber} with card {cardId}");
@@ -355,14 +355,14 @@ public class MoveChainIntegrator : MonoBehaviour
         {
             // Record the power activation first
             MoveChainTracker.ServerInstance.RecordSuperpowerActivation(playerNumber, superPowerName);
-            Debug.Log($"[MoveChainIntegrator] Server chain updated: Power activation {superPowerName} by P{playerNumber}");
+            
             
             // Then record the card play
             MoveChainTracker.ServerInstance.RecordCardPlay(playerNumber, cardId, cardData, capturedCardIds, sumValue);
-            Debug.Log($"[MoveChainIntegrator] Server chain updated: Card play {cardId} by P{playerNumber}");
+            
         }
         
-        Debug.Log($"[MoveChainIntegrator] Hybrid power true activation recorded: {superPowerName} + {cardId} by P{playerNumber}");
+        
         
         // Report power completion immediately since Server.cs handles the synchronization
         ReportPowerCompletion(superPowerName, playerNumber, $"True activation with card {cardId}");
@@ -390,10 +390,10 @@ public class MoveChainIntegrator : MonoBehaviour
         if (MoveChainTracker.ServerInstance != null)
         {
             MoveChainTracker.ServerInstance.RecordSuperpowerEffect(playerNumber, superPowerName, affectedCardIds, effectData);
-            Debug.Log($"[MoveChainIntegrator] Server chain updated: Superpower effect {superPowerName} by P{playerNumber}");
+            
         }
         
-        Debug.Log($"[MoveChainIntegrator] Server superpower effect recorded: {superPowerName} by P{playerNumber}");
+        
     }
     
     /// <summary>
@@ -433,10 +433,10 @@ public class MoveChainIntegrator : MonoBehaviour
         if (MoveChainTracker.ServerInstance != null)
         {
             MoveChainTracker.ServerInstance.RecordCardMovement(playerNumber, cardId, fromLocation, toLocation, reason);
-            Debug.Log($"[MoveChainIntegrator] Server chain updated: Card movement {cardId} by P{playerNumber}");
+            
         }
         
-        Debug.Log($"[MoveChainIntegrator] Server card movement recorded: {cardId} by P{playerNumber}");
+        
     }
     
     /// <summary>
@@ -452,10 +452,10 @@ public class MoveChainIntegrator : MonoBehaviour
         if (MoveChainTracker.ServerInstance != null)
         {
             MoveChainTracker.ServerInstance.RecordCardSwap(playerANumber, playerBNumber, cardAId, cardBId, reason);
-            Debug.Log($"[MoveChainIntegrator] Server chain updated: Card swap {cardAId} ↔ {cardBId} by P{playerANumber}");
+            
         }
         
-        Debug.Log($"[MoveChainIntegrator] Server card swap recorded: {cardAId} ↔ {cardBId} by P{playerANumber}");
+        
         
         // Report power completion for swap-based powers
         if (reason.Contains("Şunu Değiş") || reason.Contains("swap"))
@@ -477,10 +477,10 @@ public class MoveChainIntegrator : MonoBehaviour
         if (MoveChainTracker.ServerInstance != null)
         {
             MoveChainTracker.ServerInstance.RecordCardParentingChange(playerNumber, cardId, oldParent, newParent, reason);
-            Debug.Log($"[MoveChainIntegrator] Server chain updated: Card parenting {cardId} by P{playerNumber}");
+            
         }
         
-        Debug.Log($"[MoveChainIntegrator] Server card parenting recorded: {cardId} by P{playerNumber}");
+        
     }
     
     /// <summary>
@@ -502,7 +502,7 @@ public class MoveChainIntegrator : MonoBehaviour
     [ContextMenu("Trigger Test Desync")]
     public void TriggerTestDesync()
     {
-        Debug.Log("[MoveChainIntegrator] Triggering test desync detection");
+        
         OnClientDesyncDetected(99); // Test desync at move 99
     }
     
@@ -529,7 +529,7 @@ public class MoveChainIntegrator : MonoBehaviour
     [ContextMenu("Force Desync Test")]
     public void ForceDesyncTest()
     {
-        Debug.Log("[MoveChainIntegrator] Forcing desync test...");
+        
         
         // Create a fake move on client that doesn't exist on server
         if (MoveChainTracker.ClientInstance != null)
@@ -537,7 +537,7 @@ public class MoveChainIntegrator : MonoBehaviour
             var fakeMove = GameMove.CreateCardPlayMove(999, 0, "fake_card_999", new int[] { 1, 5 }, new string[0], 0);
             MoveChainTracker.ClientInstance.RecordMove(fakeMove);
             
-            Debug.LogWarning("[MoveChainIntegrator] Added fake move to client chain. This will cause a desync!");
+            
             
             // Trigger validation immediately
             TriggerPeriodicValidation();
@@ -568,7 +568,7 @@ public class MoveChainIntegrator : MonoBehaviour
         {
             isPowerOperationInProgress = true;
             powerOperationStartTime = Time.time;
-            Debug.Log($"[MoveChainIntegrator] Sync checks HALTED for power: {superPowerName} by P{playerNumber}");
+            
         }
         
         // Track this power as active
@@ -580,8 +580,8 @@ public class MoveChainIntegrator : MonoBehaviour
             isCompleted = false
         };
         
-        Debug.Log($"[MoveChainIntegrator] Power operation started: {superPowerName} by P{playerNumber} (Key: {powerKey})");
-        Debug.Log($"[MoveChainIntegrator] Active powers count: {activePowers.Count}");
+        
+        
     }
     
     /// <summary>
@@ -589,7 +589,7 @@ public class MoveChainIntegrator : MonoBehaviour
     /// </summary>
     public static void ReportPowerCompletion(string superPowerName, int playerNumber, string completionDetails = "")
     {
-        Debug.Log($"[MoveChainIntegrator] ReportPowerCompletion called: {superPowerName} by P{playerNumber} - {completionDetails}");
+        
         
         if (LocalInstance != null)
         {
@@ -597,7 +597,7 @@ public class MoveChainIntegrator : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning($"[MoveChainIntegrator] LocalInstance is null! Cannot complete power {superPowerName}");
+            
         }
     }
     
@@ -608,7 +608,7 @@ public class MoveChainIntegrator : MonoBehaviour
     {
         if (!enablePowerCompletionTracking) return;
         
-        Debug.Log($"[MoveChainIntegrator] Attempting to complete power: {superPowerName} by P{playerNumber}");
+        
         
         // Find and mark the power as completed
         string powerKey = FindPowerKey(superPowerName, playerNumber);
@@ -618,12 +618,12 @@ public class MoveChainIntegrator : MonoBehaviour
             activePowers[powerKey].completionDetails = completionDetails;
             activePowers[powerKey].completionTime = Time.time;
             
-            Debug.Log($"[MoveChainIntegrator] Power completed: {superPowerName} by P{playerNumber} - {completionDetails}");
+            
         }
         else
         {
-            Debug.LogWarning($"[MoveChainIntegrator] Could not find power key for: {superPowerName} by P{playerNumber}");
-            Debug.LogWarning($"[MoveChainIntegrator] Available power keys: {string.Join(", ", activePowers.Keys)}");
+            
+            
         }
         
         // Check if all active powers are completed
@@ -676,12 +676,12 @@ public class MoveChainIntegrator : MonoBehaviour
         lastValidationTime = Time.time; // Reset validation timer
         
         // Log completion summary
-        Debug.Log($"[MoveChainIntegrator] All power operations completed. Resuming sync checks.");
+        
         foreach (var power in activePowers.Values)
         {
             if (power.isCompleted)
             {
-                Debug.Log($"[MoveChainIntegrator] ✓ {power.powerName} by P{power.playerNumber} completed in {power.completionTime - power.startTime:F2}s");
+                
             }
         }
         
@@ -698,23 +698,23 @@ public class MoveChainIntegrator : MonoBehaviour
     [ContextMenu("Force Resume Sync Checks")]
     public void ForceResumeSyncChecks()
     {
-        Debug.LogWarning("[MoveChainIntegrator] Force resuming sync checks!");
+        
         ResumeSyncChecks();
     }
     
     [ContextMenu("Debug Power Completion State")]
     public void DebugPowerCompletionState()
     {
-        Debug.Log($"[MoveChainIntegrator] Power completion state:");
-        Debug.Log($"[MoveChainIntegrator] isPowerOperationInProgress: {isPowerOperationInProgress}");
-        Debug.Log($"[MoveChainIntegrator] Active powers count: {activePowers.Count}");
-        Debug.Log($"[MoveChainIntegrator] powerOperationStartTime: {powerOperationStartTime}");
-        Debug.Log($"[MoveChainIntegrator] Time since start: {Time.time - powerOperationStartTime:F2}s");
+        
+        
+        
+        
+        
         
         foreach (var kvp in activePowers)
         {
             var power = kvp.Value;
-            Debug.Log($"[MoveChainIntegrator] Power: {power.powerName} by P{power.playerNumber} - Completed: {power.isCompleted} - Details: {power.completionDetails}");
+            
         }
     }
     
@@ -724,18 +724,18 @@ public class MoveChainIntegrator : MonoBehaviour
     [ContextMenu("Show Power Completion Status")]
     public void ShowPowerCompletionStatus()
     {
-        Debug.Log($"[MoveChainIntegrator] Power Completion Status:");
-        Debug.Log($"  Sync checks halted: {isPowerOperationInProgress}");
-        Debug.Log($"  Active powers: {activePowers.Count}");
+        
+        
+        
         
         foreach (var kvp in activePowers)
         {
             var power = kvp.Value;
             string status = power.isCompleted ? "✓ COMPLETED" : "⏳ IN PROGRESS";
-            Debug.Log($"  {power.powerName} by P{power.playerNumber}: {status}");
+            
             if (power.isCompleted)
             {
-                Debug.Log($"    Completed in {power.completionTime - power.startTime:F2}s - {power.completionDetails}");
+                
             }
         }
     }
@@ -743,21 +743,21 @@ public class MoveChainIntegrator : MonoBehaviour
     [ContextMenu("Test Power Completion")]
     public void TestPowerCompletion()
     {
-        Debug.Log("[MoveChainIntegrator] Testing power completion...");
+        
         ReportPowerCompletion("Bu Daha İyi", 0, "Manual test completion");
     }
     
     [ContextMenu("Force Chain Synchronization")]
     public void ForceChainSynchronization()
     {
-        Debug.LogWarning("[MoveChainIntegrator] Force synchronizing chains...");
+        
         
         if (MoveChainTracker.ClientInstance != null && MoveChainTracker.ServerInstance != null)
         {
             var clientChain = MoveChainTracker.ClientInstance.GetCurrentChain();
             var serverChain = MoveChainTracker.ServerInstance.GetCurrentChain();
             
-            Debug.Log($"[MoveChainIntegrator] Before sync - Client v{clientChain.chainVersion} ({clientChain.moves?.Length ?? 0} moves), Server v{serverChain.chainVersion} ({serverChain.moves?.Length ?? 0} moves)");
+            
             
             // Force client chain to match server chain
             if (serverChain.moves != null && serverChain.moves.Length > 0)
@@ -767,11 +767,11 @@ public class MoveChainIntegrator : MonoBehaviour
                 {
                     MoveChainTracker.ClientInstance.RecordMove(move);
                 }
-                Debug.Log($"[MoveChainIntegrator] Client chain synchronized with server chain");
+                
             }
             
             var newClientChain = MoveChainTracker.ClientInstance.GetCurrentChain();
-            Debug.Log($"[MoveChainIntegrator] After sync - Client v{newClientChain.chainVersion} ({newClientChain.moves?.Length ?? 0} moves), Server v{serverChain.chainVersion} ({serverChain.moves?.Length ?? 0} moves)");
+            
         }
     }
     
@@ -780,7 +780,7 @@ public class MoveChainIntegrator : MonoBehaviour
     /// </summary>
     private void ForceImmediateValidation()
     {
-        Debug.Log("[MoveChainIntegrator] Force immediate validation triggered");
+        
         
         // Reset validation timer to trigger validation immediately
         lastValidationTime = 0f;
@@ -794,7 +794,7 @@ public class MoveChainIntegrator : MonoBehaviour
     /// </summary>
     public void ForceImmediateDesyncCheck()
     {
-        Debug.Log("[MoveChainIntegrator] Force immediate desync check for reconnected client");
+        
         
         // Immediately trigger validation without waiting for periodic check
         TriggerPeriodicValidation();
@@ -823,7 +823,7 @@ public class MoveChainIntegrator : MonoBehaviour
     /// </summary>
     public static void ConfirmChainUpdatesComplete(System.Action onComplete = null)
     {
-        Debug.Log("[MoveChainIntegrator] Confirming chain updates are complete before proceeding...");
+        
         
         // Wait for all chain updates to propagate and ensure synchronization
         if (LocalInstance != null)
@@ -848,18 +848,18 @@ public class MoveChainIntegrator : MonoBehaviour
             var clientChain = MoveChainTracker.ClientInstance.GetCurrentChain();
             var serverChain = MoveChainTracker.ServerInstance.GetCurrentChain();
             
-            Debug.Log($"[MoveChainIntegrator] Chain sync check - Client v{clientChain.chainVersion} ({clientChain.moves?.Length ?? 0} moves), Server v{serverChain.chainVersion} ({serverChain.moves?.Length ?? 0} moves)");
+            
             
             // If chains are not synchronized, wait another frame
             if (clientChain.chainVersion != serverChain.chainVersion || 
                 (clientChain.moves?.Length ?? 0) != (serverChain.moves?.Length ?? 0))
             {
-                Debug.LogWarning("[MoveChainIntegrator] Chains not synchronized, waiting another frame...");
+                
                 yield return null;
             }
         }
         
-        Debug.Log("[MoveChainIntegrator] Chain updates confirmed complete, proceeding with visual changes");
+        
         onComplete?.Invoke();
     }
     
@@ -890,7 +890,7 @@ public class MoveChainIntegrator : MonoBehaviour
         {
             LocalInstance.isPowerOperationInProgress = true;
             LocalInstance.powerOperationStartTime = Time.time;
-            Debug.Log($"[MoveChainIntegrator] Move tracking paused: {reason}");
+            
         }
     }
     
@@ -903,7 +903,7 @@ public class MoveChainIntegrator : MonoBehaviour
         {
             LocalInstance.isPowerOperationInProgress = false;
             var pauseDuration = Time.time - LocalInstance.powerOperationStartTime;
-            Debug.Log($"[MoveChainIntegrator] Move tracking resumed after {pauseDuration:F2}s: {reason}");
+            
         }
     }
     

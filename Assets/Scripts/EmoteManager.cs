@@ -45,10 +45,10 @@ public class EmoteManager : MonoBehaviour
 
     public void RequestEmote()
     {
-        Debug.Log("[EmoteManager] RequestEmote() called.");
+        
         if (isBlocked)
         {
-            Debug.Log("[EmoteManager] Request blocked due to spam protection.");
+            
             ShowBlockWarning();
             return;
         }
@@ -58,50 +58,50 @@ public class EmoteManager : MonoBehaviour
         // Default to 0 universally when seat is not assigned yet so player can use the emote system locally instantly
         if (localPlayerNo == -1) 
         {
-            Debug.Log("[EmoteManager] Local seat not assigned yet. Defaulting playerNo to 0.");
+            
             localPlayerNo = 0;
         }
 
         if (activeBubbles.ContainsKey(localPlayerNo) && activeBubbles[localPlayerNo] != null)
         {
-            Debug.Log("[EmoteManager] Request ignored: an emote is already active for this player.");
+            
             return;
         }
 
         // Open keyboard
         if (emojiKeyboard != null)
         {
-            Debug.Log("[EmoteManager] Opening custom emoji keyboard...");
+            
             emojiKeyboard.OpenKeyboard();
         }
         else
         {
-            Debug.LogError("[EmoteManager] emojiKeyboard reference is missing!");
+            
         }
     }
 
     private void OnEmojiSelected(string input)
     {
-        Debug.Log($"[EmoteManager] OnEmojiSelected(input: '{input}')");
+        
         if (string.IsNullOrEmpty(input)) 
         {
-            Debug.Log("[EmoteManager] Input is null or empty. Aborting.");
+            
             return;
         }
 
         // Extract first emoji/character
         string emoji = ExtractFirstEmoji(input);
-        Debug.Log($"[EmoteManager] Extracted emoji: '{emoji}'");
+        
         if (string.IsNullOrEmpty(emoji)) 
         {
-            Debug.Log("[EmoteManager] Extracted emoji is empty. Aborting.");
+            
             return;
         }
 
         // Check Spam
         if (CheckSpam())
         {
-            Debug.Log("[EmoteManager] Spam detected! Blocking feature.");
+            
             BlockFeature();
             return;
         }
@@ -111,7 +111,7 @@ public class EmoteManager : MonoBehaviour
         int targetPlayerNo = localPlayerNo == -1 ? 0 : localPlayerNo;
 
         // 1. ALWAYS show our own emote locally immediately for instant feedback
-        Debug.Log($"[EmoteManager] Showing emote '{emoji}' locally for player {targetPlayerNo}.");
+        
         ShowEmote(targetPlayerNo, emoji);
 
         // 2. If we are in a networked session and our seat is assigned, sync it with other players
@@ -119,12 +119,12 @@ public class EmoteManager : MonoBehaviour
         {
             if (GameNetworkRelay.Instance != null)
             {
-                Debug.Log($"[EmoteManager] Sending emoji '{emoji}' to network for player {localPlayerNo}.");
+                
                 GameNetworkRelay.Instance.SendEmoteServerRPC(localPlayerNo, emoji);
             }
             else
             {
-                Debug.LogError("[EmoteManager] Network relay instance is missing!");
+                
             }
         }
     }
@@ -156,7 +156,7 @@ public class EmoteManager : MonoBehaviour
 
     private void BlockFeature()
     {
-        Debug.Log($"[EmoteManager] Blocking emote feature for {blockDuration} seconds.");
+        
         isBlocked = true;
         blockEndTime = Time.time + blockDuration;
         ShowBlockWarning();
@@ -172,12 +172,12 @@ public class EmoteManager : MonoBehaviour
 
     public void ShowEmote(int playerNo, string emoji)
     {
-        Debug.Log($"[EmoteManager] ShowEmote(playerNo: {playerNo}, emoji: '{emoji}')");
+        
         // Find Slot Parent in SideManager
         GameObject slotParent = FindSlotParentForPlayer(playerNo);
         if (slotParent == null) 
         {
-            Debug.LogWarning($"[EmoteManager] Could not find UI slot for player {playerNo}.");
+            
             return;
         }
 

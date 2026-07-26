@@ -124,4 +124,10 @@ public class SingleplayerPowerProcessor : IPowerProcessor
     {
         controller.ExecuteZaferPuani(points);
     }
+
+    public void OnGameStateMutated()
+    {
+        // Save run progress to disk as an auto-checkpoint after each power effect.
+        controller.SaveRunState();
+    }
 }

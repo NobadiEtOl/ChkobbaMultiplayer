@@ -29,17 +29,17 @@ public class MoveChainTracker : MonoBehaviour
         {
             isServer = true;
             ServerInstance = this;
-            Debug.Log("[MoveChainTracker] Server instance initialized");
+            
         }
         else if (gameManager != null)
         {
             isServer = false;
             ClientInstance = this;
-            Debug.Log("[MoveChainTracker] Client instance initialized");
+            
         }
         else
         {
-            Debug.LogError("[MoveChainTracker] Could not determine if this is server or client instance!");
+            
         }
     }
     
@@ -59,7 +59,7 @@ public class MoveChainTracker : MonoBehaviour
         var move = GameMove.CreateCardPlayMove(nextMoveId++, playerNumber, cardId, cardData, capturedCardIds, sumValue);
         RecordMove(move);
         
-        Debug.Log($"[MoveChainTracker] {(isServer ? "Server" : "Client")} recorded card play: {move.moveType} by P{playerNumber} with {cardId}");
+        
     }
     
     /// <summary>
@@ -70,7 +70,7 @@ public class MoveChainTracker : MonoBehaviour
         var move = GameMove.CreateSuperpowerActivationMove(nextMoveId++, playerNumber, superPowerName);
         RecordMove(move);
         
-        Debug.Log($"[MoveChainTracker] {(isServer ? "Server" : "Client")} recorded superpower activation: {superPowerName} by P{playerNumber}");
+        
     }
     
     /// <summary>
@@ -82,7 +82,7 @@ public class MoveChainTracker : MonoBehaviour
         var move = GameMove.CreateSuperpowerEffectMove(nextMoveId++, playerNumber, superPowerName, affectedCardIds, effectData);
         RecordMove(move);
         
-        Debug.Log($"[MoveChainTracker] {(isServer ? "Server" : "Client")} recorded superpower effect: {superPowerName} affecting {affectedCardIds?.Length ?? 0} cards");
+        
     }
     
     /// <summary>
@@ -93,7 +93,7 @@ public class MoveChainTracker : MonoBehaviour
         var move = GameMove.CreateCardMovementMove(nextMoveId++, playerNumber, cardId, fromLocation, toLocation, reason);
         RecordMove(move);
         
-        Debug.Log($"[MoveChainTracker] {(isServer ? "Server" : "Client")} recorded card movement: {cardId} from {fromLocation} to {toLocation} by P{playerNumber} - {reason}");
+        
     }
     
     /// <summary>
@@ -112,7 +112,7 @@ public class MoveChainTracker : MonoBehaviour
         var move = GameMove.CreateCardSwapMove(nextMoveId++, playerANumber, playerBNumber, cardAId, cardBId, reason);
         RecordMove(move);
         
-        Debug.Log($"[MoveChainTracker] {(isServer ? "Server" : "Client")} recorded card swap: P{playerANumber} {cardAId} ↔ P{playerBNumber} {cardBId} - {reason}");
+        
     }
     
     /// <summary>
@@ -123,7 +123,7 @@ public class MoveChainTracker : MonoBehaviour
         var move = GameMove.CreateCardParentingChangeMove(nextMoveId++, playerNumber, cardId, oldParent, newParent, reason);
         RecordMove(move);
         
-        Debug.Log($"[MoveChainTracker] {(isServer ? "Server" : "Client")} recorded card parenting change: {cardId} from {oldParent} to {newParent} by P{playerNumber} - {reason}");
+        
     }
     
     /// <summary>
@@ -145,7 +145,7 @@ public class MoveChainTracker : MonoBehaviour
         
         if (result != MoveChain.ValidationResult.Valid)
         {
-            Debug.LogError($"[MoveChainTracker] {(isServer ? "Server" : "Client")} chain validation failed: {result} at index {mismatchIndex}");
+            
             OnDesyncDetected?.Invoke(mismatchIndex);
             return false;
         }
@@ -168,7 +168,7 @@ public class MoveChainTracker : MonoBehaviour
     {
         moveChain.Clear();
         nextMoveId = 0;
-        Debug.Log($"[MoveChainTracker] {(isServer ? "Server" : "Client")} chain reset");
+        
     }
     
     /// <summary>

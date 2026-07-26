@@ -750,11 +750,11 @@ namespace OnlineFonts2TextMeshPro
         #region Logs
         private void LogError(string errorMessage)
         {
-            Debug.LogError("[OnlineFonts2TextMeshPro] " + errorMessage);
+            
         }
         private void LogMessage(string infoMessage)
         {
-            Debug.Log("[OnlineFonts2TextMeshPro] " + infoMessage);
+            
         }
         #endregion
     }

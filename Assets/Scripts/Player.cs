@@ -29,12 +29,12 @@ public class Player : NetworkBehaviour
         {
             if (GameManager.LocalInstance != null)
             {
-                Debug.Log("[Player] Calling GameManager.NotifyConnection()");
+                
                 GameManager.LocalInstance.NotifyConnection();
             }
             else 
             {
-                Debug.LogError("[Player] GameManager.LocalInstance is null in Player.Start");
+                
             }
 
             LoadAndSendCustomization();
@@ -50,7 +50,7 @@ public class Player : NetworkBehaviour
                 int currentSeat = DeckController.LocalInstance.thisPlayerNumber;
                 if (currentSeat != -1 && AbsolutePlayerNumber.Value != currentSeat)
                 {
-                    Debug.Log($"[Player] Owner detected seat number changed to {currentSeat}. Submitting to Server.");
+                    
                     SubmitPlayerNumberServerRpc(currentSeat);
                 }
             }

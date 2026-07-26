@@ -11,6 +11,7 @@ public class MultiplayerMoveProcessor : IMoveProcessor
 
     public bool IsActive => networkRelay != null;
     public string ModeName => "Multiplayer";
+    public bool RunsPostMoveBackgroundCheck => true;
 
     public MultiplayerMoveProcessor(GameNetworkRelay relay)
     {
@@ -19,7 +20,7 @@ public class MultiplayerMoveProcessor : IMoveProcessor
 
     public void ProcessCardPlay(string cardId, Dictionary<string, int[]> centerCards, int sumValue, int cardValue, int playerNumber)
     {
-        Debug.Log($"[MultiplayerMoveProcessor] ProcessCardPlay: card={cardId}, cardValue={cardValue}, sumValue={sumValue}");
+        
         GameManager.AddToDebugLog($"[MultiplayerMoveProcessor] ProcessCardPlay: card={cardId}, cardValue={cardValue}, sumValue={sumValue}");
 
         SerializableCard serializableCard = new SerializableCard(centerCards);
@@ -28,5 +29,12 @@ public class MultiplayerMoveProcessor : IMoveProcessor
 
         networkRelay.SendMoveToServerRPC(cardId, serializableCard, playerNumber, sumValue);
         GameManager.AddToDebugLog($"[MultiplayerMoveProcessor] SendMoveToServerRPC sent");
+    }
+
+    public void ProcessAddToCenter(string cardId, int[] cardKindValue)
+    {
+        
+        GameManager.AddToDebugLog($"[MultiplayerMoveProcessor] ProcessAddToCenter: card={cardId}");
+        networkRelay.AddCenterCardServerRPC(cardId, cardKindValue);
     }
 }

@@ -32,11 +32,11 @@ public class MaterialChanger : MonoBehaviour
         
         if (targetMaterial == null)
         {
-            Debug.LogError("Could not load Unlit_WoodenFrame material. Please assign it manually in the inspector.");
+            
             return;
         }
         
-        Debug.Log("Unlit_WoodenFrame material loaded successfully!");
+        
     }
     
     [ContextMenu("Find and Change Cube Materials (Scale & Rotation Aware)")]
@@ -50,7 +50,7 @@ public class MaterialChanger : MonoBehaviour
         
         if (targetMaterial == null)
         {
-            Debug.LogError("No target material assigned. Please assign Unlit_WoodenFrame material manually.");
+            
             return;
         }
         
@@ -59,7 +59,7 @@ public class MaterialChanger : MonoBehaviour
         
         if (mesaMantelRandom == null)
         {
-            Debug.LogError("Could not find 'MesaMantelRandom' object in the scene.");
+            
             return;
         }
         
@@ -68,7 +68,7 @@ public class MaterialChanger : MonoBehaviour
         
         if (frameTransform == null)
         {
-            Debug.LogError("Could not find 'Frame' object under MesaMantelRandom.");
+            
             return;
         }
         
@@ -117,17 +117,17 @@ public class MaterialChanger : MonoBehaviour
                              logMessage += $" (Rotation: {rotation.x:F1}°, {rotation.y:F1}°, {rotation.z:F1}°)";
                          }
                          
-                         Debug.Log(logMessage);
+                         
                      }
                      else
                      {
-                         Debug.Log($"Changed material for cube: {child.name}");
+                         
                      }
                 }
             }
         }
         
-        Debug.Log($"Successfully changed materials for {cubeCount} cube objects with scale and rotation awareness.");
+        
     }
     
     [ContextMenu("Change Materials for Assigned Cubes (Scale & Rotation Aware)")]
@@ -135,13 +135,13 @@ public class MaterialChanger : MonoBehaviour
     {
         if (targetMaterial == null)
         {
-            Debug.LogError("No target material assigned. Please assign Unlit_WoodenFrame material.");
+            
             return;
         }
         
         if (cubeObjects == null || cubeObjects.Length == 0)
         {
-            Debug.LogError("No cube objects assigned. Please assign them in the inspector or use 'Find and Change Cube Materials'.");
+            
             return;
         }
         
@@ -187,17 +187,17 @@ public class MaterialChanger : MonoBehaviour
                              logMessage += $" (Rotation: {rotation.x:F1}°, {rotation.y:F1}°, {rotation.z:F1}°)";
                          }
                          
-                         Debug.Log(logMessage);
+                         
                      }
                      else
                      {
-                         Debug.Log($"Changed material for cube: {cube.name}");
+                         
                      }
                 }
             }
         }
         
-        Debug.Log($"Successfully changed materials for {changedCount} assigned cube objects with scale and rotation awareness.");
+        
     }
     
     private void ApplyScaleAwareProperties(Material material, Transform targetTransform)
@@ -478,12 +478,12 @@ public class MaterialChanger : MonoBehaviour
     [ContextMenu("Manual Material Assignment")]
     public void ManualMaterialAssignment()
     {
-        Debug.Log("To manually assign materials:");
-        Debug.Log("1. Select this GameObject in the inspector");
-        Debug.Log("2. Drag the 'Unlit_WoodenFrame' material from Assets/Shader/SceneDecor/ to the 'Target Material' field");
-        Debug.Log("3. Drag the 4 Cube objects to the 'Cube Objects' array");
-        Debug.Log("4. Enable 'Scale Awareness' if your material supports it");
-        Debug.Log("5. Click 'Change Materials for Assigned Cubes' in the context menu");
+        
+        
+        
+        
+        
+        
     }
     
     [ContextMenu("Test Scale and Rotation Awareness")]
@@ -491,45 +491,45 @@ public class MaterialChanger : MonoBehaviour
     {
         if (targetMaterial == null)
         {
-            Debug.LogError("No target material assigned.");
+            
             return;
         }
         
-        Debug.Log("=== TESTING SCALE AND ROTATION AWARENESS ===");
         
-        Debug.Log("\n--- SCALE PROPERTIES ---");
-        Debug.Log($"Material has _ObjectScale property: {targetMaterial.HasProperty(scalePropertyName)}");
-        Debug.Log($"Material has _Scale property: {targetMaterial.HasProperty("_Scale")}");
-        Debug.Log($"Material has _MainTex property: {targetMaterial.HasProperty("_MainTex")}");
-        Debug.Log($"Material has _ScaleFactor property: {targetMaterial.HasProperty("_ScaleFactor")}");
-        Debug.Log($"Material has _NormalizedScale property: {targetMaterial.HasProperty("_NormalizedScale")}");
-        Debug.Log($"Material has _LogScale property: {targetMaterial.HasProperty("_LogScale")}");
-        Debug.Log($"Material has _AspectRatio property: {targetMaterial.HasProperty("_AspectRatio")}");
-        Debug.Log($"Material has _ThicknessFactor property: {targetMaterial.HasProperty("_ThicknessFactor")}");
-        Debug.Log($"Material has _ScaleX property: {targetMaterial.HasProperty("_ScaleX")}");
-        Debug.Log($"Material has _ScaleY property: {targetMaterial.HasProperty("_ScaleY")}");
-        Debug.Log($"Material has _ScaleZ property: {targetMaterial.HasProperty("_ScaleZ")}");
         
-        Debug.Log("\n--- ROTATION PROPERTIES ---");
-        Debug.Log($"Material has _ObjectRotation property: {targetMaterial.HasProperty(rotationPropertyName)}");
-        Debug.Log($"Material has _Rotation property: {targetMaterial.HasProperty("_Rotation")}");
-        Debug.Log($"Material has _RotationRadians property: {targetMaterial.HasProperty("_RotationRadians")}");
-        Debug.Log($"Material has _RotationX property: {targetMaterial.HasProperty("_RotationX")}");
-        Debug.Log($"Material has _RotationY property: {targetMaterial.HasProperty("_RotationY")}");
-        Debug.Log($"Material has _RotationZ property: {targetMaterial.HasProperty("_RotationZ")}");
-        Debug.Log($"Material has _RotationXRad property: {targetMaterial.HasProperty("_RotationXRad")}");
-        Debug.Log($"Material has _RotationYRad property: {targetMaterial.HasProperty("_RotationYRad")}");
-        Debug.Log($"Material has _RotationZRad property: {targetMaterial.HasProperty("_RotationZRad")}");
-        Debug.Log($"Material has _RotationQuaternion property: {targetMaterial.HasProperty("_RotationQuaternion")}");
-        Debug.Log($"Material has _RotationNormalized property: {targetMaterial.HasProperty("_RotationNormalized")}");
-        Debug.Log($"Material has _Forward property: {targetMaterial.HasProperty("_Forward")}");
-        Debug.Log($"Material has _Right property: {targetMaterial.HasProperty("_Right")}");
-        Debug.Log($"Material has _Up property: {targetMaterial.HasProperty("_Up")}");
-        Debug.Log($"Material has _RotationMatrix property: {targetMaterial.HasProperty("_RotationMatrix")}");
-        Debug.Log($"Material has _TextureRotation property: {targetMaterial.HasProperty("_TextureRotation")}");
-        Debug.Log($"Material has _RotationOffset property: {targetMaterial.HasProperty("_RotationOffset")}");
         
-        Debug.Log("\n=== TEST COMPLETE ===");
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
     }
     
     [ContextMenu("Analyze Extreme Scales")]
@@ -540,7 +540,7 @@ public class MaterialChanger : MonoBehaviour
         
         if (mesaMantelRandom == null)
         {
-            Debug.LogError("Could not find 'MesaMantelRandom' object in the scene.");
+            
             return;
         }
         
@@ -549,11 +549,11 @@ public class MaterialChanger : MonoBehaviour
         
         if (frameTransform == null)
         {
-            Debug.LogError("Could not find 'Frame' object under MesaMantelRandom.");
+            
             return;
         }
         
-        Debug.Log("=== EXTREME SCALE ANALYSIS ===");
+        
         
         // Find all Cube objects under Frame
         Transform[] cubeTransforms = frameTransform.GetComponentsInChildren<Transform>();
@@ -576,18 +576,18 @@ public class MaterialChanger : MonoBehaviour
                      rotation.z * Mathf.Deg2Rad
                  );
                  
-                 Debug.Log($"\nCube: {child.name}");
-                 Debug.Log($"  Raw Scale: ({scale.x:F6}, {scale.y:F6}, {scale.z:F6})");
-                 Debug.Log($"  Normalized Scale: ({normalizedScale.x:F3}, {normalizedScale.y:F3}, {normalizedScale.z:F3})");
-                 Debug.Log($"  Tiling: ({tiling.x:F3}, {tiling.y:F3})");
-                 Debug.Log($"  Scale Factor: {scaleFactor:F3}");
-                 Debug.Log($"  Aspect Ratio: {aspectRatio:F3}");
-                 Debug.Log($"  Thickness Factor: {thicknessFactor:F6}");
-                 Debug.Log($"  Rotation (Euler): ({rotation.x:F1}°, {rotation.y:F1}°, {rotation.z:F1}°)");
-                 Debug.Log($"  Rotation (Radians): ({rotationRadians.x:F3}, {rotationRadians.y:F3}, {rotationRadians.z:F3})");
-                 Debug.Log($"  Forward Vector: ({child.forward.x:F3}, {child.forward.y:F3}, {child.forward.z:F3})");
-                 Debug.Log($"  Right Vector: ({child.right.x:F3}, {child.right.y:F3}, {child.right.z:F3})");
-                 Debug.Log($"  Up Vector: ({child.up.x:F3}, {child.up.y:F3}, {child.up.z:F3})");
+                 
+                 
+                 
+                 
+                 
+                 
+                 
+                 
+                 
+                 
+                 
+                 
                  
                  // Check if this is an extreme scale case
                  float maxScale = Mathf.Max(scale.x, scale.y, scale.z);
@@ -596,17 +596,17 @@ public class MaterialChanger : MonoBehaviour
                  
                  if (scaleRatio > 100f)
                  {
-                     Debug.Log($"  ⚠️ EXTREME SCALE DETECTED: {scaleRatio:F0}x difference");
+                     
                  }
                  
                  // Check for significant rotation
                  if (Mathf.Abs(rotation.x) > 5f || Mathf.Abs(rotation.y) > 5f || Mathf.Abs(rotation.z) > 5f)
                  {
-                     Debug.Log($"  🔄 SIGNIFICANT ROTATION DETECTED: {rotation.magnitude:F1}° total rotation");
+                     
                  }
             }
         }
         
-        Debug.Log("\n=== ANALYSIS COMPLETE ===");
+        
     }
 } 

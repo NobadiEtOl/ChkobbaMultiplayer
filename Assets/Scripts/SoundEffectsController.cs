@@ -45,14 +45,7 @@ public class SoundEffectsController : MonoBehaviour
             // Increment pitch for next card (but don't exceed max)
             currentPitch = Mathf.Min(currentPitch + pitchIncrement, maxPitch);
             
-            Debug.Log($"[SoundEffectsController] Playing card deal sound with pitch: {audioSource.pitch}");
-        }
-        else
-        {
-            if (cardDealSound == null)
-                Debug.LogWarning("[SoundEffectsController] Card deal sound is not assigned!");
-            if (audioSource == null)
-                Debug.LogWarning("[SoundEffectsController] AudioSource is not assigned!");
+            
         }
     }
     
@@ -65,14 +58,7 @@ public class SoundEffectsController : MonoBehaviour
         if (soundClip != null && audioSource != null)
         {
             audioSource.PlayOneShot(soundClip);
-            Debug.Log($"[SoundEffectsController] Playing sound: {soundClip.name}");
-        }
-        else
-        {
-            if (soundClip == null)
-                Debug.LogWarning("[SoundEffectsController] Sound clip is null!");
-            if (audioSource == null)
-                Debug.LogWarning("[SoundEffectsController] AudioSource is not assigned!");
+            
         }
     }
     
@@ -105,6 +91,6 @@ public class SoundEffectsController : MonoBehaviour
     public void ResetPitch()
     {
         currentPitch = basePitch;
-        Debug.Log($"[SoundEffectsController] Pitch reset to base pitch: {basePitch}");
+        
     }
 }

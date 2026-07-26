@@ -34,7 +34,7 @@ public class VintageRobo_Controller : MonoBehaviour
 
         if (animator == null)
         {
-            Debug.LogError("No Animator component found! Please add an Animator to this GameObject.");
+            
         }
     }
 
@@ -47,7 +47,7 @@ public class VintageRobo_Controller : MonoBehaviour
     {
         if (animator == null)
         {
-            Debug.LogError("Animator is null! Cannot play animation.");
+            
             return;
         }
 
@@ -56,7 +56,7 @@ public class VintageRobo_Controller : MonoBehaviour
         
         if (!string.IsNullOrEmpty(triggerName))
         {
-            Debug.Log($"Playing animation: {newState}");
+            
             animator.SetTrigger(triggerName);
         }
     }

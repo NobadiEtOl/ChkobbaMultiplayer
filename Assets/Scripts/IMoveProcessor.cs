@@ -24,4 +24,16 @@ public interface IMoveProcessor
         int cardValue,
         int playerNumber
     );
+
+    /// <summary>
+    /// Process an add-to-center move (no capture). Implementation decides whether to call RPCs
+    /// or route directly to singleplayer validation.
+    /// </summary>
+    void ProcessAddToCenter(string cardId, int[] cardKindValue);
+
+    /// <summary>
+    /// True when the mode should call SuperPowerSpawner.CheckIfBackgroundPanelOpen after a card play.
+    /// Multiplayer: true. Singleplayer: false.
+    /// </summary>
+    bool RunsPostMoveBackgroundCheck { get; }
 }

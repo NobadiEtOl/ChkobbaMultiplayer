@@ -79,21 +79,21 @@ public class DeckController : MonoBehaviour
         if (deckTransform != null)
         {
             deckStartingPosition = deckTransform.position;
-            Debug.Log($"[DeckController] Deck starting position stored: {deckStartingPosition}");
+            
         }
         else
         {
-            Debug.LogWarning("[DeckController] DeckTransform not found!");
+            
         }
         
         // Validate deck movement settings
         if (deckReachPoint == null)
         {
-            Debug.LogError("[DeckController] deckReachPoint is not set in the inspector! Deck movement will not work.");
+            
         }
         else
         {
-            Debug.Log($"[DeckController] Deck reach point set to: {deckReachPoint.position}");
+            
         }
     }
 
@@ -105,26 +105,26 @@ public class DeckController : MonoBehaviour
         //          $"CardPrefabsList: {(cardPrefabsList != null ? "FOUND" : "NULL")}\n" +
         //          $"CardPrefabsList Count: {cardPrefabsList?.Count ?? 0}");
         
-        // Debug.Log("[DeckController] Starting DefineCardPrefabs coroutine...");
+        // 
         yield return StartCoroutine(DefineCardPrefabs());
-        // Debug.Log("[DeckController] DefineCardPrefabs coroutine completed");
+        // 
         
-        // Debug.Log("[DeckController] Starting  coroutine...");
+        // 
         yield return StartCoroutine(InitializeCardPool());
-        // Debug.Log("[DeckController] InitializeCardPool coroutine completed");
+        // 
         
         // Move deck to reach point for initial dealing
-        // Debug.Log("[DeckController] Moving deck to reach point...");
+        // 
         MoveDeckToReachPoint();
         
         // Wait for deck to reach position before notifying that deck is ready
-        // Debug.Log("[DeckController] Waiting for deck to reach position...");
+        // 
         while (isDeckMoving || !isDeckAtReachPoint)
         {
             yield return null;
         }
         
-        // Debug.Log("[DeckController] Deck is ready and in position for dealing");
+        // 
         // Debug.Log($"[DeckController] ===== ÖNEMLİ: DECK START COMPLETED =====\n" +
         //          $"Calling gameManager.DeckReady()");
         gameManager.DeckReady();
@@ -144,7 +144,7 @@ public class DeckController : MonoBehaviour
             }
             else
             {
-                //Debug.LogWarning($"Card prefab with ID {cardIDString} already exists. Skipping...");
+                //
             }
         }
         yield return null;
@@ -196,7 +196,7 @@ public class DeckController : MonoBehaviour
 
                 counter++;
             }
-            Debug.LogWarning("cardInteractionList.Count: " + cardInteractionList.Count);
+            
             //deckTransform.rotation = Quaternion.Euler(90, 0, 0);
         }
 
@@ -217,11 +217,11 @@ public class DeckController : MonoBehaviour
                     }
                 }
             }
-            Debug.LogWarning($"[DeckController] Repopulated cardInteractionList with {cardInteractionList.Count} cards");
+            
         }
 
         // CRITICAL: Send card interactions to GameManager for reconnection
-        // Debug.Log($"[DeckController] Sending {cardInteractionList.Count} card interactions to GameManager for reconnection");
+        // 
         SendCardInteractionsToGameManager();
 
     }
@@ -291,19 +291,19 @@ public class DeckController : MonoBehaviour
 
         if (playerCount != 2 && playerCount != 4)
         {
-            //Debug.LogError("Player number is different from 2 or 4");
+            //
             return;
         }
 
         // Check if deck is already at reach point (initial dealing) or needs to be moved (subsequent dealing)
         if (isDeckAtReachPoint && !isDeckMoving)
         {
-            // Debug.Log("[DeckController] Deck already at reach point (initial dealing), starting immediately");
+            // 
             StartCoroutine(DelayedDealPlayersCoroutine(playerHands));
         }
         else
         {
-            // Debug.Log("[DeckController] Deck not at reach point (subsequent dealing), moving deck first");
+            // 
             MoveDeckToReachPoint();
             StartCoroutine(DelayedDealPlayersCoroutine(playerHands));
         }
@@ -333,24 +333,24 @@ public class DeckController : MonoBehaviour
 
     private IEnumerator DealTwoPlayers(Dictionary<int, List<string>> playerHands)
     {
-        Debug.LogError($"[DEALING] DealTwoPlayers called - thisPlayerNumber: {thisPlayerNumber}, playerCount: {playerCount}, startingPlayerNoCounter: {startingPlayerNoCounter}");
+        
         
         // CRITICAL FIX: Wait for player number to be set (for reconnection cases)
         int retryCount = 0;
         while (thisPlayerNumber == -1 && retryCount < 50) // Wait up to 5 seconds
         {
-            Debug.LogError($"[DEALING] Waiting for player number to be set... retry {retryCount}/50");
+            
             yield return new WaitForSeconds(0.1f);
             retryCount++;
         }
         
         if (thisPlayerNumber == -1)
         {
-            Debug.LogError($"[DEALING] ERROR: thisPlayerNumber is still -1 after waiting, cannot deal cards. Aborting deal.");
+            
             yield break;
         }
         
-        Debug.LogError($"[DEALING] Player number is now set to {thisPlayerNumber}, proceeding with deal");
+        
         
         var cardObjects = new List<GameObject>();
         var positions = new List<Vector3>();
@@ -362,7 +362,7 @@ public class DeckController : MonoBehaviour
         {
             int i = (startingPlayerNoCounter + n) % 2;
             relativeIndex = (i - thisPlayerNumber + playerCount) % playerCount;
-            Debug.LogError($"[DEALING] Player {n}: i={i}, thisPlayerNumber={thisPlayerNumber}, relativeIndex={relativeIndex}");
+            
 
             if (relativeIndex == 0)
             {
@@ -427,31 +427,31 @@ public class DeckController : MonoBehaviour
         }
         
         // After dealing to players is complete, close the deck
-        Debug.Log("[DeckController] Finished dealing to 2 players, closing deck");
+        
         MoveDeckToStartingPosition();
 
     }
 
     private IEnumerator DealFourPlayers(Dictionary<int, List<string>> playerHands)
     {
-        Debug.LogError($"[DEALING] DealFourPlayers called - thisPlayerNumber: {thisPlayerNumber}, playerCount: {playerCount}, startingPlayerNoCounter: {startingPlayerNoCounter}");
+        
         
         // CRITICAL FIX: Wait for player number to be set (for reconnection cases)
         int retryCount = 0;
         while (thisPlayerNumber == -1 && retryCount < 50) // Wait up to 5 seconds
         {
-            Debug.LogError($"[DEALING] Waiting for player number to be set... retry {retryCount}/50");
+            
             yield return new WaitForSeconds(0.1f);
             retryCount++;
         }
         
         if (thisPlayerNumber == -1)
         {
-            Debug.LogError($"[DEALING] ERROR: thisPlayerNumber is still -1 after waiting, cannot deal cards. Aborting deal.");
+            
             yield break;
         }
         
-        Debug.LogError($"[DEALING] Player number is now set to {thisPlayerNumber}, proceeding with deal");
+        
         
         var cardObjects = new List<GameObject>();
         var positions = new List<Vector3>();
@@ -463,7 +463,7 @@ public class DeckController : MonoBehaviour
         {
             int i = (startingPlayerNoCounter + n) % 4;
             relativeIndex = (i - thisPlayerNumber + playerCount) % playerCount;
-            Debug.LogWarning("relativeIndex: " + relativeIndex);
+            
 
             if (relativeIndex == 0)
             {
@@ -532,7 +532,7 @@ public class DeckController : MonoBehaviour
         }
         
         // After dealing to players is complete, close the deck
-        Debug.Log("[DeckController] Finished dealing to 4 players, closing deck");
+        
         MoveDeckToStartingPosition();
     }
 
@@ -547,11 +547,11 @@ public class DeckController : MonoBehaviour
             yield return null;
         }
         
-        Debug.Log("[DeckController] Starting to deal cards to center");
+        
         
         //To make sure the center position is correct each round
         centerTransform.position = new Vector3(0, 50, 0);
-        Debug.LogWarning("DealCenter called with centerCardIDs: " + string.Join(", ", centerCardIDs));
+        
         startingPlayerNoCounter++;
         SendCardInteractionsToGameManager();
         List<GameObject> cardObjects = new List<GameObject>();
@@ -602,7 +602,7 @@ public class DeckController : MonoBehaviour
         yield return StartCoroutine(TweenMoveTransform(centerTransform, targetPos, centerTransform.rotation, centerTransform.localScale, duration));
         
         // NOTE: Don't close the deck here - it needs to stay open for player dealing
-        Debug.Log("[DeckController] Finished dealing to center, deck remains open for player dealing");
+        
         
         // After DealCenter animation/logic is done:
         GameNetworkRelay.Instance.NotifyDealCenterFinishedServerRPC(NetworkManager.Singleton.LocalClientId);
@@ -657,7 +657,7 @@ public class DeckController : MonoBehaviour
             }
             else
             {
-                Debug.LogWarning("No card found with the tag: " + cardID[0] + "_" + cardID[1]);
+                
             }
         }
 
@@ -667,7 +667,7 @@ public class DeckController : MonoBehaviour
         {
             if (CardInteraction.cardLookup[selectedCards[selectedCards.Count - 1]].GetCardID()[1] == CardInteraction.cardLookup[selectedCards[selectedCards.Count - 2]].GetCardID()[1])
             {
-                Debug.LogError("Pişti happened!");
+                
                 piştiHappened = true;
             }
         }
@@ -795,11 +795,11 @@ public class DeckController : MonoBehaviour
 
     public void UpdateCurrentPlayerHandLayout()
     {
-        Debug.Log($"[Showcase] DeckController: UpdateCurrentPlayerHandLayout() called - isShowcaseAllActive = {isShowcaseAllActive}");
+        
         
         if (isShowcaseAllActive)
         {
-            Debug.Log("[Showcase] DeckController: isShowcaseAllActive is true, calling ShowcaseAllOtherHandsLayout()");
+            
             //ShowcaseAllOtherHandsLayout();
             return;
         }
@@ -840,9 +840,9 @@ public class DeckController : MonoBehaviour
     [ContextMenu("ShowcaseAllOtherHands")]
     private void ShowcaseAllOtherHandsLayout()
     {
-        Debug.Log("[Showcase] DeckController: ShowcaseAllOtherHandsLayout() called");
-        Debug.Log($"[Showcase] DeckController: isShowcaseAllActive = {isShowcaseAllActive}");
-        Debug.Log($"[Showcase] DeckController: playerHandTransforms.Count = {playerHandTransforms.Count}");
+        
+        
+        
         
         float spacing = 500f;
         int handCount = playerHandTransforms.Count;
@@ -850,26 +850,26 @@ public class DeckController : MonoBehaviour
         int endExclusive = showcaseOnlyOwnHand ? Mathf.Min(1, handCount) : handCount;
 
         // Layout for all hands (showcase)
-        Debug.Log($"[Showcase] DeckController: Processing {handCount} hands for showcase");
+        
         for (int handIdx = startIdx; handIdx < endExclusive; handIdx++)
         {
             Transform hand = playerHandTransforms[handIdx];
             if (hand == null)
             {
-                Debug.LogError($"[Showcase] DeckController: ERROR - Hand at index {handIdx} is null!");
+                
                 continue;
             }
             
-            Debug.Log($"[Showcase] DeckController: Processing hand {handIdx}: {hand.name}");
+            
             var playerCards = new List<GameObject>();
             int counter = 0;
             foreach (Transform child in hand)
             {
-                if (counter > 1) playerCards.Add(child.gameObject);
+                if (counter >= 0) playerCards.Add(child.gameObject);
                 counter++;
             }
             int totalCards = playerCards.Count;
-            Debug.Log($"[Showcase] DeckController: Hand {handIdx} has {totalCards} cards to showcase");
+            
             if (totalCards == 0) continue;
 
             float offsetMult = (totalCards - 1) / 2f;
@@ -881,26 +881,26 @@ public class DeckController : MonoBehaviour
                 GameObject card = playerCards[i];
                 if (card == null)
                 {
-                    Debug.LogError($"[Showcase] DeckController: ERROR - Card at index {i} in hand {handIdx} is null!");
+                    
                     continue;
                 }
                 
                 var ci = card.GetComponent<CardInteraction>();
                 if (ci == null)
                 {
-                    Debug.LogWarning($"[Showcase] DeckController: No CardInteraction found on {card.name} in hand {handIdx}");
+                    
                     continue;
                 }
 
                 // Store original transform and flags if not already stored
                 if (!showcaseOriginalTransforms.ContainsKey(card))
                 {
-                    Debug.Log($"[Showcase] DeckController: Storing original transform for {card.name} at position {card.transform.position}");
+                    
                     showcaseOriginalTransforms[card] = (card.transform.position, card.transform.rotation, card.transform.localScale, ci.isAutoRotating);
                 }
                 else
                 {
-                    Debug.Log($"[Showcase] DeckController: {card.name} already has stored transform, skipping");
+                    
                 }
 
                 Vector3 offset = Vector3.zero;
@@ -922,7 +922,7 @@ public class DeckController : MonoBehaviour
                         offset = new Vector3(1000, (i * 10) + 1000, spacing * 3f * (i - offsetMult));
                         rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + 90, centerRotation.z);
                         targetPosition = basePos + offset;
-                        Debug.Log($"[Showcase] DeckController: Moving {card.name} to position {targetPosition} (hand {handIdx}, card {i})");
+                        
                         MoveCard(targetPosition, card, 10, rotation, scale);
                         break;
                         
@@ -930,7 +930,7 @@ public class DeckController : MonoBehaviour
                         offset = new Vector3(-1000, (i * 10) + 1000, spacing * 3f * (i - offsetMult));
                         rotation = Quaternion.Euler(centerRotation.x, centerRotation.y + 90, centerRotation.z);
                         targetPosition = basePos + offset;
-                        Debug.Log($"[Showcase] DeckController: Moving {card.name} to position {targetPosition} (hand {handIdx}, card {i})");
+                        
                         MoveCard(targetPosition, card, 10, rotation, scale);
                         break;
                         
@@ -938,7 +938,7 @@ public class DeckController : MonoBehaviour
                         offset = new Vector3(spacing * 3f * (i - offsetMult), (i * 10) + 1000, 0);
                         rotation = Quaternion.Euler(centerRotation.x, centerRotation.y, centerRotation.z);
                         targetPosition = basePos + offset;
-                        Debug.Log($"[Showcase] DeckController: Moving {card.name} to position {targetPosition} (hand {handIdx}, card {i})");
+                        
                         MoveCard(targetPosition, card, 10, rotation, scale);
                         break;
                         
@@ -946,7 +946,7 @@ public class DeckController : MonoBehaviour
                         offset = new Vector3(spacing * 3f * (i - offsetMult), i * 10, 0);
                         rotation = Quaternion.Euler(centerRotation.x, centerRotation.y, centerRotation.z);
                         targetPosition = basePos + offset;
-                        Debug.Log($"[Showcase] DeckController: Moving {card.name} to position {targetPosition} (hand {handIdx}, card {i})");
+                        
                         MoveCard(targetPosition, card, 10, rotation, scale);
                         break;
                 }
@@ -1007,11 +1007,6 @@ public class DeckController : MonoBehaviour
             int childIndex = 0;
             foreach (Transform child in hand)
             {
-                if (childIndex <= 1)
-                {
-                    childIndex++;
-                    continue;
-                }
 
                 if (child == null)
                 {
@@ -1056,25 +1051,25 @@ public class DeckController : MonoBehaviour
     [ContextMenu("ExitShowcaseAllOtherHands")]
     public void ExitShowcaseAllOtherHands()
     {
-        Debug.Log("[Showcase] DeckController: ExitShowcaseAllOtherHands() called");
-        Debug.Log($"[Showcase] DeckController: Current isShowcaseAllActive state: {isShowcaseAllActive}");
-        Debug.Log($"[Showcase] DeckController: Cards in showcaseOriginalTransforms: {showcaseOriginalTransforms.Count}");
+        
+        
+        
         
         isShowcaseAllActive = false;
         showcaseOnlyOwnHand = false;
-        Debug.Log("[Showcase] DeckController: Set isShowcaseAllActive = false");
+        
         
         // CRITICAL FIX: Don't restore cards immediately if peek animations are active
         // This prevents the twitching conflict between showcase restoration and peek animations
         if (IsPeekAnimationActive())
         {
-            Debug.Log("[Showcase] DeckController: Peek animation is active - delaying showcase restoration");
+            
             StartCoroutine(DelayedShowcaseRestoration());
             return;
         }
         
         // Restore all cards to their stored transforms and flags
-        Debug.Log($"[Showcase] DeckController: Starting to restore {showcaseOriginalTransforms.Count} cards");
+        
         RestoreShowcaseCards();
     }
     
@@ -1101,7 +1096,7 @@ public class DeckController : MonoBehaviour
                 // Check if card is currently animating (being peeked)
                 if (DOTween.IsTweening(card.transform))
                 {
-                    Debug.Log($"[Showcase] DeckController: Found animating card {card.name} - peek animation active");
+                    
                     return true;
                 }
             }
@@ -1115,13 +1110,13 @@ public class DeckController : MonoBehaviour
     /// </summary>
     private IEnumerator DelayedShowcaseRestoration()
     {
-        Debug.Log("[Showcase] DeckController: Starting delayed showcase restoration");
+        
         
         // Wait a bit longer than the peek animations to ensure they complete
         float waitTime = 5.0f; // Safe buffer time
         yield return new WaitForSeconds(waitTime);
         
-        Debug.Log("[Showcase] DeckController: Delayed restoration - now restoring cards");
+        
         RestoreShowcaseCards();
     }
     
@@ -1138,11 +1133,11 @@ public class DeckController : MonoBehaviour
             
             if (card == null)
             {
-                Debug.LogError($"[Showcase] DeckController: ERROR - Card is null in showcaseOriginalTransforms at index {restoredCount}");
+                
                 continue;
             }
             
-            Debug.Log($"[Showcase] DeckController: Restoring card {card.name} to position {pos}");
+            
             MoveCard(pos, card, 10, rot, scale);
             restoredCount++;
 
@@ -1150,19 +1145,19 @@ public class DeckController : MonoBehaviour
             if (ci != null)
             {
                 ci.StopAutoRotate();
-                Debug.Log($"[Showcase] DeckController: Stopped auto rotate for {card.name}");
+                
             }
             else
             {
-                Debug.LogWarning($"[Showcase] DeckController: No CardInteraction found on {card.name}");
+                
             }
         }
         
-        Debug.Log($"[Showcase] DeckController: Restored {restoredCount} cards, clearing showcaseOriginalTransforms");
+        
         showcaseOriginalTransforms.Clear();
 
         // After restoring, update layout to ensure flags are correct for your hand
-        Debug.Log("[Showcase] DeckController: Calling UpdateCurrentPlayerHandLayout() after restore");
+        
         UpdateCurrentPlayerHandLayout();
     }
 
@@ -1178,29 +1173,29 @@ public class DeckController : MonoBehaviour
 
     public void ShowcaseAllOtherHands(bool includeOwnHand = true)
     {
-        Debug.Log("[Showcase] DeckController: ShowcaseAllOtherHands() called");
-        Debug.Log($"[Showcase] DeckController: Current isShowcaseAllActive state: {isShowcaseAllActive}");
-        Debug.Log($"[Showcase] DeckController: includeOwnHand = {includeOwnHand}");
+        
+        
+        
         
         isShowcaseAllActive = true;
         showcaseIncludeOwnHand = includeOwnHand;
         showcaseOnlyOwnHand = false;
-        Debug.Log("[Showcase] DeckController: Set isShowcaseAllActive = true");
+        
         
         ShowcaseAllOtherHandsLayout();
-        Debug.Log("[Showcase] DeckController: ShowcaseAllOtherHandsLayout() called");
+        
     }
 
     public void ShowcaseOnlyOwnHand()
     {
-        Debug.Log("[Showcase] DeckController: ShowcaseOnlyOwnHand() called");
+        
 
         isShowcaseAllActive = true;
         showcaseIncludeOwnHand = true;
         showcaseOnlyOwnHand = true;
 
         ShowcaseAllOtherHandsLayout();
-        Debug.Log("[Showcase] DeckController: ShowcaseOnlyOwnHand layout applied");
+        
     }
 
     /// <summary>
@@ -1306,7 +1301,7 @@ public class DeckController : MonoBehaviour
             MoveCard(targetPosition, playerCards[i], 10, rotation, currentScale);
         }
         //if (playerNumber == 0) StartCoroutine(SetAutoRotateFlagTrue(playerCards));
-        //Debug.LogWarning(playerNumber);
+        //
     }
 
     private void UpdateCurrentPlayerHandLayoutFourPlayers(int playerNumber = -1)
@@ -1391,7 +1386,7 @@ public class DeckController : MonoBehaviour
 
     public IEnumerator SetAutoRotateFlagTrue(List<GameObject> cardObjects)
     {
-        //Debug.LogWarning("CardInteraction not found for the specified GameObject.");
+        //
         yield return new WaitForSeconds(0.2f);
         // Search the list for a CardInteraction with the matching GameObject
         foreach (var cardObject in cardObjects)
@@ -1409,7 +1404,7 @@ public class DeckController : MonoBehaviour
 
     public void SetAutoRotateFlagFalse(GameObject cardObject)
     {
-        //Debug.LogWarning("CardInteraction not found for the specified GameObject.");
+        //
 
         foreach (var cardInteraction in cardInteractionList)
         {
@@ -1422,7 +1417,7 @@ public class DeckController : MonoBehaviour
 
 
 
-        //Debug.LogWarning("CardInteraction not found for the specified GameObject.");
+        //
 
     }
 
@@ -1452,7 +1447,7 @@ public class DeckController : MonoBehaviour
     {
         if (poolIndex < 0 || poolIndex >= playerPoolTransforms.Count || poolIndex >= playerPiştiPoolTransforms.Count)
         {
-            Debug.LogWarning($"[DeckController] ShowcasePlayerPoolCards ignored: invalid pool index {poolIndex}");
+            
             return;
         }
 
@@ -1823,7 +1818,7 @@ public class DeckController : MonoBehaviour
         
         // All animations complete, clear the flag
         isCenterShowcaseAnimating = false;
-        Debug.Log("[DeckController] Center showcase animation completed, flag cleared");
+        
     }
     
     /// <summary>
@@ -2187,7 +2182,7 @@ public class DeckController : MonoBehaviour
                 {
                     positions[i] = new Vector3(position.x + 100 + GetChkobbaZOffset(), position.y, position.z - GetChkobbaZOffset() + 10);
                     rotations[i] = Quaternion.Euler(tempRotation.x + 90, tempRotation.y, tempRotation.z + UnityEngine.Random.Range(170f, 190f) + 90);
-                    //Debug.LogWarning(poolIndex);
+                    //
                 }
                 StartCoroutine(ChkobbaCoroutine());
             }
@@ -2270,12 +2265,12 @@ public class DeckController : MonoBehaviour
     public void SetPlayerNumber(int playerNumber)
     {
         thisPlayerNumber = playerNumber;
-        Debug.LogError($"[PLAYER NUMBER] SetPlayerNumber called with playerNumber: {playerNumber}, thisPlayerNumber now: {thisPlayerNumber}");
+        
         
         // CRITICAL FIX: Save player number to PlayerPrefs for reconnection
         PlayerPrefs.SetInt("SavedPlayerSeat", playerNumber);
         PlayerPrefs.Save();
-        Debug.LogError($"[PLAYER NUMBER] Saved player number {playerNumber} to PlayerPrefs (SavedPlayerSeat) for reconnection");
+        
 
         if (SideManager.Instance != null)
         {
@@ -2321,7 +2316,7 @@ public class DeckController : MonoBehaviour
             }
         }
 
-        Debug.LogWarning($"[DeckController] Rebuilt CardInteraction.cardLookup with {CardInteraction.cardLookup.Count} active cards.");
+        
     }
 
     public int GetSavedPlayerSeat()
@@ -2335,7 +2330,7 @@ public class DeckController : MonoBehaviour
     public void SetStartingPlayerNoCounter(int counter)
     {
         startingPlayerNoCounter = counter;
-        Debug.LogError($"[GAME STATE] SetStartingPlayerNoCounter called with counter: {counter}, startingPlayerNoCounter now: {startingPlayerNoCounter}");
+        
     }
  
     public int SendPlayerNumber()
@@ -2346,14 +2341,14 @@ public class DeckController : MonoBehaviour
     [ContextMenu("Print ThisPlayerNumber")]
     private void PrintThisPlayerNumber()
     {
-        //Debug.Log("ThisPlayerNumber: " + thisPlayerNumber);
+        //
     }
 
     private List<GameObject> orderedCardObjectList = new List<GameObject>();
     public void AddCardsToPlayerPool(int playerNumber)
     {
         if (playerNumber == -1) return;
-        //Debug.Log("inside AddCardsToPlayerPool: " + gameManager.centerCardsObjects.Count);
+        //
         List<GameObject> cardObjects = new List<GameObject>();
         int relativePoolIndex = (playerNumber - thisPlayerNumber + playerCount) % playerCount;
 
@@ -2362,7 +2357,7 @@ public class DeckController : MonoBehaviour
 
         foreach (Transform child in children)
         {
-            Debug.LogWarning("Child: " + child.name);
+            
             GameObject card = child.gameObject;
             cardObjects.Add(card);
             card.transform.parent = null; // Unparent the card
@@ -2420,7 +2415,7 @@ public class DeckController : MonoBehaviour
         // which uses the new formula: [capturing card value] + [n(n+1)/2]
         // No need to process individual cards here anymore
         
-        Debug.Log("[DeckController] Gold calculation now handled in OnLocalCapture() with new formula");
+        
         
         // No card movement here - BuildPoolMoveListsAndMoveCards handles that
         yield return null;
@@ -2467,33 +2462,33 @@ public class DeckController : MonoBehaviour
         // Only do UI management during reconnection, not during normal game start
         if (isReconnection)
         {
-            Debug.Log($"[DeckController] GetPlayerCount called for reconnection - initializing UI screens");
+            
             
             // Find and manage UI screens (same as InitialGameManagerSetUp and InitializeCardPrefabs do)
             var waitingScreen = GameObject.Find("WaitingScreen");
             if (waitingScreen != null && waitingScreen.activeSelf)
             {
-                Debug.Log("[DeckController] ✓ Closing waiting screen for reconnection");
+                
                 waitingScreen.SetActive(false);
             }
             
             var winScreen = GameObject.Find("WinScreen");
             if (winScreen != null && winScreen.activeSelf)
             {
-                Debug.Log("[DeckController] ✓ Closing win screen for reconnection");
+                
                 winScreen.SetActive(false);
             }
             
             var mainScreen = GameObject.Find("MainScreen");
             if (mainScreen != null && mainScreen.activeSelf)
             {
-                Debug.Log("[DeckController] ✓ Deactivating main screen for reconnection");
+                
                 mainScreen.SetActive(false);
             }
         }
         else
         {
-            Debug.Log($"[DeckController] GetPlayerCount called for normal game start - skipping UI management");
+            
         }
         
         Debug.Log($"[DeckController] ===== ÖNEMLİ: GET PLAYER COUNT COMPLETED =====\n" +
@@ -2537,35 +2532,79 @@ public class DeckController : MonoBehaviour
     /// </summary>
     public void PeekOpponentCard(int opponentPlayerNo, int cardIndex)
     {
-        Debug.LogWarning($"PeekOpponentCard called for opponent {opponentPlayerNo} at card index {cardIndex}");
-        int myNo = thisPlayerNumber;
-        int playerCount = this.playerCount;
-        int relativeIndex = (opponentPlayerNo - myNo + playerCount) % playerCount;
-        bool isMine = thisPlayerNumber == opponentPlayerNo;
-
-        // Get the hand transform for the opponent in my perspective
-        Transform handTransform = playerHandTransforms[GetHandIndex(relativeIndex)];
-
-        // Get the card GameObject at the specified index
-        if (handTransform.childCount <= cardIndex + 2) // +2 for pool/extra children
-            return;
-
-        // Skip pool/extra children if needed
-        int actualIndex = 0;
-        int found = 0;
-        foreach (Transform child in handTransform)
+        Debug.Log($"[UcundanGözAt] DeckController.PeekOpponentCard() called: opponentPlayerNo={opponentPlayerNo}, cardIndex={cardIndex}");
+        Debug.Log($"[UcundanGözAt] DeckController: thisPlayerNumber={thisPlayerNumber}, playerCount={playerCount}");
+        
+        try
         {
-            if (actualIndex > 1) // skip pool/extra
+            int myNo = thisPlayerNumber;
+            int playerCount = this.playerCount;
+            int relativeIndex = (opponentPlayerNo - myNo + playerCount) % playerCount;
+            bool isMine = thisPlayerNumber == opponentPlayerNo;
+            
+            Debug.Log($"[UcundanGözAt] DeckController: relativeIndex={relativeIndex}, isMine={isMine}");
+            Debug.Log($"[UcundanGözAt] DeckController: playerHandTransforms.Count={playerHandTransforms?.Count ?? -1}");
+            
+            // Get hand index safely
+            int handIndex = -1;
+            try
             {
-                if (found == cardIndex)
-                {
-                    GameObject card = child.gameObject;
-                    StartCoroutine(PeekCardAnimation(card,isMine));
-                    break;
-                }
-                found++;
+                handIndex = GetHandIndex(relativeIndex);
+                Debug.Log($"[UcundanGözAt] DeckController: GetHandIndex({relativeIndex}) returned {handIndex}");
             }
-            actualIndex++;
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[UcundanGözAt] DeckController: GetHandIndex({relativeIndex}) threw exception: {ex.Message}\n{ex.StackTrace}");
+                return;
+            }
+            
+            // Validate hand index
+            if (playerHandTransforms == null)
+            {
+                Debug.LogError($"[UcundanGözAt] DeckController: playerHandTransforms is NULL");
+                return;
+            }
+            
+            if (handIndex < 0 || handIndex >= playerHandTransforms.Count)
+            {
+                Debug.LogError($"[UcundanGözAt] DeckController: handIndex {handIndex} is out of bounds (playerHandTransforms.Count={playerHandTransforms.Count})");
+                return;
+            }
+            
+            // Get the hand transform for the opponent in my perspective
+            Transform handTransform = playerHandTransforms[handIndex];
+            Debug.Log($"[UcundanGözAt] DeckController: handTransform retrieved, childCount={handTransform.childCount}");
+
+            // Get the card GameObject at the specified index
+            if (handTransform.childCount <= cardIndex)
+            {
+                Debug.LogWarning($"[UcundanGözAt] DeckController: Not enough cards. childCount={handTransform.childCount}, need cardIndex+2={cardIndex + 2}");
+                return;
+            }
+
+            int actualIndex = 0;
+            int found = 0;
+            foreach (Transform child in handTransform)
+            {
+                if (actualIndex >= 0)
+                {
+                    if (found == cardIndex)
+                    {
+                        GameObject card = child.gameObject;
+                        Debug.Log($"[UcundanGözAt] DeckController: Found card at actualIndex={actualIndex}, starting PeekCardAnimation");
+                        StartCoroutine(PeekCardAnimation(card, isMine));
+                        return;
+                    }
+                    found++;
+                }
+                actualIndex++;
+            }
+            
+            Debug.LogError($"[UcundanGözAt] DeckController: Card at index {cardIndex} was not found in hand");
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"[UcundanGözAt] DeckController.PeekOpponentCard() threw exception: {ex.Message}\n{ex.StackTrace}");
         }
     }
 
@@ -2585,7 +2624,7 @@ public class DeckController : MonoBehaviour
         List<GameObject> cardsToPeek = new List<GameObject>();
         foreach (Transform child in handTransform)
         {
-            if (actualIndex > 1) // skip pool/extra
+            if (actualIndex >= 0)
             {
                 cardsToPeek.Add(child.gameObject);
             }
@@ -2601,9 +2640,13 @@ public class DeckController : MonoBehaviour
     /// </summary>
     private IEnumerator PeekCardAnimation(GameObject card, bool isMine)
     {
+        Debug.Log($"[UcundanGözAt] DeckController.PeekCardAnimation() started: card={card.name}, isMine={isMine}");
+        
         Vector3 originalPos = card.transform.position;
         Quaternion originalRot = card.transform.rotation;
         Vector3 originalScale = card.transform.localScale;
+        
+        Debug.Log($"[UcundanGözAt] DeckController: Original state - pos={originalPos}, rot={originalRot}, scale={originalScale}");
 
         if (isMine)
         {
@@ -2611,6 +2654,7 @@ public class DeckController : MonoBehaviour
             CardInteraction interaction = card.GetComponent<CardInteraction>();
             if (interaction != null)
             {
+                Debug.Log("[UcundanGözAt] DeckController: Stopping auto-rotate for my card");
                 interaction.StopAutoRotate();
             }
         }
@@ -2618,20 +2662,29 @@ public class DeckController : MonoBehaviour
         Vector3 peekPos = originalPos + new Vector3(0, 1200, isMine ? 0 : (playerCount == 2 ? -500 : 0));
         Vector3 peekScale = isMine ? originalScale : originalScale * 2.0f;
         Quaternion peekRot = isMine ? Quaternion.Euler(-90, 0, 0) : Quaternion.Euler(90, 0, 0);
+        
+        Debug.Log($"[UcundanGözAt] DeckController: Peek state - peekPos={peekPos}, peekRot={peekRot}, peekScale={peekScale}");
 
         float moveDuration = 0.4f;
         float pauseDuration = 3f;
 
         // Move to peek
+        Debug.Log($"[UcundanGözAt] DeckController: Starting move to peek position (duration={moveDuration}s)");
         yield return TweenMoveTransform(card.transform, peekPos, peekRot, peekScale, moveDuration);
+        Debug.Log("[UcundanGözAt] DeckController: Move to peek position completed");
 
+        Debug.Log($"[UcundanGözAt] DeckController: Pausing for {pauseDuration}s to show card");
         yield return new WaitForSeconds(pauseDuration);
+        Debug.Log("[UcundanGözAt] DeckController: Pause completed");
 
         // Move back
+        Debug.Log($"[UcundanGözAt] DeckController: Starting move back to original position (duration={moveDuration}s)");
         yield return TweenMoveTransform(card.transform, originalPos, originalRot, originalScale, moveDuration);
+        Debug.Log("[UcundanGözAt] DeckController: Move back to original position completed");
 
         if (isMine)
         {
+            Debug.Log("[UcundanGözAt] DeckController: Restarting auto-rotate for my card");
             CardInteraction interaction = card.GetComponent<CardInteraction>();
             if (interaction != null)
             {
@@ -2641,13 +2694,21 @@ public class DeckController : MonoBehaviour
 
         if (SuperPowerSpawner.LocalInstance != null && SuperPowerSpawner.LocalInstance.isInfoBoxOpen)
         {
+            Debug.Log("[UcundanGözAt] DeckController: Closing SuperPowerSpawner InfoBox");
             SuperPowerSpawner.LocalInstance.StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
+        }
+        else
+        {
+            Debug.Log("[UcundanGözAt] DeckController: SuperPowerSpawner infobox not open or spawner null");
         }
 
         if (GameManager.LocalInstance != null)
         {
+            Debug.Log("[UcundanGözAt] DeckController: Calling EndGameplayActionIfTagStartsWith");
             GameManager.LocalInstance.EndGameplayActionIfTagStartsWith("SuperPower", "Ucundan Goz At animation completed");
         }
+        
+        Debug.Log("[UcundanGözAt] DeckController.PeekCardAnimation() completed successfully");
     }
 
 
@@ -2732,7 +2793,7 @@ public class DeckController : MonoBehaviour
         // CRITICAL FIX: Notify that Baya Baya Bak animation is complete
         if (!isMine) // Only for opponent cards (Baya Baya Bak)
         {
-            Debug.Log("[DeckController] Baya Baya Bak animation complete - notifying SuperPowerSpawner");
+            
             if (SuperPowerSpawner.LocalInstance != null)
             {
                 SuperPowerSpawner.LocalInstance.OnPeekAnimationComplete();
@@ -2763,7 +2824,6 @@ public class DeckController : MonoBehaviour
         // Get the hand transform for the opponent in my perspective
         Transform handTransform = playerHandTransforms[GetHandIndex(relativeIndex)];
 
-        // Count only the actual hand cards (skip pool/extra children if needed)
         List<Transform> handCards = new List<Transform>();
         foreach (Transform child in handTransform)
         {
@@ -2799,16 +2859,16 @@ public class DeckController : MonoBehaviour
     }
 
     /// <summary>
-    /// Gets the hand card GameObject at the given index, skipping pool/extra children.
+    /// Gets the hand card GameObject at the given index
     /// </summary>
     private GameObject GetHandCardByIndex(Transform handTransform, int index)
     {
         int actualIndex = 0;
         foreach (Transform child in handTransform)
         {
-            if (actualIndex > 1) // skip pool/extra
+            if (actualIndex >= 0) // skip pool/extra
             {
-                if ((actualIndex - 2) == index)
+                if (actualIndex == index)
                     return child.gameObject;
             }
             actualIndex++;
@@ -2932,7 +2992,7 @@ public class DeckController : MonoBehaviour
 
     public IEnumerator SwapCardsBetweenPlayersByID(int playerANo, string cardAID, int playerBNo, string cardBID, bool sunuFlag = false)
     {
-        Debug.Log($"[ŞDBT] Visual swap start: playerA={playerANo}, cardA={cardAID}, playerB={playerBNo}, cardB={cardBID}, sunuFlag={sunuFlag}");
+        
         int relA = (playerANo - thisPlayerNumber + playerCount) % playerCount;
         int relB = (playerBNo - thisPlayerNumber + playerCount) % playerCount;
 
@@ -2942,7 +3002,7 @@ public class DeckController : MonoBehaviour
         if (!CardInteraction.cardLookup.TryGetValue(cardAID, out var cardAInteraction) ||
             !CardInteraction.cardLookup.TryGetValue(cardBID, out var cardBInteraction))
         {
-            Debug.LogWarning($"[ŞDBT] Visual swap aborted because lookup failed. hasA={CardInteraction.cardLookup.ContainsKey(cardAID)}, hasB={CardInteraction.cardLookup.ContainsKey(cardBID)}");
+            
             yield break;
         }
 
@@ -2963,7 +3023,7 @@ public class DeckController : MonoBehaviour
             i++;
         }
 
-        Debug.Log($"[ŞDBT] Visual swap indexes resolved. idxA={idxA}, idxB={idxB}, relA={relA}, relB={relB}");
+        
 
         // Store world positions before changing parents
         Vector3 cardAOldPos = cardAObj.transform.position;
@@ -3045,14 +3105,12 @@ public class DeckController : MonoBehaviour
         //UpdateCurrentPlayerHandLayout();
         CardInteraction.currentlySelectedCard = null;
         GameManager.LocalInstance.SetCurrentSelectedHandCardNull();
-        Debug.Log($"[ŞDBT] Visual swap finished: cardA={cardAID}, cardB={cardBID}");
+        
         //yield return new WaitForSeconds(0.5f);
     }
 
 
 
-
-    //DeğişTokuş
     public List<string> GetOpponentHandCardIDs(int absolutePlayerNo)
     {
         int myNo = thisPlayerNumber;
@@ -3063,7 +3121,7 @@ public class DeckController : MonoBehaviour
         int actualIndex = 0;
         foreach (Transform child in handTransform)
         {
-            if (actualIndex > 1) // skip pool/extra
+            if (actualIndex >= 0) // skip pool/extra
             {
                 CardInteraction ci = child.GetComponent<CardInteraction>();
                 if (ci != null) handCardIDs.Add(ci.uniqueCardInstanceID);
@@ -3194,7 +3252,7 @@ public class DeckController : MonoBehaviour
         Dictionary<int, List<string>> playersPooledCardsIDs = playersPooledCardsIDsSerialized.ToDictionary();
         if (playerPoolTransforms == null || playerPoolTransforms.Count == 0)
         {
-            Debug.LogError("playerPoolTransforms not set!");
+            
             return;
         }
 
@@ -3242,7 +3300,7 @@ public class DeckController : MonoBehaviour
                 }
                 else
                 {
-                    Debug.LogWarning($"CardInteraction.cardLookup does not contain cardID: {cardID}");
+                    
                 }
             }
         }
@@ -3256,7 +3314,7 @@ public class DeckController : MonoBehaviour
         Dictionary<int, List<string>> playersPistiCardsIDs = playersPistiCardsIDsSerialized.ToDictionary();
         if (playerPiştiPoolTransforms == null || playerPiştiPoolTransforms.Count == 0)
         {
-            Debug.LogError("playerPiştiPoolTransforms not set!");
+            
             return;
         }
 
@@ -3308,7 +3366,7 @@ public class DeckController : MonoBehaviour
                 }
                 else
                 {
-                    Debug.LogWarning($"CardInteraction.cardLookup does not contain pişti cardID: {cardID}");
+                    
                 }
             }
         }
@@ -3329,7 +3387,7 @@ public class DeckController : MonoBehaviour
     {
         if (playerHandTransforms == null || playerHandTransforms.Count == 0)
         {
-            Debug.LogError("playerHandTransforms not set!");
+            
             return;
         }
 
@@ -3351,7 +3409,7 @@ public class DeckController : MonoBehaviour
                 }
                 else
                 {
-                    Debug.LogWarning($"Could not find card for cardID: {cardID}");
+                    
                 }
             }
         }
@@ -3390,11 +3448,11 @@ public class DeckController : MonoBehaviour
         Transform deckTransform = GameObject.Find("DeckTransform").transform;
         if (deckTransform == null)
         {
-            Debug.LogError("[DeckController] DeckTransform not found! Cannot move deck.");
+            
             return;
         }
         
-        Debug.Log($"[DeckController] Moving deck from {deckTransform.position} to reach point {deckReachPoint.position}");
+        
         
         // Kill any existing movement sequence
         if (deckMoveSequence != null)
@@ -3408,7 +3466,7 @@ public class DeckController : MonoBehaviour
         deckMoveSequence.Append(deckTransform.DOMove(deckReachPoint.position, deckMoveSpeed).SetEase(deckMoveEase));
         deckMoveSequence.OnComplete(() => {
             isDeckMoving = false;
-            Debug.Log("[DeckController] Deck reached target position");
+            
         });
     }
     
@@ -3423,11 +3481,11 @@ public class DeckController : MonoBehaviour
         Transform deckTransform = GameObject.Find("DeckTransform").transform;
         if (deckTransform == null)
         {
-            Debug.LogError("[DeckController] DeckTransform not found! Cannot move deck.");
+            
             return;
         }
         
-        Debug.Log($"[DeckController] Moving deck from {deckTransform.position} to starting position {deckStartingPosition}");
+        
         
         // Kill any existing movement sequence
         if (deckMoveSequence != null)
@@ -3441,7 +3499,7 @@ public class DeckController : MonoBehaviour
         deckMoveSequence.Append(deckTransform.DOMove(deckStartingPosition, deckMoveSpeed).SetEase(deckMoveEase));
         deckMoveSequence.OnComplete(() => {
             isDeckMoving = false;
-            Debug.Log("[DeckController] Deck returned to starting position");
+            
         });
     }
     
@@ -3485,7 +3543,7 @@ public class DeckController : MonoBehaviour
     /// </summary>
     public void DestroyAllCards()
     {
-        Debug.LogWarning("[DeckController] ===== DESTROYING ALL CARD OBJECTS =====");
+        
         
         int destroyedCount = 0;
         
@@ -3501,7 +3559,7 @@ public class DeckController : MonoBehaviour
                 }
             }
             cardObjectList.Clear();
-            Debug.LogWarning($"[DeckController] Destroyed {destroyedCount} card objects from cardObjectList");
+            
         }
         
         // Clear all references
@@ -3531,7 +3589,7 @@ public class DeckController : MonoBehaviour
             CardInteraction.cardLookup.Clear();
         }
         
-        Debug.LogWarning($"[DeckController] All card objects destroyed and references cleared. Total destroyed: {destroyedCount}");
+        
     }
     
     void OnDestroy()

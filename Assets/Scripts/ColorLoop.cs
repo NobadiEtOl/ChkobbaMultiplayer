@@ -21,7 +21,7 @@ public class ColorLoop : MonoBehaviour
         
         if (textComponent == null)
         {
-            Debug.LogError("ColorLoop: No Text component found on " + gameObject.name);
+            
             enabled = false; // Disable this script if no Text component is found
         }
     }

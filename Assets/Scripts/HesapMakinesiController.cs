@@ -75,49 +75,49 @@ public class HesapMakinesiController : MonoBehaviour
     
     void Start()
     {
-        Debug.Log("[HesapMakinesiController] Start() called - initializing positioning");
+        
         
         // Get reach points from ScreenEdgePositionAdjuster (centralized source)
         screenEdgeAdjuster = FindObjectOfType<ScreenEdgePositionAdjuster>();
         if (screenEdgeAdjuster != null)
         {
-            Debug.Log("[HesapMakinesiController] ScreenEdgePositionAdjuster found in scene");
+            
             
             reachPoint = screenEdgeAdjuster.GetReachPointTransform("HesapMakinesi");
             if (reachPoint == null)
             {
-                Debug.LogError("[HesapMakinesiController] Could not find group 'HesapMakinesi' in ScreenEdgePositionAdjuster!");
+                
             }
             else
             {
-                Debug.Log($"[HesapMakinesiController] Successfully retrieved reachPoint at position: {reachPoint.position}");
+                
             }
 
             // Get the return/starting position from the outside reach point
-            Debug.Log("[HesapMakinesiController] Attempting to retrieve outside reach point for group 'HesapMakinesi'...");
+            
             startingPosition = screenEdgeAdjuster.GetOutsideReachPointPosition("HesapMakinesi");
-            Debug.Log($"[HesapMakinesiController] Retrieved startingPosition: {startingPosition}");
-            Debug.Log($"[HesapMakinesiController] Is it zero vector? {startingPosition == Vector3.zero}");
+            
+            
             
             if (startingPosition == Vector3.zero)
             {
-                Debug.LogWarning("[HesapMakinesiController] Could not find 'HesapMakinesiOutlineReachPoint' in ScreenEdgePositionAdjuster. Using current position as fallback.");
+                
                 startingPosition = transform.position;
-                Debug.Log($"[HesapMakinesiController] Falling back to current transform position: {startingPosition}");
+                
             }
         }
         else
         {
-            Debug.LogError("[HesapMakinesiController] ScreenEdgePositionAdjuster not found in scene!");
+            
             startingPosition = transform.position;
-            Debug.Log($"[HesapMakinesiController] Fallback: Using current transform position: {startingPosition}");
+            
         }
         
-        Debug.Log($"[HesapMakinesiController] Final startingPosition set to: {startingPosition}");
+        
         // Store the starting position for animation purposes
         startingPositionForAnimation = startingPosition;
-        Debug.Log($"[HesapMakinesiController] startingPositionForAnimation set to: {startingPositionForAnimation}");
-        Debug.Log("[HesapMakinesiController] Initial transform position: " + transform.position);
+        
+        
         
         // Find the coin in the scene
         FindCoinInScene();
@@ -191,14 +191,14 @@ public class HesapMakinesiController : MonoBehaviour
                 (obj.tag != null && obj.tag.ToLower().Contains("coin")))
             {
                 currentCoin = obj;
-                //Debug.Log($"HesapMakinesiController: Found coin: {obj.name}");
+                //
                 break;
             }
         }
         
         if (currentCoin == null)
         {
-            //Debug.LogWarning("HesapMakinesiController: No coin found in scene!");
+            //
         }
     }
     
@@ -207,7 +207,7 @@ public class HesapMakinesiController : MonoBehaviour
     /// </summary>
     public void OnQuickDropDetected()
     {
-        //Debug.Log("HesapMakinesiController: Quick drop detected! Moving to reach point");
+        //
         hasMovedToReachPoint = true;
         MoveToReachPoint();
 
@@ -222,7 +222,7 @@ public class HesapMakinesiController : MonoBehaviour
     /// </summary>
     public void ForceClose()
     {
-        Debug.Log("HesapMakinesiController: Force closing hesap makinesi!");
+        
         hasMovedToReachPoint = false;
         MoveToStartingPosition();
     }
@@ -233,7 +233,7 @@ public class HesapMakinesiController : MonoBehaviour
     [ContextMenu("Open Hesap Makinesi")]
     public void ManualOpen()
     {
-        Debug.Log("HesapMakinesiController: Manually opening hesap makinesi!");
+        
         hasMovedToReachPoint = true;
         MoveToReachPoint();
 
@@ -247,7 +247,7 @@ public class HesapMakinesiController : MonoBehaviour
     [ContextMenu("Close Hesap Makinesi")]
     public void ManualClose()
     {
-        Debug.Log("HesapMakinesiController: Manually closing hesap makinesi!");
+        
         hasMovedToReachPoint = false;
         MoveToStartingPosition();
     }
@@ -262,7 +262,7 @@ public class HesapMakinesiController : MonoBehaviour
         {
             if (SuperPowerSpawner.LocalInstance != null && (!SuperPowerSpawner.LocalInstance.isInfoBoxOpen || !SuperPowerSpawner.LocalInstance.isMenuPageOpen))
             {
-                Debug.Log("[HesapMakinesiController] Activating menu alongside hesap makinesi");
+                
                 menuController.ShowTokenMenu();
             }
         }
@@ -273,9 +273,17 @@ public class HesapMakinesiController : MonoBehaviour
     public void SetCostMode(int mode)
     {
         selectedCostMode = Mathf.Clamp(mode, 1, 3);
-        Debug.Log($"[HesapMakinesiController] Cost mode set to {selectedCostMode}");
+        
         UpdateModeDisplays();
         UpdateButtonVisuals();
+        
+        // Communicate cost mode to KeseController for next coin drop
+        KeseController keseController = FindObjectOfType<KeseController>();
+        if (keseController != null)
+        {
+            keseController.SetCostMode(selectedCostMode);
+            
+        }
     }
     
     /// <summary>
@@ -323,7 +331,7 @@ public class HesapMakinesiController : MonoBehaviour
     {
         if (index < 0 || index >= tableStars.Count)
         {
-            Debug.LogWarning($"[HesapMakinesiController] Table star index {index} is out of range (0-2).");
+            
             return null;
         }
         return tableStars[index];
@@ -336,7 +344,7 @@ public class HesapMakinesiController : MonoBehaviour
     {
         if (index < 0 || index >= hesapMakinesiStars.Count)
         {
-            Debug.LogWarning($"[HesapMakinesiController] Hesap makinesi star index {index} is out of range (0-2).");
+            
             return null;
         }
         return hesapMakinesiStars[index];
@@ -376,7 +384,7 @@ public class HesapMakinesiController : MonoBehaviour
         {
             if (filledStarSprite == null || emptyStarSprite == null)
             {
-                Debug.LogError("[HesapMakinesiController] Filled and empty star sprites must be assigned!");
+                
                 return;
             }
             
@@ -415,7 +423,7 @@ public class HesapMakinesiController : MonoBehaviour
         
         if (starList.Count != 3)
         {
-            Debug.LogWarning($"[HesapMakinesiController] Mode display container should have exactly 3 stars but has {starList.Count}.");
+            
             return;
         }
         
@@ -444,7 +452,7 @@ public class HesapMakinesiController : MonoBehaviour
             }
         }
         
-        Debug.Log($"[HesapMakinesiController] Updated mode display: {selectedCostMode} filled stars, {3 - selectedCostMode} empty stars");
+        
     }
     
     /// <summary>
@@ -462,26 +470,9 @@ public class HesapMakinesiController : MonoBehaviour
             hesapMakinesiCoinAmountDisplay.text = goldAmount.ToString();
         }
         
-        Debug.Log($"[HesapMakinesiController] Updated coin displays: {goldAmount} gold");
+        
     }
-    
-    /// <summary>
-    /// Sends token data to KeseController
-    /// </summary>
-    private void SendTokenDataToKeseController(List<KeseController.TokenData> tokens)
-    {
-        // Find KeseController in the scene
-        KeseController keseController = FindObjectOfType<KeseController>();
-        if (keseController != null)
-        {
-            keseController.SetCoinTokenData(tokens, selectedCostMode);
-            Debug.Log($"HesapMakinesiController: Sent {tokens.Count} token types to KeseController (costMode: {selectedCostMode})");
-        }
-        else
-        {
-            Debug.LogWarning("HesapMakinesiController: KeseController not found in scene!");
-        }
-    }
+
     
     /// <summary>
     /// Moves the hesap makinesi from starting position to reach point
@@ -490,16 +481,16 @@ public class HesapMakinesiController : MonoBehaviour
     {
         if (isMoving || reachPoint == null)
         {
-            Debug.Log($"[HesapMakinesiController] MoveToReachPoint: Cannot move - isMoving={isMoving}, reachPoint={reachPoint}");
+            
             return;
         }
         
-        Debug.Log($"[HesapMakinesiController] MoveToReachPoint: Starting movement from {transform.position} to {reachPoint.position}");
+        
         
         // Kill any existing movement sequence
         if (moveSequence != null)
         {
-            Debug.Log("[HesapMakinesiController] MoveToReachPoint: Killing existing movement sequence");
+            
             moveSequence.Kill();
         }
         
@@ -508,14 +499,14 @@ public class HesapMakinesiController : MonoBehaviour
         animationTimer = 0f; // Reset animation timer
         currentAnimationFrame = 0;
         
-        Debug.Log($"[HesapMakinesiController] MoveToReachPoint: Set isAtReachPoint=true, isMoving=true, starting DOTween animation");
+        
         
         // Create movement sequence
         moveSequence = DOTween.Sequence();
         moveSequence.Append(transform.DOMove(reachPoint.position, moveSpeed).SetEase(moveEase));
         moveSequence.OnComplete(() => {
             isMoving = false;
-            Debug.Log($"[HesapMakinesiController] MoveToReachPoint: COMPLETED - Now at {transform.position}");
+            
         });
     }
     
@@ -526,16 +517,16 @@ public class HesapMakinesiController : MonoBehaviour
     {
         if (isMoving)
         {
-            Debug.Log($"[HesapMakinesiController] MoveToStartingPosition: Cannot move - already isMoving=true");
+            
             return;
         }
         
-        Debug.Log($"[HesapMakinesiController] MoveToStartingPosition: Starting movement from {transform.position} to {startingPosition}");
+        
         
         // Kill any existing movement sequence
         if (moveSequence != null)
         {
-            Debug.Log("[HesapMakinesiController] MoveToStartingPosition: Killing existing movement sequence");
+            
             moveSequence.Kill();
         }
         
@@ -544,14 +535,14 @@ public class HesapMakinesiController : MonoBehaviour
         animationTimer = 0f; // Reset animation timer
         currentAnimationFrame = 0;
         
-        Debug.Log($"[HesapMakinesiController] MoveToStartingPosition: Set isAtReachPoint=false, isMoving=true, starting DOTween animation");
+        
         
         // Create movement sequence
         moveSequence = DOTween.Sequence();
         moveSequence.Append(transform.DOMove(startingPosition, moveSpeed).SetEase(moveEase));
         moveSequence.OnComplete(() => {
             isMoving = false;
-            Debug.Log($"[HesapMakinesiController] MoveToStartingPosition: COMPLETED - Now at {transform.position}");
+            
         });
     }
     

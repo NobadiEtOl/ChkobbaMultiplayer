@@ -14,7 +14,7 @@ public class GameNetworkRelay : NetworkBehaviour
     {
         if (server != null && server.IsProcessingMove)
         {
-            Debug.LogWarning($"[GameNetworkRelay] {rpcName} rejected: server is processing a move");
+            
             return true;
         }
         return false;
@@ -56,7 +56,7 @@ public class GameNetworkRelay : NetworkBehaviour
         }
         else
         {
-            Debug.LogError("GameManagers list is null or empty!");
+            
         }
     }
     [ClientRpc(RequireOwnership = false)]
@@ -68,7 +68,7 @@ public class GameNetworkRelay : NetworkBehaviour
         }
         else
         {
-            Debug.LogError("GameManagers list is null or empty!");
+            
         }
     }
     [ClientRpc(RequireOwnership = false)]
@@ -81,7 +81,7 @@ public class GameNetworkRelay : NetworkBehaviour
         
         StartCoroutine(GameManager.LocalInstance.InitializeCardPrefabs(isReconnection));
         
-        // Debug.Log($"[GameNetworkRelay] ===== ÖNEMLİ: INITIALIZE CARD PREFABS CLIENT RPC COMPLETED =====");
+        // 
     }
     
     [ClientRpc(RequireOwnership = false)]
@@ -90,26 +90,26 @@ public class GameNetworkRelay : NetworkBehaviour
         // Only process if this is the target client
         if (NetworkManager.Singleton.LocalClientId == targetClientId)
         {
-            Debug.LogError($"[RECONNECTION] InitializeCardPrefabsForReconnectedClientClientRPC received by target client {targetClientId}");
+            
             StartCoroutine(GameManager.LocalInstance.InitializeCardPrefabs(isReconnection));
         }
         else
         {
-            Debug.LogError($"[RECONNECTION] InitializeCardPrefabsForReconnectedClientClientRPC received by non-target client {NetworkManager.Singleton.LocalClientId}, target was {targetClientId}");
+            
         }
     }
 
     [ClientRpc(RequireOwnership = false)]
     public void DealCardPrefabsToPlayersClientRPC(int playerCount, SerializableDictionary serializableDictionary)
     {
-        Debug.LogError($"[DEALING RPC] DealCardPrefabsToPlayersClientRPC received - playerCount: {playerCount}, hands: {serializableDictionary.Count}");
+        
         GameManager.LocalInstance.CardPrefabsToPlayers(playerCount, serializableDictionary);
     }
 
     [ClientRpc(RequireOwnership = false)]
     public void DealCardPrefabsToCenterClientRPC(SerializableCard serializableCard)
     {
-        // Debug.Log("DealCardPrefabsToCenterClientRPC called");
+        // 
         GameManager.LocalInstance.CardPrefabsToCenter(serializableCard);
     }
 
@@ -146,7 +146,7 @@ public class GameNetworkRelay : NetworkBehaviour
         }
         else
         {
-            Debug.LogWarning($"[GameNetworkRelay] UpdateScoreDisplayClientRPC skipped: GameManager.LocalInstance is null (scores {point0}-{point1})");
+            
         }
     }
 
@@ -181,7 +181,7 @@ public class GameNetworkRelay : NetworkBehaviour
         
         DeckController.LocalInstance.GetPlayerCount(playerCount, false); // false = not reconnection
         
-        // Debug.Log($"[GameNetworkRelay] ===== ÖNEMLİ: GIVE PLAYER COUNT CLIENT RPC COMPLETED =====");
+        // 
     }
     
     [ClientRpc(RequireOwnership = false)]
@@ -190,12 +190,12 @@ public class GameNetworkRelay : NetworkBehaviour
         // Only process if this is the target client
         if (NetworkManager.Singleton.LocalClientId == targetClientId)
         {
-            Debug.LogError($"[RECONNECTION] GivePlayerCountForReconnectedClientClientRPC received by target client {targetClientId}");
+            
             DeckController.LocalInstance.GetPlayerCount(playerCount, true); // true = isReconnection
         }
         else
         {
-            Debug.LogError($"[RECONNECTION] GivePlayerCountForReconnectedClientClientRPC received by non-target client {NetworkManager.Singleton.LocalClientId}, target was {targetClientId}");
+            
         }
     }
     [ClientRpc(RequireOwnership = false)]
@@ -224,14 +224,14 @@ public class GameNetworkRelay : NetworkBehaviour
     [ClientRpc]
     public void UseBayaBayaBakClientRPC(int opponentPlayerNo)
     {
-        // Debug.Log($"[GameNetworkRelay] UseBayaBayaBakClientRPC received - Opponent: {opponentPlayerNo}, Time: {Time.time}");
+        // 
         
         // Track the RPC call
         DebugChainPrinter.LocalInstance?.TrackNetworkRPC("UseBayaBayaBakClientRPC", $"opponentPlayerNo={opponentPlayerNo}");
         DebugChainPrinter.LocalInstance?.TrackLocalAction($"UseBayaBayaBakClientRPC received for opponent {opponentPlayerNo}");
         
         GameManager.LocalInstance.OnBayaBayaBakSynced(opponentPlayerNo);
-        // Debug.Log($"[GameNetworkRelay] UseBayaBayaBakClientRPC complete");
+        // 
     }
 
     [ClientRpc]
@@ -255,25 +255,25 @@ public class GameNetworkRelay : NetworkBehaviour
     [ClientRpc]
     public void SetOynayamazsinActiveClientRPC(bool isActive)
     {
-        Debug.Log($"[GameNetworkRelay] SetOynayamazsinActiveClientRPC received - isActive: {isActive}, Time: {Time.time}");
+        
         GameManager.LocalInstance.SetOynayamazsinActive(isActive);
-        Debug.Log($"[GameNetworkRelay] SetOynayamazsinActiveClientRPC complete");
+        
     }
 
     [ClientRpc]
     public void SetVerZehriActiveClientRPC(bool isActive)
     {
-        Debug.Log($"[GameNetworkRelay] SetVerZehriActiveClientRPC received - isActive: {isActive}, Time: {Time.time}");
+        
         GameManager.LocalInstance.SetVerZehriActive(isActive);
-        Debug.Log($"[GameNetworkRelay] SetVerZehriActiveClientRPC complete");
+        
     }
 
     [ClientRpc]
     public void SetKutsalDesteActiveClientRPC(bool isActive)
     {
-        Debug.Log($"[GameNetworkRelay] SetKutsalDesteActiveClientRPC received - isActive: {isActive}, Time: {Time.time}");
+        
         GameManager.LocalInstance.SetKutsalDesteActive(isActive);
-        Debug.Log($"[GameNetworkRelay] SetKutsalDesteActiveClientRPC complete");
+        
     }
 
     [ClientRpc]
@@ -291,9 +291,9 @@ public class GameNetworkRelay : NetworkBehaviour
     [ClientRpc]
     public void UseBuDahaIyiClientRPC(int activatingPlayerNo, int handCardOwnerPlayerNo, string handCardID, string centerCardID)
     {
-        Debug.Log($"[GameNetworkRelay] UseBuDahaIyiClientRPC received - ActivatingPlayer: {activatingPlayerNo}, HandCardOwner: {handCardOwnerPlayerNo}, HandCard: {handCardID}, CenterCard: {centerCardID}, Time: {Time.time}");
+        
         GameManager.LocalInstance.OnBuDahaIyiSynced(activatingPlayerNo, handCardOwnerPlayerNo, handCardID, centerCardID);
-        Debug.Log($"[GameNetworkRelay] UseBuDahaIyiClientRPC complete");
+        
     }
 
     [ClientRpc]
@@ -306,7 +306,7 @@ public class GameNetworkRelay : NetworkBehaviour
     public void UseSunuDegisBunuTokusClientRPC(int myPlayerNo, int otherPlayerNo, string myHandCardID, string otherHandCardID, int myHandIndex, bool readyToExit = false)
     {
         // Use the sequential queue so concurrent RPCs don't race with showcase restoration.
-        Debug.Log($"[ŞDBT] ClientRPC received: myPlayer={myPlayerNo}, otherPlayer={otherPlayerNo}, my={myHandCardID}, other={otherHandCardID}, idx={myHandIndex}, readyToExit={readyToExit}");
+        
         GameManager.LocalInstance.EnqueueSunuDegisBunuTokusSwap(myPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID, myHandIndex, readyToExit);
     }
     [ClientRpc(RequireOwnership = false)]
@@ -317,9 +317,9 @@ public class GameNetworkRelay : NetworkBehaviour
     [ClientRpc(RequireOwnership = false)]
     public void KopyalaYapistirClientRPC(string targetUniqueID, string sourceUniqueID)
     {
-        Debug.Log($"[GameNetworkRelay] KopyalaYapistirClientRPC received - Target: {targetUniqueID}, Source: {sourceUniqueID}, Time: {Time.time}");
+        
         GameManager.LocalInstance.OnKopyalaYapistir(targetUniqueID, sourceUniqueID);
-        Debug.Log($"[GameNetworkRelay] KopyalaYapistirClientRPC complete");
+        
     }
     [ClientRpc(RequireOwnership = false)]
     public void ShowcaseSuperPowerClientRPC(string powerName, float fadeDuration = 0.5f, float displayDuration = 2f)
@@ -341,7 +341,7 @@ public class GameNetworkRelay : NetworkBehaviour
     [ClientRpc(RequireOwnership = false)]
     public void ReceiveGoldFromTeammateClientRPC(int goldAmount)
     {
-        Debug.Log($"[GameNetworkRelay] Received {goldAmount} gold from teammate");
+        
         if (SuperPowerSpawner.LocalInstance != null)
         {
             SuperPowerSpawner.LocalInstance.ReceiveGoldFromTeammate(goldAmount);
@@ -360,7 +360,7 @@ public class GameNetworkRelay : NetworkBehaviour
         }
         else
         {
-            Debug.LogWarning("[GameNetworkRelay] SyncGoldAndPowersServerRPC called but Server.Singleton is null");
+            
         }
     }
 
@@ -403,7 +403,7 @@ public class GameNetworkRelay : NetworkBehaviour
     {
         if (!ValidatePowerCaller(out int callerPlayerNo, rpcParams)) return;
 
-        Debug.Log($"[KopyalaYapıştırLogs] [Server] KopyalaYapistirServerRPC called - Caller Player: {callerPlayerNo}, Target: {targetUniqueID}, Source: {sourceUniqueID}, Time: {Time.time}");
+        
 
         // Completing Kopyala Yapıştır ends interactive selection, so stop power timer and resume turn timer.
         if (server != null)
@@ -415,7 +415,7 @@ public class GameNetworkRelay : NetworkBehaviour
         if (Server.Singleton != null && Server.Singleton.allCardLookup.ContainsKey(sourceUniqueID) && Server.Singleton.allCardLookup.ContainsKey(targetUniqueID))
         {
             var sourceID = Server.Singleton.allCardLookup[sourceUniqueID];
-            Debug.Log($"[KopyalaYapıştırLogs] [Server] Updating authoritative card data - Target card [{targetUniqueID}] will copy [{sourceID[0]}, {sourceID[1]}]");
+            
             Server.Singleton.allCardLookup[targetUniqueID][0] = sourceID[0]; // kind
             Server.Singleton.allCardLookup[targetUniqueID][1] = sourceID[1]; // value
             
@@ -427,14 +427,14 @@ public class GameNetworkRelay : NetworkBehaviour
         }
         else
         {
-            Debug.LogWarning($"[KopyalaYapıştırLogs] [Server] KopyalaYapistirServerRPC - Card lookup failed on Server! Source exists: {Server.Singleton?.allCardLookup.ContainsKey(sourceUniqueID)}, Target exists: {Server.Singleton?.allCardLookup.ContainsKey(targetUniqueID)}");
+            
         }
         
         // Notify all clients to update visuals and local cardID
-        Debug.Log($"[KopyalaYapıştırLogs] [Server] Broadcasting KopyalaYapistirClientRPC to all clients");
+        
         ShowcaseSuperPowerClientRPC("Kopyala Yapıştır");
         KopyalaYapistirClientRPC(targetUniqueID, sourceUniqueID);
-        Debug.Log($"[KopyalaYapıştırLogs] [Server] KopyalaYapistirServerRPC completed successfully");
+        
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -531,7 +531,7 @@ public class GameNetworkRelay : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void SendCorrectionRequestToHostServerRPC(ServerRpcParams rpcParams = default)
     {
-        Debug.Log("[GameNetworkRelay] Received correction request from non-host player");
+        
         
         // Get the calling client's player number
         ulong callerClientId = rpcParams.Receive.SenderClientId;
@@ -539,18 +539,18 @@ public class GameNetworkRelay : NetworkBehaviour
         
         if (callerPlayerNo == -1)
         {
-            Debug.LogWarning("[GameNetworkRelay] Could not determine player number for correction request caller");
+            
             return;
         }
         
         // Make sure the caller is NOT the host
         if (callerPlayerNo == 0)
         {
-            Debug.LogWarning("[GameNetworkRelay] Host tried to send correction request (should use undo directly) - ignoring");
+            
             return;
         }
         
-        Debug.Log($"[GameNetworkRelay] Non-host player {callerPlayerNo} requested correction - notifying host");
+        
         
         // Broadcast the correction request widget to the host
         NotifyHostOfCorrectionRequestClientRPC();
@@ -562,12 +562,12 @@ public class GameNetworkRelay : NetworkBehaviour
     [ClientRpc(RequireOwnership = false)]
     public void NotifyHostOfCorrectionRequestClientRPC()
     {
-        Debug.Log("[GameNetworkRelay] Broadcasting correction request notification");
+        
         
         // Check if this is the host
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsHost)
         {
-            Debug.Log("[GameNetworkRelay] This is the host - showing correction request widget");
+            
             
             // Get reference to MainUIScript and show the widget
             MainUIScript mainUI = FindObjectOfType<MainUIScript>();
@@ -577,7 +577,7 @@ public class GameNetworkRelay : NetworkBehaviour
             }
             else
             {
-                Debug.LogError("[GameNetworkRelay] MainUIScript not found - cannot show correction widget");
+                
             }
         }
     }
@@ -613,7 +613,7 @@ public class GameNetworkRelay : NetworkBehaviour
     {
         if (!ValidatePowerCaller(out int callerPlayerNo, rpcParams)) return;
 
-        Debug.Log($"[GameNetworkRelay] UseBuDahaIyiServerRPC called - HandCard: {handCardID}, CenterCard: {centerCardID}, Time: {Time.time}");
+        
 
         // Completing card selection ends interactive power flow.
         if (server != null)
@@ -627,26 +627,26 @@ public class GameNetworkRelay : NetworkBehaviour
             int handCardOwnerPlayerNo = server.FindOwnerOfCard(handCardID);
             if (handCardOwnerPlayerNo == -1)
             {
-                Debug.LogWarning($"[GameNetworkRelay] UseBuDahaIyiServerRPC rejected: card {handCardID} is not in any player's hand");
+                
                 return;
             }
 
             // Require the provided center card to still exist on server for deterministic sync.
             if (!server.IsCardInCenter(centerCardID))
             {
-                Debug.LogWarning($"[GameNetworkRelay] UseBuDahaIyiServerRPC rejected: center card {centerCardID} is not in center anymore");
+                
                 return;
             }
 
-            Debug.Log($"[GameNetworkRelay] Power not blocked, calling server.BuDahaIyiSwap()");
+            
             server.BuDahaIyiSwap(handCardOwnerPlayerNo, handCardID, centerCardID);
-            Debug.Log($"[GameNetworkRelay] Broadcasting UseBuDahaIyiClientRPC to all clients");
+            
             UseBuDahaIyiClientRPC(callerPlayerNo, handCardOwnerPlayerNo, handCardID, centerCardID);
-            Debug.Log($"[GameNetworkRelay] UseBuDahaIyiServerRPC complete");
+            
         }
         else
         {
-            Debug.Log($"[GameNetworkRelay] UseBuDahaIyiServerRPC blocked by Yapamazsın power");
+            
         }
     }
 
@@ -655,11 +655,11 @@ public class GameNetworkRelay : NetworkBehaviour
     {
         if (!ValidatePowerCaller(out int callerPlayerNo, rpcParams)) return;
         if (ShouldRejectPowerRpcDuringMove(nameof(ActivateVerZehriServerRPC))) return;
-        Debug.Log($"[GameNetworkRelay] ActivateVerZehriServerRPC called - Time: {Time.time}");
-        Debug.Log($"[GameNetworkRelay] Calling server.ActivateVerZehri() - This will set verZehriPending=true");
+        
+        
         ShowcaseSuperPowerClientRPC("Ver Zehri");
         server.ActivateVerZehri();
-        Debug.Log($"[GameNetworkRelay] ActivateVerZehriServerRPC complete - Effect will activate at end of turn");
+        
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -667,11 +667,11 @@ public class GameNetworkRelay : NetworkBehaviour
     {
         if (!ValidatePowerCaller(out int callerPlayerNo, rpcParams)) return;
         if (ShouldRejectPowerRpcDuringMove(nameof(ActivateKutsalDesteServerRPC))) return;
-        Debug.Log($"[GameNetworkRelay] ActivateKutsalDesteServerRPC called - Time: {Time.time}");
-        Debug.Log($"[GameNetworkRelay] Calling server.ActivateKutsalDeste() - This will set kutsalDestePending=true");
+        
+        
         ShowcaseSuperPowerClientRPC("Kutsal Deste");
         server.ActivateKutsalDeste();
-        Debug.Log($"[GameNetworkRelay] ActivateKutsalDesteServerRPC complete - Effect will activate at end of turn");
+        
     }
 
     /*[ServerRpc(RequireOwnership = false)]
@@ -685,11 +685,11 @@ public class GameNetworkRelay : NetworkBehaviour
     {
         if (!ValidatePowerCaller(out int callerPlayerNo, rpcParams)) return;
         if (ShouldRejectPowerRpcDuringMove(nameof(ActivateOynayamazsinServerRPC))) return;
-        Debug.Log($"[GameNetworkRelay] ActivateOynayamazsinServerRPC called - Time: {Time.time}");
-        Debug.Log($"[GameNetworkRelay] Calling server.ActivateOynayamazsin() - This will set oynayamazsinPending=true");
+        
+        
         ShowcaseSuperPowerClientRPC("Oynayamazsın");
         server.ActivateOynayamazsin();
-        Debug.Log($"[GameNetworkRelay] ActivateOynayamazsinServerRPC complete - Effect will activate at end of turn");
+        
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -715,7 +715,7 @@ public class GameNetworkRelay : NetworkBehaviour
     {
         if (!ValidatePowerCaller(out int callerPlayerNo, rpcParams)) return;
         if (ShouldRejectPowerRpcDuringMove(nameof(UseBayaBayaBakServerRPC))) return;
-        Debug.Log($"[GameNetworkRelay] UseBayaBayaBakServerRPC called - Caller: {callerPlayerNo}, Time: {Time.time}");
+        
 
         DebugChainPrinter.LocalInstance?.TrackNetworkRPC("UseBayaBayaBakServerRPC", $"callerPlayerNo={callerPlayerNo}");
 
@@ -726,17 +726,17 @@ public class GameNetworkRelay : NetworkBehaviour
             if (opponents.Count == 0) return;
             int serverOpponentNo = opponents[UnityEngine.Random.Range(0, opponents.Count)];
 
-            Debug.Log($"[GameNetworkRelay] Power not blocked, calling UseBayaBayaBakClientRPC() with opponent {serverOpponentNo}");
+            
             DebugChainPrinter.LocalInstance?.TrackLocalAction($"BayaBayaBak targeting server-selected opponent {serverOpponentNo}");
             UseBayaBayaBakClientRPC(serverOpponentNo);
         }
         else
         {
-            Debug.Log($"[GameNetworkRelay] Power was blocked by Yapamazsın");
+            
             DebugChainPrinter.LocalInstance?.TrackLocalAction("BayaBayaBak power was blocked by Yapamazsın");
         }
 
-        Debug.Log($"[GameNetworkRelay] UseBayaBayaBakServerRPC complete");
+        
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -773,7 +773,7 @@ public class GameNetworkRelay : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void PrintMessageServerRPC(string message)
     {
-        Debug.Log("PrintMessageServerRPC called with message: " + message);
+        
         server.PrintMessage(message);
     }
 
@@ -803,13 +803,13 @@ public class GameNetworkRelay : NetworkBehaviour
     {
         // Always use the authenticated sender id — never trust the client-passed value for auth decisions.
         ulong trustedClientId = rpcParams.Receive.SenderClientId;
-        Debug.Log($"[GameNetworkRelay] ReclaimSeatServerRPC: seat {playerNo} claimed by sender {trustedClientId} (passed id: {clientId}, playerId: {claimantPlayerId})");
+        
         if (server != null)
         {
             bool accepted = server.TryHandleSeatReclaim(playerNo, trustedClientId, claimantPlayerId);
             if (!accepted)
             {
-                Debug.LogWarning($"[RECLAIM] Reclaim request rejected for seat {playerNo}, sender {trustedClientId}.");
+                
             }
         }
     }
@@ -817,7 +817,7 @@ public class GameNetworkRelay : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void NotifyCientConnectedServerRPC(ulong clientId)
     {
-        Debug.Log($"[GameNetworkRelay] NotifyCientConnectedServerRPC: {clientId} (deprecated)");
+        
         // Manual path disabled - AnotherPlayerConnected handles all reconnections
         return;
     }
@@ -834,7 +834,7 @@ public class GameNetworkRelay : NetworkBehaviour
                  $"This is for NORMAL GAME FLOW only - reconnection handled by ReconnectingClientCardsReadyServerRPC");
         
         // NORMAL GAME FLOW ONLY - proceed with initial deals
-        Debug.Log($"[GameNetworkRelay] Normal game flow - proceeding with initial deals for client {clientId}");
+        
         server.InitialDealCoroutineCheck();
     }
 
@@ -849,13 +849,13 @@ public class GameNetworkRelay : NetworkBehaviour
         {
             if (phase != Server.ReconnectPhase.InitSent)
             {
-                Debug.LogWarning($"[GameNetworkRelay] ReconnectingClientCardsReady from {trustedClientId} ignored: phase is {phase}");
+                
                 return;
             }
         }
         else
         {
-            Debug.LogWarning($"[GameNetworkRelay] ReconnectingClientCardsReady from {trustedClientId} ignored: no phase tracked");
+            
             return;
         }
 
@@ -864,7 +864,7 @@ public class GameNetworkRelay : NetworkBehaviour
         // Build current game state and send to reconnected client
         var gameState = server.BuildGameStateSnapshot();
         
-        Debug.Log($"[GameNetworkRelay] Sending state snapshot v{gameState.snapshotVersion} to {trustedClientId}");
+        
         
         // Single point of truth for state sync
         ApplySnapshotToClient(gameState, trustedClientId);
@@ -918,7 +918,7 @@ public class GameNetworkRelay : NetworkBehaviour
     public void AnnounceReconnectedPlayerNumberServerRPC(int playerNo, ServerRpcParams rpcParams = default)
     {
         ulong senderClientId = rpcParams.Receive.SenderClientId;
-        Debug.Log($"[GameNetworkRelay] AnnounceReconnectedPlayerNumberServerRPC: player {playerNo} reconnected as client {senderClientId}");
+        
         server.RebindPlayerClientId(playerNo, senderClientId);
     }
 
@@ -927,11 +927,11 @@ public class GameNetworkRelay : NetworkBehaviour
     {
         ulong senderClientId = rpcParams.Receive.SenderClientId;
         int callerPlayerNo = server.GetPlayerNoForClient(senderClientId);
-        Debug.Log($"[ŞDBT] ServerRPC received: my={myHandCardID}, other={otherHandCardID}, idx={myHandIndex}, readyToExit={readyToExit}, senderClient={senderClientId}, callerPlayerNo={callerPlayerNo}, currentPlayer={server.currentPlayer}");
+        
 
         if (callerPlayerNo == -1 || callerPlayerNo != server.currentPlayer)
         {
-            Debug.LogWarning($"[ŞDBT] ServerRPC rejected: senderClient={senderClientId}, callerPlayerNo={callerPlayerNo}, currentPlayer={server.currentPlayer}");
+            
             return;
         }
 
@@ -939,35 +939,35 @@ public class GameNetworkRelay : NetworkBehaviour
         int otherPlayerNo = server.FindOwnerOfCard(otherHandCardID);
         if (otherPlayerNo == -1 || otherPlayerNo == callerPlayerNo)
         {
-            Debug.LogWarning($"[ŞDBT] ServerRPC rejected after owner lookup. otherPlayerNo={otherPlayerNo}, callerPlayerNo={callerPlayerNo}");
+            
             return;
         }
 
-        Debug.Log($"[ŞDBT] ServerRPC validated. callerPlayerNo={callerPlayerNo}, otherPlayerNo={otherPlayerNo}");
+        
 
         server.SunuDegisBunuTokusSwap(callerPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID, myHandIndex);
-        Debug.Log($"[ŞDBT] Server authoritative swap applied for idx={myHandIndex}");
+        
 
         if (readyToExit)
         {
-            Debug.Log("[ŞDBT] Last swap reached on server. Stopping power timer and triggering showcase.");
+            
             server.StopPowerDurationTimerAndResumeTurn();
             ShowcaseSuperPowerClientRPC("Şunu Değiş Bunu Tokuş");
         }
 
-        Debug.Log($"[ŞDBT] Broadcasting ClientRPC for idx={myHandIndex}");
+        
         UseSunuDegisBunuTokusClientRPC(callerPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID, myHandIndex, readyToExit);
     }
 
     [ServerRpc(RequireOwnership = false)]
     public void ShareGoldWithTeammateServerRPC(int teammateNumber, int goldAmount)
     {
-        Debug.Log($"[GameNetworkRelay] Player sharing {goldAmount} gold with teammate {teammateNumber}");
+        
         // Server validation - just debug print for now
         if (server != null)
         {
             // You can add server-side validation here if needed
-            Debug.Log($"[GameNetworkRelay] Server validated gold sharing: {goldAmount} to player {teammateNumber}");
+            
         }
     }
 
@@ -979,7 +979,7 @@ public class GameNetworkRelay : NetworkBehaviour
     [ClientRpc(RequireOwnership = false)]
     public void ApplyGameStateClientRPC(SerializableGameState snapshot, ClientRpcParams clientRpcParams = default)
     {
-        Debug.Log($"[GameNetworkRelay] Received game state snapshot version {snapshot.snapshotVersion}");
+        
         
         GameManager.LocalInstance?.ApplyGameState(snapshot);
     }
@@ -990,7 +990,7 @@ public class GameNetworkRelay : NetworkBehaviour
         // Only apply the game state if this is the target client
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.LocalClientId == targetClientId)
         {
-            Debug.Log($"[GameNetworkRelay] Applying game state snapshot v{snapshot.snapshotVersion} to reconnected client {targetClientId}");
+            
             GameManager.LocalInstance?.ApplyGameState(snapshot);
         }
     }
@@ -998,29 +998,29 @@ public class GameNetworkRelay : NetworkBehaviour
     [ClientRpc(RequireOwnership = false)]
     public void TriggerDesyncCheckForReconnectedClientClientRPC(ulong targetClientId)
     {
-        Debug.LogError($"[Visual Sync] ===== TRIGGER DESYNC CHECK FOR RECONNECTED CLIENT RPC CALLED =====");
-        Debug.LogError($"[Visual Sync] Target client ID: {targetClientId}, Local client ID: {NetworkManager.Singleton?.LocalClientId}");
+        
+        
         
         // Only trigger desync check if this is the target client
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.LocalClientId == targetClientId)
         {
-            Debug.LogError($"[Visual Sync] Client ID matches - proceeding with desync check");
-            Debug.Log($"[GameNetworkRelay] Triggering desync check for reconnected client {targetClientId}");
+            
+            
             
             // Trigger desync check after a short delay to ensure game state is fully applied
             if (GameManager.LocalInstance != null)
             {
-                Debug.LogError($"[Visual Sync] GameManager found - calling TriggerDesyncCheckAfterReconnection method");
+                
                 GameManager.LocalInstance.TriggerDesyncCheckAfterReconnection();
             }
             else
             {
-                Debug.LogError($"[Visual Sync] ERROR: GameManager.LocalInstance is null");
+                
             }
         }
         else
         {
-            Debug.LogError($"[Visual Sync] Client ID does not match - skipping desync check");
+            
         }
     }
 
@@ -1041,7 +1041,7 @@ public class GameNetworkRelay : NetworkBehaviour
         if (MoveChainTracker.ClientInstance != null)
         {
             // TODO: Implement move validation logic
-            Debug.Log($"[GameNetworkRelay] Client received move for validation: {move.moveType} by P{move.playerNumber}");
+            
         }
     }
 
@@ -1049,7 +1049,7 @@ public class GameNetworkRelay : NetworkBehaviour
     public void RequestFullStateSyncServerRPC(ServerRpcParams rpcParams = default)
     {
         ulong clientId = rpcParams.Receive.SenderClientId;
-        Debug.Log($"[Relay] Full state sync requested by client {clientId}");
+        
         
         if (Server.Singleton != null)
         {
@@ -1062,7 +1062,7 @@ public class GameNetworkRelay : NetworkBehaviour
     [ClientRpc(RequireOwnership = false)]
     public void OnPlayerDisconnectedClientRPC(ulong clientId, string reason)
     {
-        Debug.LogWarning($"[GameNetworkRelay] Player {clientId} disconnected: {reason}");
+        
         
         // Notify GameManager about the disconnect
         if (GameManager.LocalInstance != null)
@@ -1076,7 +1076,7 @@ public class GameNetworkRelay : NetworkBehaviour
     {
         // Client notifies server about impending disconnect
         ulong clientId = OwnerClientId;
-        Debug.LogWarning($"[GameNetworkRelay] Client {clientId} notifying disconnect: {reason}");
+        
         
         // Notify all clients about the disconnect
         OnPlayerDisconnectedClientRPC(clientId, reason);
@@ -1093,20 +1093,20 @@ public class GameNetworkRelay : NetworkBehaviour
     {
         // Reconnected client requests current game state
         ulong clientId = OwnerClientId;
-        Debug.Log($"[GameNetworkRelay] Reconnected client {clientId} requesting game state sync");
+        
         
         if (Server.Singleton != null)
         {
             // Build current game state snapshot
             var gameState = Server.Singleton.BuildGameStateSnapshot();
-            Debug.Log($"[GameNetworkRelay] Sending game state snapshot v{gameState.snapshotVersion} to reconnected client {clientId}");
+            
             
             // Send game state to the requesting client
             ApplySnapshotToClient(gameState, clientId);
         }
         else
         {
-            Debug.LogError("[GameNetworkRelay] Server.Singleton is null - cannot provide game state");
+            
         }
     }
 
@@ -1129,7 +1129,7 @@ public class GameNetworkRelay : NetworkBehaviour
     [ClientRpc(RequireOwnership = false)]
     public void RedoRevertToStateClientRPC(SerializableGameState snapshot, string revertType)
     {
-        Debug.Log($"[GameNetworkRelay] Received redo revert to {revertType} - snapshot v{snapshot.snapshotVersion}");
+        
         
         // Apply the reverted state using existing game state system
         if (GameManager.LocalInstance != null)
@@ -1138,7 +1138,7 @@ public class GameNetworkRelay : NetworkBehaviour
         }
         else
         {
-            Debug.LogError("[GameNetworkRelay] GameManager.LocalInstance is null - cannot apply redo state");
+            
         }
     }
 
@@ -1174,7 +1174,7 @@ public class GameNetworkRelay : NetworkBehaviour
     public void RequestRedoToPreviousStateServerRPC()
     {
         ulong clientId = OwnerClientId;
-        Debug.Log($"[GameNetworkRelay] Client {clientId} requested redo to previous state");
+        
         
         if (server != null)
         {
@@ -1182,7 +1182,7 @@ public class GameNetworkRelay : NetworkBehaviour
         }
         else
         {
-            Debug.LogError("[GameNetworkRelay] Server reference is null - cannot process redo request");
+            
         }
     }
     
@@ -1193,7 +1193,7 @@ public class GameNetworkRelay : NetworkBehaviour
     public void RequestRedoToPrePreviousStateServerRPC()
     {
         ulong clientId = OwnerClientId;
-        Debug.Log($"[GameNetworkRelay] Client {clientId} requested redo to pre-previous state");
+        
         
         if (server != null)
         {
@@ -1201,7 +1201,7 @@ public class GameNetworkRelay : NetworkBehaviour
         }
         else
         {
-            Debug.LogError("[GameNetworkRelay] Server reference is null - cannot process redo request");
+            
         }
     }
     
@@ -1216,14 +1216,14 @@ public class GameNetworkRelay : NetworkBehaviour
         if (server != null)
         {
             string status = server.GetRedoStateStatus();
-            Debug.Log($"[GameNetworkRelay] Redo status requested by client {clientId}: {status}");
+            
             
             // Send status back to requesting client
             SendRedoStateStatusClientRPC(status, clientId);
         }
         else
         {
-            Debug.LogError("[GameNetworkRelay] Server reference is null - cannot get redo status");
+            
         }
     }
     
@@ -1236,7 +1236,7 @@ public class GameNetworkRelay : NetworkBehaviour
         // Only process if this is the target client
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.LocalClientId == targetClientId)
         {
-            Debug.Log($"[GameNetworkRelay] Redo state status: {status}");
+            
             
             if (GameManager.LocalInstance != null)
             {
@@ -1252,7 +1252,7 @@ public class GameNetworkRelay : NetworkBehaviour
     public void ConfirmRedoSceneReconstructionFinishedServerRPC()
     {
         ulong clientId = OwnerClientId;
-        Debug.Log($"[GameNetworkRelay] Client {clientId} confirmed redo scene reconstruction finished");
+        
         
         if (server != null)
         {
@@ -1260,7 +1260,7 @@ public class GameNetworkRelay : NetworkBehaviour
         }
         else
         {
-            Debug.LogError("[GameNetworkRelay] Server reference is null - cannot confirm redo reconstruction");
+            
         }
     }
 

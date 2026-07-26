@@ -70,7 +70,7 @@ public class AvatarCustomization : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("AvatarCustomization: Another instance already exists! Destroying duplicate on " + gameObject.name);
+            
             Destroy(this);
             return;
         }
@@ -126,7 +126,7 @@ public class AvatarCustomization : MonoBehaviour
         PlayerPrefs.SetInt("AvatarMouthIndex", selectedMouthIndex);
         PlayerPrefs.Save();
 
-        Debug.Log($"[AvatarCustomization] Customization saved successfully! Base: {selectedBaseFaceIndex}, Hair: {selectedHairIndex}, Eyes: {selectedEyesIndex}, Eyebrows: {selectedEyebrowsIndex}, Mouth: {selectedMouthIndex}");
+        
     }
 
     public void ResetToSaved()

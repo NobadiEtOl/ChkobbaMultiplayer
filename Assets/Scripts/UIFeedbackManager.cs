@@ -37,7 +37,7 @@ public class UIFeedbackManager : MonoBehaviour
     {
         if (feedbackCanvasGroup == null || feedbackText == null)
         {
-            Debug.LogWarning("[UIFeedbackManager] References not set.");
+            
             return;
         }
 

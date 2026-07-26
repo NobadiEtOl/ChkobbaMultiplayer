@@ -21,10 +21,7 @@ public class SoundMaster : MonoBehaviour
             DontDestroyOnLoad(gameObject);
             
             // Load saved volume settings
-            LoadVolumeSettings();
-            
-            if (enableDebugLogs)
-                Debug.Log("[SoundMaster] Initialized with master volume system");
+            LoadVolumeSettings();                
         }
         else
         {
@@ -43,7 +40,7 @@ public class SoundMaster : MonoBehaviour
         
         if (enableDebugLogs)
         {
-            Debug.Log($"[SoundMaster] Loaded volume settings - Master: {masterVolume:F2}, SFX: {soundEffectsVolume:F2}, Music: {musicVolume:F2}");
+            
         }
     }
 
@@ -55,10 +52,7 @@ public class SoundMaster : MonoBehaviour
     {
         masterVolume = Mathf.Clamp01(volume);
         PlayerPrefs.SetFloat("MasterVolume", masterVolume);
-        PlayerPrefs.Save();
-        
-        if (enableDebugLogs)
-            Debug.Log($"[SoundMaster] Master volume set to: {masterVolume:F2}");
+        PlayerPrefs.Save();            
     }
 
     /// <summary>
@@ -73,9 +67,7 @@ public class SoundMaster : MonoBehaviour
         
         // Update all sound effects controllers
         UpdateAllSoundEffectsControllers();
-        
-        if (enableDebugLogs)
-            Debug.Log($"[SoundMaster] Sound effects volume set to: {soundEffectsVolume:F2}");
+           
     }
 
     /// <summary>
@@ -87,9 +79,6 @@ public class SoundMaster : MonoBehaviour
         musicVolume = Mathf.Clamp01(volume);
         PlayerPrefs.SetFloat("MusicVolume", musicVolume);
         PlayerPrefs.Save();
-        
-        if (enableDebugLogs)
-            Debug.Log($"[SoundMaster] Music volume set to: {musicVolume:F2}");
     }
 
     /// <summary>
@@ -152,9 +141,6 @@ public class SoundMaster : MonoBehaviour
                 controller.SetVolume(effectiveVolume);
             }
         }
-        
-        if (enableDebugLogs)
-            Debug.Log($"[SoundMaster] Updated {controllers.Length} SoundEffectsController instances with effective volume: {effectiveVolume:F2}");
     }
 
     /// <summary>
@@ -175,9 +161,6 @@ public class SoundMaster : MonoBehaviour
         SetMasterVolume(1f);
         SetSoundEffectsVolume(1f);
         SetMusicVolume(1f);
-        
-        if (enableDebugLogs)
-            Debug.Log("[SoundMaster] All volumes reset to default (100%)");
     }
 
     /// <summary>
@@ -186,11 +169,11 @@ public class SoundMaster : MonoBehaviour
     [ContextMenu("Print Volume Settings")]
     public void PrintVolumeSettings()
     {
-        Debug.Log($"[SoundMaster] Current Volume Settings:");
-        Debug.Log($"  Master Volume: {masterVolume:F2} ({masterVolume * 100:F0}%)");
-        Debug.Log($"  Sound Effects Volume: {soundEffectsVolume:F2} ({soundEffectsVolume * 100:F0}%)");
-        Debug.Log($"  Music Volume: {musicVolume:F2} ({musicVolume * 100:F0}%)");
-        Debug.Log($"  Effective SFX Volume: {GetEffectiveSoundEffectsVolume():F2} ({GetEffectiveSoundEffectsVolume() * 100:F0}%)");
-        Debug.Log($"  Effective Music Volume: {GetEffectiveMusicVolume():F2} ({GetEffectiveMusicVolume() * 100:F0}%)");
+        
+        
+        
+        
+        
+        
     }
 }

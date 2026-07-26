@@ -15,7 +15,7 @@ public class TagAssigner : MonoBehaviour
 
         if (guids.Length == 0)
         {
-            Debug.LogWarning($"No GameObjects found in folder: {folderPath}");
+            
             return;
         }
 
@@ -29,7 +29,7 @@ public class TagAssigner : MonoBehaviour
 
             if (obj == null)
             {
-                Debug.LogWarning($"Failed to load GameObject at path: {assetPath}. Skipping...");
+                
                 continue;
             }
 
@@ -38,7 +38,7 @@ public class TagAssigner : MonoBehaviour
             // Check if the tag exists
             if (!UnityEditorInternal.InternalEditorUtility.tags.Contains(tag))
             {
-                Debug.LogWarning($"Tag '{tag}' does not exist. Make sure to generate tags first.");
+                
                 return;
             }
 
@@ -49,11 +49,11 @@ public class TagAssigner : MonoBehaviour
             // Stop if we've exhausted the generated tags
             if (tagIndex >= 40) // 4_10 is the last tag in your range
             {
-                Debug.LogWarning("Not enough tags for all specified objects. Some objects were not tagged.");
+                
                 break;
             }
         }
 
-        Debug.Log("Tags assigned to GameObjects in the folder successfully!");
+        
     }
 }

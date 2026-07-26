@@ -18,7 +18,7 @@ public class CardGenerator : MonoBehaviour
         // Check if card faces, back, and selected card indicator are assigned
         if (cardFaces.Length == 0 || cardBack == null || selectedCardIndicatorPrefab == null)
         {
-            Debug.LogError("Card Faces, Card Back, or Selected Card Indicator not assigned!");
+            
             return;
         }
 

@@ -30,14 +30,14 @@ public class MoveChainInitializer : MonoBehaviour
             integrator = gameObject.AddComponent<MoveChainIntegrator>();
             if (enableLogging)
             {
-                Debug.Log("[MoveChainInitializer] Added MoveChainIntegrator to scene");
+                
             }
         }
         
         // The integrator will automatically set up the tracking components on Server and GameManager
         if (enableLogging)
         {
-            Debug.Log("[MoveChainInitializer] Move chain system initialized successfully");
+            
         }
     }
     

@@ -63,11 +63,11 @@ public static class JokerController
     {
         if (options == null || options.Count == 0)
         {
-            Debug.LogError("[JokerController] No joker options provided!");
+            
             return;
         }
 
-        Debug.Log($"[JokerController] Displaying joker selection panel with {options.Count} options");
+        
 
         // Find the joker selection panel UI
         // TODO: Implement UI display logic
@@ -75,7 +75,7 @@ public static class JokerController
         
         foreach (var joker in options)
         {
-            Debug.Log($"  Joker Option: {joker}");
+            
         }
 
         // TODO: Show UI panel, wait for player click
@@ -92,7 +92,7 @@ public static class JokerController
 
         if (jokerPool.Count == 0)
         {
-            Debug.LogWarning("[JokerController] Joker pool is empty!");
+            
             return new List<JokerDefinition>();
         }
 
@@ -111,7 +111,7 @@ public static class JokerController
             options.Add(jokerPool[randomIndex]);
         }
 
-        Debug.Log($"[JokerController] Generated {options.Count} random joker options");
+        
         return options;
     }
 
@@ -130,7 +130,7 @@ public static class JokerController
             }
         }
 
-        Debug.LogWarning($"[JokerController] Joker with ID {jokerID} not found!");
+        
         return null;
     }
 
@@ -142,7 +142,7 @@ public static class JokerController
         activeJoker = GetJokerById(jokerID);
         if (activeJoker != null)
         {
-            Debug.Log($"[JokerController] Active joker set: {activeJoker.jokerName}");
+            
         }
     }
 
@@ -163,7 +163,7 @@ public static class JokerController
             return joker.modifiers;
         }
 
-        Debug.LogWarning($"[JokerController] Could not find modifiers for joker {jokerID}");
+        
         return new JokerModifiers();
     }
 
@@ -178,7 +178,7 @@ public static class JokerController
             return;
         }
 
-        Debug.Log("[JokerController] Initializing joker pool with placeholder jokers");
+        
 
         // Clear and rebuild pool
         jokerPool.Clear();
@@ -205,11 +205,11 @@ public static class JokerController
             };
 
             jokerPool.Add(joker);
-            Debug.Log($"  Created {joker.jokerName}: {joker.modifiers}");
+            
         }
 
         jokerPoolInitialized = true;
-        Debug.Log($"[JokerController] Joker pool initialized with {jokerPool.Count} jokers");
+        
     }
 
     /// <summary>
@@ -220,10 +220,10 @@ public static class JokerController
     {
         EnsureJokerPoolInitialized();
 
-        Debug.Log("=== JOKER POOL ===");
+        
         foreach (var joker in jokerPool)
         {
-            Debug.Log($"  {joker}");
+            
         }
     }
 }

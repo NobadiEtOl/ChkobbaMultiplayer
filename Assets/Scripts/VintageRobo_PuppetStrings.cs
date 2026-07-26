@@ -56,17 +56,17 @@ public class VintageRobo_PuppetStrings : MonoBehaviour
 
     private void InitializeStrings()
     {
-        Debug.Log($"Initializing {strings.Count} puppet strings...");
+        
         
         foreach (PuppetString puppetString in strings)
         {
             if (puppetString.boneTarget == null)
             {
-                Debug.LogWarning($"String '{puppetString.stringName}' has no bone target assigned! Please drag a bone into the Bone Target field.");
+                
                 continue;
             }
 
-            Debug.Log($"Setting up string: {puppetString.stringName} attached to {puppetString.boneTarget.name}");
+            
 
             // Create LineRenderer directly on this GameObject if it doesn't exist
             if (puppetString.lineRenderer == null)
@@ -75,16 +75,16 @@ public class VintageRobo_PuppetStrings : MonoBehaviour
                 stringObject.transform.SetParent(transform);
                 stringObject.transform.rotation = Quaternion.identity; // Lock rotation
                 puppetString.lineRenderer = stringObject.AddComponent<LineRenderer>();
-                Debug.Log($"Created LineRenderer for {puppetString.stringName}");
+                
             }
 
             // Configure LineRenderer
             SetupLineRenderer(puppetString);
             
-            Debug.Log($"String '{puppetString.stringName}' initialized successfully!");
+            
         }
         
-        Debug.Log("Puppet strings initialization complete!");
+        
     }
 
     private void SetupLineRenderer(PuppetString puppetString)
@@ -112,7 +112,7 @@ public class VintageRobo_PuppetStrings : MonoBehaviour
             newMat.color = puppetString.stringColor;
             lr.material = newMat;
             
-            Debug.Log($"Created material with shader: {unlitShader.name} for {puppetString.stringName}");
+            
         }
         
         lr.startColor = puppetString.stringColor;
@@ -128,7 +128,7 @@ public class VintageRobo_PuppetStrings : MonoBehaviour
         // Set alignment to view for better visibility
         lr.alignment = LineAlignment.View;
         
-        Debug.Log($"LineRenderer configured for {puppetString.stringName}: width={puppetString.stringWidth}, color={puppetString.stringColor}");
+        
     }
 
     private void UpdateStringPositions()
@@ -240,7 +240,7 @@ public class VintageRobo_PuppetStrings : MonoBehaviour
 
     public void SetStringVisibility(bool visible)
     {
-        Debug.Log($"Setting string visibility to: {visible}");
+        
         int count = 0;
         
         foreach (PuppetString puppetString in strings)
@@ -252,7 +252,7 @@ public class VintageRobo_PuppetStrings : MonoBehaviour
             }
         }
         
-        Debug.Log($"Updated visibility for {count} strings");
+        
     }
 
     // Editor helper methods

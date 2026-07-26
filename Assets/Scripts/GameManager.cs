@@ -90,7 +90,7 @@ public class GameManager : MonoBehaviour
 
         {
 
-            Debug.Log("No debug logs to print. Use 'Reset Debug Logs' to start fresh logging.");
+            
 
             return;
 
@@ -98,7 +98,7 @@ public class GameManager : MonoBehaviour
 
         
 
-        Debug.Log("=== DEBUG LOG START ===\n" + debugLog + "=== DEBUG LOG END ===");
+        
 
     }
 
@@ -112,7 +112,7 @@ public class GameManager : MonoBehaviour
 
         debugLog = "";
 
-        Debug.Log("Debug logs reset. New logs will be collected.");
+        
 
     }
 
@@ -126,7 +126,7 @@ public class GameManager : MonoBehaviour
 
         loggingEnabled = !loggingEnabled;
 
-        Debug.Log($"Debug logging {(loggingEnabled ? "enabled" : "disabled")}");
+        
 
     }
 
@@ -150,7 +150,7 @@ public class GameManager : MonoBehaviour
 
         syncLog += line + "\n";
 
-        Debug.Log(line);
+        
 
     }
 
@@ -166,7 +166,7 @@ public class GameManager : MonoBehaviour
 
         syncLog += line + "\n";
 
-        Debug.LogWarning(line);
+        
 
     }
 
@@ -182,7 +182,7 @@ public class GameManager : MonoBehaviour
 
         syncLog += line + "\n";
 
-        Debug.LogError(line);
+        
 
     }
 
@@ -198,13 +198,13 @@ public class GameManager : MonoBehaviour
 
         {
 
-            Debug.Log("No sync logs to print. Use 'Reset Sync Logs' to start fresh logging.");
+            
 
             return;
 
         }
 
-        Debug.Log("=== SYNC LOG START ===\n" + syncLog + "=== SYNC LOG END ===");
+        
 
     }
 
@@ -218,7 +218,7 @@ public class GameManager : MonoBehaviour
 
         syncLog = "";
 
-        Debug.Log("Sync logs reset. New sync logs will be collected.");
+        
 
     }
 
@@ -232,7 +232,7 @@ public class GameManager : MonoBehaviour
 
         syncLoggingEnabled = !syncLoggingEnabled;
 
-        Debug.Log($"[SYNC] Logging enabled: {syncLoggingEnabled}");
+        
 
     }
 
@@ -275,6 +275,10 @@ public class GameManager : MonoBehaviour
     private IMoveProcessor moveProcessor;
     private IPowerProcessor powerProcessor;
     public IPowerProcessor PowerProcessor => powerProcessor;
+    private IModeAdapter modeAdapter;
+    public IModeAdapter ModeAdapter => modeAdapter;
+    private PowerOrchestrator powerOrchestrator;
+    public PowerOrchestrator PowerOrchestrator => powerOrchestrator;
 
     //Card Variables
 
@@ -503,7 +507,7 @@ public class GameManager : MonoBehaviour
     /// </summary>
     public void ResetForNewGame()
     {
-        Debug.LogWarning("[GameManager] ===== RESETTING FOR NEW GAME =====");
+        
         
         // CRITICAL: Destroy all card GameObjects first for clean slate
         if (deckController != null)
@@ -548,7 +552,7 @@ public class GameManager : MonoBehaviour
         isYandimAnamPending = false;
         isBuDahaIyiPending = false;
         
-        Debug.LogWarning("[GameManager] GameManager reset complete - All cards destroyed, ready for NEW GAME");
+        
     }
 
 
@@ -557,13 +561,13 @@ public class GameManager : MonoBehaviour
 
     {
 
-        Debug.Log($"GameManager Awake called on {gameObject.GetInstanceID()}");
+        
 
         if (LocalInstance != null && LocalInstance != this)
 
         {
 
-            Debug.LogWarning($"Destroying duplicate GameManager {gameObject.GetInstanceID()}");
+            
 
             Destroy(this.gameObject);
 
@@ -575,7 +579,7 @@ public class GameManager : MonoBehaviour
 
         DontDestroyOnLoad(this.gameObject);
 
-        Debug.Log($"GameManager LocalInstance set to {gameObject.GetInstanceID()}");
+        
 
     }
 
@@ -585,11 +589,11 @@ public class GameManager : MonoBehaviour
 
     {
 
-        Debug.Log("GameManager started");
+        
 
         InitialGameManagerSetUp();//Identifies and assigns necessary variables and calls other functions
 
-        InitializeMoveProcessor();
+        UpdateMoveProcessorState();
 
 
 
@@ -602,47 +606,88 @@ public class GameManager : MonoBehaviour
             GameObject debugPrinterObj = new GameObject("DebugChainPrinter");
             debugPrinterObj.AddComponent<DebugChainPrinter>();
             DontDestroyOnLoad(debugPrinterObj);
-            Debug.Log("[GameManager] Created DebugChainPrinter instance");
+            
         }
     }
 
 
 
-    private void InitializeMoveProcessor()
+    private void UpdateMoveProcessorState()
     {
-        if (SinglePlayerModeController.Instance != null)
+        bool isMultiplayerListening = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
+        bool isSinglePlayerRunning = SinglePlayerModeController.Instance != null && SinglePlayerModeController.IsGameRunning;
+
+        // Determine target mode
+        string desiredMode = "None";
+        if (isMultiplayerListening) desiredMode = "Multiplayer";
+        else if (isSinglePlayerRunning) desiredMode = "Singleplayer";
+
+        // Current mode
+        string currentMode = "None";
+        if (moveProcessor != null) currentMode = moveProcessor.ModeName;
+
+        // If mismatch, re-initialize
+        if (desiredMode != currentMode)
+        {
+            
+            InitializeMoveProcessor(desiredMode);
+        }
+    }
+
+    private void InitializeMoveProcessor(string mode)
+    {
+        if (mode == "Singleplayer" && SinglePlayerModeController.Instance != null)
         {
             moveProcessor = new SingleplayerMoveProcessor(SinglePlayerModeController.Instance);
             powerProcessor = new SingleplayerPowerProcessor(SinglePlayerModeController.Instance);
+            // Ensure adapter exists; add if not present
+            if (GetComponent<SingleplayerModeAdapter>() == null)
+                gameObject.AddComponent<SingleplayerModeAdapter>();
+            modeAdapter = GetComponent<SingleplayerModeAdapter>();
         }
-        else if (networkRelay != null)
+        else if (mode == "Multiplayer" && networkRelay != null)
         {
             moveProcessor = new MultiplayerMoveProcessor(networkRelay);
             powerProcessor = new MultiplayerPowerProcessor(networkRelay);
+            // Ensure adapter exists; add if not present
+            if (GetComponent<MultiplayerModeAdapter>() == null)
+                gameObject.AddComponent<MultiplayerModeAdapter>();
+            modeAdapter = GetComponent<MultiplayerModeAdapter>();
         }
         else
         {
             moveProcessor = null;
             powerProcessor = null;
-            Debug.LogError("[IMoveProcessor] Could not initialize: SinglePlayerModeController and networkRelay are both null.");
+            modeAdapter = null;
         }
+
+        // Initialize PowerOrchestrator for both modes
+        if (GetComponent<PowerOrchestrator>() == null)
+            gameObject.AddComponent<PowerOrchestrator>();
+        powerOrchestrator = GetComponent<PowerOrchestrator>();
 
         if (moveProcessor != null)
         {
-            Debug.Log($"[IMoveProcessor] Initialized: mode={moveProcessor.ModeName}");
+            
             AddToDebugLog($"[IMoveProcessor] Initialized: mode={moveProcessor.ModeName}");
+        }
+        else
+        {
+            
+            AddToDebugLog("[IMoveProcessor] Reset to None");
         }
 
         if (powerProcessor != null)
         {
-            Debug.Log($"[IPowerProcessor] Initialized: type={powerProcessor.GetType().Name}");
+            
             AddToDebugLog($"[IPowerProcessor] Initialized: type={powerProcessor.GetType().Name}");
         }
+            
     }
 
     public void NotifyConnection()
     {
-        Debug.Log("[GameManager] NotifyConnection called (deprecated - reconnection handled by AnotherPlayerConnected)");
+        
         // Manual notification path no longer needed
         return;
     }
@@ -652,20 +697,20 @@ public class GameManager : MonoBehaviour
     /// </summary>
     public void OnReconnectionGameStateApplied()
     {
-        Debug.Log("[GameManager] Reconnected client game state applied successfully");
+        
         
         // 1. Close any waiting screens that might still be open
         if (waitingScreen != null && waitingScreen.activeSelf)
         {
             waitingScreen.SetActive(false);
-            Debug.Log("[GameManager] Closed waiting screen after reconnection");
+            
         }
         
         // 2. Ensure main screen (lobby) is hidden and game is visible
         if (mainScreen != null && mainScreen.activeSelf)
         {
             mainScreen.SetActive(false);
-            Debug.Log("[GameManager] Closed main screen (lobby) after reconnection");
+            
         }
 
         // 3. Specifically deactivate "MainUI" as requested by user
@@ -673,7 +718,7 @@ public class GameManager : MonoBehaviour
         if (mainUI != null && mainUI.activeSelf)
         {
             mainUI.SetActive(false);
-            Debug.Log("[GameManager] Deactivated MainUI after reconnection so game can be seen");
+            
         }
         
         // 4. Update button visibility in case MainUIScript is still active (unlikely if MainUI is deactivated)
@@ -684,7 +729,7 @@ public class GameManager : MonoBehaviour
             // The user wants MainUI deactivated, so we've done that.
         }
         
-        Debug.Log("[GameManager] Reconnected client is now ready to play and game should be visible");
+        
     }
 
 
@@ -697,7 +742,7 @@ public class GameManager : MonoBehaviour
 
         {
 
-            Debug.LogWarning($"GameManager {gameObject.GetInstanceID()} destroyed, clearing LocalInstance");
+            
 
             LocalInstance = null;
 
@@ -714,6 +759,8 @@ public class GameManager : MonoBehaviour
     void Update()
 
     {
+        // Keep move processor state in sync with the active game mode (singleplayer vs multiplayer)
+        UpdateMoveProcessorState();
 
         if (Input.GetKeyDown(KeyCode.W)) PlayAutomatically(3);
 
@@ -840,7 +887,7 @@ public class GameManager : MonoBehaviour
         if (isReconnection)
         {
             isReconnecting = true;
-            Debug.Log("[GameManager] Reconnection detected – waiting for server snapshot");
+            
             if (networkRelay != null)
             {
                 networkRelay.RequestFullStateSyncServerRPC();
@@ -848,21 +895,21 @@ public class GameManager : MonoBehaviour
             yield break; // Do not reset or redeal locally
         }
 
-        Debug.Log("[GameManager] InitializeCardPrefabs called for new game - resetting game state");
+        
         ResetForNewRound();
         roundCount++;
         isReconnecting = false;
 
-        Debug.Log("[GameManager] Checking and managing UI screens...");
+        
         if (waitingScreen.activeSelf) 
         {
-            Debug.Log("[GameManager] Closing waiting screen");
+            
             waitingScreen.SetActive(false);
         }
 
-        Debug.Log("[GameManager] Starting DeckController.DeckStart() coroutine...");
+        
         yield return StartCoroutine(deckController.DeckStart());
-        Debug.Log("[GameManager] DeckController.DeckStart() coroutine completed");
+        
         
         // RECONNECTION: Let the normal flow handle everything
         // The card IDs will be deterministic and match the server
@@ -870,13 +917,13 @@ public class GameManager : MonoBehaviour
 
         if (winScreen.activeSelf) 
         {
-            Debug.Log("[GameManager] Closing win screen");
+            
             winScreen.SetActive(false);
         }
 
         if (mainScreen.activeSelf) 
         {
-            Debug.Log("[GameManager] Closing main screen");
+            
             mainScreen.SetActive(false);
         }
 
@@ -891,7 +938,7 @@ public class GameManager : MonoBehaviour
     public void DeckReady()
 
     {
-        Debug.LogError("[Visual Sync] ===== DECK READY CALLED =====");
+        
         Debug.Log($"[GameManager] ===== ÖNEMLİ: DECK READY CALLED =====\n" +
                  $"IsReconnecting: {isReconnecting}\n" +
                  $"GameNetworkRelay: {(networkRelay != null ? "FOUND" : "NULL")}\n" +
@@ -902,16 +949,16 @@ public class GameManager : MonoBehaviour
 
         if (isReconnecting)
         {
-            Debug.Log("[GameManager] Reconnecting client – waiting for snapshot only");
+            
             return; // Do not call DeckReadyServerRPC
         }
 
-        Debug.Log("Deck is ready, notifying server.");
+        
 
         // For normal game flow, use the regular RPC
-        Debug.Log($"[GameManager] Calling networkRelay.DeckReadyServerRPC()...");
+        
         networkRelay.DeckReadyServerRPC();
-        Debug.Log($"[GameManager] networkRelay.DeckReadyServerRPC() call completed");
+        
     }
 
 
@@ -940,12 +987,12 @@ public class GameManager : MonoBehaviour
 
         if (alreadySubbed) return;
 
-        Debug.Log("oluyor");
+        
 
         foreach (var cardInteraction in cardInteractionsScripts)
 
         {
-            Debug.Log("oluyor");
+            
             cardInteraction.OnCardSelected += CardSelected;
 
             cardInteraction.OnCardsPlayed += CardsPlayed;
@@ -969,7 +1016,7 @@ public class GameManager : MonoBehaviour
         // RECONNECTION FIX: Skip dealing during reconnection - let ApplyGameState handle it
         if (isReconnecting)
         {
-            Debug.Log("[GameManager] CardPrefabsToPlayers called during reconnection - skipping deal, will be handled by ApplyGameState");
+            
             return;
         }
 
@@ -989,7 +1036,7 @@ public class GameManager : MonoBehaviour
         if (valeArarActive)
         {
             RefreshValeArarIndicators();
-            Debug.Log("[GameManager] Vale Arar indicators refreshed on new cards");
+            
         }
 
         SuperPowerSpawner.LocalInstance.ReadyToSpawnSuperPowers(1);
@@ -1024,14 +1071,14 @@ public class GameManager : MonoBehaviour
 
     public void CardPrefabsToCenter(SerializableCard serializableCard)
     {
-        Debug.Log("CardPrefabsToCenter called with serializableCard: " + serializableCard.ToString());
+        
         //Converts serializablelist to a normal list
         List<string> centerCardIDs = serializableCard.ToDictionary().Keys.ToList();
 
         // RECONNECTION FIX: Skip dealing during reconnection - let ApplyGameState handle it
         if (isReconnecting)
         {
-            Debug.Log("[GameManager] CardPrefabsToCenter called during reconnection - skipping deal, will be handled by ApplyGameState");
+            
             return;
         }
 
@@ -1042,7 +1089,7 @@ public class GameManager : MonoBehaviour
             deckController.MoveDeckToReachPoint();
             StartCoroutine(deckController.DealCenter(centerCardIDs));
         }
-        else Debug.LogError("DeckController is not assigned in GameManager.");  
+        else   
 
         // Refresh Vale Arar indicators on new center cards if the power is active
         if (valeArarActive)
@@ -1059,7 +1106,7 @@ public class GameManager : MonoBehaviour
         // Wait a bit for center cards to be spawned
         yield return new WaitForSeconds(0.5f);
         RefreshValeArarIndicators();
-        Debug.Log("[GameManager] Vale Arar indicators refreshed on new center cards");
+        
     }
 
 
@@ -1108,6 +1155,9 @@ public class GameManager : MonoBehaviour
                 isSunuDegisTokusSelectingOpponent = false;
                 AddToDebugLog($"[GameManager] ŞunuDeğişTokuş/DeğişTokuş: First hand card selected: {cardID}");
 
+                // Sync PowerOrchestrator state to Phase 2
+                PowerOrchestrator?.ExecuteSunuDegisTokus(cardID, null);
+
                 // Update InfoBox with explicit step progression
                 SuperPowerSpawner.LocalInstance?.ShowDualSelectionStepText("Adım 2/2: Şimdi farklı bir el kartı seç");
 
@@ -1132,22 +1182,25 @@ public class GameManager : MonoBehaviour
             }
 
             // 1. Call PowerActivated for local effects
-            Debug.Log($"[GameManager] Calling PowerActivated() for {activeSunuDegisTokusPowerName} since both cards are now selected");
+            
             TriggerActiveSunuDegisTokusPowerActivated();
 
             // 2. Send swap request to server — ClientRPC will handle the swap for all clients (including this one)
             networkRelay.UseSunuDegisTokusServerRPC(sunuDegisTokusFirstCard, cardID);
 
-            // 3. Stop hand showcasing
-            Debug.Log("[Showcase] GameManager: Stopping Şunu Değiş Tokuş dual selection showcase");
+            // 3. Clear PowerOrchestrator state
+            PowerOrchestrator?.ClearAllSelectionFlags();
+
+            // 4. Stop hand showcasing
+            
             if (SuperPowerSpawner.LocalInstance != null)
             {
                 SuperPowerSpawner.LocalInstance.StopHandShowcase();
-                Debug.Log("[Showcase] GameManager: Called StopHandShowcase for Şunu Değiş Tokuş");
+                
             }
             else
             {
-                Debug.LogError("[Showcase] GameManager: ERROR - SuperPowerSpawner.LocalInstance is null!");
+                
             }
 
             isSunuDegisTokusActive = false;
@@ -1208,7 +1261,7 @@ public class GameManager : MonoBehaviour
             if (CardInteraction.cardLookup.TryGetValue(pairedHandCard, out var pairedCI))
                 pairedCI.ShowDebugCandidateIndicator(new Color(0.4f, 0.8f, 1f, 0.65f));
 
-            Debug.Log($"[ŞDBT] Queued pair {sunuDegisBunuTokusSwapIndex + 1}/{sunuDegisBunuTokusTotalSwaps}: my={pairedHandCard}, other={cardID}");
+            
 
             sunuDegisBunuTokusSwapIndex++;
             AddToDebugLog($"ŞunuDeğişBunuTokuş: Queued swap {sunuDegisBunuTokusSwapIndex}/{sunuDegisBunuTokusTotalSwaps}.");
@@ -1252,7 +1305,7 @@ public class GameManager : MonoBehaviour
 
         AddToDebugLog($"[GameManager] CardInteraction.currentlySelectedCard at start of CardsPlayed: {CardInteraction.currentlySelectedCard?.gameObject.name}");
 
-        Debug.Log($"[GameManager] movePlayedLocally at start of CardsPlayed: {movePlayedLocally}");
+        
 
         // Check if player can play on their turn
 
@@ -1281,7 +1334,7 @@ public class GameManager : MonoBehaviour
         AddToDebugLog($"[GameManager] Player can play - proceeding with move validation");
 
         
-        Debug.Log($"[GameManager] currentSelectedHandCard before CheckIfLegal: {currentSelectedHandCard}");
+        
         CheckIfLegal(playerNumber);
 
     }
@@ -1421,7 +1474,7 @@ public class GameManager : MonoBehaviour
             moveProcessor.ProcessCardPlay(currentSelectedHandCard, centerCards, sumValue, cardValue, playerNumber);
             CardInteraction.currentlySelectedCard = null;
             SetCurrentSelectedHandCardNull();
-            if (moveProcessor.ModeName == "Multiplayer")
+            if (moveProcessor.RunsPostMoveBackgroundCheck)
             {
                 SuperPowerSpawner.LocalInstance.CheckIfBackgroundPanelOpen();
             }
@@ -1639,21 +1692,19 @@ public class GameManager : MonoBehaviour
     private void CardAddedToCenter()
 
     {
-        // Singleplayer mode: route to SinglePlayerModeController for validation and animation
-        if (SinglePlayerModeController.Instance != null && SinglePlayerModeController.IsGameRunning && SinglePlayerModeController.IsPlayerTurn)
+        if (moveProcessor == null || !moveProcessor.IsActive)
         {
-            AddToDebugLog("[GameManager] Singleplayer: routing add-to-center to SinglePlayerModeController");
-            int[] cardKindValue = CardInteraction.cardLookup.TryGetValue(currentSelectedHandCard, out var ci) ? ci.GetCardID() : null;
-            // NOTE: Do NOT remove card from myCards here - let ProcessPlayerAddToCenter handle it during animation
-            SinglePlayerModeController.Instance.ProcessPlayerAddToCenter(currentSelectedHandCard, cardKindValue);
-            currentSelectedHandCard = null;
+            
             return;
         }
 
-        networkRelay.AddCenterCardServerRPC(currentSelectedHandCard, CardInteraction.cardLookup[currentSelectedHandCard].GetCardID());
+        AddToDebugLog("[GameManager] Routing add-to-center through moveProcessor");
+        int[] cardKindValue = CardInteraction.cardLookup.TryGetValue(currentSelectedHandCard, out var ci) ? ci.GetCardID() : null;
+        moveProcessor.ProcessAddToCenter(currentSelectedHandCard, cardKindValue);
 
+        // Multiplayer: GameManager removes the card immediately (server confirms separately).
+        // Singleplayer: ProcessPlayerAddToCenterCoroutine checks Contains() before removing at animation time, so this is safe for both.
         myCards.Remove(currentSelectedHandCard);
-
         currentSelectedHandCard = null;
 
     }
@@ -1670,7 +1721,7 @@ public class GameManager : MonoBehaviour
 
         
 
-        Debug.Log($"GameManager: Card {playedCard} captured cards for player {playerNumber}");
+        
 
         var cardDictionary = serializedCard.ToDictionary();
 
@@ -1724,7 +1775,7 @@ public class GameManager : MonoBehaviour
 
                 AddToDebugLog($"[GameManager] Added capture card {playedCard} with value [{cardID[0]},{cardID[1]}] to center cards");
 
-                Debug.Log($"[GameManager] Added capture card {playedCard} with value [{cardID[0]},{cardID[1]}] to center cards");
+                
 
             }
 
@@ -1744,7 +1795,7 @@ public class GameManager : MonoBehaviour
 
                     AddToDebugLog($"[GameManager] Added captured card {kvp.Key} with value [{kvp.Value[0]},{kvp.Value[1]}] to center cards");
 
-                    Debug.Log($"[GameManager] Added captured card {kvp.Key} with value [{kvp.Value[0]},{kvp.Value[1]}] to center cards");
+                    
 
                 }
 
@@ -1772,7 +1823,7 @@ public class GameManager : MonoBehaviour
 
             AddToDebugLog($"[GameManager] Center cards before gold calculation: {centerCards.Count} cards");
 
-            Debug.Log($"[GameManager] Center cards before gold calculation: {centerCards.Count} cards");
+            
 
             foreach (var kvp in centerCards)
 
@@ -1780,7 +1831,7 @@ public class GameManager : MonoBehaviour
 
                 AddToDebugLog($"[GameManager] Center card: {kvp.Key} -> [{kvp.Value[0]}, {kvp.Value[1]}]");
 
-                Debug.Log($"[GameManager] Center card: {kvp.Key} -> [{kvp.Value[0]}, {kvp.Value[1]}]");
+                
 
             }
 
@@ -1909,7 +1960,7 @@ public class GameManager : MonoBehaviour
         // Reset card selection if it was my turn before but isn't now
         if (wasMyTurn && !IsLocalPlayerTurn())
         {
-            Debug.Log("[CardSelection] Turn changed away from local player, resetting card selection");
+            
             CardInteraction.ResetCardSelection();
             CancelDualSelectionPower();
         }
@@ -1930,7 +1981,7 @@ public class GameManager : MonoBehaviour
     {
         if (deckController == null)
         {
-            Debug.LogWarning("[GameManager] IsLocalPlayerTurn: deckController is null");
+            
             return false;
         }
         
@@ -1971,18 +2022,23 @@ public class GameManager : MonoBehaviour
     /// </summary>
     public void EndGameplayAction(string reason = "")
     {
+        
+
         if (!isGameplayActionInProgress)
         {
+            
             return;
         }
 
         string endedTag = activeGameplayActionTag;
         float elapsed = gameplayActionStartTime >= 0f ? (Time.time - gameplayActionStartTime) : 0f;
 
+        
         isGameplayActionInProgress = false;
         activeGameplayActionTag = string.Empty;
         gameplayActionStartTime = -1f;
 
+        
         AddToDebugLog($"[GameManager] Gameplay action ended: {endedTag}, reason={reason}, elapsed={elapsed:0.00}s");
     }
 
@@ -1991,14 +2047,24 @@ public class GameManager : MonoBehaviour
     /// </summary>
     public void EndGameplayActionIfTagStartsWith(string tagPrefix, string reason = "")
     {
+        
+        
+
         if (!isGameplayActionInProgress)
         {
+            
             return;
         }
 
+        
         if (string.IsNullOrEmpty(tagPrefix) || activeGameplayActionTag.StartsWith(tagPrefix))
         {
+            
             EndGameplayAction(reason);
+        }
+        else
+        {
+            
         }
     }
 
@@ -2060,7 +2126,7 @@ public class GameManager : MonoBehaviour
 
             int playerKey = kvp.Key;
 
-            Debug.Log("Player " + playerKey);
+            
 
             List<string> cardList = kvp.Value;
 
@@ -2072,7 +2138,7 @@ public class GameManager : MonoBehaviour
 
                 string cardRepresentation = string.Join(", ", card);
 
-                Debug.Log("Card: " + cardRepresentation);
+                
 
             }
 
@@ -2182,7 +2248,7 @@ public class GameManager : MonoBehaviour
             }
             else
             {
-                Debug.LogWarning($"[GameManager] RenderScoreBoardVisuals skipped: score text objects not found. Score: {lastAuthoritativeScore0}-{lastAuthoritativeScore1}");
+                
                 return;
             }
         }
@@ -2250,7 +2316,7 @@ public class GameManager : MonoBehaviour
     public void GetPlayerNumber(int playerNumber)
 
     {
-        Debug.LogError($"[PLAYER NUMBER] GetPlayerNumber called with playerNumber: {playerNumber}");
+        
         deckController.SetPlayerNumber(playerNumber);
 
     }
@@ -2777,29 +2843,39 @@ public class GameManager : MonoBehaviour
 
     public void UsePeekOpponentCardPower()
     {
-        Debug.Log("Using Peek Opponent Card Power");
-        powerProcessor?.ExecutePeekOpponentCard();
+        
+        powerOrchestrator?.ExecutePeekOpponentCard();
     }
 
     public void OnPeekOpponentCardSynced(int opponentPlayerNo, int cardIndex)
     {
+        Debug.Log($"[UcundanGözAt] GameManager.OnPeekOpponentCardSynced() called: opponentPlayerNo={opponentPlayerNo}, cardIndex={cardIndex}");
+        
+        if (deckController == null)
+        {
+            Debug.LogError("[UcundanGözAt] GameManager: deckController is null");
+            return;
+        }
+        
+        Debug.Log($"[UcundanGözAt] GameManager: Delegating to deckController.PeekOpponentCard()");
         deckController.PeekOpponentCard(opponentPlayerNo, cardIndex);
+        Debug.Log("[UcundanGözAt] GameManager.OnPeekOpponentCardSynced() completed");
     }
 
     public void UseBayaBayaBakPower()
     {
-        Debug.Log($"[GameManager] UseBayaBayaBakPower() called - Player: {deckController.thisPlayerNumber}, Time: {Time.time}");
-        DebugChainPrinter.LocalInstance?.TrackPowerUsage("BayaBayaBak", deckController.thisPlayerNumber, "Routing to processor");
-        DebugChainPrinter.LocalInstance?.TrackLocalAction("UseBayaBayaBakPower - routing to processor");
+        
+        DebugChainPrinter.LocalInstance?.TrackPowerUsage("BayaBayaBak", deckController.thisPlayerNumber, "Routing to orchestrator");
+        DebugChainPrinter.LocalInstance?.TrackLocalAction("UseBayaBayaBakPower - routing to orchestrator");
 
-        powerProcessor?.ExecuteBayaBayaBak();
+        powerOrchestrator?.ExecuteBayaBayaBak();
 
-        Debug.Log($"[GameManager] UseBayaBayaBakPower() complete");
+        
     }
 
     public void OnBayaBayaBakSynced(int opponentPlayerNo)
     {
-        Debug.Log($"[GameManager] OnBayaBayaBakSynced() called - Opponent: {opponentPlayerNo}, Time: {Time.time}");
+        
         
         // Track the power effect
         DebugChainPrinter.LocalInstance?.TrackLocalAction($"OnBayaBayaBakSynced received for opponent {opponentPlayerNo}");
@@ -2809,15 +2885,11 @@ public class GameManager : MonoBehaviour
         MoveChainIntegrator.ReportPowerCompletion("BayaBayaBak", deckController.thisPlayerNumber, $"Revealed opponent {opponentPlayerNo} cards");
         
         // CRITICAL FIX: Force game state save after power completion to ensure reconnection sync
-        if (Server.Singleton != null)
-        {
-            Debug.Log("[GameManager] Power effect completed - forcing game state save for reconnection sync");
-            Server.Singleton.SaveCurrentGameState();
-        }
+        powerProcessor?.OnGameStateMutated();
 
         deckController.PeekOpponentCardAll(opponentPlayerNo);
 
-        Debug.Log($"[GameManager] OnBayaBayaBakSynced() complete - Opponent cards revealed");
+        
     }
 
     private int GetRandomOpponentPlayerNo()
@@ -2841,21 +2913,6 @@ public class GameManager : MonoBehaviour
         return possibleOpponents[UnityEngine.Random.Range(0, possibleOpponents.Count)];
     }
 
-    public void UseSwapCardWithOpponentPower()
-    {
-        Debug.Log("Using Swap Card With Opponent Power");
-
-        if (myCards == null || myCards.Count == 0)
-        {
-            Debug.LogWarning("No cards in hand for DeğişTokuş!");
-            return;
-        }
-
-        powerProcessor?.ExecuteSwapCardWithOpponent();
-    }
-
-
-
     private IEnumerator DelayedSwap(int myPlayerNo, string myHandCardID, int opponentPlayerNo, string oppHandCardID)
 
     {
@@ -2873,7 +2930,7 @@ public class GameManager : MonoBehaviour
         // INTENTIONALLY CLIENT-LOCAL: Vale Arar only reveals Jack highlights to the activating player.
         // This is private information — it does not change game state for any other client.
         // No server sync is needed or appropriate here.
-        Debug.Log("ValeArar power activated! Showing indicators for all Jacks for the entire round.");
+        
         
         valeArarActive = true;
         
@@ -2901,7 +2958,7 @@ public class GameManager : MonoBehaviour
 
     public void DeactivateValeArarPower()
     {
-        Debug.Log("Deactivating ValeArar power: hiding indicators for all Jacks.");
+        
         
         valeArarActive = false;
         
@@ -2924,7 +2981,7 @@ public class GameManager : MonoBehaviour
     {
         if (!valeArarActive) return;
         
-        Debug.Log("Refreshing Vale Arar indicators for all Jacks.");
+        
         
         foreach (var cardScript in cardInteractionsScripts)
         {
@@ -2961,7 +3018,7 @@ public class GameManager : MonoBehaviour
         if (sourceCard == null)
         {
             // Phase 1: player must select the source card first
-            Debug.Log("[GameManager] StartKopyalaYapistirDualSelection - entering phase 1 (select source)");
+            
             isKopyalaSelectingSource = true;
             isKopyalaActive = false;
             kopyalaSourceCard = null;
@@ -2979,12 +3036,12 @@ public class GameManager : MonoBehaviour
                 DeckController.LocalInstance.ShowcaseAllOtherHands(false);
             }
 
-            Debug.Log("[GameManager] Phase 1 active - waiting for source card selection");
+            
         }
         else
         {
             // Phase 2: source card already known, wait for target card
-            Debug.Log($"[GameManager] StartKopyalaYapistirDualSelection - entering phase 2 with source: {sourceCard.uniqueCardInstanceID}");
+            
             isKopyalaSelectingSource = false;
             isKopyalaActive = true;
             kopyalaSourceCard = sourceCard;
@@ -2994,14 +3051,14 @@ public class GameManager : MonoBehaviour
                 DeckController.LocalInstance.ShowcaseAllOtherHands(false);
             }
 
-            Debug.Log("[GameManager] Phase 2 active - waiting for target card selection");
+            
         }
     }
 
     /// <summary>Called from CardInteraction when the player taps a card during Kopyala phase 1.</summary>
     public void SelectKopyalaSource(CardInteraction sourceCard)
     {
-        Debug.Log($"[GameManager] SelectKopyalaSource - selected: {sourceCard.uniqueCardInstanceID}");
+        
         isKopyalaSelectingSource = false;
         isKopyalaActive = true;
         kopyalaSourceCard = sourceCard;
@@ -3014,14 +3071,10 @@ public class GameManager : MonoBehaviour
         // Update InfoBox to guide target selection
         SuperPowerSpawner.LocalInstance?.ShowDualSelectionStepText("Yapıştırmak için bir kart seç");
 
-        Debug.Log("[GameManager] Kopyala phase 2 active - waiting for target card selection");
+        
     }
     
-    public void ActivateKopyalaYapistirPower()
-    {
-        // This method is now obsolete - Kopyala Yapıştır uses dual selection
-        Debug.LogWarning("[GameManager] ActivateKopyalaYapistirPower() called but this method is obsolete. Kopyala Yapıştır now uses dual selection.");
-    }
+
 
 
 
@@ -3031,20 +3084,20 @@ public class GameManager : MonoBehaviour
 
     public void TryKopyalaYapistir(CardInteraction targetCard)
     {
-        Debug.Log($"[KopyalaYapıştırLogs] [Client] TryKopyalaYapistir called - Target: {targetCard?.gameObject.name}, Source: {kopyalaSourceCard?.gameObject.name}");
+        
 
         if (!isKopyalaActive || kopyalaSourceCard == null || targetCard == null || targetCard == kopyalaSourceCard)
         {
-            Debug.LogWarning($"[KopyalaYapıştırLogs] [Client] TryKopyalaYapistir rejected - Invalid state: isKopyalaActive={isKopyalaActive}, sourceNull={kopyalaSourceCard == null}, targetNull={targetCard == null}, sameCard={targetCard == kopyalaSourceCard}");
+            
             return;
         }
 
-        Debug.Log($"[KopyalaYapıştırLogs] [Client] Executing local KopyalaYapıştır play: {kopyalaSourceCard.gameObject.name} ({kopyalaSourceCard.uniqueCardInstanceID}) -> {targetCard.gameObject.name} ({targetCard.uniqueCardInstanceID})");
+        
 
         // NOW call PowerActivated() since both cards are selected and we're executing the power
         if (DeckController.LocalInstance != null)
         {
-            Debug.Log("[GameManager] Calling PowerActivated() for Kopyala Yapıştır since both cards are now selected");
+            
             // Create a temporary power instance to call PowerActivated
             var tempPower = ScriptableObject.CreateInstance<KopyalaYapistir>();
             tempPower.PowerActivated();
@@ -3055,15 +3108,15 @@ public class GameManager : MonoBehaviour
         networkRelay.KopyalaYapistirServerRPC(targetCard.uniqueCardInstanceID, kopyalaSourceCard.uniqueCardInstanceID);
 
         // Stop hand showcasing
-        Debug.Log("[Showcase] GameManager: Stopping Kopyala Yapıştır dual selection showcase");
+        
         if (SuperPowerSpawner.LocalInstance != null)
         {
             SuperPowerSpawner.LocalInstance.StopHandShowcase();
-            Debug.Log("[Showcase] GameManager: Called StopHandShowcase for Kopyala Yapıştır");
+            
         }
         else
         {
-            Debug.LogError("[Showcase] GameManager: ERROR - SuperPowerSpawner.LocalInstance is null!");
+            
         }
 
         // Close InfoBox now that the copy is complete
@@ -3087,7 +3140,7 @@ public class GameManager : MonoBehaviour
     public void OnKopyalaYapistir(string targetUniqueID, string sourceUniqueID, bool instant = false)
 
     {
-        Debug.Log($"[KopyalaYapıştırLogs] [Client] OnKopyalaYapistir called - Target: {targetUniqueID}, Source: {sourceUniqueID}, Instant: {instant}");
+        
 
         if (CardInteraction.cardLookup.TryGetValue(targetUniqueID, out var targetCard) &&
 
@@ -3110,11 +3163,7 @@ public class GameManager : MonoBehaviour
             MoveChainIntegrator.ReportPowerCompletion("Kopyala Yapıştır", currentPlayerNo, $"Copied {sourceUniqueID} to {targetUniqueID}");
             
             // CRITICAL FIX: Force game state save after power completion to ensure reconnection sync
-            if (Server.Singleton != null)
-            {
-                Debug.Log("[KopyalaYapıştırLogs] [Server] Power effect completed - forcing game state save for reconnection sync");
-                Server.Singleton.SaveCurrentGameState();
-            }
+            powerProcessor?.OnGameStateMutated();
 
             // Copy cardID and sprite
 
@@ -3124,7 +3173,7 @@ public class GameManager : MonoBehaviour
 
             targetCard.activePowerEffect = sourceCard.activePowerEffect; // Copy active power effect
             copiedCardMap[targetUniqueID] = sourceUniqueID;
-            Debug.Log($"[KopyalaYapıştırLogs] [Client] OnKopyalaYapistir local mapping stored: target={targetUniqueID}, source={sourceUniqueID}");
+            
 
             // Set cardID and sprite with fade-in (or instantly)
             if (instant)
@@ -3153,7 +3202,7 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning($"[KopyalaYapıştırLogs] [Client] OnKopyalaYapistir failed! Target exists: {CardInteraction.cardLookup.ContainsKey(targetUniqueID)}, Source exists: {CardInteraction.cardLookup.ContainsKey(sourceUniqueID)}");
+            
         }
 
     }
@@ -3324,7 +3373,7 @@ public class GameManager : MonoBehaviour
 
         {
 
-            Debug.LogError($"PlayAutomatically: playerHandTransforms missing for player {playerIndex}");
+            
 
             return;
 
@@ -3338,7 +3387,7 @@ public class GameManager : MonoBehaviour
 
         {
 
-            Debug.LogWarning($"PlayAutomatically: No cards left in hand for player {playerIndex}");
+            
 
             return;
 
@@ -3356,7 +3405,7 @@ public class GameManager : MonoBehaviour
 
         {
 
-            Debug.LogError("PlayAutomatically: CardInteraction not found on hand card.");
+            
 
             return;
 
@@ -3386,15 +3435,7 @@ public class GameManager : MonoBehaviour
 
 
 
-    public void ActivateBombaPower()
 
-    {
-
-        // Tell the server to bomb the center
-
-        networkRelay.BombaServerRPC();
-
-    }
 
 
 
@@ -3438,7 +3479,7 @@ public class GameManager : MonoBehaviour
 
         {
 
-            Debug.LogError("BombedStack GameObject not found in scene!");
+            
 
             yield break;
 
@@ -3504,7 +3545,7 @@ public class GameManager : MonoBehaviour
 
         {
 
-            Debug.LogWarning("Explosion object or animator not found!");
+            
 
         }
 
@@ -3518,7 +3559,7 @@ public class GameManager : MonoBehaviour
 
 
 
-        Debug.Log("Bomba: Center cleared and cards moved to BombedStack.");
+        
 
     }
 
@@ -3570,13 +3611,7 @@ public class GameManager : MonoBehaviour
 
 
 
-    public void ActivateYapamazsınPower()
 
-    {
-
-        networkRelay.ActivateYapamazsınServerRPC();
-
-    }
 
 
 
@@ -3607,7 +3642,7 @@ public class GameManager : MonoBehaviour
         {
 
             // CRITICAL: This is called when the power is TRULY activated (after card play), not when button is pressed
-            Debug.LogWarning("Oynayamazsin power TRULY activated! Showing block prefab above center.");
+            
 
             // Show the block prefab above the center
 
@@ -3649,14 +3684,9 @@ public class GameManager : MonoBehaviour
 
 
 
-    public void ActivateKapkacPower()
-    {
-        StartKapkacSelectionPower();
-    }
-
     public void StartKapkacSelectionPower()
     {
-        Debug.Log("[GameManager] StartKapkacSelectionPower - entering single-card selection mode");
+        
 
         isKapkacPending = true;
         isYandimAnamPending = false;
@@ -3669,7 +3699,7 @@ public class GameManager : MonoBehaviour
         {
             networkRelay.PauseTurnTimerForPowerServerRPC();
             networkRelay.StartPowerDurationTimerServerRPC();
-            Debug.Log("[GameManager] Kapkaç selection: turn timer paused, power duration timer started");
+            
         }
 
         if (DeckController.LocalInstance != null)
@@ -3682,13 +3712,6 @@ public class GameManager : MonoBehaviour
     }
 
 
-
-
-
-    public void ActivateBlockNextPlayerPower()
-    {
-        powerProcessor?.ExecuteBlockNextPlayer();
-    }
 
 
 
@@ -3760,7 +3783,7 @@ public class GameManager : MonoBehaviour
 
         // CRITICAL: This is called when Ver Zehri is TRULY activated (after card play), not when button is pressed
 
-        Debug.Log("VerZehri effect TRULY started (after card play)!");
+        
 
         // TODO: Add your visual effect here
 
@@ -3784,7 +3807,7 @@ public class GameManager : MonoBehaviour
 
         // Hide UI/animation for VerZehri
 
-        Debug.Log("VerZehri effect stopped!");
+        
 
         // TODO: Remove your visual effect here
 
@@ -3808,7 +3831,7 @@ public class GameManager : MonoBehaviour
 
         // CRITICAL: This is called when Kutsal Deste is TRULY activated (after card play), not when button is pressed
 
-        Debug.Log("KutsalDeste effect TRULY started (after card play)!");
+        
 
         // TODO: Add your visual effect here
 
@@ -3828,7 +3851,7 @@ public class GameManager : MonoBehaviour
 
     {
 
-        Debug.Log("KutsalDeste effect stopped!");
+        
 
         // TODO: Remove your visual effect here
 
@@ -3870,7 +3893,7 @@ public class GameManager : MonoBehaviour
 
         {
 
-            Debug.LogWarning("No card selected or center is empty!");
+            
 
             return;
 
@@ -3888,7 +3911,7 @@ public class GameManager : MonoBehaviour
 
     {
 
-        Debug.Log("[GameManager] StartBuDahaIyiSelectionPower - entering single-card selection mode");
+        
 
         isBuDahaIyiPending = true;
         isKapkacPending = false;
@@ -3901,7 +3924,7 @@ public class GameManager : MonoBehaviour
         {
             networkRelay.PauseTurnTimerForPowerServerRPC();
             networkRelay.StartPowerDurationTimerServerRPC();
-            Debug.Log("[GameManager] Bu Daha İyi selection: turn timer paused, power duration timer started");
+            
         }
 
         if (DeckController.LocalInstance != null)
@@ -3979,11 +4002,7 @@ public class GameManager : MonoBehaviour
         MoveChainIntegrator.ReportPowerCompletion("Bu Daha İyi", activatingPlayerNo, $"Swapped hand card {handCardID} (owner P{handCardOwnerPlayerNo}) with center card {centerCardID}");
 
         // CRITICAL FIX: Force game state save after power completion to ensure reconnection sync
-        if (Server.Singleton != null)
-        {
-            Debug.Log("[GameManager] Power effect completed - forcing game state save for reconnection sync");
-            Server.Singleton.SaveCurrentGameState();
-        }
+        powerProcessor?.OnGameStateMutated();
 
         // Swap card objects visually
         ShowAffectedCardsDebugVisual("Bu Daha İyi", handCardID, centerCardID);
@@ -4030,14 +4049,14 @@ public class GameManager : MonoBehaviour
     public void ToggleVisualDebug()
     {
         debugVisualsEnabled = !debugVisualsEnabled;
-        Debug.Log($"[DebugVisual] Visual debug {(debugVisualsEnabled ? "ON" : "OFF")}");
+        
     }
 
     [ContextMenu("Debug/Toggle Değiş Tokuş Candidate Debug")]
     public void ToggleDegisTokusCandidateDebug()
     {
         debugDegisTokusCandidatesEnabled = !debugDegisTokusCandidatesEnabled;
-        Debug.Log($"[DebugVisual] Değiş Tokuş candidate debug {(debugDegisTokusCandidatesEnabled ? "ON" : "OFF")}");
+        
     }
 
     private void ShowAffectedCardsDebugVisual(string powerName, params string[] cardIds)
@@ -4112,7 +4131,7 @@ public class GameManager : MonoBehaviour
     // New dual selection method for Şunu Değiş Tokuş / Değiş Tokuş
     public void StartSunuDegisTokusDualSelection(string myHandCard, string powerName = "Şunu Değiş Tokuş")
     {
-        Debug.Log($"[GameManager] StartSunuDegisTokusDualSelection - Power: {powerName}, My card: {myHandCard}");
+        
         
         isSunuDegisTokusActive = true;
         sunuDegisTokusFirstCard = null;
@@ -4120,7 +4139,11 @@ public class GameManager : MonoBehaviour
         activeSunuDegisTokusPowerName = powerName;
 
         // Pause the normal turn timer and start the power-selection timeout
-        powerProcessor?.StartSunuDegisTokusSelection();
+        if (networkRelay != null)
+        {
+            networkRelay.PauseTurnTimerForPowerServerRPC();
+            networkRelay.StartPowerDurationTimerServerRPC();
+        }
         
         // All hand cards are selectable in this mode, so showcase every hand consistently.
         if (DeckController.LocalInstance != null)
@@ -4129,11 +4152,11 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            Debug.LogError("[Showcase] GameManager: ERROR - DeckController.LocalInstance is null!");
+            
         }
 
         SuperPowerSpawner.LocalInstance?.ShowDualSelectionStepText("Adım 1/2: Değiş tokuş için ilk el kartını seç");
-        Debug.Log($"[GameManager] {powerName}: Select any hand card first.");
+        
     }
 
     /// <summary>
@@ -4147,7 +4170,7 @@ public class GameManager : MonoBehaviour
 
         if (isBuDahaIyiPending)
         {
-            Debug.LogWarning("[GameManager] Power selection timed out — cancelling Bu Daha İyi");
+            
 
             isBuDahaIyiPending = false;
             CardInteraction.currentlySelectedCard = null;
@@ -4159,14 +4182,14 @@ public class GameManager : MonoBehaviour
             if (SuperPowerSpawner.LocalInstance != null)
                 StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
 
-            Debug.Log("[GameManager] Bu Daha İyi cancelled — player can now play a card normally.");
+            
             return;
         }
 
         if (isKapkacPending || isYandimAnamPending)
         {
             string activePower = isKapkacPending ? "Kapkaç" : "Yandım Anam";
-            Debug.LogWarning($"[GameManager] Power selection timed out — cancelling {activePower}");
+            
 
             isKapkacPending = false;
             isYandimAnamPending = false;
@@ -4180,13 +4203,13 @@ public class GameManager : MonoBehaviour
             if (SuperPowerSpawner.LocalInstance != null)
                 StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
 
-            Debug.Log($"[GameManager] {activePower} cancelled — player can now play a card normally.");
+            
             return;
         }
 
         if (isKopyalaActive || isKopyalaSelectingSource)
         {
-            Debug.LogWarning("[GameManager] Power selection timed out — cancelling Kopyala Yapıştır");
+            
             isKopyalaActive = false;
             isKopyalaSelectingSource = false;
             kopyalaSourceCard = null;
@@ -4198,13 +4221,13 @@ public class GameManager : MonoBehaviour
             if (SuperPowerSpawner.LocalInstance != null)
                 StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
 
-            Debug.Log("[GameManager] Kopyala Yapıştır cancelled — player can now play a card normally.");
+            
             return;
         }
 
         if (isSunuDegisBunuTokusActive)
         {
-            Debug.LogWarning("[ŞDBT] Power selection timed out — cancelling Şunu Değiş Bunu Tokuş");
+            
 
             ClearSunuDegisBunuTokusIndicators();
             ResetSunuDegisBunuTokusState(true);
@@ -4215,11 +4238,11 @@ public class GameManager : MonoBehaviour
             if (SuperPowerSpawner.LocalInstance != null)
                 StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
 
-            Debug.Log("[ŞDBT] Şunu Değiş Bunu Tokuş cancelled — player can now play a card normally.");
+            
             return;
         }
 
-        Debug.LogWarning($"[GameManager] Power selection timed out — cancelling {activeSunuDegisTokusPowerName}");
+        
 
         // Reset dual-selection state
         isSunuDegisTokusActive = false;
@@ -4231,7 +4254,7 @@ public class GameManager : MonoBehaviour
         if (DeckController.LocalInstance != null)
             DeckController.LocalInstance.ExitShowcaseAllOtherHands();
 
-        Debug.Log("[GameManager] Power cancelled — player can now play a card normally.");
+        
     }
 
     public bool IsSunuDegisTokusSelectingOpponent()
@@ -4257,14 +4280,6 @@ public class GameManager : MonoBehaviour
         DestroyImmediate(defaultPower);
     }
     
-    public void ActivateSunuDegisTokusPower()
-    {
-        // This method is now obsolete - Şunu Değiş Tokuş uses dual selection
-        Debug.LogWarning("[GameManager] ActivateSunuDegisTokusPower() called but this method is obsolete. Şunu Değiş Tokuş now uses dual selection.");
-    }
-
-
-
     public IEnumerator OnSunuDegisTokusSynced(int myPlayerNo, int otherPlayerNo, string myHandCardID, string otherHandCardID)
     {
         // Track the card swap in move chain
@@ -4274,11 +4289,7 @@ public class GameManager : MonoBehaviour
         MoveChainIntegrator.ReportPowerCompletion("Şunu Değiş Tokuş", myPlayerNo, $"Swapped {myHandCardID} with {otherHandCardID} from P{otherPlayerNo}");
         
         // CRITICAL FIX: Force game state save after power completion to ensure reconnection sync
-        if (Server.Singleton != null)
-        {
-            Debug.Log("[GameManager] Power effect completed - forcing game state save for reconnection sync");
-            Server.Singleton.SaveCurrentGameState();
-        }
+        powerProcessor?.OnGameStateMutated();
         
         // Swap in myCards if relevant
         if (deckController.thisPlayerNumber == myPlayerNo && deckController.thisPlayerNumber == otherPlayerNo)
@@ -4340,7 +4351,7 @@ public class GameManager : MonoBehaviour
 
     public void EnqueueSunuDegisBunuTokusSwap(int myPlayerNo, int otherPlayerNo, string myHandCardID, string otherHandCardID, int myHandIndex, bool readyToExit)
     {
-        Debug.Log($"[ŞDBT] Enqueue synced swap: my={myHandCardID}, other={otherHandCardID}, idx={myHandIndex}, readyToExit={readyToExit}, queuedBefore={sunuDegisBunuTokusSwapQueue.Count}");
+        
         sunuDegisBunuTokusSwapQueue.Enqueue(OnSunuDegisBunuTokusSynced(myPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID, myHandIndex, readyToExit));
         if (!sunuDegisBunuTokusSwapProcessing)
             StartCoroutine(ProcessSunuDegisBunuTokusSwapQueue());
@@ -4349,14 +4360,14 @@ public class GameManager : MonoBehaviour
     private IEnumerator ProcessSunuDegisBunuTokusSwapQueue()
     {
         sunuDegisBunuTokusSwapProcessing = true;
-        Debug.Log($"[ŞDBT] Processing sync queue start. Count={sunuDegisBunuTokusSwapQueue.Count}");
+        
         while (sunuDegisBunuTokusSwapQueue.Count > 0)
         {
-            Debug.Log($"[ŞDBT] Dequeue synced swap. RemainingAfterDequeue={sunuDegisBunuTokusSwapQueue.Count - 1}");
+            
             yield return StartCoroutine(sunuDegisBunuTokusSwapQueue.Dequeue());
         }
         sunuDegisBunuTokusSwapProcessing = false;
-        Debug.Log("[ŞDBT] Processing sync queue finished.");
+        
     }
 
 
@@ -4377,7 +4388,7 @@ public class GameManager : MonoBehaviour
 
         {
 
-            Debug.LogWarning("No cards in hand for ŞunuDeğişBunuTokuş!");
+            
 
             return;
 
@@ -4388,7 +4399,7 @@ public class GameManager : MonoBehaviour
         int availableOpponentCards = GetAvailableOpponentCardCount();
         if (availableOpponentCards == 0)
         {
-            Debug.LogWarning("No opponent cards available for ŞunuDeğişBunuTokuş!");
+            
             return;
         }
 
@@ -4403,8 +4414,8 @@ public class GameManager : MonoBehaviour
         sunuDegisBunuTokusExpectedSyncs = 0;
         sunuDegisBunuTokusCompletedSyncs = 0;
 
-        Debug.Log($"ŞunuDeğişBunuTokuş: Starting with {sunuDegisBunuTokusTotalSwaps} swaps (my hand: {localHandSnapshot.Count}, opponent cards: {availableOpponentCards}). Select a card from another player's hand to swap with your first card.");
-        Debug.Log($"[ŞDBT] Activation started. myHand={localHandSnapshot.Count}, opponentAvailable={availableOpponentCards}, totalSwaps={sunuDegisBunuTokusTotalSwaps}");
+        
+        
 
         // Pause turn timer and start power duration timer
         if (networkRelay != null)
@@ -4424,15 +4435,15 @@ public class GameManager : MonoBehaviour
         SuperPowerSpawner.LocalInstance?.ShowDualSelectionStepText(GetSunuDegisBunuTokusSelectionText(0, sunuDegisBunuTokusTotalSwaps));
 
         // Start hand showcasing for multi-swap selection
-        Debug.Log("[Showcase] GameManager: Starting Şunu Değiş Bunu Tokuş multi-swap showcase");
+        
         if (SuperPowerSpawner.LocalInstance != null)
         {
             SuperPowerSpawner.LocalInstance.StartHandShowcaseForDualSelection("Şunu Değiş Bunu Tokuş");
-            Debug.Log("[Showcase] GameManager: Called StartHandShowcaseForDualSelection for Şunu Değiş Bunu Tokuş");
+            
         }
         else
         {
-            Debug.LogError("[Showcase] GameManager: ERROR - SuperPowerSpawner.LocalInstance is null!");
+            
         }
 
     }
@@ -4497,7 +4508,7 @@ public class GameManager : MonoBehaviour
                 childIndex++;
             }
         }
-        Debug.Log($"[ŞDBT] Counted available opponent cards: {count}");
+        
         return count;
     }
 
@@ -4520,7 +4531,7 @@ public class GameManager : MonoBehaviour
 
     private void FinalizeSunuDegisBunuTokusActivation()
     {
-        Debug.Log($"[ŞDBT] Finalizing activation. completedSyncs={sunuDegisBunuTokusCompletedSyncs}, expectedSyncs={sunuDegisBunuTokusExpectedSyncs}");
+        
 
         deckController.ExitShowcaseAllOtherHands();
         deckController.TryStopShowcaseCenterCards();
@@ -4533,11 +4544,8 @@ public class GameManager : MonoBehaviour
 
         ResetSunuDegisBunuTokusState(false);
 
-        if (Server.Singleton != null)
-        {
-            Debug.Log("[ŞDBT] Power effect completed - forcing game state save for reconnection sync");
-            Server.Singleton.SaveCurrentGameState();
-        }
+        // CRITICAL FIX: Force game state save after power completion to ensure reconnection sync
+        powerProcessor?.OnGameStateMutated();
     }
 
     private string GetSunuDegisBunuTokusSelectionText(int index, int totalSwaps)
@@ -4576,11 +4584,11 @@ public class GameManager : MonoBehaviour
     private void CompleteSunuDegisBunuTokusActivation()
     {
         int pairCount = sunuDegisBunuTokusSelectedOpponentCards.Count;
-        Debug.Log($"[ŞDBT] Complete activation requested. pairCount={pairCount}, totalSwaps={sunuDegisBunuTokusTotalSwaps}");
+        
 
         if (pairCount == 0)
         {
-            Debug.LogWarning("[ŞDBT] Completion aborted because no swap pairs were collected.");
+            
             ResetSunuDegisBunuTokusState(false);
             return;
         }
@@ -4607,7 +4615,7 @@ public class GameManager : MonoBehaviour
         for (int i = 0; i < pairCount; i++)
         {
             bool isLast = (i == pairCount - 1);
-            Debug.Log($"[ŞDBT] Sending swap RPC {i + 1}/{pairCount}: my={sunuDegisBunuTokusMyHandSnapshot[i]}, other={sunuDegisBunuTokusSelectedOpponentCards[i]}, readyToExit={isLast}");
+            
             networkRelay.UseSunuDegisBunuTokusServerRPC(
                 sunuDegisBunuTokusMyHandSnapshot[i],
                 sunuDegisBunuTokusSelectedOpponentCards[i],
@@ -4616,7 +4624,7 @@ public class GameManager : MonoBehaviour
         }
 
         AddToDebugLog("ŞunuDeğişBunuTokuş: All selections sent to server.");
-        Debug.Log($"[ŞDBT] All swap RPCs sent. Waiting for synced completions: expected={sunuDegisBunuTokusExpectedSyncs}");
+        
     }
 
 
@@ -4626,7 +4634,7 @@ public class GameManager : MonoBehaviour
     public IEnumerator OnSunuDegisBunuTokusSynced(int myPlayerNo, int otherPlayerNo, string myHandCardID, string otherHandCardID, int myHandIndex, bool readyToExit = false)
 
     {
-        Debug.Log($"[ŞDBT] Synced swap received: my={myHandCardID}, other={otherHandCardID}, idx={myHandIndex}, readyToExit={readyToExit}");
+        
         // Track power completion for move chain synchronization
         MoveChainIntegrator.ReportPowerCompletion("Şunu Değiş Bunu Tokuş", myPlayerNo, $"Swapped {myHandCardID} with {otherHandCardID} from P{otherPlayerNo}");
 
@@ -4672,7 +4680,7 @@ public class GameManager : MonoBehaviour
         if (sunuDegisBunuTokusActivationPending)
         {
             sunuDegisBunuTokusCompletedSyncs++;
-            Debug.Log($"[ŞDBT] Synced swap animation complete. completed={sunuDegisBunuTokusCompletedSyncs}/{sunuDegisBunuTokusExpectedSyncs}, readyToExit={readyToExit}");
+            
             SuperPowerSpawner.LocalInstance?.ShowDualSelectionStepText($"Kartlar değiştiriliyor... ({sunuDegisBunuTokusCompletedSyncs}/{Mathf.Max(sunuDegisBunuTokusExpectedSyncs, 1)})");
         }
 
@@ -4680,7 +4688,7 @@ public class GameManager : MonoBehaviour
         {
             if (!sunuDegisBunuTokusActivationPending)
             {
-                Debug.LogWarning("[ŞDBT] readyToExit received, but activation is no longer pending.");
+                
             }
             else if (sunuDegisBunuTokusCompletedSyncs >= sunuDegisBunuTokusExpectedSyncs)
             {
@@ -4688,7 +4696,7 @@ public class GameManager : MonoBehaviour
             }
             else
             {
-                Debug.LogWarning($"[ŞDBT] readyToExit arrived before all synced swaps completed. completed={sunuDegisBunuTokusCompletedSyncs}, expected={sunuDegisBunuTokusExpectedSyncs}");
+                
             }
         }
 
@@ -4825,7 +4833,7 @@ public class GameManager : MonoBehaviour
     /// </summary>
     public void OnPlayerDisconnected(ulong clientId, string reason)
     {
-        Debug.LogWarning($"[GameManager] Player {clientId} disconnected: {reason}");
+        
         
         // TODO: Implement bot placeholder system here
         // This is where you would:
@@ -4833,7 +4841,7 @@ public class GameManager : MonoBehaviour
         // 2. Update the UI to show the player is now a bot
         // 3. Handle the bot's turns automatically
         
-        Debug.LogWarning($"[GameManager] Bot placeholder system should activate for disconnected player {clientId}");
+        
     }
 
     public void ShowcaseSuperPower(string powerName, float fadeDuration = 0.5f, float displayDuration = 1f)
@@ -5021,7 +5029,7 @@ public class GameManager : MonoBehaviour
 
     public void StartYandimAnamSelectionPower()
     {
-        Debug.Log("[GameManager] StartYandimAnamSelectionPower - entering single-card selection mode");
+        
 
         isYandimAnamPending = true;
         isKapkacPending = false;
@@ -5029,8 +5037,6 @@ public class GameManager : MonoBehaviour
 
         CardInteraction.currentlySelectedCard = null;
         SetCurrentSelectedHandCardNull();
-
-        powerProcessor?.StartYandimAnamSelection();
 
         if (DeckController.LocalInstance != null)
         {
@@ -5261,7 +5267,7 @@ public class GameManager : MonoBehaviour
     /// </summary>
     public void ApplyGameState(SerializableGameState snapshot)
     {
-        Debug.LogError("[Visual Sync] ===== APPLY GAME STATE CALLED =====");
+        
         // Single comprehensive log for game state application start
         Debug.Log($"[GameManager] ===== ÖNEMLİ: APPLYING GAME STATE START =====\n" +
                  $"Snapshot version: {snapshot.snapshotVersion}\n" +
@@ -5278,19 +5284,19 @@ public class GameManager : MonoBehaviour
         // Ensure a clean slate immediately before we start rebuild
         if (deckController != null)
         {
-            Debug.LogError("[Visual Sync] Starting ApplyGameStateWithReset coroutine");
+            
             StartCoroutine(ApplyGameStateWithReset(snapshot));
         }
         else
         {
-            Debug.LogError("[GameManager] CRITICAL ERROR: deckController is null; cannot apply game state");
+            
             SyncLogError("deckController is null; cannot apply game state");
         }
     }
 
     private IEnumerator ApplyGameStateWithReset(SerializableGameState snapshot)
     {
-        Debug.LogError("[Visual Sync] ===== APPLY GAME STATE WITH RESET STARTED =====");
+        
 
         // CRITICAL: Reset transient state BEFORE initializing deck or resetting cards
         // This ensures flags like alreadySubbed are cleared so new cards can subscribe to events.
@@ -5300,13 +5306,13 @@ public class GameManager : MonoBehaviour
         if (deckController != null)
         {
             deckController.isInstantMode = true;
-            Debug.Log("[GameManager] Instant mode ENABLED for reconnection animations");
+            
         }
         
         // Ensure cards are initialized if this client is reconnecting and bypassed standard initialization
         if (deckController != null && (deckController.cardInteractionList == null || deckController.cardInteractionList.Count == 0))
         {
-            Debug.Log("[GameManager] Deck has not been initialized yet. Initializing deck first...");
+            
             yield return StartCoroutine(deckController.DeckStart());
         }
 
@@ -5321,14 +5327,14 @@ public class GameManager : MonoBehaviour
         yield return StartCoroutine(deckController.ResetCards());
         SyncLog("ResetCards completed");
         
-        Debug.LogError("[Visual Sync] About to call ApplyGameStateCoroutine");
+        
         // Then continue the usual coroutine
         yield return StartCoroutine(ApplyGameStateCoroutine(snapshot));
-        Debug.LogError("[Visual Sync] ApplyGameStateCoroutine completed");
+        
 
         // CRITICAL RECONNECTION FIX: Ensure isReconnecting is false once state is fully restored
         isReconnecting = false;
-        Debug.LogError("[RECONNECTION] isReconnecting explicitly set to false – normal dealing can proceed.");
+        
     }
 
     /// <summary>
@@ -5370,8 +5376,8 @@ public class GameManager : MonoBehaviour
 
         // NOTE: Visual restoration moved to AFTER desync detection completes
         // This ensures the move chain is properly synchronized before restoring visuals
-        Debug.LogError("[Visual Sync] ===== SKIPPING VISUAL RESTORATION IN APPLY GAME STATE =====");
-        Debug.LogError("[Visual Sync] Visual restoration will happen after desync detection completes");
+        
+        
 
         // 5. Apply effects and flags
         SyncLog("Step 5: Applying effects and flags");
@@ -5403,7 +5409,7 @@ public class GameManager : MonoBehaviour
         if (deckController != null)
         {
             deckController.isInstantMode = false;
-            Debug.Log("[GameManager] Instant mode DISABLED - reconstruction complete");
+            
         }
     }
 
@@ -5412,7 +5418,7 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void FreezeClientForResync()
     {
-        Debug.Log("[GameManager] Freezing client for resync");
+        
         
         // Stop all card tweens
         var allCards = FindObjectsOfType<CardInteraction>();
@@ -5435,7 +5441,7 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void ResetTransientClientState()
     {
-        Debug.Log("[GameManager] Resetting transient client state");
+        
         
         // Reset selection state
         currentSelectedHandCard = null;
@@ -5468,7 +5474,7 @@ public class GameManager : MonoBehaviour
         if (valeArarActive)
         {
             DeactivateValeArarPower();
-            Debug.Log("[GameManager] Vale Arar deactivated at end of round");
+            
         }
         
         // Close any open info boxes
@@ -5489,11 +5495,11 @@ public class GameManager : MonoBehaviour
         if (!isReconnecting)
         {
             MoveChainIntegrator.ResetChains();
-            Debug.Log("[GameManager] Reset all move chains to prevent desync loops after full state sync");
+            
         }
         else
         {
-            Debug.Log("[GameManager] Skipping move chain reset for reconnection - letting desync detection handle synchronization");
+            
         }
     }
 
@@ -5502,7 +5508,7 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void ApplyCoreGameState(SerializableGameState snapshot)
     {
-        Debug.Log("[GameManager] Applying core game state");
+        
 
         // Restore player number from PlayerPrefs immediately during reconnection/migration
         // to ensure we have the correct local seat perspective before card container rebuild starts.
@@ -5518,7 +5524,7 @@ public class GameManager : MonoBehaviour
         if (deckController != null)
         {
             deckController.SetStartingPlayerNoCounter(snapshot.roundCount);
-            Debug.LogError($"[GAME STATE] Applied roundCount {snapshot.roundCount} to startingPlayerNoCounter for reconnection");
+            
         }
         
         // Update bot-controlled players
@@ -5526,10 +5532,10 @@ public class GameManager : MonoBehaviour
         if (snapshot.botControlledPlayers.items != null)
         {
             botControlledPlayers.AddRange(snapshot.botControlledPlayers.items);
-            Debug.Log($"[GameManager] Applied {botControlledPlayers.Count} bot-controlled players from snapshot");
+            
         }
         
-        Debug.Log($"[GameManager] Applied server game state - currentPlayer: {currentPlayerNo}, turnCounter: {turnCounter}, roundCount: {roundCount}");
+        
         
         // Update points display instantly from the snapshot during reconnection or host migration resync
         if (snapshot.points.items != null && snapshot.points.items.Length >= 2)
@@ -5542,7 +5548,7 @@ public class GameManager : MonoBehaviour
                 snapshot.p1side_oppFakePointReduction,
                 snapshot.p2side_oppFakePointReduction
             );
-            Debug.Log($"[GameManager] Applied points and fake reductions from snapshot during resync: {snapshot.points.items[0]} - {snapshot.points.items[1]} (Reductions: {snapshot.p1side_selfFakePointReduction}, {snapshot.p2side_selfFakePointReduction}, {snapshot.p1side_oppFakePointReduction}, {snapshot.p2side_oppFakePointReduction})");
+            
         }
 
         // The server will handle sending the updated current player via existing RPC
@@ -5567,7 +5573,7 @@ public class GameManager : MonoBehaviour
                        powerName == "Kapkaç" || 
                        powerName == "Yandım Anam";
         
-        Debug.LogError($"[Visual Sync] IsVisualChangingPower({powerName}) = {isVisual}");
+        
         return isVisual;
         // Add more powers here as needed
     }
@@ -5577,33 +5583,33 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private IEnumerator RestoreVisualEffectFromMove(GameMove move)
     {
-        Debug.LogError($"[Visual Sync] RestoreVisualEffectFromMove called for power: {move.superPowerName}");
+        
         SyncLog($"Restoring visual effect for power: {move.superPowerName}");
         
         switch (move.superPowerName)
         {
             case "Kopyala Yapıştır":
-                Debug.LogError("[Visual Sync] Calling RestoreKopyalaYapistirVisual");
+                
                 yield return StartCoroutine(RestoreKopyalaYapistirVisual(move));
                 break;
                 
             case "Kapkaç":
-                Debug.LogError("[Visual Sync] Calling RestoreKapkacVisual");
+                
                 yield return StartCoroutine(RestoreKapkacVisual(move));
                 break;
                 
             case "Yandım Anam":
-                Debug.LogError("[Visual Sync] Calling RestoreYandimAnamVisual");
+                
                 yield return StartCoroutine(RestoreYandimAnamVisual(move));
                 break;
                 
             default:
-                Debug.LogError($"[Visual Sync] Unknown visual power: {move.superPowerName}");
+                
                 SyncLogWarning($"Unknown visual power: {move.superPowerName}");
                 break;
         }
         
-        Debug.LogError($"[Visual Sync] RestoreVisualEffectFromMove completed for {move.superPowerName}");
+        
     }
     
     /// <summary>
@@ -5623,7 +5629,7 @@ public class GameManager : MonoBehaviour
         
         if (!CardInteraction.cardLookup.TryGetValue(targetCardId, out var targetCard))
         {
-            Debug.LogError($"[Visual Sync] ERROR: Card {targetCardId} not found in cardLookup during Kopyala Yapıştır restoration");
+            
             yield break;
         }
         
@@ -5640,32 +5646,32 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private IEnumerator RestoreKapkacVisual(GameMove move)
     {
-        Debug.LogError($"[Visual Sync] RestoreKapkacVisual called - affectedCardIds: {string.Join(",", move.affectedCardIds ?? new string[0])}");
+        
         
         if (move.affectedCardIds == null || move.affectedCardIds.Length == 0)
         {
-            Debug.LogError("[Visual Sync] ERROR: Kapkaç move missing affected card data");
+            
             SyncLogWarning("Kapkaç move missing affected card data");
             yield break;
         }
         
         string cardId = move.affectedCardIds[0];
-        Debug.LogError($"[Visual Sync] Restoring Kapkaç visual effect for card: {cardId}");
+        
         SyncLog($"Restoring Kapkaç visual effect for card: {cardId}");
         
         // Check if card exists in lookup before calling
         if (!CardInteraction.cardLookup.TryGetValue(cardId, out var targetCard))
         {
-            Debug.LogError($"[Visual Sync] ERROR: Card {cardId} not found in cardLookup during Kapkaç restoration");
+            
             yield break;
         }
         
-        Debug.LogError($"[Visual Sync] Card {cardId} found in lookup - calling OnKapkacCardChanged");
+        
         
         // Use existing OnKapkacCardChanged method to restore visual state instantly
         OnKapkacCardChanged(cardId, true);
         
-        Debug.LogError($"[Visual Sync] OnKapkacCardChanged completed for card: {cardId}");
+        
         
         yield return null; // Allow one frame for processing
     }
@@ -5686,7 +5692,7 @@ public class GameManager : MonoBehaviour
         
         if (!CardInteraction.cardLookup.TryGetValue(cardId, out var targetCard))
         {
-            Debug.LogError($"[Visual Sync] ERROR: Card {cardId} not found in cardLookup during Yandım Anam restoration");
+            
             yield break;
         }
         
@@ -5939,7 +5945,7 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void ApplyEffectsAndFlags(SerializableGameState snapshot)
     {
-        Debug.Log("[GameManager] Applying effects and flags");
+        
         
         // Apply special power states via existing methods
         SetYapamazsınActive(snapshot.isYapamazsınActive);
@@ -5960,7 +5966,7 @@ public class GameManager : MonoBehaviour
         // Reconstruct all card copies and power overlays in a single, ordered step.
         copiedCardMap = snapshot.copiedCardMap.ToDictionary();
         cardPowerEffects = snapshot.cardPowerEffects.ToDictionary();
-        Debug.Log($"[KopyalaYapıştırLogs] [Client] ApplyEffectsAndFlags: received copiedCardMap of size {(copiedCardMap != null ? copiedCardMap.Count : 0)} and cardPowerEffects of size {(cardPowerEffects != null ? cardPowerEffects.Count : 0)} from snapshot.");
+        
         ReconstructPowerVisuals(snapshot);
         // ----------------------------------------------
 
@@ -5975,7 +5981,7 @@ public class GameManager : MonoBehaviour
                 if (goldDict != null && goldDict.TryGetValue(myPlayerNo, out int restoredGold))
                 {
                     SuperPowerSpawner.LocalInstance.SetGold(restoredGold);
-                    Debug.Log($"[GameManager] Restored local gold to {restoredGold} from snapshot");
+                    
                 }
                 
                 // 2. Restore Superpowers
@@ -5983,7 +5989,7 @@ public class GameManager : MonoBehaviour
                 if (powersDict != null && powersDict.TryGetValue(myPlayerNo, out List<string> restoredPowers))
                 {
                     SuperPowerSpawner.LocalInstance.RestorePowers(restoredPowers);
-                    Debug.Log($"[GameManager] Restored local superpowers: {string.Join(", ", restoredPowers)}");
+                    
                 }
             }
         }
@@ -6138,7 +6144,7 @@ public class GameManager : MonoBehaviour
                     }
                     else
                     {
-                        Debug.LogWarning($"[KopyalaYapıştırLogs] CaptureVisualSnapshot: skipping card {kvp.Key} because its cardID is null or empty!");
+                        
                     }
                 }
             }
@@ -6152,8 +6158,8 @@ public class GameManager : MonoBehaviour
     public void PrintCapturedSnapshot()
     {
         SerializableGameState snapshot = CaptureVisualSnapshot();
-        Debug.Log($"[MIGRATION] Captured Snapshot v{snapshot.snapshotVersion}");
-        Debug.Log($"[MIGRATION] Center cards: {string.Join(", ", snapshot.center.ToList())}");
+        
+        
         snapshot.hands.PrintAll();
     }
 
@@ -6191,7 +6197,7 @@ public class GameManager : MonoBehaviour
     {
         if (copiedCards == null || copiedCards.Count == 0) return;
         
-        Debug.Log($"[GameManager] Applying copied card map with {copiedCards.Count} copied cards");
+        
         
         foreach (var kvp in copiedCards)
         {
@@ -6206,7 +6212,7 @@ public class GameManager : MonoBehaviour
                 depth++;
             }
             
-            Debug.Log($"[GameManager] Restoring copied card: {targetCardID} <- {kvp.Value} (Ultimate Source: {ultimateSourceID}, depth: {depth})");
+            
             
             // Find target and ultimate source cards
             if (CardInteraction.cardLookup.TryGetValue(targetCardID, out var targetCard) &&
@@ -6229,15 +6235,15 @@ public class GameManager : MonoBehaviour
                     CopyEffectVisuals(targetCard, true);
                 }
                 
-                Debug.Log($"[GameManager] Successfully restored copied card {targetCardID} using ultimate source {ultimateSourceID}");
+                
             }
             else
             {
-                Debug.LogWarning($"[GameManager] Could not find cards for copied mapping: {targetCardID} <- {ultimateSourceID}");
+                
             }
         }
         
-        Debug.Log("[GameManager] Copied card map application complete");
+        
     }
 
     /// <summary>
@@ -6269,13 +6275,13 @@ public class GameManager : MonoBehaviour
 
                     default:
                         cardInteraction.activePowerEffect = powerEffect;
-                        Debug.LogWarning($"Unknown power effect: {powerEffect} for card {cardUniqueID}");
+                        
                         break;
                 }
             }
             else
             {
-                Debug.LogWarning($"Card {cardUniqueID} not found in cardLookup when applying power effect {powerEffect}");
+                
             }
         }
     }
@@ -6286,7 +6292,7 @@ public class GameManager : MonoBehaviour
     /// </summary>
     public void ReconstructPowerVisuals(SerializableGameState snapshot)
     {
-        Debug.LogError($"[KopyalaYapıştırLogs] [Visual Reconstruction] Starting unified power visual reconstruction... CardLookup Count: {CardInteraction.cardLookup.Count}");
+        
 
         // STEP 1: Pristine Slate
         int resetCount = 0;
@@ -6300,13 +6306,13 @@ public class GameManager : MonoBehaviour
                 resetCount++;
             }
         }
-        Debug.Log($"[KopyalaYapıştırLogs] [Visual Reconstruction] Step 1: Cleared active effects and restored original cards for {resetCount} cards.");
+        
 
         // STEP 2: Base Identity Resolution (Kopyala Yapıştır)
         var copiedCards = snapshot.copiedCardMap.ToDictionary();
         if (copiedCards != null && copiedCards.Count > 0)
         {
-            Debug.Log($"[KopyalaYapıştırLogs] [Visual Reconstruction] Step 2: Restoring copied card identities for {copiedCards.Count} cards");
+            
             foreach (var kvp in copiedCards)
             {
                 string targetCardID = kvp.Key;
@@ -6333,26 +6339,20 @@ public class GameManager : MonoBehaviour
                     targetCard.SetCardIDAndSprite(baseCardID, baseSprite);
                     targetCard.activePowerEffect = "none";
                     
-                    Debug.LogError($"[KopyalaYapıştırLogs] [Visual Reconstruction] Copy SUCCESS: {targetCardID} <- {ultimateSourceID} (Mapped: {mappedSourceID}, Identity restored to: {baseCardID[0]}_{baseCardID[1]})");
-                }
-                else
-                {
-                    Debug.LogError($"[KopyalaYapıştırLogs] [Visual Reconstruction] Copy FAILED! Target found: {hasTarget} ({targetCardID}), Source found: {hasSource} ({ultimateSourceID}). Current cardLookup count: {CardInteraction.cardLookup.Count}");
-                    if (!hasTarget) Debug.LogWarning($"[KopyalaYapıştırLogs] [Visual Reconstruction] Missing target card in cardLookup: {targetCardID}");
-                    if (!hasSource) Debug.LogWarning($"[KopyalaYapıştırLogs] [Visual Reconstruction] Missing source card in cardLookup: {ultimateSourceID}");
+                    
                 }
             }
         }
         else
         {
-            Debug.Log("[KopyalaYapıştırLogs] [Visual Reconstruction] Step 2: No copied cards found in snapshot.copiedCardMap");
+            
         }
 
         // STEP 3: Status Alterations (Kapkaç, YandımAnam)
         var powerEffects = snapshot.cardPowerEffects.ToDictionary();
         if (powerEffects != null && powerEffects.Count > 0)
         {
-            Debug.Log($"[KopyalaYapıştırLogs] [Visual Reconstruction] Step 3: Reconstructing active power effects for {powerEffects.Count} cards");
+            
             foreach (var kvp in powerEffects)
             {
                 string cardUniqueID = kvp.Key;
@@ -6360,7 +6360,7 @@ public class GameManager : MonoBehaviour
 
                 if (CardInteraction.cardLookup.TryGetValue(cardUniqueID, out var cardInteraction))
                 {
-                    Debug.LogError($"[KopyalaYapıştırLogs] [Visual Reconstruction] Applying power effect overlay: {powerEffect} on card: {cardUniqueID}");
+                    
                     switch (powerEffect)
                     {
                         case "Kapkaç":
@@ -6374,22 +6374,22 @@ public class GameManager : MonoBehaviour
 
                         default:
                             cardInteraction.activePowerEffect = powerEffect;
-                            Debug.LogWarning($"[KopyalaYapıştırLogs] [Visual Reconstruction] Unknown power effect: {powerEffect} on {cardUniqueID}");
+                            
                             break;
                     }
                 }
                 else
                 {
-                    Debug.LogWarning($"[KopyalaYapıştırLogs] [Visual Reconstruction] Power effect card not found in cardLookup: {cardUniqueID} (effect: {powerEffect})");
+                    
                 }
             }
         }
         else
         {
-            Debug.Log("[KopyalaYapıştırLogs] [Visual Reconstruction] Step 3: No active power effects found in snapshot.cardPowerEffects");
+            
         }
 
-        Debug.LogError("[KopyalaYapıştırLogs] [Visual Reconstruction] Unified power visual reconstruction completed successfully.");
+        
     }
 
     public Dictionary<string, string> GetCardPowerEffectsSnapshot()
@@ -6407,7 +6407,7 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private IEnumerator UpdateUIAndLayout()
     {
-        Debug.Log("[GameManager] Updating UI and layout");
+        
         
         // Update hand layouts
         if (deckController != null)
@@ -6426,7 +6426,7 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void UnfreezeClientAfterResync()
     {
-        Debug.Log("[GameManager] Unfreezing client after resync");
+        
         
         // Re-enable auto-rotation for local player's cards
         if (deckController != null)
@@ -6517,7 +6517,7 @@ public class GameManager : MonoBehaviour
         // This method can be called before saving to ensure client states are captured
         // For now, the states are captured during ApplyGameState, but this could be enhanced
         // to send current states to server before save if needed
-        Debug.Log($"[GameManager] Current client superpower states: kapkac={isKapkacPending}, yandimAnam={isYandimAnamPending}, kopyala={isKopyalaActive}, sunuDegis={isSunuDegisTokusActive}, sunuDegisBunu={isSunuDegisBunuTokusActive}");
+        
     }
 
     private void LogDetailedLocalState(string label)
@@ -6741,12 +6741,12 @@ public class GameManager : MonoBehaviour
     {
         if (myCards == null || myCards.Count == 0)
         {
-            Debug.LogWarning("[GameManager] No cards in hand to test with!");
+            
             return;
         }
 
         string testCardId = myCards[0];
-        Debug.Log($"[GameManager] Testing desync: Playing card {testCardId} locally only");
+        
         
         // Record the move locally (this will create a desync)
         if (MoveChainTracker.ClientInstance != null)
@@ -6782,13 +6782,13 @@ public class GameManager : MonoBehaviour
                 deckController.UpdateCurrentPlayerHandLayout();
             }
             
-            Debug.LogWarning($"[GameManager] DESYNC TEST: Card {testCardId} played locally but NOT sent to server!");
-            Debug.LogWarning("[GameManager] This will create a desync when server and client chains are compared.");
-            Debug.LogWarning("[GameManager] The card should now be visible in the center of the screen.");
+            
+            
+            
         }
         else
         {
-            Debug.LogError("[GameManager] MoveChainTracker not found! Cannot test desync.");
+            
         }
     }
     
@@ -6800,12 +6800,12 @@ public class GameManager : MonoBehaviour
     {
         if (myCards == null || myCards.Count == 0)
         {
-            Debug.LogWarning("[GameManager] No cards in hand to test with!");
+            
             return;
         }
 
         string testCardId = myCards[0];
-        Debug.Log($"[GameManager] Testing desync: Applying Kapkaç effect to {testCardId} locally only");
+        
         
         // Record the superpower effect locally (this will create a desync)
         if (MoveChainTracker.ClientInstance != null)
@@ -6818,12 +6818,12 @@ public class GameManager : MonoBehaviour
             };
             MoveChainTracker.ClientInstance.RecordSuperpowerEffect(deckController.thisPlayerNumber, "Kapkaç", new[] { testCardId }, effectData);
             
-            Debug.LogWarning($"[GameManager] DESYNC TEST: Kapkaç effect applied to {testCardId} locally but NOT synced with server!");
-            Debug.LogWarning("[GameManager] This will create a desync when server and client chains are compared.");
+            
+            
         }
         else
         {
-            Debug.LogError("[GameManager] MoveChainTracker not found! Cannot test desync.");
+            
         }
     }
     
@@ -6835,36 +6835,36 @@ public class GameManager : MonoBehaviour
     {
         if (MoveChainTracker.ClientInstance == null)
         {
-            Debug.LogError("[GameManager] Client MoveChainTracker not found!");
+            
             return;
         }
 
         if (MoveChainTracker.ServerInstance == null)
         {
-            Debug.LogError("[GameManager] Server MoveChainTracker not found!");
+            
             return;
         }
 
         var clientChain = MoveChainTracker.ClientInstance.GetCurrentChain();
         var serverChain = MoveChainTracker.ServerInstance.GetCurrentChain();
         
-        Debug.Log($"[GameManager] === CHAIN VALIDATION TEST ===");
-        Debug.Log($"[GameManager] Client chain: {clientChain.chainVersion} moves");
-        Debug.Log($"[GameManager] Server chain: {serverChain.chainVersion} moves");
+        
+        
+        
         
         var validationResult = clientChain.ValidateAgainst(serverChain, out int mismatchIndex);
         bool isValid = validationResult == MoveChain.ValidationResult.Valid;
         
         if (isValid)
         {
-            Debug.Log("[GameManager] ✅ Chains are in sync!");
+            
         }
         else
         {
-            Debug.LogError($"[GameManager] ❌ DESYNC DETECTED at move index {mismatchIndex}!");
-            Debug.LogError($"[GameManager] Client chain version: {clientChain.chainVersion}");
-            Debug.LogError($"[GameManager] Server chain version: {serverChain.chainVersion}");
-            Debug.LogError($"[GameManager] Validation result: {validationResult}");
+            
+            
+            
+            
         }
     }
     
@@ -6875,7 +6875,7 @@ public class GameManager : MonoBehaviour
     public void ResetMoveChains()
     {
         MoveChainIntegrator.ResetChains();
-        Debug.Log("[GameManager] Manually reset all move chains");
+        
     }
 
     /// <summary>
@@ -6883,8 +6883,8 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void RebuildCardLookupForReconnection()
     {
-        Debug.Log($"[GameManager] Rebuilding cardLookup for reconnection");
-        Debug.Log($"[GameManager] Current cardLookup count: {CardInteraction.cardLookup.Count}");
+        
+        
         
         // Clear the existing cardLookup (it has wrong IDs)
         CardInteraction.cardLookup.Clear();
@@ -6892,18 +6892,18 @@ public class GameManager : MonoBehaviour
         // Get all card interactions from DeckController
         if (deckController != null && deckController.cardInteractionList != null)
         {
-            Debug.Log($"[GameManager] Found {deckController.cardInteractionList.Count} card interactions");
+            
             
             // For each card interaction, we need to map it to the correct server ID
             // The issue is that we don't know which server ID corresponds to which card
             // We need to wait for the game state to be applied to know the correct mapping
             
             // For now, just log that we're ready to rebuild
-            Debug.Log($"[GameManager] Card interactions ready for server ID mapping");
+            
         }
         else
         {
-            Debug.LogError("[GameManager] DeckController or cardInteractionList is null - cannot rebuild cardLookup");
+            
         }
     }
     
@@ -6916,7 +6916,7 @@ public class GameManager : MonoBehaviour
         // Check if MoveChainIntegrator exists and is properly initialized
         if (MoveChainIntegrator.LocalInstance == null)
         {
-            Debug.LogError("[GameManager] MoveChainIntegrator.LocalInstance is null - move chain system not initialized!");
+            
             return;
         }
         
@@ -6924,15 +6924,15 @@ public class GameManager : MonoBehaviour
         var moveChainTracker = GetComponent<MoveChainTracker>();
         if (moveChainTracker == null)
         {
-            Debug.LogWarning("[GameManager] MoveChainTracker not found on GameManager - this should be added by MoveChainIntegrator");
+            
         }
         else
         {
-            Debug.Log("[GameManager] MoveChainTracker found and ready");
+            
         }
         
         // Ensure move tracking is enabled
-        Debug.Log("[GameManager] Move chain system initialization check completed");
+        
     }
 
     /// <summary>
@@ -6940,8 +6940,8 @@ public class GameManager : MonoBehaviour
     /// </summary>
     public void TriggerDesyncCheckAfterReconnection()
     {
-        Debug.LogError("[Visual Sync] ===== TRIGGER DESYNC CHECK AFTER RECONNECTION CALLED =====");
-        Debug.Log("[GameManager] TriggerDesyncCheckAfterReconnection called - starting coroutine");
+        
+        
         
         // Start the coroutine on this GameManager instance
         StartCoroutine(TriggerDesyncCheckAfterReconnectionCoroutine());
@@ -6952,8 +6952,8 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private IEnumerator TriggerDesyncCheckAfterReconnectionCoroutine()
     {
-        Debug.LogError("[Visual Sync] ===== TRIGGER DESYNC CHECK AFTER RECONNECTION COROUTINE STARTED =====");
-        Debug.Log("[GameManager] TriggerDesyncCheckAfterReconnection coroutine - waiting for game state to be fully applied");
+        
+        
         
         // Wait for the game state to be fully applied
         yield return new WaitForSeconds(1.0f);
@@ -6961,23 +6961,23 @@ public class GameManager : MonoBehaviour
         // CRITICAL FIX: Reset isReconnecting flag after reconnection sync is complete
         // This allows normal dealing to work again
         isReconnecting = false;
-        Debug.LogError("[RECONNECTION] isReconnecting flag reset to false - normal dealing can now work");
+        
         
         // Check if MoveChainIntegrator is available
         if (MoveChainIntegrator.LocalInstance != null)
         {
-            Debug.LogError("[Visual Sync] MoveChainIntegrator found - triggering desync check");
-            Debug.Log("[GameManager] Triggering forced desync check for reconnected client");
+            
+            
             MoveChainIntegrator.LocalInstance.ForceImmediateDesyncCheck();
             
             // NEW: After desync check, trigger visual restoration
-            Debug.LogError("[Visual Sync] ===== TRIGGERING VISUAL RESTORATION AFTER DESYNC CHECK =====");
+            
             StartCoroutine(TriggerVisualRestorationAfterDesyncCheck());
         }
         else
         {
-            Debug.LogError("[Visual Sync] ERROR: MoveChainIntegrator.LocalInstance is null - cannot force desync check");
-            Debug.LogWarning("[GameManager] MoveChainIntegrator.LocalInstance is null - cannot force desync check");
+            
+            
         }
     }
     
@@ -6987,12 +6987,12 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private IEnumerator TriggerVisualRestorationAfterDesyncCheck()
     {
-        Debug.LogError("[Visual Sync] ===== TRIGGER VISUAL RESTORATION AFTER DESYNC CHECK STARTED =====");
+        
         
         // Wait for desync check to complete and move chain to be synchronized
         yield return new WaitForSeconds(2.0f);
         
-        Debug.LogError("[Visual Sync] Desync check should be complete - starting visual restoration");
+        
         
         // Now restore visual states from the properly synchronized move chain
         yield return StartCoroutine(RestoreVisualStatesFromMoveChain());
@@ -7000,7 +7000,7 @@ public class GameManager : MonoBehaviour
         // Deactivate MainUI and other lobby screens after reconnection is complete
         OnReconnectionGameStateApplied();
         
-        Debug.LogError("[Visual Sync] ===== VISUAL RESTORATION AFTER DESYNC CHECK COMPLETED =====");
+        
     }
     
     /// <summary>
@@ -7014,12 +7014,12 @@ public class GameManager : MonoBehaviour
         // Check if MoveChainIntegrator is available
         if (MoveChainIntegrator.LocalInstance != null)
         {
-            Debug.Log("[GameManager] Triggering forced desync check for reconnected client");
+            
             MoveChainIntegrator.LocalInstance.ForceImmediateDesyncCheck();
         }
         else
         {
-            Debug.LogWarning("[GameManager] MoveChainIntegrator.LocalInstance is null - cannot force desync check");
+            
         }
     }
     
@@ -7028,59 +7028,59 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void RestorePlayerNumberFromPrefs()
     {
-        Debug.LogError($"[PLAYER NUMBER] ===== RESTORING PLAYER NUMBER FROM PREFS =====");
+        
         
         // If the deck controller already has a valid seat assigned in-memory (e.g., from prior active gameplay),
         // do not overwrite it with shared PlayerPrefs which could be corrupted by multiple local testing instances.
         if (deckController != null && deckController.thisPlayerNumber >= 0)
         {
             int savedNumber = deckController.thisPlayerNumber;
-            Debug.Log($"[PLAYER NUMBER] DeckController already has valid in-memory player number {savedNumber}. Skipping PlayerPrefs restore to prevent multi-client seat corruption.");
+            
             
             // Announce player number to server so it rebinds playerClientIds with the new client ID
             if (networkRelay != null)
             {
                 networkRelay.AnnounceReconnectedPlayerNumberServerRPC(savedNumber);
-                Debug.LogError($"[PLAYER NUMBER] Announced in-memory player number {savedNumber} to server for client-ID rebinding");
+                
             }
-            Debug.LogError($"[PLAYER NUMBER] ===== END RESTORING PLAYER NUMBER =====");
+            
             return;
         }
 
-        Debug.LogError($"[PLAYER NUMBER] PlayerPrefs.HasKey('SavedPlayerSeat'): {PlayerPrefs.HasKey("SavedPlayerSeat")}");
+        
         
         if (PlayerPrefs.HasKey("SavedPlayerSeat"))
         {
             int savedPlayerNumber = PlayerPrefs.GetInt("SavedPlayerSeat");
-            Debug.LogError($"[PLAYER NUMBER] Restoring player number {savedPlayerNumber} from PlayerPrefs (SavedPlayerSeat) during reconnection");
+            
             
             // Set the player number directly on DeckController
             if (deckController != null)
             {
-                Debug.LogError($"[PLAYER NUMBER] DeckController found, calling SetPlayerNumber({savedPlayerNumber})");
+                
                 deckController.SetPlayerNumber(savedPlayerNumber);
-                Debug.LogError($"[PLAYER NUMBER] Successfully restored player number {savedPlayerNumber} to DeckController");
-                Debug.LogError($"[PLAYER NUMBER] DeckController.thisPlayerNumber is now: {deckController.thisPlayerNumber}");
+                
+                
 
                 // Announce player number to server so it rebinds playerClientIds with the new client ID
                 if (networkRelay != null)
                 {
                     networkRelay.AnnounceReconnectedPlayerNumberServerRPC(savedPlayerNumber);
-                    Debug.LogError($"[PLAYER NUMBER] Announced player number {savedPlayerNumber} to server for client-ID rebinding");
+                    
                 }
             }
             else
             {
-                Debug.LogError($"[PLAYER NUMBER] ERROR: DeckController is null, cannot restore player number");
+                
             }
         }
         else
         {
-            Debug.LogError($"[PLAYER NUMBER] WARNING: No saved player number found in PlayerPrefs during reconnection");
-            Debug.LogError($"[PLAYER NUMBER] Available PlayerPrefs keys: {string.Join(", ", GetAllPlayerPrefsKeys())}");
+            
+            
         }
         
-        Debug.LogError($"[PLAYER NUMBER] ===== END RESTORING PLAYER NUMBER =====");
+        
     }
     
     private string[] GetAllPlayerPrefsKeys()
@@ -7102,15 +7102,15 @@ public class GameManager : MonoBehaviour
     /// </summary>
     public void OnRedoRevertToState(SerializableGameState snapshot, string revertType)
     {
-        Debug.Log($"[GameManager] Redo: Reverting to {revertType} - applying snapshot v{snapshot.snapshotVersion}");
-        Debug.Log($"[GameManager] Redo: State contains currentPlayer={snapshot.currentPlayer}, turnCounter={snapshot.turnCounter}");
+        
+        
         
         // CRITICAL FIX: Explicitly apply current player and turn counter after redo
         // This ensures the UI reflects the correct turn immediately
         currentPlayerNo = snapshot.currentPlayer;
         turnCounter = snapshot.turnCounter;
         
-        Debug.Log($"[GameManager] Redo: Applied currentPlayer={currentPlayerNo}, turnCounter={turnCounter}");
+        
         
         // Show a message to the user about the revert
         ShowcaseSuperPower($"Reverted to {revertType}", 0.5f, 3f);
@@ -7119,7 +7119,7 @@ public class GameManager : MonoBehaviour
         // This ensures the server waits for all clients before sending current player update
         StartCoroutine(WaitForSceneReconstructionAndConfirm(snapshot, revertType));
         
-        Debug.Log($"[GameManager] Redo revert to {revertType} initiated");
+        
     }
 
     /// <summary>
@@ -7127,18 +7127,18 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private IEnumerator WaitForSceneReconstructionAndConfirm(SerializableGameState snapshot, string revertType)
     {
-        Debug.Log($"[GameManager] Starting scene reconstruction for {revertType}");
+        
         
         // Use existing game state application system and wait for it to complete
         if (deckController != null)
         {
-            Debug.Log($"[GameManager] Waiting for scene reconstruction coroutines to complete");
+            
             yield return StartCoroutine(ApplyGameStateWithReset(snapshot));
-            Debug.Log($"[GameManager] Scene reconstruction coroutines completed");
+            
         }
         else
         {
-            Debug.LogError("[GameManager] deckController is null - falling back to ApplyGameState");
+            
             ApplyGameState(snapshot);
             // Wait a bit as fallback
             yield return new WaitForSeconds(2.0f);
@@ -7147,7 +7147,7 @@ public class GameManager : MonoBehaviour
         // Additional safety wait to ensure all visual updates are complete
         yield return new WaitForSeconds(1.0f);
         
-        Debug.Log($"[GameManager] Confirming redo scene reconstruction is complete for {revertType}");
+        
         
         if (networkRelay != null)
         {
@@ -7155,10 +7155,10 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            Debug.LogError("[GameManager] GameNetworkRelay is null - cannot confirm redo completion");
+            
         }
         
-        Debug.Log($"[GameManager] Redo scene reconstruction confirmation sent for {revertType}");
+        
     }
 
     /// <summary>
@@ -7166,7 +7166,7 @@ public class GameManager : MonoBehaviour
     /// </summary>
     public void OnRedoStateStatusReceived(string status)
     {
-        Debug.Log($"[GameManager] Redo state status: {status}");
+        
         // You could display this in UI if needed
     }
 
@@ -7178,12 +7178,12 @@ public class GameManager : MonoBehaviour
     {
         if (networkRelay != null)
         {
-            Debug.Log("[GameManager] Requesting redo to previous state");
+            
             networkRelay.RequestRedoToPreviousStateServerRPC();
         }
         else
         {
-            Debug.LogError("[GameManager] GameNetworkRelay is null - cannot request redo");
+            
         }
     }
 
@@ -7195,12 +7195,12 @@ public class GameManager : MonoBehaviour
     {
         if (networkRelay != null)
         {
-            Debug.Log("[GameManager] Requesting redo to pre-previous state");
+            
             networkRelay.RequestRedoToPrePreviousStateServerRPC();
         }
         else
         {
-            Debug.LogError("[GameManager] GameNetworkRelay is null - cannot request redo");
+            
         }
     }
 
@@ -7212,12 +7212,12 @@ public class GameManager : MonoBehaviour
     {
         if (networkRelay != null)
         {
-            Debug.Log("[GameManager] Requesting redo state status");
+            
             networkRelay.RequestRedoStateStatusServerRPC();
         }
         else
         {
-            Debug.LogError("[GameManager] GameNetworkRelay is null - cannot request redo status");
+            
         }
     }
 

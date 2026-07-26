@@ -72,7 +72,7 @@ private async Task<bool> AttemptReconnectionToGame(string joinCode)
         bool success = NetworkManager.Singleton.StartClient();
         if (success)
         {
-            Debug.Log("Successfully reconnected directly via relay join code");
+            
             return true;
         }
     }

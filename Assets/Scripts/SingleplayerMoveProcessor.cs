@@ -11,6 +11,7 @@ public class SingleplayerMoveProcessor : IMoveProcessor
 
     public bool IsActive => controller != null;
     public string ModeName => "Singleplayer";
+    public bool RunsPostMoveBackgroundCheck => false;
 
     public SingleplayerMoveProcessor(SinglePlayerModeController controller)
     {
@@ -19,9 +20,16 @@ public class SingleplayerMoveProcessor : IMoveProcessor
 
     public void ProcessCardPlay(string cardId, Dictionary<string, int[]> centerCards, int sumValue, int cardValue, int playerNumber)
     {
-        Debug.Log($"[SingleplayerMoveProcessor] ProcessCardPlay: card={cardId}, cardValue={cardValue}, sumValue={sumValue}");
+        
         GameManager.AddToDebugLog($"[SingleplayerMoveProcessor] ProcessCardPlay: card={cardId}, cardValue={cardValue}, sumValue={sumValue}");
 
         controller.ValidateAndProcessPlayerMove(cardId, centerCards, sumValue, cardValue);
+    }
+
+    public void ProcessAddToCenter(string cardId, int[] cardKindValue)
+    {
+        
+        GameManager.AddToDebugLog($"[SingleplayerMoveProcessor] ProcessAddToCenter: card={cardId}");
+        controller.ProcessPlayerAddToCenter(cardId, cardKindValue);
     }
 }

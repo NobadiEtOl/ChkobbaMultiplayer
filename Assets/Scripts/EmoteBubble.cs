@@ -23,7 +23,7 @@ public class EmoteBubble : MonoBehaviour
         {
             emoteText.text = text;
         }
-        Debug.Log($"[EmoteBubble] Starting animation for '{text}'.");
+        
         StartCoroutine(EmoteSequence());
     }
 
@@ -79,7 +79,7 @@ public class EmoteBubble : MonoBehaviour
             canvasGroup.alpha = 0;
         }
 
-        Debug.Log("[EmoteBubble] Animation complete. Destroying object.");
+        
         Destroy(gameObject);
     }
 }

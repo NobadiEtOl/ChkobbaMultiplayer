@@ -12,9 +12,18 @@ using TMPro;
 /// 
 /// PLAYABLE MODE: Includes runtime UI creation and debug capture methods for testing.
 /// </summary>
-public class SinglePlayerModeController : MonoBehaviour
+public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
 {
+    
     public static SinglePlayerModeController Instance { get; private set; }
+
+    // ===== IGameModeInitState =====
+    public bool IsInitialized => deckCardsDict != null && currentRunConfig != null;
+    public string GetInitializationStatus() =>
+        $"[Singleplayer Init] Deck:{deckCardsDict?.Count ?? 0} cards, " +
+        $"OpponentHand:{opponentHandList?.Count ?? 0}, " +
+        $"Center:{localCenterCards?.Count ?? 0}, " +
+        $"Stage:{currentStage}, Running:{isGameRunning}";
 
     [Serializable]
     public class SinglePlayerRunConfig
@@ -81,7 +90,7 @@ public class SinglePlayerModeController : MonoBehaviour
 
     // Turn management (offline, authoritative within SinglePlayer)
     public static bool IsPlayerTurn { get; private set; } = false;
-    public static bool IsGameRunning { get; private set; } = false;
+    public static bool IsGameRunning => Instance != null && Instance.isGameRunning;
     private bool playerMoveSignal = false; // Set true when player completes a move; unblocks WaitForPlayerInput
     private string pendingPlayerCardId;
     private SerializableCard pendingPlayerCapturedCards;
@@ -124,7 +133,7 @@ public class SinglePlayerModeController : MonoBehaviour
         }
         else
         {
-            Debug.LogError("roundEndScreenParent is not assigned!");
+            
         }
     }
 
@@ -192,7 +201,7 @@ public class SinglePlayerModeController : MonoBehaviour
     /// </summary>
     public void StartNewRun(int seed, string deckClassName)
     {
-        Debug.Log($"\n=== [SinglePlayerModeController] STARTING NEW RUN ===\nSeed: {seed} | DeckClass: {deckClassName}\n");
+        
 
         currentRunConfig = new SinglePlayerRunConfig
         {
@@ -229,13 +238,13 @@ public class SinglePlayerModeController : MonoBehaviour
     /// </summary>
     public void ResumeSavedRun()
     {
-        Debug.Log($"\n=== [SinglePlayerModeController] RESUMING SAVED RUN ===\n");
+        
 
         // Load saved run progress from PlayerPrefs
         var savedData = RunManager.LoadRunProgress();
         if (savedData == null)
         {
-            Debug.LogError("[SinglePlayerModeController] ResumeSavedRun: No saved run data found!");
+            
             return;
         }
 
@@ -275,11 +284,11 @@ public class SinglePlayerModeController : MonoBehaviour
         if (SuperPowerSpawner.LocalInstance != null)
         {
             SuperPowerSpawner.LocalInstance.SetGold(savedData.currentGold);
-            Debug.Log($"[SinglePlayerModeController] Restored gold: {savedData.currentGold}");
+            
         }
         else
         {
-            Debug.LogWarning("[SinglePlayerModeController] SuperPowerSpawner.LocalInstance not found - cannot restore gold");
+            
         }
 
         // Ensure side visibility is synchronized in singleplayer: side 0 on, side 1 off.
@@ -293,12 +302,12 @@ public class SinglePlayerModeController : MonoBehaviour
         if (savedData.activeJokerId >= 0)
         {
             JokerController.SetActiveJoker(savedData.activeJokerId);
-            Debug.Log($"[SinglePlayerModeController] Restored active joker: ID {savedData.activeJokerId}");
+            
         }
 
         // Start at the saved stage and opponent
         // We'll skip joker selection since it's already been chosen and saved
-        Debug.Log($"[SinglePlayerModeController] Resuming at Stage {currentStage}, Opponent {currentOpponentDifficulty + 1}/3");
+        
         StartCoroutine(StartRoundLoop(currentOpponentDifficulty));
     }
 
@@ -308,14 +317,14 @@ public class SinglePlayerModeController : MonoBehaviour
     /// </summary>
     private void DisableGameScreensForSinglePlayer()
     {
-        Debug.Log("[SinglePlayerModeController] Disabling UI screens for game start");
+        
 
         // 1. Disable waiting screen
         GameObject waitingScreen = GameObject.Find("WaitingScreen");
         if (waitingScreen != null && waitingScreen.activeSelf)
         {
             waitingScreen.SetActive(false);
-            Debug.Log("[SinglePlayerModeController] Deactivated WaitingScreen");
+            
         }
 
         // 2. Disable main/lobby screen
@@ -323,7 +332,7 @@ public class SinglePlayerModeController : MonoBehaviour
         if (mainScreen != null && mainScreen.activeSelf)
         {
             mainScreen.SetActive(false);
-            Debug.Log("[SinglePlayerModeController] Deactivated MainScreen");
+            
         }
 
         // 3. Disable win screen
@@ -331,7 +340,7 @@ public class SinglePlayerModeController : MonoBehaviour
         if (winScreen != null && winScreen.activeSelf)
         {
             winScreen.SetActive(false);
-            Debug.Log("[SinglePlayerModeController] Deactivated WinScreen");
+            
         }
 
         // 4. Disable MainUI
@@ -339,7 +348,7 @@ public class SinglePlayerModeController : MonoBehaviour
         if (mainUI != null && mainUI.activeSelf)
         {
             mainUI.SetActive(false);
-            Debug.Log("[SinglePlayerModeController] Deactivated MainUI");
+            
         }
     }
 
@@ -348,7 +357,7 @@ public class SinglePlayerModeController : MonoBehaviour
     /// </summary>
     private void InitializeScene()
     {
-        Debug.Log("[SinglePlayerModeController] Initializing scene for single player mode");
+        
 
         // Seed the random number generator for reproducibility
         UnityEngine.Random.InitState(currentRunConfig.seed);
@@ -361,7 +370,7 @@ public class SinglePlayerModeController : MonoBehaviour
     /// </summary>
     private void BuildFreshDeck()
     {
-        Debug.Log("[SinglePlayerModeController] === BUILDING FRESH DECK ===");
+        
         
         deckCardsDict = new Dictionary<string, int[]>();
         int cardIndex = 0;
@@ -398,7 +407,7 @@ public class SinglePlayerModeController : MonoBehaviour
             cardIndex++;
         }
 
-        Debug.Log($"[SinglePlayerModeController] Fresh deck built with {deckCardsDict.Count} cards");
+        
     }
 
     /// <summary>
@@ -407,7 +416,7 @@ public class SinglePlayerModeController : MonoBehaviour
     /// </summary>
     private void ShuffleDeck()
     {
-        Debug.Log($"[SinglePlayerModeController] === SHUFFLING DECK with seed {currentRunConfig.seed} ===");
+        
 
         System.Random rng = new System.Random(currentRunConfig.seed);
         var deckList = new List<KeyValuePair<string, int[]>>(deckCardsDict);
@@ -429,7 +438,7 @@ public class SinglePlayerModeController : MonoBehaviour
             deckCardsDict[kvp.Key] = kvp.Value;
         }
 
-        Debug.Log($"[SinglePlayerModeController] Deck shuffled. First 4 cards (center): {string.Join(", ", deckList.Take(4).Select(kvp => kvp.Key))}");
+        
     }
 
     /// <summary>
@@ -439,7 +448,7 @@ public class SinglePlayerModeController : MonoBehaviour
     /// </summary>
     private (List<string>, Dictionary<int, List<string>>) DealFromDeck(bool dealToCenter = true)
     {
-        Debug.Log($"[SinglePlayerModeController] === DEALING FROM DECK (Center: {dealToCenter}) ===");
+        
         
         // Deal center (first 4 cards) if requested
         List<string> centerCardIDs = new List<string>();
@@ -485,10 +494,10 @@ public class SinglePlayerModeController : MonoBehaviour
             }
         }
 
-        Debug.Log($"[SinglePlayerModeController] Dealt to center: {string.Join(", ", centerCardIDs)}");
-        Debug.Log($"[SinglePlayerModeController] Dealt to player 0: {string.Join(", ", playerHands[0])}");
-        Debug.Log($"[SinglePlayerModeController] Dealt to player 1: {string.Join(", ", playerHands[1])}");
-        Debug.Log($"[SinglePlayerModeController] Remaining deck: {deckCardsDict.Count} cards");
+        
+        
+        
+        
 
         return (centerCardIDs, playerHands);
     }
@@ -503,7 +512,7 @@ public class SinglePlayerModeController : MonoBehaviour
     /// </summary>
     private void RegisterSinglePlayerParticipants()
     {
-        Debug.Log("[SinglePlayerModeController] === REGISTERING SINGLEPLAYER PARTICIPANTS ===");
+        
 
         const int PLAYER_NUMBER = 0; // Human player is always player 0 (bottom/local)
         const int PLAYER_COUNT = 2;  // Singleplayer is a 2-player game (human + opponent AI)
@@ -512,11 +521,11 @@ public class SinglePlayerModeController : MonoBehaviour
         if (deckController != null)
         {
             deckController.SetPlayerNumber(PLAYER_NUMBER);
-            Debug.Log($"[SinglePlayerModeController] Registered with DeckController - playerNumber: {PLAYER_NUMBER}");
+            
         }
         else
         {
-            Debug.LogError("[SinglePlayerModeController] DeckController not found! Cannot register player.");
+            
         }
 
         // 2. Register player count with DeckController and dependent systems
@@ -524,44 +533,44 @@ public class SinglePlayerModeController : MonoBehaviour
         if (deckController != null)
         {
             deckController.GetPlayerCount(PLAYER_COUNT, isReconnection: false);
-            Debug.Log($"[SinglePlayerModeController] Registered with DeckController - playerCount: {PLAYER_COUNT}");
+            
         }
 
         // 3. Register player number with SuperPowerSpawner
         if (SuperPowerSpawner.LocalInstance != null)
         {
             SuperPowerSpawner.LocalInstance.SetPlayerNumber(PLAYER_NUMBER);
-            Debug.Log($"[SinglePlayerModeController] Registered with SuperPowerSpawner - playerNumber: {PLAYER_NUMBER}");
+            
         }
         else
         {
-            Debug.LogWarning("[SinglePlayerModeController] SuperPowerSpawner.LocalInstance not found");
+            
         }
 
         // 4. Register hand mode with ElHolderScript (for token positions)
         if (ElHolderScript.LocalInstance != null)
         {
             ElHolderScript.LocalInstance.SetHandMode(PLAYER_COUNT);
-            Debug.Log($"[SinglePlayerModeController] Registered with ElHolderScript - playerCount: {PLAYER_COUNT}");
+            
         }
         else
         {
-            Debug.LogWarning("[SinglePlayerModeController] ElHolderScript.LocalInstance not found");
+            
         }
 
         // 5. Opponent health display will be initialized when round starts with pre-calculated opponent max health
         if (opponentHealthDisplay == null)
         {
-            Debug.LogWarning("[SinglePlayerModeController] OpponentHealthDisplay not found - will be initialized at round start");
+            
         }
         else
         {
             // Keep the component disabled until a round actually starts
             opponentHealthDisplay.SetActive(false);
-            Debug.Log("[SinglePlayerModeController] OpponentHealthDisplay ready (will be activated at round start)");
+            
         }
 
-        Debug.Log("[SinglePlayerModeController] === PLAYER REGISTRATION COMPLETE ===\n");
+        
     }
 
     /// <summary>
@@ -580,7 +589,7 @@ public class SinglePlayerModeController : MonoBehaviour
         };
 
         int calculatedHealth = Mathf.RoundToInt(OPPONENT_BASE_HEALTH * currentStageDifficultyMultiplier * difficultyFactor);
-        Debug.Log($"[SinglePlayerModeController] Calculated opponent health - Stage {currentStage}, Difficulty {difficulty} ({GetDifficultyName(difficulty)}): {OPPONENT_BASE_HEALTH} × {currentStageDifficultyMultiplier:F2} × {difficultyFactor:F2} = {calculatedHealth}");
+        
         return calculatedHealth;
     }
 
@@ -591,7 +600,7 @@ public class SinglePlayerModeController : MonoBehaviour
     /// </summary>
     private void CalculateStageOpponentsInfo()
     {
-        Debug.Log($"[SinglePlayerModeController] === CALCULATING OPPONENT INFO FOR STAGE {currentStage} ===");
+        
 
         stageOpponentsInfo = new List<OpponentInfo>();
         for (int difficulty = 0; difficulty < 3; difficulty++)
@@ -602,10 +611,10 @@ public class SinglePlayerModeController : MonoBehaviour
                 difficulty = difficulty,
                 maxHealth = maxHealth
             });
-            Debug.Log($"[SinglePlayerModeController] Stage {currentStage} Opponent {difficulty + 1}/3 ({GetDifficultyName(difficulty)}): MaxHealth = {maxHealth}");
+            
         }
 
-        Debug.Log($"[SinglePlayerModeController] === OPPONENT INFO CALCULATION COMPLETE ===");
+        
     }
 
     // ===== LOOP RESET FUNCTIONS =====
@@ -617,7 +626,7 @@ public class SinglePlayerModeController : MonoBehaviour
     /// </summary>
     private void ResetForSingleplayerRun()
     {
-        Debug.Log("[SinglePlayerModeController] === RESET FOR SINGLEPLAYER RUN ===");
+        
 
         // Full card teardown via GameManager (destroys GameObjects, clears power dicts, all flags)
         if (GameManager.LocalInstance != null)
@@ -659,7 +668,7 @@ public class SinglePlayerModeController : MonoBehaviour
             SuperPowerSpawner.LocalInstance.ResetGoldToStarting();
         }
 
-        Debug.Log("[SinglePlayerModeController] Run reset complete");
+        
     }
 
     /// <summary>
@@ -670,7 +679,7 @@ public class SinglePlayerModeController : MonoBehaviour
     /// </summary>
     private void ResetForStage(int stageIndex)
     {
-        Debug.Log($"[SinglePlayerModeController] === RESET FOR STAGE {stageIndex} ===");
+        
 
         // Calculate and cache difficulty multiplier (1.3^stageIndex)
         currentStageDifficultyMultiplier = Mathf.Pow(1.3f, stageIndex);
@@ -682,7 +691,7 @@ public class SinglePlayerModeController : MonoBehaviour
         // Reset deck flag so a fresh deck is built for this stage's first round
         isDeckInitializedForRound = false;
 
-        Debug.Log($"[SinglePlayerModeController] Stage {stageIndex} reset: difficulty multiplier = {currentStageDifficultyMultiplier:F2}");
+        
 
         UpdateStageDisplay();
     }
@@ -695,7 +704,7 @@ public class SinglePlayerModeController : MonoBehaviour
     /// </summary>
     private void ResetForRound(int opponentDifficulty)
     {
-        Debug.Log($"[SinglePlayerModeController] === RESET FOR ROUND (Opponent {opponentDifficulty + 1}/3, Stage {currentStage}) ===");
+        
 
         // Increment round counter within this stage
         currentRoundInStage++;
@@ -705,13 +714,13 @@ public class SinglePlayerModeController : MonoBehaviour
         if (stageOpponentsInfo != null && opponentDifficulty < stageOpponentsInfo.Count)
         {
             opponentMaxHealth = stageOpponentsInfo[opponentDifficulty].maxHealth;
-            Debug.Log($"[SinglePlayerModeController] Using pre-calculated opponent max health: {opponentMaxHealth}");
+            
         }
         else
         {
             // Fallback if info not pre-calculated (shouldn't happen if flow is correct)
             opponentMaxHealth = CalculateOpponentMaxHealth(opponentDifficulty);
-            Debug.LogWarning($"[SinglePlayerModeController] Fallback: calculated opponent max health: {opponentMaxHealth}");
+            
         }
 
         // Reset opponent health to 0 (no damage dealt yet at round start)
@@ -727,7 +736,7 @@ public class SinglePlayerModeController : MonoBehaviour
         {
             opponentHealthDisplay.SetActive(true);
             opponentHealthDisplay.InitializeHealthDisplay(opponentMaxHealth);
-            Debug.Log($"[SinglePlayerModeController] Initialized OpponentHealthDisplay: maxHealth={opponentMaxHealth}, currentHealth=0 (will show as full bar)");
+            
         }
 
         // Reset turn state — player always starts each round
@@ -759,7 +768,7 @@ public class SinglePlayerModeController : MonoBehaviour
         CardInteraction.currentlySelectedCard = null;
         CardInteraction.isOneCardSelected = false;
 
-        Debug.Log($"[SinglePlayerModeController] Round reset complete: opponent {opponentDifficulty + 1}/3, multiplier {currentStageDifficultyMultiplier:F2}");
+        
 
         UpdateOpponentHealthDisplay();
         UpdateStageDisplay();
@@ -773,7 +782,7 @@ public class SinglePlayerModeController : MonoBehaviour
     /// </summary>
     private void StartStage(int stageNumber)
     {
-        Debug.Log($"\n>>> STARTING STAGE {stageNumber} <<<");
+        
 
         currentStage = stageNumber;
         ResetForStage(stageNumber);
@@ -787,11 +796,11 @@ public class SinglePlayerModeController : MonoBehaviour
     /// </summary>
     private void ShowJokerSelectionPanel()
     {
-        Debug.Log("[SinglePlayerModeController] === JOKER SELECTION PHASE ===");
+        
 
         if (jokerDisplayParent == null)
         {
-            Debug.LogError("[SinglePlayerModeController] jokerDisplayParent not assigned! Cannot display jokers.");
+            
             return;
         }
 
@@ -824,10 +833,10 @@ public class SinglePlayerModeController : MonoBehaviour
             button.targetGraphic = image;
             button.onClick.AddListener(() => OnJokerButtonClicked(joker.jokerID));
             
-            Debug.Log($"  Joker {i}: {joker.jokerName} (ID: {joker.jokerID})");
+            
         }
 
-        Debug.Log("Select a joker, or use: SinglePlayerModeController.Instance.DebugSelectJoker(jokerID)");
+        
     }
 
     /// <summary>
@@ -844,7 +853,7 @@ public class SinglePlayerModeController : MonoBehaviour
     /// </summary>
     private void OnJokerSelected(int jokerID)
     {
-        Debug.Log($"\n*** JOKER SELECTED: ID={jokerID} ***\n");
+        
 
         if (currentRoundData == null)
         {
@@ -876,8 +885,8 @@ public class SinglePlayerModeController : MonoBehaviour
     /// </summary>
     private IEnumerator StartRoundLoop(int startingDifficulty)
     {
-        Debug.Log($"[SinglePlayerModeController] === STAGE {currentStage} LOOP START ===");
-        Debug.Log($"[SinglePlayerModeController] Opponents: Easy → Normal → Hard");
+        
+        
 
         // PRE-CALCULATE opponent info for all 3 opponents before any round starts
         // This allows the UI to display opponent stats at stage start
@@ -887,14 +896,14 @@ public class SinglePlayerModeController : MonoBehaviour
         {
             currentOpponentDifficulty = difficulty;
             
-            Debug.Log($"[SinglePlayerModeController] >> Starting opponent {difficulty + 1}/3 ({GetDifficultyName(difficulty)}) in Stage {currentStage}");
+            
             
             // ROUND LOOP: Run a single opponent battle
             yield return StartCoroutine(StartRound(difficulty));
 
             if (opponentHealth >= opponentMaxHealth)
             {
-                Debug.Log($"[SinglePlayerModeController] << Opponent {difficulty + 1} defeated. Waiting for round-end continue...");
+                
                 yield return new WaitUntil(() => awaitingRoundContinue);
                 awaitingRoundContinue = false;
                 continue;
@@ -902,12 +911,12 @@ public class SinglePlayerModeController : MonoBehaviour
 
             if (!isGameRunning && !roundIsWaiting)
             {
-                Debug.Log($"[SinglePlayerModeController] << Round ended without victory. Stopping stage loop.");
+                
                 yield break;
             }
         }
 
-        Debug.Log($"[SinglePlayerModeController] === STAGE {currentStage} LOOP COMPLETE - ALL OPPONENTS DEFEATED ===");
+        
         OnStageCleared();
     }
 
@@ -918,8 +927,8 @@ public class SinglePlayerModeController : MonoBehaviour
     /// </summary>
     private IEnumerator StartRound(int opponentDifficulty)
     {
-        Debug.Log($"[SinglePlayerModeController] ┌─ ROUND START: Opponent #{opponentDifficulty + 1}/3 ({GetDifficultyName(opponentDifficulty)})");
-        Debug.Log($"[SinglePlayerModeController] │  Difficulty Multiplier: {currentStageDifficultyMultiplier:F2}x");
+        
+        
 
         ResetForRound(opponentDifficulty);
 
@@ -934,7 +943,7 @@ public class SinglePlayerModeController : MonoBehaviour
         {
             if (!isDeckInitializedForRound)
             {
-                Debug.Log($"[SinglePlayerModeController] │  Building fresh deck for stage {currentStage}");
+                
                 BuildFreshDeck();
                 ShuffleDeck();
                 isDeckInitializedForRound = true;
@@ -944,7 +953,7 @@ public class SinglePlayerModeController : MonoBehaviour
             Dictionary<string, int[]> dealtCardValueLookup = new Dictionary<string, int[]>(deckCardsDict);
 
             yield return StartCoroutine(deckController.DeckStart());
-            Debug.Log("[SinglePlayerModeController] │  Deck ready");
+            
 
             var (centerCardIDs, playerHands) = DealFromDeck(true);
             handsDealtCount = 1;
@@ -962,22 +971,22 @@ public class SinglePlayerModeController : MonoBehaviour
             cardsRemainingInDeck = deckCardsDict.Count;
 
             yield return StartCoroutine(deckController.DealCenter(centerCardIDs));
-            Debug.Log("[SinglePlayerModeController] │  Center cards dealt");
+            
 
             deckController.DealPlayers(2, playerHands);
-            Debug.Log("[SinglePlayerModeController] │  Player hands dealt");
+            
         }
 
         isGameRunning = true;
-        Debug.Log($"[SinglePlayerModeController] │  Game Start: Opponent {opponentMaxHealth} HP | Deck: {cardsRemainingInDeck} remaining");
-        Debug.Log($"[SinglePlayerModeController] └─ Starting turn sequence...");
+        
+        
 
         // Drive sequential Player → Opponent → Player turns until round ends
         // Round ends when CheckRoundEndConditions() detects opponent defeated or player defeated
         yield return StartCoroutine(GameTurnLoop());
 
-        Debug.Log($"[SinglePlayerModeController] └─ ROUND END: Opponent Health = {opponentHealth}/{opponentMaxHealth}");
-        Debug.Log($"[SinglePlayerModeController] └─ Returning to stage loop for next opponent...");
+        
+        
     }
 
     /// <summary>
@@ -992,7 +1001,7 @@ public class SinglePlayerModeController : MonoBehaviour
             IsPlayerTurn = true;
             if (GameManager.LocalInstance != null)
                 GameManager.LocalInstance.UpdateCurrentPlayer(0, playerTurnIndex);
-            Debug.Log($"[SinglePlayerModeController] Player turn {playerTurnIndex}");
+            
 
             yield return StartCoroutine(WaitForPlayerInput());
 
@@ -1002,7 +1011,7 @@ public class SinglePlayerModeController : MonoBehaviour
             IsPlayerTurn = false;
             if (GameManager.LocalInstance != null)
                 GameManager.LocalInstance.UpdateCurrentPlayer(1, playerTurnIndex);
-            Debug.Log($"[SinglePlayerModeController] Opponent turn {playerTurnIndex}");
+            
 
             yield return StartCoroutine(ExecuteOpponentTurn());
 
@@ -1018,7 +1027,7 @@ public class SinglePlayerModeController : MonoBehaviour
             {
                 if (handsDealtCount < 6)
                 {
-                    Debug.Log($"[SinglePlayerModeController] Both hands empty - dealing hand {handsDealtCount + 1}");
+                    
                     var (_, newHands) = DealFromDeck(false);
                     handsDealtCount++;
                     cardsRemainingInDeck = deckCardsDict.Count;
@@ -1035,7 +1044,7 @@ public class SinglePlayerModeController : MonoBehaviour
                 else
                 {
                     // 6+1'th deal check: all 6 hands dealt and played, opponent still alive
-                    Debug.Log("[SinglePlayerModeController] All 6 hands played - player did not defeat opponent in time");
+                    
                     OnPlayerLost();
                     break;
                 }
@@ -1061,7 +1070,7 @@ public class SinglePlayerModeController : MonoBehaviour
     {
         if (opponentHandList.Count == 0)
         {
-            Debug.LogWarning("[SinglePlayerModeController] Opponent has no cards - skipping turn");
+            
             yield break;
         }
 
@@ -1071,7 +1080,7 @@ public class SinglePlayerModeController : MonoBehaviour
         int cardIndex = OpponentBehaviorManager.SelectCardToPlay(opponentHandList, currentOpponentBehaviorConfig, playerTurnIndex);
         if (cardIndex < 0 || cardIndex >= opponentHandList.Count)
         {
-            Debug.LogWarning("[SinglePlayerModeController] OpponentBehaviorManager returned invalid index");
+            
             yield break;
         }
 
@@ -1086,7 +1095,7 @@ public class SinglePlayerModeController : MonoBehaviour
         int playedValue = playedCardKindValue != null ? playedCardKindValue[1] : 0;
         bool isJack = playedValue == 11;
 
-        Debug.Log($"[SinglePlayerModeController] Opponent plays card {playedCardId} (value {playedValue})");
+        
 
         // Check if opponent captures any center cards
         bool capturedSomething = false;
@@ -1099,7 +1108,7 @@ public class SinglePlayerModeController : MonoBehaviour
         if (localCenterCards.Count > 0 && (isJack || (topCard != null && topCard[1] == playedValue)))
         {
             capturedSomething = true;
-            Debug.Log($"[SinglePlayerModeController] Opponent captures center cards");
+            
             
             // Copy captured cards before clearing
             foreach (var kvp in localCenterCards)
@@ -1114,7 +1123,7 @@ public class SinglePlayerModeController : MonoBehaviour
             // No capture — opponent adds card to center
             if (playedCardKindValue != null)
                 localCenterCards[playedCardId] = playedCardKindValue;
-            Debug.Log($"[SinglePlayerModeController] Opponent adds card to center (no capture)");
+            
         }
 
         // Animate opponent move and update GameManager state via DeckController
@@ -1123,12 +1132,12 @@ public class SinglePlayerModeController : MonoBehaviour
             if (capturedSomething)
             {
                 SerializableCard capturedCards = new SerializableCard(capturedCenterDict);
-                Debug.Log($"[SinglePlayerModeController] Animating opponent capture with {capturedCenterDict.Count} cards");
+                
                 yield return StartCoroutine(deckController.DiscardCapturedCards(playedCardId, capturedCards, 1));
             }
             else
             {
-                Debug.Log("[SinglePlayerModeController] Animating opponent add-to-center");
+                
                 yield return StartCoroutine(deckController.PlayHandCardToCenter(playedCardId, playedCardKindValue, isDiscarded: false));
             }
         }
@@ -1144,11 +1153,11 @@ public class SinglePlayerModeController : MonoBehaviour
     {
         if (!isGameRunning)
         {
-            Debug.LogError("[DEBUG] Game not running! Start a run first.");
+            
             return;
         }
 
-        Debug.Log($"\n[DEBUG CAPTURE] Captured: {string.Join(", ", capturedCardValues)} | Pişti: {isPişti} | JackPişti: {isJackPişti}");
+        
 
         lastCaptureTelemetry = new DamageSystem.CaptureTelemetry
         {
@@ -1166,7 +1175,7 @@ public class SinglePlayerModeController : MonoBehaviour
         currentRoundData.totalDamageDealt += damageDealt;
         opponentHealth += damageDealt;
 
-        Debug.Log($"[DEBUG] Damage dealt: {damageDealt} | Total this round: {currentRoundData.totalDamageDealt} | Opponent HP: {opponentHealth}/{opponentMaxHealth}\n");
+        
 
         UpdateOpponentHealthDisplay();
 
@@ -1179,9 +1188,9 @@ public class SinglePlayerModeController : MonoBehaviour
     /// </summary>
     public void DebugSimulateOpponentTurn()
     {
-        Debug.Log("\n[DEBUG] Simulating opponent turn...");
+        
         playerTurnIndex++;
-        Debug.Log($"[DEBUG] Opponent turn {playerTurnIndex} executed. Waiting for next player capture.\n");
+        
     }
 
     /// <summary>
@@ -1189,7 +1198,7 @@ public class SinglePlayerModeController : MonoBehaviour
     /// </summary>
     public void DebugSelectJoker(int jokerID)
     {
-        Debug.Log($"[DEBUG] Selecting joker ID {jokerID}");
+        
         OnJokerSelected(jokerID);
     }
 
@@ -1198,7 +1207,7 @@ public class SinglePlayerModeController : MonoBehaviour
     /// </summary>
     public void DebugDefeatCurrentOpponent()
     {
-        Debug.Log($"[DEBUG] Forcing opponent defeat!");
+        
         opponentHealth = opponentMaxHealth;
         CheckRoundEndConditions();
     }
@@ -1219,7 +1228,7 @@ public class SinglePlayerModeController : MonoBehaviour
     {
         if (!isGameRunning || !IsPlayerTurn)
         {
-            Debug.LogWarning("[SingleplayerCardPlay] ValidateAndProcessPlayerMove: Not player turn or game not running");
+            
             return;
         }
 
@@ -1233,7 +1242,7 @@ public class SinglePlayerModeController : MonoBehaviour
 
             if (playedKind != -1 && playedKind == topCardKind)
             {
-                Debug.Log($"[SinglePlayerModeController] Kind match! Played suit {playedKind} matches top center card. Spawning superpower token.");
+                
                 
                 Vector3 spawnPos = Vector3.zero;
                 if (GameManager.LocalInstance != null && GameManager.LocalInstance.centerCardsObjects != null && GameManager.LocalInstance.centerCardsObjects.Count > 0)
@@ -1254,7 +1263,7 @@ public class SinglePlayerModeController : MonoBehaviour
         // ---------------------------------------
 
         GameManager.AddToDebugLog($"[SingleplayerCardPlay] ValidateAndProcessPlayerMove entered: cardId={cardId}, cardValue={cardValue}, sumValue={sumValue}");
-        Debug.Log($"[SinglePlayerModeController] ValidateAndProcessPlayerMove: cardId={cardId}, cardValue={cardValue}, sumValue={sumValue}, oynayamazsinActive={GameManager.LocalInstance.oynayamazsinActive}");
+        
 
         // SERVER VALIDATION: Determine if this is a legal capture or add-to-center
         bool isValidCapture = false;
@@ -1263,21 +1272,21 @@ public class SinglePlayerModeController : MonoBehaviour
         {
             // Power active: cannot capture, must add to center
             GameManager.AddToDebugLog("[SingleplayerCardPlay] Validation: oynayamazsinActive=true → forcing ADD-TO-CENTER");
-            Debug.Log("[SinglePlayerModeController] oynayamazsinActive is true → enforcing add-to-center");
+            
             isValidCapture = false;
         }
         else if (cardValue == sumValue || (cardValue == 11 && sumValue != 0))
         {
             // Capture rules: card matches sum, or jack (11) with non-empty center
             GameManager.AddToDebugLog($"[SingleplayerCardPlay] Validation: cardValue={cardValue} matches sumValue={sumValue} → CAPTURE VALID");
-            Debug.Log($"[SinglePlayerModeController] Capture validation: cardValue ({cardValue}) matches sumValue ({sumValue}) or Jack rule → VALID CAPTURE");
+            
             isValidCapture = true;
         }
         else
         {
             // No match → add to center
             GameManager.AddToDebugLog($"[SingleplayerCardPlay] Validation: cardValue={cardValue} != sumValue={sumValue} → ADD-TO-CENTER");
-            Debug.Log($"[SinglePlayerModeController] Capture validation: cardValue ({cardValue}) does not match sumValue ({sumValue}) → ADD-TO-CENTER");
+            
             isValidCapture = false;
         }
 
@@ -1287,7 +1296,7 @@ public class SinglePlayerModeController : MonoBehaviour
             // Player captured center cards
             SerializableCard capturedCards = new SerializableCard(selectedCenterCards);
             GameManager.AddToDebugLog($"[SingleplayerCardPlay] DECISION: Routing to ProcessPlayerMove (CAPTURE) with {selectedCenterCards.Count} center cards");
-            Debug.Log($"[SinglePlayerModeController] Server decision: CAPTURE {selectedCenterCards.Count} center cards");
+            
             ProcessPlayerMove(cardId, capturedCards, isPisti: false, isJackPisti: false);
         }
         else
@@ -1295,7 +1304,7 @@ public class SinglePlayerModeController : MonoBehaviour
             // Player must add card to center (no capture)
             int[] cardKindValue = CardInteraction.cardLookup.TryGetValue(cardId, out var ci) ? ci.GetCardID() : null;
             GameManager.AddToDebugLog($"[SingleplayerCardPlay] DECISION: Routing to ProcessPlayerAddToCenter (ADD-TO-CENTER)");
-            Debug.Log($"[SinglePlayerModeController] Server decision: ADD-TO-CENTER");
+            
             ProcessPlayerAddToCenter(cardId, cardKindValue);
         }
     }
@@ -1319,7 +1328,7 @@ public class SinglePlayerModeController : MonoBehaviour
         if (!isGameRunning || !IsPlayerTurn) yield break;
 
         var capturedDict = capturedCards.ToDictionary();
-        Debug.Log($"[SinglePlayerModeController] Player played card {cardId}, captured {capturedDict.Count} cards");
+        
 
         var capturedValues = new List<int>();
         foreach (var kvp in capturedDict)
@@ -1353,7 +1362,7 @@ public class SinglePlayerModeController : MonoBehaviour
             if (GameManager.LocalInstance.myCards != null && GameManager.LocalInstance.myCards.Contains(cardId))
             {
                 GameManager.LocalInstance.myCards.Remove(cardId);
-                Debug.Log($"[SinglePlayerModeController] Removed {cardId} from player's hand after capture");
+                
             }
 
             // Trigger gold gain logic for capture (mirroring multiplayer flow)
@@ -1384,7 +1393,7 @@ public class SinglePlayerModeController : MonoBehaviour
         currentRoundData.totalDamageDealt += damageDealt;
         opponentHealth += damageDealt;
 
-        Debug.Log($"[SinglePlayerModeController] Damage: {damageDealt} | Total: {currentRoundData.totalDamageDealt} | Opponent HP: {opponentHealth}/{opponentMaxHealth}");
+        
 
         UpdateOpponentHealthDisplay();
 
@@ -1414,7 +1423,7 @@ public class SinglePlayerModeController : MonoBehaviour
         if (!isGameRunning || !IsPlayerTurn) yield break;
 
         GameManager.AddToDebugLog($"[SingleplayerCardPlay] ProcessPlayerAddToCenterCoroutine: card {cardId} moving to center");
-        Debug.Log($"[SinglePlayerModeController] Player added card {cardId} to center (no capture)");
+        
 
         if (cardKindValue != null)
             localCenterCards[cardId] = cardKindValue;
@@ -1429,7 +1438,7 @@ public class SinglePlayerModeController : MonoBehaviour
             {
                 GameManager.LocalInstance.myCards.Remove(cardId);
                 GameManager.AddToDebugLog($"[SingleplayerCardPlay] Removed {cardId} from player's hand");
-                Debug.Log($"[SinglePlayerModeController] Removed {cardId} from player's hand");
+                
             }
         }
 
@@ -1484,10 +1493,10 @@ public class SinglePlayerModeController : MonoBehaviour
         // Check 1: Is opponent defeated?
         if (opponentHealth >= opponentMaxHealth)
         {
-            Debug.Log($"\n╔════════════════════════════════╗");
-            Debug.Log($"║ ✓ OPPONENT {currentRoundInStage}/3 DEFEATED! ║");
-            Debug.Log($"║ Stage {currentStage} • Health {opponentHealth}/{opponentMaxHealth}   ║");
-            Debug.Log($"╚════════════════════════════════╝");
+            
+            
+            
+            
 
             isGameRunning = false;
             roundIsWaiting = false; // Signal GameTurnLoop to exit
@@ -1501,17 +1510,17 @@ public class SinglePlayerModeController : MonoBehaviour
             if (currentRoundInStage < 3) // More opponents in this stage (0-indexed: 0, 1, 2)
             {
                 int remainingOpponents = 3 - currentRoundInStage;
-                Debug.Log($"[SinglePlayerModeController] {remainingOpponents} opponent(s) remaining in stage {currentStage}. Next round will start automatically.\n");
+                
                 // The StartRoundLoop coroutine will automatically call StartRound with next difficulty
                 // which will call ResetForRound and begin the next opponent fight
             }
             else
             {
                 // All 3 opponents in this stage defeated (currentRoundInStage == 3)
-                Debug.Log($"\n╔════════════════════════════════╗");
-                Debug.Log($"║ ✓✓ STAGE {currentStage} COMPLETE!    ║");
-                Debug.Log($"║ All 3 opponents defeated       ║");
-                Debug.Log($"╚════════════════════════════════╝\n");
+                
+                
+                
+                
                 // OnStageCleared will be called by StartRoundLoop when the difficulty loop ends
             }
             return;
@@ -1527,10 +1536,10 @@ public class SinglePlayerModeController : MonoBehaviour
     /// </summary>
     private void OnStageCleared()
     {
-        Debug.Log($"\n╔════════════════════════════════╗");
-        Debug.Log($"║  STAGE {currentStage} CLEARED!            ║");
-        Debug.Log($"║  Advancing to Stage {currentStage + 1}...            ║");
-        Debug.Log($"╚════════════════════════════════╝\n");
+        
+        
+        
+        
 
         currentStage++;
         isDeckInitializedForRound = false; // Reset deck flag for next stage
@@ -1540,7 +1549,7 @@ public class SinglePlayerModeController : MonoBehaviour
 
         if (currentStage >= ENDLESS_MODE_THRESHOLD)
         {
-            Debug.Log(">>> ENDLESS MODE UNLOCKED <<<\nContinuing to Stage " + currentStage + "...\n");
+            
         }
 
         // Start next stage (RUN LOOP)
@@ -1552,7 +1561,7 @@ public class SinglePlayerModeController : MonoBehaviour
     /// </summary>
     private void ShowEndlessModePrompt()
     {
-        Debug.Log("[SinglePlayerModeController] Offering endless mode");
+        
         // TODO: Show UI prompt for endless mode
     }
 
@@ -1562,11 +1571,11 @@ public class SinglePlayerModeController : MonoBehaviour
     /// </summary>
     private void OnPlayerLost()
     {
-        Debug.Log($"\n╔════════════════════════════════╗");
-        Debug.Log($"║ ✗ PLAYER LOST                 ║");
-        Debug.Log($"║ Stage {currentStage} • Opponent {currentRoundInStage}/3   ║");
-        Debug.Log($"║ Deck exhausted before victory  ║");
-        Debug.Log($"╚════════════════════════════════╝\n");
+        
+        
+        
+        
+        
 
         isGameRunning = false;
         roundIsWaiting = false; // Signal round loop to exit
@@ -1619,6 +1628,16 @@ public class SinglePlayerModeController : MonoBehaviour
     }
 
     /// <summary>
+    /// Public entry point for processors and external systems to trigger a run save.
+    /// Safe to call at any time; no-ops if the run hasn't been configured yet.
+    /// </summary>
+    public void SaveRunState()
+    {
+        if (currentRunConfig == null) return;
+        RunManager.SaveRunProgress(BuildRunProgressData());
+    }
+
+    /// <summary>
     /// Build run progress data for persistence.
     /// </summary>
     private RunManager.RunProgressData BuildRunProgressData()
@@ -1641,14 +1660,43 @@ public class SinglePlayerModeController : MonoBehaviour
 
     public void ExecutePeekOpponentCard()
     {
-        if (opponentHandList.Count == 0) return;
+        Debug.Log("[UcundanGözAt] SinglePlayerModeController.ExecutePeekOpponentCard() called");
+        
+        if (opponentHandList.Count == 0)
+        {
+            Debug.LogError("[UcundanGözAt] SinglePlayerModeController: Opponent hand is empty - cannot peek");
+            return;
+        }
+        
+        Debug.Log($"[UcundanGözAt] SinglePlayerModeController: Opponent has {opponentHandList.Count} cards in hand");
+        
         int cardIndex = UnityEngine.Random.Range(0, opponentHandList.Count);
+        Debug.Log($"[UcundanGözAt] SinglePlayerModeController: Selected random card index {cardIndex}");
+        
+        if (GameManager.LocalInstance == null)
+        {
+            Debug.LogError("[UcundanGözAt] SinglePlayerModeController: GameManager.LocalInstance is null");
+            return;
+        }
+        
+        Debug.Log("[UcundanGözAt] SinglePlayerModeController: Calling GameManager.OnPeekOpponentCardSynced(opponentNo=1, cardIndex=" + cardIndex + ")");
         GameManager.LocalInstance.OnPeekOpponentCardSynced(1, cardIndex);
+        Debug.Log("[UcundanGözAt] SinglePlayerModeController: GameManager.OnPeekOpponentCardSynced() returned");
+        
+        Debug.Log("[UcundanGözAt] SinglePlayerModeController: Calling ShowcaseSuperPower()");
+        GameManager.LocalInstance.ShowcaseSuperPower("Ucundan Göz At");
+        
+        Debug.Log("[UcundanGözAt] SinglePlayerModeController: Calling SaveRunState()");
+        SaveRunState();
+        
+        Debug.Log("[UcundanGözAt] SinglePlayerModeController.ExecutePeekOpponentCard() completed successfully");
     }
 
     public void ExecuteBayaBayaBak()
     {
         GameManager.LocalInstance.OnBayaBayaBakSynced(1);
+        GameManager.LocalInstance.ShowcaseSuperPower("Baya Baya Bak");
+        SaveRunState();
     }
 
     public void ExecuteSwapCardWithOpponent()
@@ -1656,110 +1704,169 @@ public class SinglePlayerModeController : MonoBehaviour
         if (GameManager.LocalInstance.myCards == null || GameManager.LocalInstance.myCards.Count == 0 || opponentHandList.Count == 0) return;
         string myCardId = GameManager.LocalInstance.myCards[UnityEngine.Random.Range(0, GameManager.LocalInstance.myCards.Count)];
         string oppCardId = opponentHandList[UnityEngine.Random.Range(0, opponentHandList.Count)];
+        
+        if (opponentHandList.Contains(oppCardId))
+        {
+            opponentHandList.Remove(oppCardId);
+            opponentHandList.Add(myCardId);
+        }
+
         GameManager.LocalInstance.StartCoroutine(GameManager.LocalInstance.OnSunuDegisTokusSynced(0, 1, myCardId, oppCardId));
+        GameManager.LocalInstance.ShowcaseSuperPower("Değiş Tokuş");
+        SaveRunState();
     }
 
     public void ExecuteValeArar()
     {
         GameManager.LocalInstance.ActivateValeArarPower();
+        GameManager.LocalInstance.ShowcaseSuperPower("Vale Arar");
+        SaveRunState();
     }
 
     public void ExecuteBomba()
     {
+        localCenterCards.Clear();
         GameManager.LocalInstance.OnBombaCenter();
+        GameManager.LocalInstance.ShowcaseSuperPower("Bomba");
+        SaveRunState();
     }
 
     public void ExecuteYapamazsın()
     {
         GameManager.LocalInstance.SetYapamazsınActive(true);
+        GameManager.LocalInstance.ShowcaseSuperPower("Yapamazsın");
+        SaveRunState();
     }
 
     public void StartKapkacSelection()
     {
-        Debug.Log("[SPMC] StartKapkacSelection - Singleplayer mode");
+        GameManager.LocalInstance.StartKapkacSelectionPower();
     }
 
     public void ExecuteKapkacOnCard(string cardId)
     {
         GameManager.LocalInstance.OnKapkacCardChanged(cardId);
+        GameManager.LocalInstance.ShowcaseSuperPower("Kapkaç");
+        SaveRunState();
     }
 
     public void StartYandimAnamSelection()
     {
-        Debug.Log("[SPMC] StartYandimAnamSelection - Singleplayer mode");
+        GameManager.LocalInstance.StartYandimAnamSelectionPower();
     }
 
     public void ExecuteYandimAnamOnCard(string cardId)
     {
         GameManager.LocalInstance.OnYandimAnamCardChanged(cardId);
+        GameManager.LocalInstance.ShowcaseSuperPower("Yandım Anam");
+        SaveRunState();
     }
 
     public void ExecuteBlockNextPlayer()
     {
         GameManager.LocalInstance.SetOynayamazsinActive(true);
+        GameManager.LocalInstance.ShowcaseSuperPower("Oynayamazsın");
+        SaveRunState();
     }
 
     public void StartKopyalaYapistirSelection()
     {
-        Debug.Log("[SPMC] StartKopyalaYapistirSelection - Singleplayer mode");
+        GameManager.LocalInstance.StartKopyalaYapistirDualSelection(null);
     }
 
     public void ExecuteKopyalaYapistir(string targetId, string sourceId)
     {
         GameManager.LocalInstance.OnKopyalaYapistir(targetId, sourceId);
+        GameManager.LocalInstance.ShowcaseSuperPower("Kopyala Yapıştır");
+        SaveRunState();
     }
 
     public void ExecuteVerZehri()
     {
         GameManager.LocalInstance.SetVerZehriActive(true);
+        GameManager.LocalInstance.ShowcaseSuperPower("Ver Zehri");
+        SaveRunState();
     }
 
     public void ExecuteKutsalDeste()
     {
         GameManager.LocalInstance.SetKutsalDesteActive(true);
+        GameManager.LocalInstance.ShowcaseSuperPower("Kutsal Deste");
+        SaveRunState();
     }
 
     public void StartBuDahaIyiSelection()
     {
-        Debug.Log("[SPMC] StartBuDahaIyiSelection - Singleplayer mode");
+        GameManager.LocalInstance.StartBuDahaIyiSelectionPower();
     }
 
     public void ExecuteBuDahaIyi(string handCardId, string topCenterCardId)
     {
+        if (localCenterCards.ContainsKey(topCenterCardId))
+        {
+            int[] handCardValue = CardInteraction.cardLookup.TryGetValue(handCardId, out var ci) ? ci.GetCardID() : new int[] { 0, 0 };
+            localCenterCards.Remove(topCenterCardId);
+            localCenterCards[handCardId] = handCardValue;
+        }
+
         GameManager.LocalInstance.OnBuDahaIyiSynced(0, 0, handCardId, topCenterCardId);
+        GameManager.LocalInstance.ShowcaseSuperPower("Bu Daha İyi");
+        SaveRunState();
     }
 
     public void StartSunuDegisTokusSelection()
     {
-        Debug.Log("[SPMC] StartSunuDegisTokusSelection - Singleplayer mode");
+        GameManager.LocalInstance.StartSunuDegisTokusDualSelection(null, "Şunu Değiş Tokuş");
     }
 
     public void ExecuteSunuDegisTokus(string myCardId, string oppCardId)
     {
+        if (opponentHandList.Contains(oppCardId))
+        {
+            opponentHandList.Remove(oppCardId);
+            opponentHandList.Add(myCardId);
+        }
+
         GameManager.LocalInstance.StartCoroutine(GameManager.LocalInstance.OnSunuDegisTokusSynced(0, 1, myCardId, oppCardId));
+        GameManager.LocalInstance.ShowcaseSuperPower("Şunu Değiş Tokuş");
+        SaveRunState();
     }
 
     public void StartSunuDegisBunuTokusSelection()
     {
-        Debug.Log("[SPMC] StartSunuDegisBunuTokusSelection - Singleplayer mode");
+        GameManager.LocalInstance.ActivateSunuDegisBunuTokusPower();
     }
 
     public void ExecuteSunuDegisBunuTokus(string[] myCards, string[] oppCards)
     {
         for (int i = 0; i < myCards.Length; i++)
         {
+            if (opponentHandList.Contains(oppCards[i]))
+            {
+                opponentHandList.Remove(oppCards[i]);
+                opponentHandList.Add(myCards[i]);
+            }
+        }
+
+        for (int i = 0; i < myCards.Length; i++)
+        {
             bool isLast = (i == myCards.Length - 1);
             GameManager.LocalInstance.EnqueueSunuDegisBunuTokusSwap(0, 1, myCards[i], oppCards[i], i, isLast);
         }
+
+        GameManager.LocalInstance.ShowcaseSuperPower("Şunu Değiş Bunu Tokuş");
+        SaveRunState();
     }
 
     public void ExecuteZaferPuani(int points)
     {
-        Debug.Log($"[SPMC] ExecuteZaferPuani: {points} points earned.");
+        
         opponentHealth += points;
         UpdateOpponentHealthDisplay();
+        GameManager.LocalInstance.ShowcaseSuperPower("Zafer Puanı");
+        SaveRunState();
 
-            CheckRoundEndConditions();
+        CheckRoundEndConditions();
     }
 
     /// <summary>
@@ -1772,7 +1879,7 @@ public class SinglePlayerModeController : MonoBehaviour
 
         if (roundEndScreenParent == null || roundEndContinueButton == null)
         {
-            Debug.LogError("[SinglePlayerModeController] Round end UI references are not assigned.");
+            
             return;
         }
 
@@ -1794,7 +1901,7 @@ public class SinglePlayerModeController : MonoBehaviour
         }
         else
         {
-            Debug.LogError("roundEndScreenParent is not assigned!");
+            
         }
 
         awaitingRoundContinue = true;

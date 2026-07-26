@@ -246,8 +246,7 @@ private void SpawnTokensFromCalculatorData(Vector3 spawnOrigin, float spawnScale
 {
     if (SuperPowerSpawner.LocalInstance == null) return;
     
-    Debug.Log($"[KeseController] Spawning tokens from calculator data");
-    
+        
     // Calculate total number of tokens to spawn
     int totalTokenCount = 0;
     foreach (var token in coinTokenData)
@@ -268,11 +267,11 @@ private void SpawnTokensFromCalculatorData(Vector3 spawnOrigin, float spawnScale
         SuperPowerSpawner.LocalInstance.ReadyToSpawnSuperPowers(totalTokenCount, 
                                                                  spawnOrigin, spawnScale);
         
-        Debug.Log($"[KeseController] Successfully spent {totalGoldCost} gold and spawned {totalTokenCount} powers");
+        
     }
     else
     {
-        Debug.Log($"[KeseController] Insufficient gold! Need {totalGoldCost}, have {...}");
+        
         ReturnCoin();
     }
 }

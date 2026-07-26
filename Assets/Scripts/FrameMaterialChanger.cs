@@ -9,7 +9,7 @@ public class FrameMaterialChanger : MonoBehaviour
     {
         if (frameShaderMaterial == null)
         {
-            Debug.LogError("FrameShader Material is not assigned!");
+            
             return;
         }
 
@@ -17,7 +17,7 @@ public class FrameMaterialChanger : MonoBehaviour
         ElHolderScript elHolder = FindObjectOfType<ElHolderScript>();
         if (elHolder == null)
         {
-            Debug.LogError("ElHolderScript not found in scene!");
+            
             return;
         }
 
@@ -31,16 +31,16 @@ public class FrameMaterialChanger : MonoBehaviour
                 {
                     renderer.material = frameShaderMaterial;
                     appliedCount++;
-                    Debug.Log($"Applied FrameShader material to: {frameObject.name}");
+                    
                 }
                 else
                 {
-                    Debug.LogWarning($"No Renderer component found on: {frameObject.name}");
+                    
                 }
             }
         }
 
-        Debug.Log($"Successfully applied FrameShader material to {appliedCount} frame objects.");
+        
     }
 
     [ContextMenu("Test Turn Indication")]
@@ -51,11 +51,11 @@ public class FrameMaterialChanger : MonoBehaviour
         {
             // Test with player 0
             elHolder.UpdateCurrentPlayer(0);
-            Debug.Log("Testing turn indication for player 0");
+            
         }
         else
         {
-            Debug.LogError("ElHolderScript not found!");
+            
         }
     }
 
@@ -66,11 +66,11 @@ public class FrameMaterialChanger : MonoBehaviour
         if (elHolder != null)
         {
             elHolder.ReturnAllHandsToIdle();
-            Debug.Log("Reset all frames to idle state");
+            
         }
         else
         {
-            Debug.LogError("ElHolderScript not found!");
+            
         }
     }
 } 

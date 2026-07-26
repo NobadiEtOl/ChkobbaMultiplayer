@@ -96,16 +96,16 @@ public class MenuController : MonoBehaviour
         mainCamera = Camera.main;
         if (mainCamera == null) mainCamera = FindObjectOfType<Camera>();
         
-        Debug.Log("[MenuController] Start called - checking SuperPowerSpawner.LocalInstance");
+        
         
         if (SuperPowerSpawner.LocalInstance == null)
         {
-            Debug.LogWarning("[MenuController] SuperPowerSpawner.LocalInstance is null at Start, will try to initialize later");
+            
             StartCoroutine(WaitForSuperPowerSpawnerAndInitialize());
         }
         else
         {
-            Debug.Log("[MenuController] SuperPowerSpawner.LocalInstance found, initializing immediately");
+            
             InitializeMenu();
         }
         
@@ -137,14 +137,14 @@ public class MenuController : MonoBehaviour
 
     private IEnumerator WaitForSuperPowerSpawnerAndInitialize()
     {
-        Debug.Log("[MenuController] Waiting for SuperPowerSpawner.LocalInstance...");
+        
         
         while (SuperPowerSpawner.LocalInstance == null)
         {
             yield return new WaitForSeconds(0.1f);
         }
         
-        Debug.Log("[MenuController] SuperPowerSpawner.LocalInstance found, initializing menu");
+        
         InitializeMenu();
     }
     
@@ -153,7 +153,7 @@ public class MenuController : MonoBehaviour
         // Validate scene references
         if (!ValidateSceneReferences())
         {
-            Debug.LogError("[MenuController] Failed to initialize menu - missing scene references!");
+            
             return;
         }
         
@@ -161,7 +161,7 @@ public class MenuController : MonoBehaviour
         SortTokensByTier();
         CreateTokensInSceneContainer();
         SetMenuActive(false);
-        Debug.Log("[MenuController] Scene-based menu initialized successfully");
+        
     }
     
     private bool ValidateSceneReferences()
@@ -170,19 +170,19 @@ public class MenuController : MonoBehaviour
         
         if (tokenDisplayArea == null)
         {
-            Debug.LogError("[MenuController] TokenDisplayArea is not assigned!");
+            
             valid = false;
         }
         
         if (displayBackgroundPanel == null)
         {
-            Debug.LogError("[MenuController] DisplayBackgroundPanel is not assigned!");
+            
             valid = false;
         }
         
         if (scrollContainer == null)
         {
-            Debug.LogError("[MenuController] ScrollContainer is not assigned!");
+            
             valid = false;
         }
         
@@ -190,7 +190,7 @@ public class MenuController : MonoBehaviour
         {
             // Add colliders if missing (needed for scroll detection)
             EnsureScrollColliders();
-            Debug.Log("[MenuController] All scene references validated successfully");
+            
         }
         
         return valid;
@@ -208,7 +208,7 @@ public class MenuController : MonoBehaviour
                 // Set size based on display area - you may need to adjust these values
                 boxCollider.size = new Vector3(menuWidth, menuHeight, 1f);
                 boxCollider.isTrigger = true; // For better scroll detection
-                Debug.Log("[MenuController] Added BoxCollider to TokenDisplayArea for scroll detection");
+                
             }
         }
         
@@ -227,7 +227,7 @@ public class MenuController : MonoBehaviour
                     Vector3 spriteSize = spriteRenderer.sprite.bounds.size;
                     boxCollider.size = new Vector3(spriteSize.x, spriteSize.y, 0.1f);
                     boxCollider.isTrigger = true;
-                    Debug.Log("[MenuController] Added BoxCollider to DisplayBackgroundPanel for scroll detection");
+                    
                 }
             }
         }
@@ -244,26 +244,26 @@ public class MenuController : MonoBehaviour
     {
         if (SuperPowerSpawner.LocalInstance == null)
         {
-            Debug.LogError("[MenuController] SuperPowerSpawner.LocalInstance is null, cannot open menu InfoBox");
+            
             return;
         }
 
-        Debug.Log("[MenuController] ShowTokenMenu called - open-only behavior");
+        
         SuperPowerSpawner.LocalInstance.SetNameText("Menu");
 
         // If menu is already the active page, toggle it closed.
         if (SuperPowerSpawner.LocalInstance.isInfoBoxOpen && SuperPowerSpawner.LocalInstance.isMenuPageOpen)
         {
-            Debug.Log("[MenuController] Menu page is already open; closing it");
+            
             StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
             return;
         }
         
-        Debug.Log("[MenuController] Opening menu page in InfoBox");
+        
         
         if (!menuInitialized)
         {
-            Debug.LogWarning("[MenuController] Menu not initialized yet, trying to initialize now...");
+            
             InitializeMenu();
         }
         
@@ -275,21 +275,21 @@ public class MenuController : MonoBehaviour
     [ContextMenu("Force Initialize Menu")]
     public void ForceInitializeMenu()
     {
-        Debug.Log("[MenuController] Force initializing menu...");
+        
         if (SuperPowerSpawner.LocalInstance == null)
         {
-            Debug.LogError("[MenuController] Cannot force initialize - SuperPowerSpawner.LocalInstance is null!");
+            
             return;
         }
         
         InitializeMenu();
-        Debug.Log("[MenuController] Force initialization complete");
+        
     }
     
     [ContextMenu("Test Toggle InfoBox")]
     public void TestToggleInfoBox()
     {
-        Debug.Log("[MenuController] Testing ShowTokenMenu toggle functionality via context menu");
+        
         ShowTokenMenu();
     }
     
@@ -320,51 +320,51 @@ public class MenuController : MonoBehaviour
     [ContextMenu("Debug Hierarchy State")]
     public void DebugHierarchyState()
     {
-        Debug.Log("=== HIERARCHY DEBUG START ===");
-        Debug.Log($"MenuController GameObject: {this.gameObject.name} (active: {this.gameObject.activeInHierarchy})");
-        Debug.Log($"MenuController position: {this.transform.position}");
-        Debug.Log($"MenuInitialized: {menuInitialized}");
-        Debug.Log($"TokenDataList count: {tokenDataList.Count}");
-        Debug.Log($"InstantiatedTokens count: {instantiatedTokens.Count}");
+        
+        
+        
+        
+        
+        
         
         if (tokenDisplayArea != null)
         {
-            Debug.Log($"TokenDisplayArea: {tokenDisplayArea.name} (active: {tokenDisplayArea.activeInHierarchy})");
-            Debug.Log($"TokenDisplayArea position: {tokenDisplayArea.transform.position}");
-            Debug.Log($"TokenDisplayArea children: {tokenDisplayArea.transform.childCount}");
+            
+            
+            
         }
         else
         {
-            Debug.Log("TokenDisplayArea: NULL");
+            
         }
         
         if (scrollContainer != null)
         {
-            Debug.Log($"ScrollContainer: {scrollContainer.name} (active: {scrollContainer.activeInHierarchy})");
-            Debug.Log($"ScrollContainer position: {scrollContainer.transform.position}");
-            Debug.Log($"ScrollContainer children: {scrollContainer.transform.childCount}");
+            
+            
+            
             
             for (int i = 0; i < scrollContainer.transform.childCount; i++)
             {
                 Transform child = scrollContainer.transform.GetChild(i);
-                Debug.Log($"  Child {i}: {child.name} (active: {child.gameObject.activeInHierarchy}) at {child.position}");
+                
             }
         }
         else
         {
-            Debug.Log("ScrollContainer: NULL");
+            
         }
         
-        Debug.Log("=== HIERARCHY DEBUG END ===");
+        
     }
     
     private void CreateTokensInSceneContainer()
     {
-        Debug.Log("[MenuController] Creating tokens in scene-based container");
+        
         
         if (scrollContainer == null)
         {
-            Debug.LogError("[MenuController] ScrollContainer is null! Cannot create tokens.");
+            
             return;
         }
         
@@ -378,36 +378,36 @@ public class MenuController : MonoBehaviour
         CreateAllTokens();
         
         menuInitialized = true;
-        Debug.Log("[MenuController] ✅ Scene-based menu created successfully");
+        
         
         // Final hierarchy check
-        Debug.Log($"[MenuController] Final hierarchy check:");
-        Debug.Log($"  - MenuController: {this.name}");
-        Debug.Log($"  - TokenDisplayArea: {tokenDisplayArea?.name} (active: {tokenDisplayArea?.activeInHierarchy})");
-        Debug.Log($"  - DisplayBackgroundPanel: {displayBackgroundPanel?.name} (active: {displayBackgroundPanel?.activeInHierarchy})");
-        Debug.Log($"  - ScrollContainer: {scrollContainer?.name} (active: {scrollContainer?.activeInHierarchy})");
-        Debug.Log($"  - ScrollContainer children count: {scrollContainer?.transform.childCount}");
+        
+        
+        
+        
+        
+        
     }
     
     private void LoadTokenData()
     {
         tokenDataList.Clear();
         
-        Debug.Log("[MenuController] LoadTokenData called");
+        
         
         if (SuperPowerSpawner.LocalInstance == null) 
         {
-            Debug.LogError("[MenuController] SuperPowerSpawner.LocalInstance is null in LoadTokenData!");
+            
             return;
         }
         
-        Debug.Log("[MenuController] SuperPowerSpawner.LocalInstance found, calling GetAllTokenData()");
+        
         var allTokenData = SuperPowerSpawner.LocalInstance.GetAllTokenData();
-        Debug.Log($"[MenuController] Got {allTokenData.Count} tokens from SuperPowerSpawner");
+        
         
         if (allTokenData.Count == 0)
         {
-            Debug.LogWarning("[MenuController] No tokens returned from SuperPowerSpawner!");
+            
             return;
         }
         
@@ -415,13 +415,13 @@ public class MenuController : MonoBehaviour
         {
             if (tokenPrefab == null)
             {
-                Debug.LogWarning($"[MenuController] Token prefab is null for power: {power?.name}");
+                
                 continue;
             }
             
             if (power == null)
             {
-                Debug.LogWarning("[MenuController] Power is null for a token");
+                
                 continue;
             }
             
@@ -435,10 +435,10 @@ public class MenuController : MonoBehaviour
             TokenMenuData tokenData = new TokenMenuData(tokenSprite, power.name, power.powerCostTier, power, tokenPrefab);
             tokenDataList.Add(tokenData);
             
-            Debug.Log($"[MenuController] Added token: {power.name} (cost tier: {power.powerCostTier})");
+            
         }
         
-        Debug.Log($"[MenuController] Total tokens loaded: {tokenDataList.Count}");
+        
     }
     
     private void SortTokensByTier()
@@ -447,18 +447,18 @@ public class MenuController : MonoBehaviour
         tokenDataList.Sort((a, b) => a.rarity.CompareTo(b.rarity));
         
         // Log the sorted order with tier separators for clarity
-        Debug.Log("[MenuController] === TOKENS SORTED BY TIER ===");
+        
         int currentTier = -1;
         for (int i = 0; i < tokenDataList.Count; i++)
         {
             if (tokenDataList[i].rarity != currentTier)
             {
                 currentTier = tokenDataList[i].rarity;
-                Debug.Log($"\n--- TIER {currentTier} ---");
+                
             }
-            Debug.Log($"  [{i}] {tokenDataList[i].tokenName}");
+            
         }
-        Debug.Log("[MenuController] === END OF TIER SORT ===\n");
+        
     }
     
     private void CreateAllTokens()
@@ -479,11 +479,11 @@ public class MenuController : MonoBehaviour
 
         if (filteredList.Count == 0)
         {
-            Debug.LogWarning("[MenuController] No tokens to create for current filter!");
+            
             return;
         }
         
-        Debug.Log($"[MenuController] Creating {filteredList.Count} token GameObjects (Tier Filter: {currentFilterTier})");
+        
         
         int currentTier = -1;
         int displayIndex = 0; // Track display index including separators
@@ -500,7 +500,7 @@ public class MenuController : MonoBehaviour
                 if (i > 0) // Don't add separator before first tier
                 {
                     displayIndex++; // Add spacing for separator
-                    Debug.Log($"[MenuController] Added tier separator before Tier {currentTier}");
+                    
                 }
             }
             
@@ -510,7 +510,7 @@ public class MenuController : MonoBehaviour
         
         // Store the maximum display index for scroll calculations
         maxDisplayIndex = displayIndex > 0 ? displayIndex - 1 : 0;
-        Debug.Log($"[MenuController] Created {instantiatedTokens.Count} token GameObjects. Max display index: {maxDisplayIndex}");
+        
     }
 
     public void OnTierButtonClicked(int tier)
@@ -558,56 +558,56 @@ public class MenuController : MonoBehaviour
     
     private void CreateToken3D(TokenMenuData tokenData, int index)
     {
-        Debug.Log($"[MenuController] CreateToken3D called for index {index}, token: {tokenData.tokenName}");
+        
         
         try
         {
             // Check if tokenData is valid
             if (tokenData == null)
             {
-                Debug.LogError($"[MenuController] TokenData is null for index {index}!");
+                
                 return;
             }
             
             if (tokenData.tokenPrefab == null)
             {
-                Debug.LogError($"[MenuController] TokenPrefab is null for {tokenData.tokenName} at index {index}!");
+                
                 return;
             }
             
             if (scrollContainer == null)
             {
-                Debug.LogError($"[MenuController] ScrollContainer is null when trying to create token {tokenData.tokenName}!");
+                
                 return;
             }
             
-            Debug.Log($"[MenuController] About to instantiate token prefab: {tokenData.tokenPrefab.name}");
+            
             
             // Instantiate the actual token prefab
             GameObject tokenInstance = Instantiate(tokenData.tokenPrefab, scrollContainer.transform);
             
             if (tokenInstance == null)
             {
-                Debug.LogError($"[MenuController] Failed to instantiate token {tokenData.tokenName}!");
+                
                 return;
             }
             
-            Debug.Log($"[MenuController] Successfully instantiated {tokenInstance.name}");
+            
             
             // CRITICAL: Assign the power to the token script to prevent "Power is not assigned" error
             SuperPowerToken tokenScript = tokenInstance.GetComponent<SuperPowerToken>();
             if (tokenScript != null && tokenData.superPower != null)
             {
                 tokenScript.power = tokenData.superPower;
-                Debug.Log($"[MenuController] Assigned power {tokenData.superPower.name} to token script");
+                
             }
             else
             {
-                Debug.LogWarning($"[MenuController] Could not assign power to token script - tokenScript: {tokenScript != null}, power: {tokenData.superPower != null}");
+                
             }
             
             tokenInstance.name = $"Token_{tokenData.tokenName}_{index}";
-            Debug.Log($"[MenuController] Renamed to: {tokenInstance.name}");
+            
             
             // Scale the token
             tokenInstance.transform.localScale = tokenScale;
@@ -621,12 +621,12 @@ public class MenuController : MonoBehaviour
             {
                 tokenInstance.transform.localRotation = Quaternion.identity;
             }
-            Debug.Log($"[MenuController] Set scale to: {tokenScale} and rotation to match display background");
+            
             
             // Position the token using background panel bounds
             Vector3 tokenPosition = CalculateTokenPosition(index);
             tokenInstance.transform.localPosition = tokenPosition;
-            Debug.Log($"[MenuController] Set position to: {tokenPosition} (world: {tokenInstance.transform.position})");
+            
             
             // Re-apply scale and rotation next frame to guard against external changes
             StartCoroutine(EnforceTransformNextFrame(tokenInstance));
@@ -636,12 +636,12 @@ public class MenuController : MonoBehaviour
             if (smokeEffect != null)
             {
                 DestroyImmediate(smokeEffect.gameObject);
-                Debug.Log($"[MenuController] Removed SmokeEffectGameObject from {tokenData.tokenName}");
+                
             }
             
             // FORCE THE TOKEN TO BE ACTIVE
             tokenInstance.SetActive(true);
-            Debug.Log($"[MenuController] Forced token active state: {tokenInstance.activeInHierarchy}");
+            
             
             // Configure SpriteRenderer for masking
             SpriteRenderer tokenRenderer = tokenInstance.GetComponent<SpriteRenderer>();
@@ -649,17 +649,17 @@ public class MenuController : MonoBehaviour
             {
                 tokenRenderer.sortingOrder = 10; // High sorting order to appear on top
                 tokenRenderer.maskInteraction = SpriteMaskInteraction.VisibleInsideMask; // Enable masking
-                Debug.Log($"[MenuController] Set SpriteRenderer sorting order to 10 and enabled masking");
+                
             }
             else
             {
-                Debug.LogWarning($"[MenuController] No SpriteRenderer found on token {tokenData.tokenName}");
+                
             }
             
             // Create text elements as children of the token
             CreateTokenText(tokenData, tokenInstance, index);
             
-            Debug.Log($"[MenuController] Created text for: {tokenData.tokenName}");
+            
             
             // Check for existing colliders (tokens should already have BoxCollider3D)
             Collider existingCollider3D = tokenInstance.GetComponent<Collider>();
@@ -667,18 +667,18 @@ public class MenuController : MonoBehaviour
             
             if (existingCollider3D != null)
             {
-                Debug.Log($"[MenuController] Found existing 3D collider: {existingCollider3D.GetType().Name}");
+                
             }
             else if (existingCollider2D != null)
             {
-                Debug.Log($"[MenuController] Found existing 2D collider: {existingCollider2D.GetType().Name}");
+                
             }
             else
             {
                 // Only add if no collider exists
                 BoxCollider collider = tokenInstance.AddComponent<BoxCollider>();
                 collider.size = Vector3.one;
-                Debug.Log($"[MenuController] Added BoxCollider3D (no existing collider found)");
+                
             }
             
             // Add click handler component
@@ -688,32 +688,32 @@ public class MenuController : MonoBehaviour
                 clickHandler = tokenInstance.AddComponent<TokenClickHandler>();
             }
             clickHandler.Initialize(tokenData, this, tokenInstance); // Pass the instantiated token
-            Debug.Log($"[MenuController] Added TokenClickHandler");
+            
             
             instantiatedTokens.Add(tokenInstance);
             
-            Debug.Log($"[MenuController] ✅ Successfully created token GameObject: {tokenData.tokenName} at position {tokenInstance.transform.position}");
-            Debug.Log($"[MenuController] Token active in hierarchy: {tokenInstance.activeInHierarchy}");
-            Debug.Log($"[MenuController] Token parent: {tokenInstance.transform.parent?.name}");
-            Debug.Log($"[MenuController] Current instantiated tokens count: {instantiatedTokens.Count}");
+            
+            
+            
+            
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"[MenuController] Exception while creating token {tokenData?.tokenName}: {e.Message}\n{e.StackTrace}");
+            
         }
     }
     
     public void SetMenuActive(bool active)
     {
-        Debug.Log($"[MenuController] Setting menu active: {active}");
+        
         if (tokenDisplayArea != null)
         {
             tokenDisplayArea.SetActive(active);
-            Debug.Log($"[MenuController] Set TokenDisplayArea active: {active}");
+            
         }
         else
         {
-            Debug.LogError("[MenuController] TokenDisplayArea is null, cannot set active state!");
+            
         }
         
         if (filterButtonContainer != null)
@@ -748,7 +748,7 @@ public class MenuController : MonoBehaviour
     /// </summary>
     public void OnOtherPageOpened()
     {
-        Debug.Log("[MenuController] Other page opened, deactivating menu");
+        
         SetMenuActive(false);
     }
     
@@ -764,7 +764,7 @@ public class MenuController : MonoBehaviour
                 SuperPowerToken.ActiveInstance = null;
             }
             Destroy(menuToken);
-            Debug.Log("[MenuController] Cleaned up menu token");
+            
         }
     }
     
@@ -789,7 +789,7 @@ public class MenuController : MonoBehaviour
     public void CloseTokenMenu()
     {
         SetMenuActive(false);
-        Debug.Log("[MenuController] Token menu closed");
+        
     }
     
     // 3D Scroll handling methods
@@ -847,7 +847,7 @@ public class MenuController : MonoBehaviour
                 isDragging = true;
                 lastMousePosition = Input.mousePosition;
                 scrollVelocity = 0f;
-                Debug.Log($"[MenuController] Started drag on: {hit.collider.gameObject.name}");
+                
             }
         }
     }
@@ -887,7 +887,7 @@ public class MenuController : MonoBehaviour
         newPosition.y = currentScrollOffset; // Scroll vertically
         scrollContainer.transform.localPosition = newPosition;
         
-        Debug.Log($"[MenuController] Scrolled to offset: {currentScrollOffset}, limits: [{minScroll}, {maxScroll}]");
+        
     }
     
     private void CalculateScrollLimits(out float minScroll, out float maxScroll)
@@ -920,7 +920,7 @@ public class MenuController : MonoBehaviour
             maxScroll = scrollableDistance;  // Bottom boundary (last token)
         }
         
-        Debug.Log($"[MenuController] Scroll limits calculated: maxDisplayIndex={maxDisplayIndex}, displayHeight={displayHeight}, totalContentHeight={totalContentHeight}, scrollableDistance={scrollableDistance}, limits=[{minScroll}, {maxScroll}]");
+        
     }
     
     private float GetDisplayAreaHeight()
@@ -979,7 +979,7 @@ public class MenuController : MonoBehaviour
     
     public void OnTokenClicked(TokenMenuData tokenData, GameObject instantiatedToken)
     {
-        Debug.Log($"[MenuController] Token clicked: {tokenData.tokenName}");
+        
         SetMenuActive(false);
         // InfoBox opening removed from here; now handled by SuperPowerToken drag logic only
     }
@@ -997,7 +997,7 @@ public class MenuController : MonoBehaviour
     
     private void SetupMaskingSystem()
     {
-        Debug.Log("[MenuController] Setting up masking system");
+        
         
         // Create SpriteMask for token sprites
         SetupSpriteMask();
@@ -1028,11 +1028,11 @@ public class MenuController : MonoBehaviour
         {
             spriteMask.sprite = bgSpriteRenderer.sprite;
             spriteMask.alphaCutoff = 0.5f;
-            Debug.Log($"[MenuController] Created SpriteMask with sprite: {bgSpriteRenderer.sprite.name}");
+            
         }
         else
         {
-            Debug.LogWarning("[MenuController] Could not get sprite from DisplayBackgroundPanel for SpriteMask");
+            
         }
     }
     
@@ -1087,7 +1087,7 @@ public class MenuController : MonoBehaviour
         // Add RectMask2D for clipping
         viewportObj.AddComponent<RectMask2D>();
         
-        Debug.Log("[MenuController] Created world-space Canvas with RectMask2D for text clipping");
+        
     }
     
     private Vector3 CalculateTokenPosition(int index)
@@ -1124,8 +1124,8 @@ public class MenuController : MonoBehaviour
         float tokenX = leftEdge + leftPadding;
         float tokenY = bgPosition.y + (actualHeight * 0.5f) - (index * rowHeight) - (rowHeight * 0.5f);
         
-        Debug.Log($"[MenuController] Background bounds: width={actualWidth}, height={actualHeight}, leftEdge={leftEdge}");
-        Debug.Log($"[MenuController] Token {index} position: x={tokenX}, y={tokenY}");
+        
+        
         
         return new Vector3(tokenX, tokenY, 0f);
     }
@@ -1134,7 +1134,7 @@ public class MenuController : MonoBehaviour
     {
         if (textMaskCanvas == null)
         {
-            Debug.LogWarning("[MenuController] TextMaskCanvas is null, cannot create masked text");
+            
             return;
         }
         
@@ -1142,7 +1142,7 @@ public class MenuController : MonoBehaviour
         Transform viewport = textMaskCanvas.transform.Find("TextViewport");
         if (viewport == null)
         {
-            Debug.LogWarning("[MenuController] TextViewport not found in TextMaskCanvas");
+            
             return;
         }
         
@@ -1177,7 +1177,7 @@ public class MenuController : MonoBehaviour
         nameText.fontSizeMin = nameTextMinSize;
         nameText.fontSizeMax = nameTextMaxSize;
         
-        Debug.Log($"[MenuController] Created masked name text: {tokenData.tokenName} at ({nameX}, {nameY})");
+        
         
         // Calculate rarity position: token X + both spacings
         float rarityX = canvasLocalPos.x * scaleFactor + (tokenToNameSpacing + nameToRaritySpacing) * scaleFactor;
@@ -1198,7 +1198,7 @@ public class MenuController : MonoBehaviour
         rarityText.alignment = rarityTextAlignment;
         rarityText.fontStyle = FontStyles.Bold;
         
-        Debug.Log($"[MenuController] Created masked rarity text: {tokenData.rarity}");
+        
         
         // Add text follower component to keep text aligned with token
         TextFollower nameFollower = nameTextObj.AddComponent<TextFollower>();
@@ -1216,7 +1216,7 @@ public class MenuController : MonoBehaviour
     {
         if (textMaskCanvas == null)
         {
-            Debug.LogWarning("[MenuController] TextMaskCanvas is null, cannot create text");
+            
             return;
         }
         
@@ -1224,7 +1224,7 @@ public class MenuController : MonoBehaviour
         Transform viewport = textMaskCanvas.transform.Find("TextViewport");
         if (viewport == null)
         {
-            Debug.LogWarning("[MenuController] TextViewport not found in TextMaskCanvas");
+            
             return;
         }
         
@@ -1270,14 +1270,14 @@ public class MenuController : MonoBehaviour
         instantiatedTextElements.Add(nameTextObj);
         instantiatedTextElements.Add(rarityTextObj);
         
-        Debug.Log($"[MenuController] Created world-positioned text for: {tokenData.tokenName}");
+        
     }
     
     private IEnumerator OpenMenuInInfoBox()
     {
         if (SuperPowerSpawner.LocalInstance == null)
         {
-            Debug.LogError("[MenuController] SuperPowerSpawner.LocalInstance is null, cannot open menu in InfoBox");
+            
             yield break;
         }
 
@@ -1293,7 +1293,7 @@ public class MenuController : MonoBehaviour
             CreateAllTokens();
             
             SetMenuActive(true);
-            Debug.Log("[MenuController] Menu page already open in InfoBox, keeping it open");
+            
             yield break;
         }
         
@@ -1326,7 +1326,7 @@ public class MenuController : MonoBehaviour
         // Now show our menu
         SetMenuActive(true);
         
-        Debug.Log("[MenuController] Menu opened in InfoBox with proper token behavior");
+        
     }
     
     /// <summary>
@@ -1336,7 +1336,7 @@ public class MenuController : MonoBehaviour
     {
         if (openButtonGameObject == null)
         {
-            Debug.LogWarning("[MenuController] OpenButtonGameObject is null, cannot setup click handler");
+            
             return;
         }
         
@@ -1345,7 +1345,7 @@ public class MenuController : MonoBehaviour
         if (button == null)
         {
             button = openButtonGameObject.AddComponent<Button>();
-            Debug.Log("[MenuController] Added Button component to open button");
+            
         }
         
         // Ensure the button is properly configured
@@ -1363,10 +1363,10 @@ public class MenuController : MonoBehaviour
         {
             BoxCollider boxCollider = openButtonGameObject.AddComponent<BoxCollider>();
             boxCollider.isTrigger = true;
-            Debug.Log("[MenuController] Added BoxCollider to open button for 3D interaction");
+            
         }
         
-        Debug.Log("[MenuController] Open button listener setup complete - using Unity Button onClick");
+        
     }
 }
 
@@ -1392,7 +1392,7 @@ public class TokenClickHandler : MonoBehaviour
         }
         else
         {
-            Debug.LogError($"[TokenClickHandler] Missing references - menuController: {menuController != null}, tokenData: {tokenData != null}, instantiatedToken: {instantiatedToken != null}");
+            
         }
     }
 }
@@ -1403,7 +1403,7 @@ public class MenuPagePower : SuperPower
     public override void ActivatePower()
     {
         // Menu doesn't activate like a regular power
-        Debug.Log("[MenuPagePower] Menu page power - no activation needed");
+        
     }
 }
 

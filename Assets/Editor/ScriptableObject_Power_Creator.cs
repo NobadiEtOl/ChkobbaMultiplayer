@@ -30,12 +30,12 @@ public class ScriptableObject_Power_Creator : MonoBehaviour
 
             SuperPower asset = ScriptableObject.CreateInstance(type) as SuperPower;
             AssetDatabase.CreateAsset(asset, assetPath);
-            Debug.Log($"Created {type.Name} at {assetPath}");
+            
         }
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
-        Debug.Log("All SuperPower ScriptableObjects created!");
+        
     }
 #endif
 }

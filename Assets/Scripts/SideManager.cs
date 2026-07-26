@@ -56,7 +56,7 @@ public class SideManager : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("SideManager: Another instance already exists! Destroying duplicate on " + gameObject.name);
+            
             Destroy(this);
         }
     }
@@ -156,25 +156,25 @@ public class SideManager : MonoBehaviour
         if (worldBackground != null && worldBackground.activeSelf != isVisible)
         {
             worldBackground.SetActive(isVisible);
-            Debug.Log($"[SideManager] World background for {worldBackground.name} set to {(isVisible ? "active" : "inactive")}.");
+            
         }
     }
 
     private void SetupLocalEmoteTrigger()
     {
-        Debug.Log("[SideManager] Initializing local emote trigger setup...");
+        
         
         if (side0LocalTeam.PlayerBackground1 != null)
         {
             GameObject background = side0LocalTeam.PlayerBackground1;
-            Debug.Log("[SideManager] Target object for emote trigger (Background): " + background.name);
+            
 
             // 1. Add/Get Button component
             UnityEngine.UI.Button btn = background.GetComponent<UnityEngine.UI.Button>();
             if (btn == null)
             {
                 btn = background.AddComponent<UnityEngine.UI.Button>();
-                Debug.Log("[SideManager] Added new Button component to " + background.name);
+                
             }
 
             // 2. Ensure it has an Image component to receive raycasts and set it as target graphic
@@ -188,22 +188,22 @@ public class SideManager : MonoBehaviour
             // 3. Clear existing listeners and add the new one
             btn.onClick.RemoveAllListeners();
             btn.onClick.AddListener(() => {
-                Debug.Log("[SideManager] >>> AVATAR BACKGROUND CLICK REGISTERED! <<<");
+                
                 if (EmoteManager.Instance != null)
                 {
                     EmoteManager.Instance.RequestEmote();
                 }
                 else
                 {
-                    Debug.LogError("[SideManager] EmoteManager.Instance is NULL. Click ignored.");
+                    
                 }
             });
             
-            Debug.Log("[SideManager] Emote trigger setup complete and listener attached to background.");
+            
         }
         else
         {
-            Debug.LogError("[SideManager] PlayerBackground1 is NULL. Cannot setup emote trigger.");
+            
         }
     }
 

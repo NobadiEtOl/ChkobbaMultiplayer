@@ -95,14 +95,14 @@ public struct SerializableCard : INetworkSerializable
     {
         if (keys == null || values == null || keys.Count == 0)
         {
-            Debug.Log("SerializableCard is empty.");
+            
             return;
         }
 
         for (int i = 0; i < keys.Count; i++)
         {
-            Debug.Log($"Key: {keys[i]}");
-            Debug.Log($"Value: [{string.Join(", ", values[i])}]");
+            
+            
         }
     }
 }

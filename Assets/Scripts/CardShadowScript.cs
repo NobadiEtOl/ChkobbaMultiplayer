@@ -39,7 +39,7 @@ public class CardShadowScript : MonoBehaviour
         
         if (shadowComponent == null)
         {
-            Debug.LogWarning($"No Shadow component found on {gameObject.name}!");
+            
             return;
         }
         
@@ -79,7 +79,7 @@ public class CardShadowScript : MonoBehaviour
         
         if (showDebugInfo)
         {
-            Debug.Log($"{gameObject.name} - Initial Shadow Offset: {initialShadowOffset}, Initial Rotation: {initialRotationZ}°");
+            
         }
     }
 
@@ -117,7 +117,7 @@ public class CardShadowScript : MonoBehaviour
         
         if (showDebugInfo && Mathf.Abs(currentRotationZ - initialRotationZ) > 1f)
         {
-            Debug.Log($"{gameObject.name} - Rotation: {currentRotationZ:F1}°, Shadow Offset: {newShadowOffset}");
+            
         }
     }
 
@@ -132,7 +132,7 @@ public class CardShadowScript : MonoBehaviour
         {
             if (showDebugInfo)
             {
-                Debug.Log($"{gameObject.name} - Prevented jump: {changeDistance:F2} > {maxOffsetChange}");
+                
             }
             
             // Limit the change to maxOffsetChange in the same direction
@@ -225,7 +225,7 @@ public class CardShadowScript : MonoBehaviour
         
         if (showDebugInfo)
         {
-            Debug.Log($"{gameObject.name} - New Initial Shadow Offset: {initialShadowOffset}");
+            
         }
     }
     

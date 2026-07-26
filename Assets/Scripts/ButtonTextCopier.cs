@@ -39,7 +39,7 @@ public class ButtonTextCopier : MonoBehaviour
 
         if (string.IsNullOrEmpty(textToCopy))
         {
-            Debug.LogWarning($"[ButtonTextCopier] No text component assigned or the text is empty on GameObject: {gameObject.name}");
+            
             return;
         }
 
@@ -63,17 +63,17 @@ public class ButtonTextCopier : MonoBehaviour
         try
         {
             CopyToClipboard(text);
-            Debug.Log($"[Clipboard] WebGL copying: '{text}' requested");
+            
         }
         catch (System.Exception ex)
         {
-            Debug.LogWarning($"[Clipboard] WebGL JSLIB failed, falling back to systemCopyBuffer. Error: {ex.Message}");
+            
             GUIUtility.systemCopyBuffer = text;
         }
         #else
         // Works out-of-the-box on PC (Windows/macOS/Linux) and Mobile (Android/iOS)
         GUIUtility.systemCopyBuffer = text;
-        Debug.Log($"[Clipboard] Copied via GUIUtility.systemCopyBuffer: {text}");
+        
         #endif
     }
 }

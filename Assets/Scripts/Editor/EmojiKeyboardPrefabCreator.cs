@@ -156,7 +156,7 @@ public class EmojiKeyboardPrefabCreator : Editor
         EnsureDirectory(prefabPath);
         PrefabUtility.SaveAsPrefabAssetAndConnect(root, prefabPath, InteractionMode.AutomatedAction);
 
-        Debug.Log("Emoji Keyboard Prefab created at: " + prefabPath);
+        
 
         // Cleanup
         GameObject.DestroyImmediate(root);

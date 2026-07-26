@@ -46,11 +46,11 @@ public class ChangePixelsPerUnit : EditorWindow
                 {
                     importer.spritePixelsPerUnit = pixelsPerUnit;
                     AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
-                    Debug.Log($"Updated {sprite.name} to {pixelsPerUnit} PPU.");
+                    
                 }
                 else
                 {
-                    Debug.LogWarning($"Failed to update {sprite.name}: Not a valid sprite.");
+                    
                 }
             }
         }

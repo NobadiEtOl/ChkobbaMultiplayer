@@ -111,7 +111,7 @@ public struct SerializableList : INetworkSerializable
     {
         if (data == null || data.Count == 0)
         {
-            Debug.Log("SerializableList is empty.");
+            
             return;
         }
 
@@ -119,11 +119,11 @@ public struct SerializableList : INetworkSerializable
         {
             if (data[i] == null)
             {
-                Debug.Log($"Array {i}: null");
+                
             }
             else
             {
-                Debug.Log($"Array {i}: [{string.Join(", ", data[i])}]");
+                
             }
         }
     }

@@ -63,7 +63,7 @@ public class BotPlayer : MonoBehaviour
     public static void ToggleBotLogging()
     {
         botLoggingEnabled = !botLoggingEnabled;
-        Debug.Log($"[Bot] Bot logging {(botLoggingEnabled ? "enabled" : "disabled")}");
+        
     }
     
     /// <summary>
@@ -71,7 +71,7 @@ public class BotPlayer : MonoBehaviour
     /// </summary>
     private static void BotLog(string message)
     {
-        Debug.Log(message);
+        
         AddBotLog(message);
     }
     
@@ -96,17 +96,17 @@ public class BotPlayer : MonoBehaviour
         
         if (gameManager == null)
         {
-            Debug.LogError("[BotPlayer] GameManager not found!");
+            
         }
         
         if (server == null)
         {
-            Debug.LogError("[BotPlayer] Server not found!");
+            
         }
         
         if (networkRelay == null)
         {
-            Debug.LogError("[BotPlayer] GameNetworkRelay not found!");
+            
         }
         
     }
@@ -134,7 +134,7 @@ public class BotPlayer : MonoBehaviour
             StopCoroutine(moveCoroutine);
             moveCoroutine = null;
         }
-        Debug.Log("[BotPlayer] Bot deactivated");
+        
     }
     
     /// <summary>
@@ -148,7 +148,7 @@ public class BotPlayer : MonoBehaviour
         
         if (!isActive)
         {
-            Debug.LogWarning("[Bot] WARNING: Bot turn called but bot is not active");
+            
             AddBotLog("[Bot] WARNING: Bot turn called but bot is not active");
             return;
         }
@@ -156,7 +156,7 @@ public class BotPlayer : MonoBehaviour
         // DOUBLE SAFETY: Only proceed if the server instance on this client is the active host
         if (server != null && !server.isActiveHost)
         {
-            Debug.LogWarning("[Bot] WARNING: Bot turn called but this client's server is NOT the active host. Ignoring.");
+            
             return;
         }
 
@@ -249,7 +249,7 @@ public class BotPlayer : MonoBehaviour
             // Get the game mode to show the correct hand name in error message
             int gamePlayerCount = server != null ? server.GetPlayerCount() : 2;
             string expectedHandName = gamePlayerCount == 2 ? $"PlayerHand{botPlayerNumber + 2}" : $"PlayerHand{botPlayerNumber + 1}";
-            Debug.LogError($"[Bot] ERROR: No card found in {expectedHandName} for bot player {botPlayerNumber}");
+            
             AddBotLog($"[Bot] ERROR: No card found in {expectedHandName} for bot player {botPlayerNumber}");
             return;
         }
@@ -499,7 +499,7 @@ public class BotPlayer : MonoBehaviour
         GameObject playerHand = GameObject.Find(handName);
         if (playerHand == null)
         {
-            Debug.LogError($"[Bot] ERROR: {handName} GameObject not found!");
+            
             AddBotLog($"[Bot] ERROR: {handName} GameObject not found!");
             return null;
         }
@@ -526,7 +526,7 @@ public class BotPlayer : MonoBehaviour
             }
         }
         
-        Debug.LogWarning($"[Bot] WARNING: No cards found in {handName}");
+        
         AddBotLog($"[Bot] WARNING: No cards found in {handName}");
         return null;
     }
@@ -553,7 +553,7 @@ public class BotPlayer : MonoBehaviour
         }
         else
         {
-            Debug.LogError($"[Bot] ERROR: GameManager is null!");
+            
             AddBotLog($"[Bot] ERROR: GameManager is null!");
         }
         
@@ -585,12 +585,12 @@ public class BotPlayer : MonoBehaviour
     {
         if (isActive)
         {
-            Debug.Log("[BotPlayer] Forcing bot move via context menu");
+            
             ExecuteBotMove();
         }
         else
         {
-            Debug.LogWarning("[BotPlayer] Cannot force bot move - bot is not active");
+            
         }
     }
     
@@ -651,7 +651,7 @@ public class BotPlayer : MonoBehaviour
             StopCoroutine(moveCoroutine);
             moveCoroutine = null;
         }
-        Debug.Log("[BotPlayer] Reset for new round");
+        
     }
     
     /// <summary>
@@ -662,13 +662,13 @@ public class BotPlayer : MonoBehaviour
     {
         if (string.IsNullOrEmpty(botLogs))
         {
-            Debug.Log("[Bot] No bot logs collected yet.");
+            
             return;
         }
         
-        Debug.Log($"[Bot] ===== ALL BOT LOGS =====");
-        Debug.Log(botLogs);
-        Debug.Log($"[Bot] ===== END BOT LOGS =====");
+        
+        
+        
     }
     
     /// <summary>
@@ -678,7 +678,7 @@ public class BotPlayer : MonoBehaviour
     public void ClearBotLogsContextMenu()
     {
         ClearBotLogs();
-        Debug.Log("[Bot] Bot logs cleared.");
+        
     }
     
     /// <summary>

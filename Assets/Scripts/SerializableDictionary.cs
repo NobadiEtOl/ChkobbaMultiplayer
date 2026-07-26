@@ -115,17 +115,17 @@ public struct SerializableDictionary : INetworkSerializable
     {
         if (keys == null || values == null || keys.Count == 0)
         {
-            Debug.Log("SerializableDictionary is empty.");
+            
             return;
         }
 
         for (int i = 0; i < keys.Count; i++)
         {
-            Debug.Log($"Key (Player Number): {keys[i]}");
-            Debug.Log("UniqueIDs:");
+            
+            
             foreach (var uniqueID in values[i])
             {
-                Debug.Log($"  {uniqueID}");
+                
             }
         }
     }

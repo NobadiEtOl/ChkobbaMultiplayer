@@ -23,7 +23,7 @@ public class UIFrameAnimator : MonoBehaviour
         spriteRenderer = GetComponent<SpriteRenderer>();
         if (spriteRenderer == null)
         {
-            Debug.LogWarning("[UIFrameAnimator] SpriteRenderer component not found on " + gameObject.name);
+            
         }
         currentFrame = 0;
         timer = 0f;
@@ -56,7 +56,7 @@ public class UIFrameAnimator : MonoBehaviour
     {
         if (pageChangeFrames.Length == 0)
         {
-            Debug.LogWarning("No page change frames assigned!");
+            
             return;
         }
 

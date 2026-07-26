@@ -108,22 +108,7 @@ public class KeseController : MonoBehaviour
     [SerializeField] private HesapMakinesiController hesapMakinesiController;
     [SerializeField] private float quickDropTimeThreshold = 0.5f; // Time limit for "quick drop"
     
-    // Token data structure (same as in HesapMakinesiController)
-    [System.Serializable]
-    public class TokenData
-    {
-        public int value;
-        public int count;
-        
-        public TokenData(int value, int count)
-        {
-            this.value = value;
-            this.count = count;
-        }
-    }
-    
-    // Coin token data
-    private List<TokenData> coinTokenData = new List<TokenData>();
+
 
     void Start()
     {
@@ -134,20 +119,20 @@ public class KeseController : MonoBehaviour
             keseReachPoint = screenEdgeAdjuster.GetReachPointTransform("Kese");
             if (keseReachPoint == null)
             {
-                Debug.LogError("[KeseController] Could not find group 'Kese' in ScreenEdgePositionAdjuster!");
+                
             }
 
             // Get the return/starting position from the outside reach point
             keseStartingPosition = screenEdgeAdjuster.GetOutsideReachPointPosition("Kese");
             if (keseStartingPosition == Vector3.zero)
             {
-                Debug.LogWarning("[KeseController] Could not find group 'Kese' in ScreenEdgePositionAdjuster. Using current position as fallback.");
+                
                 keseStartingPosition = transform.position;
             }
         }
         else
         {
-            Debug.LogError("[KeseController] ScreenEdgePositionAdjuster not found in scene!");
+            
             keseStartingPosition = transform.position;
         }
         
@@ -198,7 +183,7 @@ public class KeseController : MonoBehaviour
                 rightHandObject.transform.position = target;
                 handApproachingReachPoint = false;
                 shouldHandFollowCoin = true;
-                Debug.Log("[KeseController] Hand reached coin reach point, now following coin.");
+                
             }
             else
             {
@@ -208,7 +193,7 @@ public class KeseController : MonoBehaviour
         else if ((isDraggingCoin || shouldHandFollowCoin) && currentCoin != null && rightHandObject != null && coinReachPoint != null)
         {
             // --- DEBUG: Log hand/coin positions ---
-            Debug.Log($"[KeseController] Coin at {currentCoin.transform.position}, Hand at {rightHandObject.transform.position}, Reach at {coinReachPoint.position}, HandStart at {rightHandStartPoint.position}");
+            
 
             // Check if hand is at its starting position (within a small threshold)
             float handToStartDist = Vector3.Distance(rightHandObject.transform.position, rightHandStartPoint.position);
@@ -216,7 +201,7 @@ public class KeseController : MonoBehaviour
             {
                 // If hand is at start, keep it at start instead of following the coin
                 rightHandObject.transform.position = rightHandStartPoint.position;
-                Debug.Log("[KeseController] Hand is at starting position, not following coin.");
+                
             }
             else
             {
@@ -382,28 +367,28 @@ public class KeseController : MonoBehaviour
                 // Check if we hit a Token (Super Power tokens)
                 if (hitObj.CompareTag("Token") || hitObj.name.Contains("Token"))
                 {
-                    Debug.Log("[KeseController] Click detected on Token");
+                    
                     return true;
                 }
 
                 // Check if we hit the top-level InfoBoxBackGroundPanel or any of its descendants
                 if (infoBoxBg != null && (hitObj == infoBoxBg || hitObj.transform.IsChildOf(infoBoxBg.transform)))
                 {
-                    Debug.Log("[KeseController] Click detected on InfoBox or its child");
+                    
                     return true;
                 }
 
                 // Check if we hit the menu background panel or any of its descendants
                 if (menuBg != null && (hitObj == menuBg || hitObj.transform.IsChildOf(menuBg.transform)))
                 {
-                    Debug.Log("[KeseController] Click detected on Menu display area");
+                    
                     return true;
                 }
 
                 // Check for other potential scroll display elements by name
                 if (hitObj.name == "DisplayBackgroundPanel" || hitObj.name == "TokenDisplayArea" || hitObj.name == "ScrollContainer")
                 {
-                    Debug.Log("[KeseController] Click detected on menu scroll element");
+                    
                     return true;
                 }
             }
@@ -431,7 +416,7 @@ public class KeseController : MonoBehaviour
                         
                         if (results.Count > 0)
                         {
-                            Debug.Log("[KeseController] Click detected on InfoBox canvas UI");
+                            
                             return true;
                         }
                     }
@@ -471,12 +456,12 @@ public class KeseController : MonoBehaviour
             // Show kese when coin is held for more than threshold
             if (holdTime > quickDropTimeThreshold && !isKeseAtReachPoint && !isKeseMoving)
             {
-                Debug.Log($"[KeseController] Coin held for {holdTime:F2} seconds, showing kese");
+                
                 
                 // Close hesap makinesi first if it's open
                 if (hesapMakinesiController != null && hesapMakinesiController.IsAtReachPoint())
                 {
-                    Debug.Log("[KeseController] Hesap makinesi is open, closing it before showing kese");
+                    
                     hesapMakinesiController.ForceClose();
                     
                     // Wait a short moment for hesap makinesi to start closing, then show kese
@@ -497,26 +482,26 @@ public class KeseController : MonoBehaviour
     /// </summary>
     private void OnOtherClickDetected()
     {
-        Debug.Log("[KeseController] Click detected on something else - closing hesap makinesi and infobox");
+        
         
         // Close hesap makinesi if it's open
         if (hesapMakinesiController != null && hesapMakinesiController.IsAtReachPoint())
         {
-            Debug.Log("[KeseController] Hesap makinesi is open, closing it");
+            
             hesapMakinesiController.ForceClose();
         }
         
         // Close kese when something else is clicked
         if (isKeseAtReachPoint)
         {
-            Debug.Log("[KeseController] Kese is at reach point, closing it");
+            
             MoveKeseToStartingPosition();
         }
 
         // Close InfoBox (menu) if it is currently open
         if (SuperPowerSpawner.LocalInstance != null && SuperPowerSpawner.LocalInstance.isInfoBoxOpen)
         {
-            Debug.Log("[KeseController] InfoBox is open, closing it");
+            
             SuperPowerSpawner.LocalInstance.StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
         }
     }
@@ -543,14 +528,14 @@ public class KeseController : MonoBehaviour
             // Direct hit on the hesap makinesi itself
             if (hitObj == hesapMakinesiGameObject)
             {
-                Debug.Log("[KeseController] Click detected on Hesap Makinesi");
+                
                 return true;
             }
             
             // Hit on a child of the hesap makinesi
             if (hitObj.transform.IsChildOf(hesapMakinesiGameObject.transform))
             {
-                Debug.Log("[KeseController] Click detected on Hesap Makinesi child");
+                
                 return true;
             }
         }
@@ -605,7 +590,7 @@ public class KeseController : MonoBehaviour
         // Start timer for hesap makinesi and kese
         coinTouchStartTime = Time.time;
         coinIsBeingHeld = true;
-        Debug.Log("[KeseController] Coin touch started, timer begins for hesap makinesi and kese");
+        
     }
 
     /// <summary>
@@ -631,12 +616,12 @@ public class KeseController : MonoBehaviour
             float holdTime = Time.time - coinTouchStartTime;
             coinIsBeingHeld = false;
             
-            Debug.Log($"[KeseController] Coin dropped after {holdTime:F2} seconds");
+            
             
             // If coin was held for a short time, notify hesap makinesi
             if (holdTime <= quickDropTimeThreshold && hesapMakinesiController != null)
             {
-                Debug.Log($"[KeseController] Quick drop detected! Notifying hesap makinesi");
+                
                 hesapMakinesiController.OnQuickDropDetected();
             }
         }
@@ -645,9 +630,9 @@ public class KeseController : MonoBehaviour
         Vector3 keseCurrentPosition = isKeseAtReachPoint ? keseReachPoint.position : coinDestinationPoint.position;
         float distToDest = Vector3.Distance(currentCoin.transform.position, keseCurrentPosition);
         
-        Debug.Log($"[KeseController] Coin drop check - Distance: {distToDest:F2}, AcceptRadius: {acceptRadius}, KeseAtReach: {isKeseAtReachPoint}, TokenCount: {coinTokenData.Count}");
+        
 
-        if (distToDest <= acceptRadius && coinTokenData.Count > 0)
+        if (distToDest <= acceptRadius)
         {
             // Accept: move coin and hand to destination, play pouch accept, reset coin
             shouldHandFollowCoin = false;
@@ -662,7 +647,7 @@ public class KeseController : MonoBehaviour
             // Close kese when coin is dropped outside accept radius
             if (isKeseAtReachPoint)
             {
-                Debug.Log("[KeseController] Coin dropped outside accept radius, closing kese");
+                
                 MoveKeseToStartingPosition();
             }
         }
@@ -670,32 +655,21 @@ public class KeseController : MonoBehaviour
 
     /// <summary>
     /// Handles coin acceptance and hand return after a successful drop.
+    /// Spawns 1 power with the selected cost mode tier boost.
     /// </summary>
     private void AcceptCoin()
     {
         if (coinMoveSequence != null) coinMoveSequence.Kill();
         if (handMoveSequence != null) handMoveSequence.Kill();
 
-        // --- Pass spawn origin and scale to SuperPowerSpawner ---
+        // Spawn 1 power with the selected cost mode boost
         if (SuperPowerSpawner.LocalInstance != null)
         {
             Vector3 spawnOrigin = isKeseAtReachPoint ? keseReachPoint.position : coinDestinationPoint.position;
-            float spawnScale = 1.5f; // Or any "big" scale you want
+            float spawnScale = 1.5f;
             
-            // Use token data if available, otherwise use default coinAmount
-            int totalTokens = GetTotalTokenCount();
-            Debug.Log($"[KeseController] AcceptCoin: Spawning tokens at {spawnOrigin} with scale {spawnScale}, totalTokens={totalTokens}");
             
-            if (coinTokenData.Count > 0)
-            {
-                // Spawn tokens based on calculator data
-                SpawnTokensFromCalculatorData(spawnOrigin, spawnScale);
-            }
-            else
-            {
-                // Use default behavior - spawn 1 power, cost mode 1
-                SuperPowerSpawner.LocalInstance.ReadyToSpawnSuperPowers(1, spawnOrigin, spawnScale, selectedCostMode);
-            }
+            SuperPowerSpawner.LocalInstance.ReadyToSpawnSuperPowers(1, spawnOrigin, spawnScale, selectedCostMode);
         }
         
         // Move coin and hand to destination together
@@ -738,7 +712,7 @@ public class KeseController : MonoBehaviour
         handApproachingReachPoint = true;
         shouldHandFollowCoin = false;
 
-        Debug.Log("[KeseController] ReturnCoin: Coin returning to start, hand will approach reach point then follow.");
+        
 
         // Move coin back to start
         coinMoveSequence = DOTween.Sequence();
@@ -802,7 +776,7 @@ public class KeseController : MonoBehaviour
         // Close the kese
         if (isKeseAtReachPoint)
         {
-            Debug.Log("[KeseController] Acceptance animation finished, closing kese");
+            
             MoveKeseToStartingPosition();
         }
     }
@@ -931,85 +905,13 @@ public class KeseController : MonoBehaviour
     private int selectedCostMode = 1;
 
     /// <summary>
-    /// Receives token data and cost mode from HesapMakinesiController.
+    /// Sets the cost mode tier for the next coin drop.
     /// costMode 1/2/3 boosts draws toward that tier; Tier 4 (ZaferPuani) is never boosted.
     /// </summary>
-    public void SetCoinTokenData(List<TokenData> tokens, int costMode = 1)
+    public void SetCostMode(int costMode)
     {
-        coinTokenData.Clear();
-        coinTokenData.AddRange(tokens);
-        selectedCostMode = costMode;
-
-        Debug.Log($"[KeseController] Received token data: {tokens.Count} token types, costMode: {costMode}");
-        foreach (var token in tokens)
-        {
-            Debug.Log($"[KeseController] Token: {token.count}x {token.value} value");
-        }
-    }
-    
-    /// <summary>
-    /// Gets the total number of tokens from calculator data
-    /// </summary>
-    private int GetTotalTokenCount()
-    {
-        int total = 0;
-        foreach (var token in coinTokenData)
-        {
-            total += token.count;
-        }
-        return total;
-    }
-    
-    /// <summary>
-    /// Spawns tokens based on calculator data
-    /// Each token costs 1 gold, regardless of token value.
-    /// Powers are drawn with cost-tier-weighted randomness.
-    /// </summary>
-    private void SpawnTokensFromCalculatorData(Vector3 spawnOrigin, float spawnScale)
-    {
-        if (SuperPowerSpawner.LocalInstance == null) return;
+        selectedCostMode = Mathf.Clamp(costMode, 1, 3);
         
-        Debug.Log($"[KeseController] Spawning tokens from calculator data");
-        
-        // Calculate total number of tokens to spawn
-        int totalTokenCount = 0;
-        foreach (var token in coinTokenData)
-        {
-            totalTokenCount += token.count;
-        }
-        
-        // Each power costs 1 gold
-        int totalGoldCost = totalTokenCount;
-        
-        // Check if player has enough gold
-        if (SuperPowerSpawner.LocalInstance.HasEnoughGold(totalGoldCost))
-        {
-            // Spend the gold (1 per power)
-            SuperPowerSpawner.LocalInstance.SpendGold(totalGoldCost);
-            
-            // Spawn all powers with mode-boosted inverse-weighted random selection
-            SuperPowerSpawner.LocalInstance.ReadyToSpawnSuperPowers(totalTokenCount, spawnOrigin, spawnScale, selectedCostMode);
-            
-            Debug.Log($"[KeseController] Successfully spent {totalGoldCost} gold and spawned {totalTokenCount} powers");
-        }
-        else
-        {
-            // Not enough gold - return coin to start
-            Debug.Log($"[KeseController] Insufficient gold! Need {totalGoldCost}, have {SuperPowerSpawner.LocalInstance.GetCurrentGold()}");
-            ReturnCoin();
-        }
-        
-        // Clear token data after spawning
-        //coinTokenData.Clear();
-    }
-    
-    /// <summary>
-    /// Clears the coin token data (called when coin is reset)
-    /// </summary>
-    public void ClearCoinTokenData()
-    {
-        coinTokenData.Clear();
-        Debug.Log("[KeseController] Cleared coin token data");
     }
     
     // ===== KESE MOVEMENT METHODS (like infobox and hesap makinesi) =====
@@ -1021,7 +923,7 @@ public class KeseController : MonoBehaviour
     {
         if (isKeseMoving || keseReachPoint == null) return;
         
-        Debug.Log("[KeseController] Moving kese to reach point");
+        
         
         // Kill any existing movement sequence
         if (keseMoveSequence != null)
@@ -1042,7 +944,7 @@ public class KeseController : MonoBehaviour
         keseMoveSequence.Append(transform.DOMove(keseReachPoint.position, keseMoveSpeed).SetEase(keseMoveEase));
         keseMoveSequence.OnComplete(() => {
             isKeseMoving = false;
-            Debug.Log("[KeseController] Kese reached target position");
+            
         });
     }
     
@@ -1053,7 +955,7 @@ public class KeseController : MonoBehaviour
     {
         if (isKeseMoving) return;
         
-        Debug.Log("[KeseController] Moving kese to starting position");
+        
         
         // Kill any existing movement sequence
         if (keseMoveSequence != null)
@@ -1067,7 +969,7 @@ public class KeseController : MonoBehaviour
         keseMoveSequence.Append(transform.DOMove(keseStartingPosition, keseMoveSpeed).SetEase(keseMoveEase));
         keseMoveSequence.OnComplete(() => {
             isKeseMoving = false;
-            Debug.Log("[KeseController] Kese returned to starting position");
+            
             
             // Stop pouch animation when kese reaches starting position
             if (pouchAnimCoroutine != null)

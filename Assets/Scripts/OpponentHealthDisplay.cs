@@ -24,11 +24,11 @@ public class OpponentHealthDisplay : MonoBehaviour
 
     public void InitializeHealthDisplay(int maxHealthPoints)
     {
-        Debug.Log($"[OpponentHealthDisplay] Initializing health display with max health: {maxHealthPoints}");
+        
 
         if (maxHealthPoints <= 0)
         {
-            Debug.LogError("[OpponentHealthDisplay] MaxHealth must be greater than 0!");
+            
             return;
         }
 
@@ -37,36 +37,36 @@ public class OpponentHealthDisplay : MonoBehaviour
 
         if (healthBarSlider == null)
         {
-            Debug.LogWarning("[OpponentHealthDisplay] Health bar slider is not assigned. Assign it in the Inspector.");
+            
         }
 
         if (damageBarSlider == null)
         {
-            Debug.LogWarning("[OpponentHealthDisplay] Damage bar slider is not assigned. Assign it in the Inspector.");
+            
         }
 
         if (healthText == null)
         {
-            Debug.LogWarning("[OpponentHealthDisplay] Health text is not assigned. Assign it in the Inspector.");
+            
         }
 
         isInitialized = true;
         RefreshHealthDisplay();
 
-        Debug.Log("[OpponentHealthDisplay] Initialization complete - health and damage sliders ready");
+        
     }
 
     public void SetActive(bool active)
     {
         gameObject.SetActive(active);
-        Debug.Log($"[OpponentHealthDisplay] Set active: {active}");
+        
     }
 
     public void UpdateHealth(int damageAccumulated)
     {
         if (!isInitialized)
         {
-            Debug.LogWarning("[OpponentHealthDisplay] Not initialized yet! Call InitializeHealthDisplay first.");
+            
             return;
         }
 
@@ -89,7 +89,7 @@ public class OpponentHealthDisplay : MonoBehaviour
         healthAnimationCoroutine = StartCoroutine(AnimateSliderValue(healthBarSlider, previousDisplayedHealth, currentHealth, healthAnimationDuration, true));
         damageShadowCoroutine = StartCoroutine(AnimateDamageShadow(previousDamageHealth, currentHealth));
 
-        Debug.Log($"[OpponentHealthDisplay] Damage accumulated: {damageAccumulated} | Remaining health: {currentHealth}/{maxHealth}");
+        
     }
 
     private void RefreshHealthDisplay()

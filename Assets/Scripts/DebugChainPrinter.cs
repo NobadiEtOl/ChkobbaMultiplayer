@@ -26,83 +26,83 @@ public class DebugChainPrinter : MonoBehaviour
     {
         string timestampedAction = $"[{DateTime.Now:HH:mm:ss.fff}] {action}";
         localActionHistory.Add(timestampedAction);
-        Debug.Log($"[DebugChainPrinter] TRACKED ACTION: {timestampedAction}");
+        
     }
 
     public void TrackCardMovement(string cardId, string fromLocation, string toLocation, string reason)
     {
         string movement = $"Card {cardId}: {fromLocation} → {toLocation} ({reason})";
         cardMovementHistory.Add($"[{DateTime.Now:HH:mm:ss.fff}] {movement}");
-        Debug.Log($"[DebugChainPrinter] TRACKED CARD MOVEMENT: {movement}");
+        
     }
 
     public void TrackPowerUsage(string powerName, int playerNumber, string details)
     {
         string powerUsage = $"{powerName} by P{playerNumber}: {details}";
         powerUsageHistory.Add($"[{DateTime.Now:HH:mm:ss.fff}] {powerUsage}");
-        Debug.Log($"[DebugChainPrinter] TRACKED POWER USAGE: {powerUsage}");
+        
     }
 
     public void TrackNetworkRPC(string rpcName, string parameters)
     {
         string rpcCall = $"{rpcName}({parameters})";
         networkRpcHistory.Add($"[{DateTime.Now:HH:mm:ss.fff}] {rpcCall}");
-        Debug.Log($"[DebugChainPrinter] TRACKED RPC: {rpcCall}");
+        
     }
 
     public void TrackMoveChain(string chainInfo)
     {
         moveChainHistory.Add($"[{DateTime.Now:HH:mm:ss.fff}] {chainInfo}");
-        Debug.Log($"[DebugChainPrinter] TRACKED MOVE CHAIN: {chainInfo}");
+        
     }
 
     [ContextMenu("Print Debug Chain - Problematic Powers")]
     public void PrintDebugChainProblematicPowers()
     {
         string debugChain = BuildDebugChainProblematicPowers();
-        Debug.Log("=== DEBUG CHAIN - PROBLEMATIC POWERS ===\n" + debugChain + "\n=== END DEBUG CHAIN ===");
+        
     }
 
     [ContextMenu("Print Debug Chain - All Powers")]
     public void PrintDebugChainAllPowers()
     {
         string debugChain = BuildDebugChainAllPowers();
-        Debug.Log("=== DEBUG CHAIN - ALL POWERS ===\n" + debugChain + "\n=== END DEBUG CHAIN ===");
+        
     }
 
     [ContextMenu("Print Debug Chain - Card Details")]
     public void PrintDebugChainCardDetails()
     {
         string debugChain = BuildDebugChainCardDetails();
-        Debug.Log("=== DEBUG CHAIN - CARD DETAILS ===\n" + debugChain + "\n=== END DEBUG CHAIN ===");
+        
     }
 
     [ContextMenu("Print Debug Chain - Network RPCs")]
     public void PrintDebugChainNetworkRPCs()
     {
         string debugChain = BuildDebugChainNetworkRPCs();
-        Debug.Log("=== DEBUG CHAIN - NETWORK RPCs ===\n" + debugChain + "\n=== END DEBUG CHAIN ===");
+        
     }
 
     [ContextMenu("Print Debug Chain - Complete State")]
     public void PrintDebugChainCompleteState()
     {
         string debugChain = BuildDebugChainCompleteState();
-        Debug.Log("=== DEBUG CHAIN - COMPLETE STATE ===\n" + debugChain + "\n=== END DEBUG CHAIN ===");
+        
     }
 
     [ContextMenu("Print Debug Chain - Action History")]
     public void PrintDebugChainActionHistory()
     {
         string debugChain = BuildDebugChainActionHistory();
-        Debug.Log("=== DEBUG CHAIN - ACTION HISTORY ===\n" + debugChain + "\n=== END DEBUG CHAIN ===");
+        
     }
 
     [ContextMenu("Print Debug Chain - Comprehensive Analysis")]
     public void PrintDebugChainComprehensiveAnalysis()
     {
         string debugChain = BuildDebugChainComprehensiveAnalysis();
-        Debug.Log("=== DEBUG CHAIN - COMPREHENSIVE ANALYSIS ===\n" + debugChain + "\n=== END DEBUG CHAIN ===");
+        
     }
 
     private string BuildDebugChainProblematicPowers()
@@ -610,7 +610,7 @@ public class DebugChainPrinter : MonoBehaviour
     public void PrintDebugChainSuperpowerActivationFlow()
     {
         string debugChain = BuildDebugChainSuperpowerActivationFlow();
-        Debug.Log("=== DEBUG CHAIN - SUPERPOWER ACTIVATION FLOW ===\n" + debugChain + "\n=== END DEBUG CHAIN ===");
+        
     }
 
     private string BuildDebugChainSuperpowerActivationFlow()
@@ -674,7 +674,7 @@ public class DebugChainPrinter : MonoBehaviour
     public void PrintDebugChainDesyncAnalysis()
     {
         string debugChain = BuildDebugChainDesyncAnalysis();
-        Debug.Log("=== DEBUG CHAIN - DESYNC ANALYSIS ===\n" + debugChain + "\n=== END DEBUG CHAIN ===");
+        
     }
 
     private string BuildDebugChainDesyncAnalysis()
@@ -778,41 +778,41 @@ public class DebugChainPrinter : MonoBehaviour
         powerUsageHistory.Clear();
         networkRpcHistory.Clear();
         moveChainHistory.Clear();
-        Debug.Log("[DebugChainPrinter] All history cleared");
+        
     }
 
     [ContextMenu("Clear Action History")]
     public void ClearActionHistory()
     {
         localActionHistory.Clear();
-        Debug.Log("[DebugChainPrinter] Action history cleared");
+        
     }
 
     [ContextMenu("Clear Card Movement History")]
     public void ClearCardMovementHistory()
     {
         cardMovementHistory.Clear();
-        Debug.Log("[DebugChainPrinter] Card movement history cleared");
+        
     }
 
     [ContextMenu("Clear Power Usage History")]
     public void ClearPowerUsageHistory()
     {
         powerUsageHistory.Clear();
-        Debug.Log("[DebugChainPrinter] Power usage history cleared");
+        
     }
 
     [ContextMenu("Clear Network RPC History")]
     public void ClearNetworkRpcHistory()
     {
         networkRpcHistory.Clear();
-        Debug.Log("[DebugChainPrinter] Network RPC history cleared");
+        
     }
 
     [ContextMenu("Clear Move Chain History")]
     public void ClearMoveChainHistory()
     {
         moveChainHistory.Clear();
-        Debug.Log("[DebugChainPrinter] Move chain history cleared");
+        
     }
 }

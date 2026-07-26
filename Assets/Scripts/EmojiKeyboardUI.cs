@@ -161,7 +161,7 @@ public class EmojiKeyboardUI : MonoBehaviour
                 emojis = Objects;
                 break;
             default:
-                Debug.LogWarning($"[EmojiKeyboardUI] Unknown category: {category}. Defaulting to Smileys.");
+                
                 emojis = Smileys;
                 break;
         }

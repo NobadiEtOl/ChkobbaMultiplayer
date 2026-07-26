@@ -16,7 +16,7 @@ public class CarpetScript : MonoBehaviour
 
         // Get sprite size in pixels
         float spriteWidth = sr.sprite.rect.width;
-        //Debug.Log("Sprite Width: " + spriteWidth);
+        //
         float spriteHeight = sr.sprite.rect.height;
 
         // Get world size of the sprite (before scaling)
@@ -32,9 +32,9 @@ public class CarpetScript : MonoBehaviour
 
         // Get world width visible by camera at z=0
         float worldScreenHeight = cam.orthographicSize * 2f;
-        //Debug.Log("World Screen Height: " + worldScreenHeight);
+        //
         float worldScreenWidth = worldScreenHeight * screenAspect;
-        //Debug.Log("World Screen Width: " + worldScreenWidth);
+        //
 
         // Calculate scale to fit the screen width
         float scale = worldScreenWidth / spriteWorldWidth;

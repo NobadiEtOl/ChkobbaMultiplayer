@@ -115,7 +115,7 @@ public class NetworkManagerUI : MonoBehaviour
         }
         else
         {
-            Debug.Log($"[MIGRATION] Prioritizing local real-time turn state - Turn: {snapshot.turnCounter}, Player: {snapshot.currentPlayer}");
+            
         }
 
         snapshot.roundCount = truths.roundCount;
@@ -133,7 +133,7 @@ public class NetworkManagerUI : MonoBehaviour
                 goldDict[entry.playerNo] = entry.gold;
             }
             snapshot.playerGold = new SerializableIntDictionary(goldDict);
-            Debug.Log($"[MIGRATION] Merged {goldDict.Count} player gold values from ServerTruths into snapshot.");
+            
         }
 
         // Restore player superpowers from ServerTruths during migration merge
@@ -145,7 +145,7 @@ public class NetworkManagerUI : MonoBehaviour
                 powersDict[entry.playerNo] = new List<string>(entry.powers);
             }
             snapshot.playerSuperPowers = new SerializableDictionary(powersDict);
-            Debug.Log($"[MIGRATION] Merged {powersDict.Count} player superpower sets from ServerTruths into snapshot.");
+            
         }
 
         return snapshot;
@@ -156,10 +156,10 @@ public class NetworkManagerUI : MonoBehaviour
         if (currentSession != null && currentSession.Properties.ContainsKey("GAME_META"))
         {
             string json = currentSession.Properties["GAME_META"].Value;
-            Debug.Log($"[SERVER_TRUTHS] Read from session: {json}");
+            
             return JsonUtility.FromJson<ServerTruths>(json);
         }
-        Debug.LogWarning("[SERVER_TRUTHS] No GAME_META found in session properties.");
+        
         return default;
     }
 
@@ -174,8 +174,6 @@ public class NetworkManagerUI : MonoBehaviour
     private void InitializeMainScreenReference()
     {
         mainScreen = GameObject.Find("MainScreen");
-        if (mainScreen != null) Debug.Log("[NetworkManagerUI] Main screen reference initialized successfully");
-        else Debug.LogError("[NetworkManagerUI] Main screen GameObject not found!");
     }
 
     async void Start()
@@ -196,7 +194,7 @@ public class NetworkManagerUI : MonoBehaviour
                 #else
                 utp.UseWebSockets = false;
                 #endif
-                Debug.Log($"[NetworkManagerUI] Auto-configured UnityTransport UseWebSockets to: {utp.UseWebSockets}");
+                
             }
         }
         await EnsureServicesReady();
@@ -224,26 +222,26 @@ public class NetworkManagerUI : MonoBehaviour
             if (UnityServices.State == ServicesInitializationState.Uninitialized) await UnityServices.InitializeAsync();
             if (!AuthenticationService.Instance.IsSignedIn) await AuthenticationService.Instance.SignInAnonymouslyAsync();
         }
-        catch (Exception e) { Debug.LogError($"[NetworkManagerUI] EnsureServicesReady failed: {e.Message}"); }
+        catch (Exception e) {  }
     }
 
     private bool TryBeginFlow(string flowName)
     {
         if (isFlowBusy)
         {
-            Debug.LogWarning($"[FLOW] Ignoring '{flowName}' because another flow is already running.");
+            
             return false;
         }
 
         isFlowBusy = true;
-        Debug.Log($"[FLOW] Begin: {flowName}");
+        
         return true;
     }
 
     private void EndFlow(string flowName)
     {
         isFlowBusy = false;
-        Debug.Log($"[FLOW] End: {flowName}");
+        
     }
 
     public async Task<string> StartNewHost(int playerCount, bool isPrivate)
@@ -280,11 +278,11 @@ public class NetworkManagerUI : MonoBehaviour
     {
         if (NetworkManager.Singleton == null)
         {
-            Debug.LogError("[FLOW] AttemptReconnect failed: NetworkManager.Singleton is null.");
+            
             return;
         }
 
-        Debug.Log("[FLOW] AttemptReconnect invoked.");
+        
         StartCoroutine(RejoinNGOHostRoutine());
     }
 
@@ -295,7 +293,7 @@ public class NetworkManagerUI : MonoBehaviour
         string ownerPlayerId = AuthenticationService.Instance.PlayerId;
         if (string.IsNullOrEmpty(ownerPlayerId))
         {
-            Debug.LogWarning("[SEATMAP] Skipping initial SEAT_MAP write: missing authenticated player id.");
+            
             return;
         }
 
@@ -318,11 +316,11 @@ public class NetworkManagerUI : MonoBehaviour
             var hostSession = currentSession.AsHost();
             hostSession.SetProperty(SeatMapPropertyKey, new SessionProperty(serializedSeatMap, VisibilityPropertyOptions.Public));
             await hostSession.SavePropertiesAsync();
-            Debug.Log($"[SEATMAP] Initial seat map persisted: {serializedSeatMap}");
+            
         }
         catch (Exception e)
         {
-            Debug.LogError($"[SEATMAP] Failed to save initial seat map: {e.Message}");
+            
         }
     }
 
@@ -357,7 +355,7 @@ public class NetworkManagerUI : MonoBehaviour
         }
         catch (Exception e) 
         { 
-            Debug.LogError($"[NetworkManagerUI] Failed to start host: {e.Message}"); 
+             
             if (privateFlag && mainUIScript != null)
             {
                 mainUIScript.OnReturnFromWaitingScreen();
@@ -390,7 +388,7 @@ public class NetworkManagerUI : MonoBehaviour
             if (currentSession.Properties.ContainsKey("ACTIVE_RELAY_CODE"))
             {
                 string migratedCode = currentSession.Properties["ACTIVE_RELAY_CODE"].Value;
-                Debug.Log("[NetworkManagerUI] Re-joining migrated session. Using active relay code: " + migratedCode);
+                
                 
                 var joinAllocation = await RelayService.Instance.JoinAllocationAsync(migratedCode);
                 
@@ -410,7 +408,7 @@ public class NetworkManagerUI : MonoBehaviour
             isInGame = true;
             return true;
         }
-        catch (Exception e) { Debug.LogError($"[NetworkManagerUI] Failed to join session: {e.Message}"); if (mainUIScript != null) mainUIScript.OnDisconnectDetected(); return false; }
+        catch (Exception e) {  return false; }
     }
 
     public async Task FindLobbiesAndStartHostIfNoneExist(int playerCount)
@@ -421,10 +419,10 @@ public class NetworkManagerUI : MonoBehaviour
         {
             // For quickplay with bot mode enabled, directly start a bot game without querying other sessions
             // This ensures that when the player wants to debug with bots, they always get a bot opponent
-            Debug.Log("[NetworkManagerUI] QuickPlay: Starting bot game directly without querying for other players.");
+            
             await StartHostWithRelay(playerCount, false, true);
         }
-        catch (Exception e) { Debug.LogError($"[NetworkManagerUI] QuickPlay failed: {e.Message}"); if (mainUIScript != null) mainUIScript.OnDisconnectDetected(); }
+        catch (Exception e) {  }
     }
 
     private void OnClientConnected(ulong clientId) { isInGame = true; }
@@ -433,7 +431,7 @@ public class NetworkManagerUI : MonoBehaviour
         // If we were in a game and not the host, this might be a host drop
         if (isInGame && !NetworkManager.Singleton.IsHost && !isMigrating)
         {
-            Debug.Log($"[NetworkManagerUI] NGO Disconnected (ID: {clientId}). Checking session for migration...");
+            
             if (currentSession != null)
             {
                 isMigrating = true;
@@ -451,7 +449,7 @@ public class NetworkManagerUI : MonoBehaviour
 
     private IEnumerator HandleHostMigrationRoutine()
     {
-        Debug.Log("[NetworkManagerUI] Host migration routine started. Capturing local state...");
+        
 
         // 1. Pull metadata from Session
         ServerTruths truths = ReadServerTruthsFromSession();
@@ -463,11 +461,11 @@ public class NetworkManagerUI : MonoBehaviour
 
             // 3. Merge
             localMigrationSnapshot = Merge(truths, localMigrationSnapshot);
-            Debug.Log($"[MIGRATION] State captured and merged. Snapshot v{localMigrationSnapshot.snapshotVersion}, Seed: {localMigrationSnapshot.seed}");
+            
         }
         else
         {
-            Debug.LogWarning("[MIGRATION] GameManager.LocalInstance is null. Cannot capture visual state.");
+            
             localMigrationSnapshot = default;
         }
 
@@ -478,7 +476,7 @@ public class NetworkManagerUI : MonoBehaviour
         // A7: Staggered start based on seat index to prevent simultaneous promotion attempts
         int mySeat = DeckController.LocalInstance != null ? DeckController.LocalInstance.thisPlayerNumber : 0;
         float staggerDelay = mySeat * 1.5f;
-        Debug.Log($"[MIGRATION] Staggering migration start by {staggerDelay}s (Seat {mySeat})");
+        
         yield return new WaitForSeconds(staggerDelay);
 
         // Wait a few seconds for the Session API to elect a new host
@@ -503,14 +501,14 @@ public class NetworkManagerUI : MonoBehaviour
             if (currentSession != null && !currentSession.IsHost && currentSession.Properties.ContainsKey("ACTIVE_RELAY_CODE"))
             {
                 string newRelayCode = currentSession.Properties["ACTIVE_RELAY_CODE"].Value;
-                Debug.Log("[NetworkManagerUI] New Relay Join Code detected: " + newRelayCode + ". Re-connecting...");
+                
                 
                 // 1. Join the NEW Relay allocation
                 var joinTask = RelayService.Instance.JoinAllocationAsync(newRelayCode);
                 yield return new WaitUntil(() => joinTask.IsCompleted);
                 if (joinTask.IsFaulted)
                 {
-                    Debug.LogError("[NetworkManagerUI] Failed to join new Relay allocation: " + joinTask.Exception.Message);
+                    
                     isMigrating = false;
                     PerformDisconnect();
                     yield break;
@@ -536,7 +534,7 @@ public class NetworkManagerUI : MonoBehaviour
 
         if (currentSession == null || (elapsed >= timeout && !currentSession.IsHost))
         {
-            Debug.LogWarning($"[NetworkManagerUI] Host migration failed or timed out. currentSession null: {currentSession == null}, timeout: {elapsed >= timeout}, !IsHost: {!currentSession?.IsHost}");
+            
             isMigrating = false;
             PerformDisconnect();
         }
@@ -544,13 +542,13 @@ public class NetworkManagerUI : MonoBehaviour
 
     private IEnumerator HandleHostMigrationAsNewHost()
     {
-        Debug.Log("[FLOW] HandleHostMigrationAsNewHost: relay re-allocation started.");
+        
 
         var allocationTask = RelayService.Instance.CreateAllocationAsync(currentSession.MaxPlayers - 1);
         yield return new WaitUntil(() => allocationTask.IsCompleted);
         if (allocationTask.IsFaulted)
         {
-            Debug.LogError("[NetworkManagerUI] Relay allocation failed: " + allocationTask.Exception.Message);
+            
             isMigrating = false;
             PerformDisconnect();
             yield break;
@@ -560,7 +558,7 @@ public class NetworkManagerUI : MonoBehaviour
         var joinCodeTask = RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
         yield return new WaitUntil(() => joinCodeTask.IsCompleted);
         var relayJoinCode = joinCodeTask.Result;
-        Debug.Log("[NetworkManagerUI] New Relay Join Code generated: " + relayJoinCode);
+        
 
         var hostSession = currentSession.AsHost();
         hostSession.SetProperty("ACTIVE_RELAY_CODE", new SessionProperty(relayJoinCode, VisibilityPropertyOptions.Public));
@@ -575,7 +573,7 @@ public class NetworkManagerUI : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("[NetworkManagerUI] Could not cast transport to UnityTransport. Migration might fail.");
+            
         }
 
         NetworkManager.Singleton.StartHost();
@@ -584,25 +582,25 @@ public class NetworkManagerUI : MonoBehaviour
         bool restoreSuccess = false;
         if (localMigrationSnapshot.snapshotVersion > 0)
         {
-            Debug.Log($"[MIGRATION] Injecting local migration snapshot v{localMigrationSnapshot.snapshotVersion}");
+            
             restoreSuccess = Server.Singleton.RestoreFromSnapshot(localMigrationSnapshot);
         }
         else
         {
-            Debug.LogWarning("[MIGRATION] No local snapshot found, attempting server-side capture fallback.");
+            
             var migrationSnapshot = Server.Singleton.CaptureMigrationSnapshot();
             restoreSuccess = Server.Singleton.RestoreFromSnapshot(migrationSnapshot);
         }
 
         if (!restoreSuccess)
         {
-            Debug.LogError("[MIGRATION] Host migration restore failed; disconnecting to avoid a partial state.");
+            
             isMigrating = false;
             PerformDisconnect();
             yield break;
         }
 
-        Debug.Log($"[MIGRATION] Restored migration snapshot on new host.");
+        
 
         int mySeat = -1;
         if (DeckController.LocalInstance != null)
@@ -610,12 +608,12 @@ public class NetworkManagerUI : MonoBehaviour
             mySeat = DeckController.LocalInstance.thisPlayerNumber;
         }
 
-        Debug.Log($"[NetworkManagerUI] Host Self-Binding: Claiming seat {mySeat} for Host ID {NetworkManager.Singleton.LocalClientId}");
+        
         Server.Singleton.HandleMigratedHostSelfBind(mySeat, NetworkManager.Singleton.LocalClientId);
 
         UpdateSessionHostReadyProperty();
         isMigrating = false;
-        Debug.Log("[FLOW] HandleHostMigrationAsNewHost completed.");
+        
     }
 
     private async void UpdateSessionHostReadyProperty()
@@ -627,11 +625,11 @@ public class NetworkManagerUI : MonoBehaviour
             var hostSession = currentSession.AsHost();
             hostSession.SetProperty("NGO_HOST_READY", new SessionProperty("true", VisibilityPropertyOptions.Public));
             await hostSession.SavePropertiesAsync();
-            Debug.Log("[NetworkManagerUI] Session property 'NGO_HOST_READY' set to true.");
+            
         }
         catch (Exception e)
         {
-            Debug.LogError($"[NetworkManagerUI] Failed to update session property: {e.Message}");
+            
         }
     }
 
@@ -655,7 +653,7 @@ public class NetworkManagerUI : MonoBehaviour
         
         if (!NetworkManager.Singleton.IsConnectedClient)
         {
-            Debug.LogError("[NetworkManagerUI] Failed to re-join NGO server (Timeout).");
+            
             PerformDisconnect();
             yield break;
         }
@@ -667,7 +665,7 @@ public class NetworkManagerUI : MonoBehaviour
             // to support seamless local multi-tab testing on a single computer.
             int myOriginalSeat = DeckController.LocalInstance.thisPlayerNumber;
             if (myOriginalSeat < 0) myOriginalSeat = PlayerPrefs.GetInt("SavedPlayerSeat", -1);
-            Debug.Log($"[NetworkManagerUI] Re-joined! Reclaiming seat {myOriginalSeat}...");
+            
             
             // Find the relay object - check GameManager first as it usually has it
             var relay = UnityEngine.Object.FindAnyObjectByType<GameNetworkRelay>();
@@ -702,7 +700,7 @@ public class NetworkManagerUI : MonoBehaviour
         EnsureMainScreenIsActive();
         if (DeckController.LocalInstance != null) DeckController.LocalInstance.DestroyAllCards();
         try { if (currentSession != null) { await currentSession.LeaveAsync(); currentSession = null; } }
-        catch (Exception e) { Debug.LogWarning($"[NetworkManagerUI] Error leaving session: {e.Message}"); }
+        catch (Exception e) {  }
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening) NetworkManager.Singleton.Shutdown();
         if (mainUIScript != null) mainUIScript.OnReturnFromWaitingScreen();
     }
@@ -749,7 +747,7 @@ public class NetworkManagerUI : MonoBehaviour
     /// </summary>
     private void OnSinglePlayerQuickPlayButtonClicked()
     {
-        Debug.Log("[NetworkManagerUI] 1v1 Quickplay button clicked - opening single player run settings panel");
+        
         
         // Get reference to MainUIScript to open run settings panel
         MainUIScript mainUI = FindObjectOfType<MainUIScript>();
@@ -761,7 +759,7 @@ public class NetworkManagerUI : MonoBehaviour
         }
         else
         {
-            Debug.LogError("[NetworkManagerUI] MainUIScript not found!");
+            
         }
     }
 
@@ -774,7 +772,7 @@ public class NetworkManagerUI : MonoBehaviour
                        allocation.ServerEndpoints.FirstOrDefault(e => e.ConnectionType == fallbackType);
         if (endpoint == null)
         {
-            Debug.LogError("[NetworkManagerUI] No compatible relay endpoint found for host migration.");
+            
             return;
         }
 
@@ -795,7 +793,7 @@ public class NetworkManagerUI : MonoBehaviour
             isWebSocket
         );
         utp.SetRelayServerData(relayServerData);
-        Debug.Log($"[NetworkManagerUI] Host relay configured: type={endpoint.ConnectionType}, secure={isSecure}, webSocket={isWebSocket}");
+        
     }
 
     private void ConfigureTransport(UnityTransport utp, JoinAllocation allocation)
@@ -807,7 +805,7 @@ public class NetworkManagerUI : MonoBehaviour
                        allocation.ServerEndpoints.FirstOrDefault(e => e.ConnectionType == fallbackType);
         if (endpoint == null)
         {
-            Debug.LogError("[NetworkManagerUI] No compatible relay endpoint found for client migration.");
+            
             return;
         }
 
@@ -828,6 +826,6 @@ public class NetworkManagerUI : MonoBehaviour
             isWebSocket
         );
         utp.SetRelayServerData(relayServerData);
-        Debug.Log($"[NetworkManagerUI] Client relay configured: type={endpoint.ConnectionType}, secure={isSecure}, webSocket={isWebSocket}");
+        
     }
 }

@@ -42,9 +42,26 @@ public class UcundanGözAt : SuperPower
     }
     public override void ActivatePower()
     {
-        // Debug.Log("Ucundan Göz At activated!");
+        Debug.Log("[UcundanGözAt] ActivatePower() called");
+        
+        if (GameManager.LocalInstance == null)
+        {
+            Debug.LogError("[UcundanGözAt] GameManager.LocalInstance is null - cannot activate power");
+            return;
+        }
+        
+        if (GameManager.LocalInstance.PowerOrchestrator == null)
+        {
+            Debug.LogError("[UcundanGözAt] PowerOrchestrator is null - cannot activate power");
+            return;
+        }
+        
+        Debug.Log("[UcundanGözAt] Calling PowerActivated()");
         PowerActivated();
-        GameManager.LocalInstance.UsePeekOpponentCardPower();
+        
+        Debug.Log("[UcundanGözAt] Delegating to PowerOrchestrator.ExecutePeekOpponentCard()");
+        GameManager.LocalInstance.PowerOrchestrator.ExecutePeekOpponentCard();
+        Debug.Log("[UcundanGözAt] PowerOrchestrator.ExecutePeekOpponentCard() returned");
     }
 }
 
@@ -60,12 +77,12 @@ public class Oynayamazsın : SuperPower
     }
     public override void ActivatePower()
     {
-        Debug.Log($"[Oynayamazsın] POWER ACTIVATION START - Player: {DeckController.LocalInstance?.thisPlayerNumber}, Time: {Time.time}");
-        Debug.Log($"[Oynayamazsın] Calling PowerActivated() immediately - This will trigger ShowcaseSuperPowerServerRPC");
+        
+        
         PowerActivated();
-        Debug.Log($"[Oynayamazsın] Setting up pending block effect - will activate when next card is played");
-        GameManager.LocalInstance.ActivateBlockNextPlayerPower();
-        Debug.Log($"[Oynayamazsın] POWER ACTIVATION COMPLETE - Block effect is now pending until next card play");
+        
+        GameManager.LocalInstance.PowerOrchestrator?.ExecuteBlockNextPlayer();
+        
     }
 }
 
@@ -81,10 +98,10 @@ public class DeğişTokuş : SuperPower
     }
     public override void ActivatePower()
     {
-        Debug.Log($"[DeğişTokuş] POWER ACTIVATION START - Player: {DeckController.LocalInstance?.thisPlayerNumber}, Time: {Time.time}");
+        
         PowerActivated();
-        GameManager.LocalInstance.UseSwapCardWithOpponentPower();
-        Debug.Log("[DeğişTokuş] Random swap initiated.");
+        GameManager.LocalInstance.PowerOrchestrator?.ExecuteSwapCardWithOpponent();
+        
     }
 }
 
@@ -104,15 +121,15 @@ public class Kapkaç : SuperPower
     }
     public override void ActivatePower()
     {
-        Debug.Log($"[Kapkaç] POWER ACTIVATION START - Player: {DeckController.LocalInstance?.thisPlayerNumber}, Time: {Time.time}");
+        
 
-        Debug.Log($"[Kapkaç] Calling PowerActivated() - This will trigger ShowcaseSuperPowerServerRPC");
+        
         PowerActivated();
 
         // Enter pending single-card selection mode (activate first, then select a card).
-        GameManager.LocalInstance.StartKapkacSelectionPower();
+        GameManager.LocalInstance.PowerOrchestrator?.StartKapkacSelection();
 
-        Debug.Log($"[Kapkaç] POWER ACTIVATION COMPLETE - Waiting for card selection");
+        
     }
 }
 
@@ -129,9 +146,9 @@ public class ValeArar : SuperPower
     [ContextMenu("Vale Arar")]
     public override void ActivatePower()
     {
-        // Debug.Log("ValeArar activated!");
+        // 
         PowerActivated();
-        GameManager.LocalInstance.ActivateValeArarPower();
+        GameManager.LocalInstance.PowerOrchestrator?.ExecuteValeArar();
     }
 
 
@@ -152,9 +169,9 @@ public class KopyalaYapistir : SuperPower
     }
     public override void ActivatePower()
     {
-        Debug.Log($"[KopyalaYapıştır] POWER ACTIVATION START - Player: {DeckController.LocalInstance?.thisPlayerNumber}, Time: {Time.time}");
+        
         // Phase 1: enter source-selection mode (no pre-selected card required)
-        GameManager.LocalInstance.StartKopyalaYapistirDualSelection(null);
+        GameManager.LocalInstance.PowerOrchestrator?.StartKopyalaYapistirSelection();
     }
 }
 
@@ -170,19 +187,19 @@ public class BayaBayaBak : SuperPower
     }
     public override void ActivatePower()
     {
-        Debug.Log($"[BayaBayaBak] POWER ACTIVATION START - Player: {DeckController.LocalInstance?.thisPlayerNumber}, Time: {Time.time}");
+        
         
         // Track the power activation
         DebugChainPrinter.LocalInstance?.TrackLocalAction($"BayaBayaBak power activation started by Player {DeckController.LocalInstance?.thisPlayerNumber}");
         DebugChainPrinter.LocalInstance?.TrackPowerUsage("BayaBayaBak", DeckController.LocalInstance?.thisPlayerNumber ?? 0, "Power activation initiated");
         
-        Debug.Log($"[BayaBayaBak] Calling PowerActivated() - This will trigger ShowcaseSuperPowerServerRPC and track activation");
+        
         PowerActivated();
         
-        Debug.Log($"[BayaBayaBak] Calling UseBayaBayaBakPower() - This will call UseBayaBayaBakServerRPC");
-        GameManager.LocalInstance.UseBayaBayaBakPower();
         
-        Debug.Log($"[BayaBayaBak] POWER ACTIVATION COMPLETE");
+        GameManager.LocalInstance.PowerOrchestrator?.ExecuteBayaBayaBak();
+        
+        
         DebugChainPrinter.LocalInstance?.TrackLocalAction("BayaBayaBak power activation completed");
     }
 }
@@ -199,9 +216,9 @@ public class Bomba : SuperPower
     }
     public override void ActivatePower()
     {
-        // Debug.Log("Bomba activated!");
+        // 
         PowerActivated();
-        if (GameManager.LocalInstance.centerCards.Count != 0) GameManager.LocalInstance.ActivateBombaPower();
+        if (GameManager.LocalInstance.centerCards.Count != 0) GameManager.LocalInstance.PowerOrchestrator?.ExecuteBomba();
     }
 }
 
@@ -217,9 +234,9 @@ public class Yapamazsın : SuperPower
     }
     public override void ActivatePower()
     {
-        // Debug.Log("Yapamazsın activated!");
+        // 
         PowerActivated();
-        GameManager.LocalInstance.ActivateYapamazsınPower();
+        GameManager.LocalInstance.PowerOrchestrator?.ExecuteYapamazsın();
     }
 }
 
@@ -235,13 +252,13 @@ public class VerZehri : SuperPower
     }
     public override void ActivatePower()
     {
-        Debug.Log($"[VerZehri] POWER ACTIVATION START - Player: {DeckController.LocalInstance?.thisPlayerNumber}, Time: {Time.time}");
-        Debug.Log($"[VerZehri] Center cards count: {GameManager.LocalInstance.centerCards.Count}");
-        Debug.Log($"[VerZehri] Calling PowerActivated() immediately - This will trigger ShowcaseSuperPowerServerRPC");
+        
+        
+        
         PowerActivated();
-        Debug.Log($"[VerZehri] Setting up pending poison effect - will activate when next card is played");
-        GameManager.LocalInstance.networkRelay.ActivateVerZehriServerRPC();
-        Debug.Log($"[VerZehri] POWER ACTIVATION COMPLETE - Poison effect is now pending until next card play");
+        
+        GameManager.LocalInstance.PowerOrchestrator?.ExecuteVerZehri();
+        
     }
 }
 
@@ -257,13 +274,13 @@ public class KutsalDeste : SuperPower
     }
     public override void ActivatePower()
     {
-        Debug.Log($"[KutsalDeste] POWER ACTIVATION START - Player: {DeckController.LocalInstance?.thisPlayerNumber}, Time: {Time.time}");
-        Debug.Log($"[KutsalDeste] Center cards count: {GameManager.LocalInstance.centerCards.Count}");
-        Debug.Log($"[KutsalDeste] Calling PowerActivated() immediately - This will trigger ShowcaseSuperPowerServerRPC");
+        
+        
+        
         PowerActivated();
-        Debug.Log($"[KutsalDeste] Setting up pending holy effect - will activate when next card is played");
-        GameManager.LocalInstance.networkRelay.ActivateKutsalDesteServerRPC();
-        Debug.Log($"[KutsalDeste] POWER ACTIVATION COMPLETE - Holy effect is now pending until next card play");
+        
+        GameManager.LocalInstance.PowerOrchestrator?.ExecuteKutsalDeste();
+        
     }
 }
 
@@ -279,16 +296,16 @@ public class BuDahaİyi : SuperPower
     }
     public override void ActivatePower()
     {
-        Debug.Log($"[BuDahaİyi] POWER ACTIVATION START - Player: {DeckController.LocalInstance?.thisPlayerNumber}, Time: {Time.time}");
-        Debug.Log($"[BuDahaİyi] Center cards count: {GameManager.LocalInstance.centerCards.Count}");
+        
+        
 
-        Debug.Log($"[BuDahaİyi] Calling PowerActivated() - This will trigger ShowcaseSuperPowerServerRPC");
+        
         PowerActivated();
 
         // Enter pending single-card selection mode (activate first, then pick hand card).
-        GameManager.LocalInstance.StartBuDahaIyiSelectionPower();
+        GameManager.LocalInstance.PowerOrchestrator?.StartBuDahaIyiSelection();
 
-        Debug.Log($"[BuDahaİyi] POWER ACTIVATION COMPLETE - Waiting for hand card selection");
+        
     }
 }
 
@@ -304,9 +321,9 @@ public class SunuDegisTokus : SuperPower
     }
     public override void ActivatePower()
     {
-        Debug.Log($"[ŞunuDeğişTokuş] POWER ACTIVATION START - Player: {DeckController.LocalInstance?.thisPlayerNumber}, Time: {Time.time}");
-        GameManager.LocalInstance.StartSunuDegisTokusDualSelection(null, "Şunu Değiş Tokuş");
-        Debug.Log("[ŞunuDeğişTokuş] Selection mode started. Select any two different hand cards.");
+        
+        GameManager.LocalInstance.PowerOrchestrator?.StartSunuDegisTokusSelection();
+        
     }
 }
 
@@ -325,19 +342,19 @@ public class SunuDegisBunuTokus : SuperPower
     }
     public override void ActivatePower()
     {
-        Debug.Log($"[ŞunuDeğişBunuTokuş] POWER ACTIVATION START - Player: {DeckController.LocalInstance?.thisPlayerNumber}, Time: {Time.time}");
+        
         
         // Check if player has cards in hand
         if (GameManager.LocalInstance.myCards == null || GameManager.LocalInstance.myCards.Count == 0)
         {
-            Debug.LogWarning("[ŞunuDeğişBunuTokuş] No cards in hand! Cannot activate this power.");
+            
             return;
         }
         
-        Debug.Log($"[ŞunuDeğişBunuTokuş] Starting multi-swap mode - {GameManager.LocalInstance.myCards.Count} cards to swap");
+        
         // NOTE: PowerActivated() will be called AFTER all swaps are complete
-        GameManager.LocalInstance.ActivateSunuDegisBunuTokusPower();
-        Debug.Log($"[ŞunuDeğişBunuTokuş] Multi-swap mode started - PowerActivated() will be called when all swaps are done");
+        GameManager.LocalInstance.PowerOrchestrator?.StartSunuDegisBunuTokusSelection();
+        
     }
 }
 
@@ -356,16 +373,16 @@ public class ZaferPuani : SuperPower
 
     public override void ActivatePower()
     {
-        Debug.Log($"[ZaferPuani] POWER ACTIVATION START - Player: {DeckController.LocalInstance?.thisPlayerNumber}, Points: {points}, Time: {Time.time}");
+        
         
         // Call PowerActivated() first for visual effects
         PowerActivated();
         
         // DIRECT POINT ADDITION: Add points immediately to the player/team
         int playerNumber = DeckController.LocalInstance.thisPlayerNumber;
-        GameManager.LocalInstance.PowerProcessor?.ExecuteZaferPuani(points);
+        GameManager.LocalInstance.PowerOrchestrator?.ExecuteZaferPuani(points);
         
-        Debug.Log($"[ZaferPuani] POWER ACTIVATION COMPLETE - Added {points} points immediately to player {playerNumber}");
+        
     }
 }
 
@@ -385,15 +402,15 @@ public class YandımAnam : SuperPower
     }
     public override void ActivatePower()
     {
-        Debug.Log($"[YandımAnam] POWER ACTIVATION START - Player: {DeckController.LocalInstance?.thisPlayerNumber}, Time: {Time.time}");
+        
 
-        Debug.Log($"[YandımAnam] Calling PowerActivated() - This will trigger ShowcaseSuperPowerServerRPC");
+        
         PowerActivated();
 
         // Enter pending single-card selection mode (activate first, then select a card).
-        GameManager.LocalInstance.StartYandimAnamSelectionPower();
+        GameManager.LocalInstance.PowerOrchestrator?.StartYandimAnamSelection();
 
-        Debug.Log($"[YandımAnam] POWER ACTIVATION COMPLETE - Waiting for card selection");
+        
     }
 }
 

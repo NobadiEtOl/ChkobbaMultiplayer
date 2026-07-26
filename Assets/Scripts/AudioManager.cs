@@ -30,7 +30,7 @@ public class AudioManager : MonoBehaviour
         {
             if (audioSourceMap.ContainsKey(index))
             {
-                Debug.LogWarning($"Audio clip at index {index} is already playing!");
+                
                 return;
             }
 
@@ -50,7 +50,7 @@ public class AudioManager : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning($"Audio clip index {index} is out of range!");
+            
         }*/
     }
 
@@ -90,7 +90,7 @@ public class AudioManager : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning($"No audio clip playing at index {index} to adjust volume.");
+            
         }
     }
 

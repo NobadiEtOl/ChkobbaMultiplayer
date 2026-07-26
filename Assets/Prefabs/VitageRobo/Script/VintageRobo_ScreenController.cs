@@ -83,11 +83,11 @@ public class VintageRobo_ScreenController : MonoBehaviour
     {
         if (frames == null || frames.Length == 0)
         {
-            Debug.LogWarning($"No frames assigned for state: {currentState}");
+            
             yield break;
         }
 
-        Debug.Log($"Starting animation for state: {currentState} with {frames.Length} frames");
+        
 
         while (true)
         {
@@ -100,7 +100,7 @@ public class VintageRobo_ScreenController : MonoBehaviour
             
             ShuffleList(frameIndices);
             
-            //Debug.Log($"Playing animation loop for state: {currentState}");
+            //
             
             // Play all frames in random order using custom frame rate
             float frameTime = 1f / frameRate;
@@ -109,16 +109,16 @@ public class VintageRobo_ScreenController : MonoBehaviour
                 if (frames[index] != null)
                 {
                     spriteRenderer.sprite = frames[index];
-                    //Debug.Log($"Displaying frame {index} for state: {currentState}");
+                    //
                 }
                 else
                 {
-                    Debug.LogWarning($"Frame {index} is null for state: {currentState}");
+                    
                 }
                 yield return new WaitForSeconds(frameTime);
             }
             
-            //Debug.Log($"Completed one loop for state: {currentState}, looping again...");
+            //
         }
     }
 

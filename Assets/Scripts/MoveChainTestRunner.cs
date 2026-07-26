@@ -29,7 +29,7 @@ public class MoveChainTestRunner : MonoBehaviour
     [ContextMenu("Run All Tests")]
     public void RunAllTests()
     {
-        Debug.Log("[MoveChainTestRunner] === STARTING MOVE CHAIN TESTS ===");
+        
         
         // Test 1: Check if system is initialized
         TestSystemInitialization();
@@ -40,7 +40,7 @@ public class MoveChainTestRunner : MonoBehaviour
         // Test 3: Test desync detection
         TestDesyncDetection();
         
-        Debug.Log("[MoveChainTestRunner] === TESTS COMPLETED ===");
+        
     }
     
     /// <summary>
@@ -49,7 +49,7 @@ public class MoveChainTestRunner : MonoBehaviour
     [ContextMenu("Test 1: System Initialization")]
     public void TestSystemInitialization()
     {
-        Debug.Log("[MoveChainTestRunner] Test 1: Checking system initialization...");
+        
         
         bool serverTrackerExists = MoveChainTracker.ServerInstance != null;
         bool clientTrackerExists = MoveChainTracker.ClientInstance != null;
@@ -60,11 +60,11 @@ public class MoveChainTestRunner : MonoBehaviour
         
         if (lastTestPassed)
         {
-            Debug.Log("[MoveChainTestRunner] ✅ Test 1 PASSED: All components initialized");
+            
         }
         else
         {
-            Debug.LogError($"[MoveChainTestRunner] ❌ Test 1 FAILED: {lastTestMessage}");
+            
         }
     }
     
@@ -74,11 +74,11 @@ public class MoveChainTestRunner : MonoBehaviour
     [ContextMenu("Test 2: Basic Move Recording")]
     public void TestBasicMoveRecording()
     {
-        Debug.Log("[MoveChainTestRunner] Test 2: Testing basic move recording...");
+        
         
         if (MoveChainTracker.ClientInstance == null)
         {
-            Debug.LogError("[MoveChainTestRunner] ❌ Test 2 FAILED: Client tracker not found");
+            
             lastTestPassed = false;
             lastTestMessage = "Client tracker not found";
             return;
@@ -94,11 +94,11 @@ public class MoveChainTestRunner : MonoBehaviour
         
         if (lastTestPassed)
         {
-            Debug.Log("[MoveChainTestRunner] ✅ Test 2 PASSED: Move recorded successfully");
+            
         }
         else
         {
-            Debug.LogError($"[MoveChainTestRunner] ❌ Test 2 FAILED: {lastTestMessage}");
+            
         }
     }
     
@@ -108,11 +108,11 @@ public class MoveChainTestRunner : MonoBehaviour
     [ContextMenu("Test 3: Desync Detection")]
     public void TestDesyncDetection()
     {
-        Debug.Log("[MoveChainTestRunner] Test 3: Testing desync detection...");
+        
         
         if (MoveChainTracker.ClientInstance == null || MoveChainTracker.ServerInstance == null)
         {
-            Debug.LogError("[MoveChainTestRunner] ❌ Test 3 FAILED: Trackers not found");
+            
             lastTestPassed = false;
             lastTestMessage = "Trackers not found";
             return;
@@ -134,11 +134,11 @@ public class MoveChainTestRunner : MonoBehaviour
         
         if (lastTestPassed)
         {
-            Debug.Log("[MoveChainTestRunner] ✅ Test 3 PASSED: Desync correctly detected");
+            
         }
         else
         {
-            Debug.LogWarning($"[MoveChainTestRunner] ⚠️ Test 3: Desync not detected as expected: {lastTestMessage}");
+            
         }
     }
     
@@ -148,11 +148,11 @@ public class MoveChainTestRunner : MonoBehaviour
     [ContextMenu("Test 4: Superpower Effect Tracking")]
     public void TestSuperpowerEffectTracking()
     {
-        Debug.Log("[MoveChainTestRunner] Test 4: Testing superpower effect tracking...");
+        
         
         if (MoveChainTracker.ClientInstance == null)
         {
-            Debug.LogError("[MoveChainTestRunner] ❌ Test 4 FAILED: Client tracker not found");
+            
             lastTestPassed = false;
             lastTestMessage = "Client tracker not found";
             return;
@@ -176,11 +176,11 @@ public class MoveChainTestRunner : MonoBehaviour
         
         if (lastTestPassed)
         {
-            Debug.Log("[MoveChainTestRunner] ✅ Test 4 PASSED: Superpower effect tracked successfully");
+            
         }
         else
         {
-            Debug.LogError($"[MoveChainTestRunner] ❌ Test 4 FAILED: {lastTestMessage}");
+            
         }
     }
     
@@ -190,7 +190,7 @@ public class MoveChainTestRunner : MonoBehaviour
     [ContextMenu("Cleanup Test Data")]
     public void CleanupTestData()
     {
-        Debug.Log("[MoveChainTestRunner] Cleaning up test data...");
+        
         
         if (MoveChainTracker.ClientInstance != null)
         {
@@ -202,7 +202,7 @@ public class MoveChainTestRunner : MonoBehaviour
             MoveChainTracker.ServerInstance.ResetChain();
         }
         
-        Debug.Log("[MoveChainTestRunner] Test data cleaned up");
+        
     }
     
     /// <summary>
@@ -211,20 +211,20 @@ public class MoveChainTestRunner : MonoBehaviour
     [ContextMenu("Show Test Status")]
     public void ShowTestStatus()
     {
-        Debug.Log($"[MoveChainTestRunner] === TEST STATUS ===");
-        Debug.Log($"[MoveChainTestRunner] Last Test Passed: {lastTestPassed}");
-        Debug.Log($"[MoveChainTestRunner] Last Test Message: {lastTestMessage}");
+        
+        
+        
         
         if (MoveChainTracker.ClientInstance != null)
         {
             var clientChain = MoveChainTracker.ClientInstance.GetCurrentChain();
-            Debug.Log($"[MoveChainTestRunner] Client Chain Version: {clientChain.chainVersion}");
+            
         }
         
         if (MoveChainTracker.ServerInstance != null)
         {
             var serverChain = MoveChainTracker.ServerInstance.GetCurrentChain();
-            Debug.Log($"[MoveChainTestRunner] Server Chain Version: {serverChain.chainVersion}");
+            
         }
     }
 }

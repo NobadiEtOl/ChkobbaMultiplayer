@@ -115,7 +115,7 @@ public class MainUIScript : MonoBehaviour
 
     public void OnQuickPlayCloseButtonClicked()
     {
-        Debug.Log("Quick Play Close Button Clicked");
+        
         quickPlayUI.SetActive(false);
         startingScreenUI.SetActive(true);
     }
@@ -153,12 +153,12 @@ public class MainUIScript : MonoBehaviour
     /// </summary>
     public void OnStartSinglePlayerButtonClicked()
     {
-        Debug.Log("[MainUIScript] Start Single Player button clicked");
+        
 
         // Validate inputs
         if (seedInputField == null || deckClassDropdown == null)
         {
-            Debug.LogError("[MainUIScript] Run settings panel references not assigned!");
+            
             return;
         }
 
@@ -168,7 +168,7 @@ public class MainUIScript : MonoBehaviour
         {
             if (!int.TryParse(seedInputField.text, out seed))
             {
-                Debug.LogWarning("[MainUIScript] Invalid seed input, using random seed");
+                
                 seed = new System.Random().Next();
             }
         }
@@ -182,7 +182,7 @@ public class MainUIScript : MonoBehaviour
             ? deckClassDropdown.options[deckClassDropdown.value].text 
             : "Balanced";
 
-        Debug.Log($"[MainUIScript] Starting single player with seed={seed}, deckClass={deckClassName}");
+        
 
         // Close quickplay UI
         if (quickPlayUI != null) quickPlayUI.SetActive(false);
@@ -195,7 +195,7 @@ public class MainUIScript : MonoBehaviour
         }
         else
         {
-            Debug.LogError("[MainUIScript] SinglePlayerModeController not found in scene!");
+            
         }
     }
 
@@ -205,7 +205,7 @@ public class MainUIScript : MonoBehaviour
     /// </summary>
     public void OnRunSettingsCloseButtonClicked()
     {
-        Debug.Log("[MainUIScript] Run Settings Close Button Clicked");
+        
         if (runSettingsPanel != null) runSettingsPanel.SetActive(false);
         if (quickPlayUI != null) quickPlayUI.SetActive(true);
     }
@@ -216,12 +216,12 @@ public class MainUIScript : MonoBehaviour
     /// </summary>
     public void OnContinueSavedRunButtonClicked()
     {
-        Debug.Log("[MainUIScript] Continue Saved Run button clicked");
+        
 
         // Check if there's actually a saved run
         if (!RunManager.HasSavedRunProgress())
         {
-            Debug.LogWarning("[MainUIScript] No saved run progress found! Cannot continue.");
+            
             return;
         }
 
@@ -235,7 +235,7 @@ public class MainUIScript : MonoBehaviour
         }
         else
         {
-            Debug.LogError("[MainUIScript] SinglePlayerModeController not found in scene!");
+            
         }
     }
 
@@ -252,11 +252,11 @@ public class MainUIScript : MonoBehaviour
 
         if (hasSavedRun)
         {
-            Debug.Log("[MainUIScript] Saved run found - Continue button is visible");
+            
         }
         else
         {
-            Debug.Log("[MainUIScript] No saved run - Continue button is hidden");
+            
         }
     }
 
@@ -266,14 +266,14 @@ public class MainUIScript : MonoBehaviour
     /// </summary>
     public void ShowRunSettingsPanel()
     {
-        Debug.Log("[MainUIScript] Showing run settings panel");
+        
         if (runSettingsPanel != null)
         {
             runSettingsPanel.SetActive(true);
         }
         else
         {
-            Debug.LogWarning("[MainUIScript] Run settings panel not assigned in inspector!");
+            
         }
     }
 
@@ -290,7 +290,7 @@ public class MainUIScript : MonoBehaviour
 
     public void OnLeaveGameButtonClicked()
     {
-        Debug.Log("[MainUIScript] Leave Game button clicked - resetting player state before disconnection");
+        
         
         // STEP 1: Reset player's game state before disconnection
         ResetPlayerGameStateBeforeDisconnection();
@@ -300,12 +300,12 @@ public class MainUIScript : MonoBehaviour
         
         if (networkManagerUI != null)
         {
-            Debug.Log("[MainUIScript] Using NetworkManagerUI.OnReturnToMainMenuButtonClicked() for proper disconnection");
+            
             networkManagerUI.OnReturnToMainMenuButtonClicked();
         }
         else
         {
-            Debug.LogError("[MainUIScript] NetworkManagerUI not found - falling back to basic return to main page");
+            
             ReturnToMainPage();
         }
     }
@@ -403,10 +403,10 @@ public class MainUIScript : MonoBehaviour
     [ContextMenu("Return to Main Page (Close All Connections)")]
     public void ReturnToMainPage()
     {
-        Debug.Log("[MainUIScript] Returning to main page and closing all network connections...");
+        
         
         // STEP 1: Reset Server singleton for fresh game start
-        Debug.Log("[MainUIScript] Resetting Server singleton for fresh game start");
+        
         Server.ResetServerSingletonForMainMenu();
         
         // STEP 2: Close all UI popups/pages
@@ -421,7 +421,7 @@ public class MainUIScript : MonoBehaviour
         // STEP 5: Clear any pending network operations
         ClearPendingNetworkOperations();
         
-        Debug.Log("[MainUIScript] Successfully returned to main page with clean network state");
+        
     }
 
     /// <summary>
@@ -429,7 +429,7 @@ public class MainUIScript : MonoBehaviour
     /// </summary>
     private void CloseAllUIPages()
     {
-        Debug.Log("[MainUIScript] Closing all UI pages...");
+        
 
         if (joinCodeAnimationCoroutine != null)
         {
@@ -461,7 +461,7 @@ public class MainUIScript : MonoBehaviour
         // Update button visibility after closing all pages
         UpdateLeaveGameButtonVisibility();
         
-        Debug.Log("[MainUIScript] All UI pages closed");
+        
     }
 
     /// <summary>
@@ -469,50 +469,50 @@ public class MainUIScript : MonoBehaviour
     /// </summary>
     private void DisconnectFromNetwork()
     {
-        Debug.Log("[MainUIScript] Disconnecting from network...");
+        
         
         // Shutdown NetworkManager if it's running
         if (NetworkManager.Singleton != null)
         {
             if (NetworkManager.Singleton.IsListening)
             {
-                Debug.Log("[MainUIScript] NetworkManager is listening, shutting down...");
+                
                 
                 if (NetworkManager.Singleton.IsHost)
                 {
-                    Debug.Log("[MainUIScript] Shutting down as Host...");
+                    
                     NetworkManager.Singleton.Shutdown();
                 }
                 else if (NetworkManager.Singleton.IsClient)
                 {
-                    Debug.Log("[MainUIScript] Shutting down as Client...");
+                    
                     NetworkManager.Singleton.Shutdown();
                 }
                 else if (NetworkManager.Singleton.IsServer)
                 {
-                    Debug.Log("[MainUIScript] Shutting down as Server...");
+                    
                     NetworkManager.Singleton.Shutdown();
                 }
             }
             else
             {
-                Debug.Log("[MainUIScript] NetworkManager is not listening, no need to shutdown");
+                
             }
         }
         else
         {
-            Debug.Log("[MainUIScript] NetworkManager.Singleton is null");
+            
         }
         
         // STEP 3: Also try to find and disconnect from any GameNetworkRelay
         var networkRelay = FindObjectOfType<GameNetworkRelay>();
         if (networkRelay != null)
         {
-            Debug.Log("[MainUIScript] Found GameNetworkRelay, ensuring clean state");
+            
             // GameNetworkRelay will be cleaned up when NetworkManager shuts down
         }
         
-        Debug.Log("[MainUIScript] Network disconnection complete");
+        
     }
 
     /// <summary>
@@ -520,7 +520,7 @@ public class MainUIScript : MonoBehaviour
     /// </summary>
     private void ResetToMainPage()
     {
-        Debug.Log("[MainUIScript] Resetting to main page...");
+        
         
         // Show the main starting screen
         startingScreenUI.SetActive(true);
@@ -536,7 +536,7 @@ public class MainUIScript : MonoBehaviour
         // Update button visibility since we're back to main screen
         UpdateLeaveGameButtonVisibility();
         
-        Debug.Log("[MainUIScript] UI reset to main page complete");
+        
     }
 
     /// <summary>
@@ -544,21 +544,21 @@ public class MainUIScript : MonoBehaviour
     /// </summary>
     private void ClearPendingNetworkOperations()
     {
-        Debug.Log("[MainUIScript] Clearing pending network operations...");
+        
         
         // CRITICAL FIX: Do NOT reset server state during disconnection
         // This was causing connectedPlayerCount to be reset to 0 before OnClientDisconnected() could run
         // The server needs to maintain its state for proper disconnection handling
         if (Server.Singleton != null)
         {
-            Debug.Log("[MainUIScript] NOT resetting Server state during disconnection - server handles its own cleanup");
+            
             // Server.Singleton.ResetAllServerVariables(); // COMMENTED OUT - causes double counting bug
         }
         
         // Reset any game manager state if it exists
         if (GameManager.LocalInstance != null)
         {
-            Debug.Log("[MainUIScript] Resetting GameManager state...");
+            
             GameManager.LocalInstance.ResetForNewRound();
         }
         
@@ -566,21 +566,21 @@ public class MainUIScript : MonoBehaviour
         try
         {
             MoveChainIntegrator.ResetChains();
-            Debug.Log("[MainUIScript] Move chains reset");
+            
         }
         catch (System.Exception e)
         {
-            Debug.LogWarning($"[MainUIScript] Could not reset move chains: {e.Message}");
+            
         }
         
         // Also reset the connection count manually to ensure clean state
         if (Server.Singleton != null)
         {
-            Debug.Log("[MainUIScript] Manually resetting Server connection count...");
+            
             Server.Singleton.ResetConnectionCount();
         }
         
-        Debug.Log("[MainUIScript] Pending network operations cleared");
+        
     }
 
     /// <summary>
@@ -596,10 +596,10 @@ public class MainUIScript : MonoBehaviour
     /// </summary>
     public void OnReturnFromWaitingScreen()
     {
-        Debug.Log("[MainUIScript] Returning from waiting screen - cleaning up network state...");
+        
         
         // Reset Server singleton for fresh game start
-        Debug.Log("[MainUIScript] Resetting Server singleton for fresh game start");
+        
         Server.ResetServerSingletonForMainMenu();
         
         // Close waiting screen UI
@@ -608,7 +608,7 @@ public class MainUIScript : MonoBehaviour
         // Reset to main page
         ResetToMainPage();
         
-        Debug.Log("[MainUIScript] Successfully returned from waiting screen to main page");
+        
     }
 
     /// <summary>
@@ -618,7 +618,7 @@ public class MainUIScript : MonoBehaviour
     {
         // NetworkManagerUI.OnClientDisconnected already performs the network teardown
         // (LeaveAsync + Shutdown) before calling this. Here we only do UI cleanup.
-        Debug.Log("[MainUIScript] Disconnect detected - returning to main page");
+        
         CloseAllUIPages();
         ResetToMainPage();
     }
@@ -637,11 +637,11 @@ public class MainUIScript : MonoBehaviour
             float musicVolume = PlayerPrefs.GetFloat("MusicVolume", 0.5f);
             musicVolumeSlider.value = musicVolume;
             musicVolumeSlider.onValueChanged.AddListener(OnMusicVolumeChanged);
-            Debug.Log($"[MainUIScript] Music volume slider initialized with value: {musicVolume}");
+            
         }
         else
         {
-            Debug.LogWarning("[MainUIScript] Music volume slider is not assigned!");
+            
         }
 
         // Initialize sound effects volume slider
@@ -654,11 +654,11 @@ public class MainUIScript : MonoBehaviour
             
             // Apply the volume to the sound effects controller
             ApplySoundEffectsVolume(soundEffectsVolume);
-            Debug.Log($"[MainUIScript] Sound effects volume slider initialized with value: {soundEffectsVolume}");
+            
         }
         else
         {
-            Debug.LogWarning("[MainUIScript] Sound effects volume slider is not assigned!");
+            
         }
     }
 
@@ -675,7 +675,7 @@ public class MainUIScript : MonoBehaviour
         // Apply volume to music system (when implemented)
         ApplyMusicVolume(volume);
         
-        Debug.Log($"[MainUIScript] Music volume changed to: {volume}");
+        
     }
 
     /// <summary>
@@ -691,7 +691,7 @@ public class MainUIScript : MonoBehaviour
         // Apply volume to sound effects system
         ApplySoundEffectsVolume(volume);
         
-        Debug.Log($"[MainUIScript] Sound effects volume changed to: {volume}");
+        
     }
 
     /// <summary>
@@ -702,7 +702,7 @@ public class MainUIScript : MonoBehaviour
     {
         // TODO: Implement music volume control when music system is added
         // For now, this is a placeholder for future music implementation
-        Debug.Log($"[MainUIScript] Music volume applied: {volume} (music system not yet implemented)");
+        
     }
 
     /// <summary>
@@ -715,7 +715,7 @@ public class MainUIScript : MonoBehaviour
         if (SoundMaster.Instance != null)
         {
             SoundMaster.Instance.SetSoundEffectsVolume(volume);
-            Debug.Log($"[MainUIScript] Sound effects volume set via SoundMaster: {volume}");
+            
         }
         else
         {
@@ -728,7 +728,7 @@ public class MainUIScript : MonoBehaviour
                     controller.SetVolume(volume);
                 }
             }
-            Debug.Log($"[MainUIScript] Sound effects volume set directly to {soundControllers.Length} controllers: {volume}");
+            
         }
     }
 
@@ -761,7 +761,7 @@ public class MainUIScript : MonoBehaviour
         
         if (soundController != null)
         {
-            Debug.Log("[MainUIScript] Playing 10 card deal sounds for volume testing...");
+            
             
             // Print current volume settings for debugging
             if (SoundMaster.Instance != null)
@@ -770,14 +770,14 @@ public class MainUIScript : MonoBehaviour
             }
             else
             {
-                Debug.Log($"[MainUIScript] No SoundMaster found. Using direct volume control.");
+                
             }
             
             StartCoroutine(PlayMultipleCardDealSounds(soundController, 10));
         }
         else
         {
-            Debug.LogWarning("[MainUIScript] No SoundEffectsController found in the scene! Make sure you have one in your game.");
+            
         }
     }
 
@@ -791,13 +791,13 @@ public class MainUIScript : MonoBehaviour
         for (int i = 0; i < count; i++)
         {
             soundController.PlayCardDealSound();
-            Debug.Log($"[MainUIScript] Playing card deal sound {i + 1}/{count}");
+            
             
             // Wait 0.3 seconds between each sound
             yield return new WaitForSeconds(0.3f);
         }
         
-        Debug.Log("[MainUIScript] Finished playing all test sounds");
+        
     }
 
     /// <summary>
@@ -811,11 +811,11 @@ public class MainUIScript : MonoBehaviour
             bool shouldShowLeaveGameButton = !mainScreen.activeSelf;
             leaveGameButton.SetActive(shouldShowLeaveGameButton);
             
-            Debug.Log($"[MainUIScript] Leave game button {(shouldShowLeaveGameButton ? "shown" : "hidden")} - Main screen active: {startingScreenUI.activeSelf}");
+            
         }
         else
         {
-            Debug.LogWarning("[MainUIScript] Leave game button is not assigned!");
+            
         }
     }
 
@@ -833,11 +833,11 @@ public class MainUIScript : MonoBehaviour
             
             undoButton.SetActive(isInGame);
             
-            Debug.Log($"[MainUIScript] Undo button {(isInGame ? "shown" : "hidden")} - In game: {isInGame}");
+            
         }
         else
         {
-            Debug.LogWarning("[MainUIScript] Undo button is not assigned!");
+            
         }
     }
 
@@ -848,7 +848,7 @@ public class MainUIScript : MonoBehaviour
     {
         if (DeckController.LocalInstance == null)
         {
-            Debug.LogWarning("[MainUIScript] DeckController.LocalInstance is null - cannot process undo");
+            
             return;
         }
 
@@ -856,7 +856,7 @@ public class MainUIScript : MonoBehaviour
 
         if (isHost)
         {
-            Debug.Log("[MainUIScript] Host pressed undo button - performing undo action");
+            
             // Host behavior: Execute the actual undo
             PerformActualUndo();
 
@@ -866,7 +866,7 @@ public class MainUIScript : MonoBehaviour
         }
         else
         {
-            Debug.Log("[MainUIScript] Non-host player pressed undo button - sending correction request to host");
+            
             // Non-host behavior: Send correction request to host
             SendCorrectionRequestToHost();
         }
@@ -877,7 +877,7 @@ public class MainUIScript : MonoBehaviour
     /// </summary>
     private void PerformActualUndo()
     {
-        Debug.Log("[MainUIScript] Performing undo - delegating to GameManager");
+        
         
         if (GameManager.LocalInstance != null)
         {
@@ -885,7 +885,7 @@ public class MainUIScript : MonoBehaviour
         }
         else
         {
-            Debug.LogError("[MainUIScript] GameManager.LocalInstance is null - cannot perform undo");
+            
         }
     }
 
@@ -894,7 +894,7 @@ public class MainUIScript : MonoBehaviour
     /// </summary>
     private void SendCorrectionRequestToHost()
     {
-        Debug.Log("[MainUIScript] Non-host player sending correction request to host...");
+        
         
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient)
         {
@@ -903,19 +903,19 @@ public class MainUIScript : MonoBehaviour
             if (relay != null)
             {
                 relay.SendCorrectionRequestToHostServerRPC();
-                Debug.Log("[MainUIScript] Correction request RPC sent to host");
+                
                 
                 // Show local widget indicating request was sent
                 ShowLocalCorrectionRequestSentWidget();
             }
             else
             {
-                Debug.LogError("[MainUIScript] GameNetworkRelay not found - cannot send correction request");
+                
             }
         }
         else
         {
-            Debug.LogWarning("[MainUIScript] Not connected to network - cannot send correction request");
+            
         }
     }
 
@@ -924,10 +924,10 @@ public class MainUIScript : MonoBehaviour
     /// </summary>
     private void ShowLocalCorrectionRequestSentWidget()
     {
-        Debug.Log("[MainUIScript] Showing 'correction request sent' widget on non-host device...");
+        
         
         string message = "Düzeltme talebi masa sahibine bildirildi";
-        Debug.Log($"[MainUIScript] CORRECTION REQUEST SENT: {message}");
+        
         
         if (UIFeedbackManager.Instance != null)
         {
@@ -941,10 +941,10 @@ public class MainUIScript : MonoBehaviour
     /// </summary>
     public void ShowCorrectionRequestWidgetOnHost()
     {
-        Debug.Log("[MainUIScript] Showing correction request widget on host device...");
+        
         
         string message = "Başka bir oyuncu düzeltme talep ediyor";
-        Debug.Log($"[MainUIScript] CORRECTION REQUEST RECEIVED: {message}");
+        
         
         if (UIFeedbackManager.Instance != null)
         {
@@ -962,13 +962,13 @@ public class MainUIScript : MonoBehaviour
     /// </summary>
     private void ResetPlayerGameStateBeforeDisconnection()
     {
-        Debug.Log("[MainUIScript] Resetting player game state before disconnection...");
+        
         
         SuperPowerSpawner spawner = FindObjectOfType<SuperPowerSpawner>();
         if (spawner != null)
         {
             spawner.isDisconnectingCleanUp = true;
-            Debug.Log("[MainUIScript] Set isDisconnectingCleanUp = true on spawner to safeguard server state");
+            
         }
         
         // STEP 1: Reset gold to starting amount
@@ -977,7 +977,7 @@ public class MainUIScript : MonoBehaviour
         // STEP 2: Remove and destroy all superpower tokens
         RemoveAllSuperpowerTokens();
         
-        Debug.Log("[MainUIScript] Player game state reset complete - ready for disconnection");
+        
     }
 
     /// <summary>
@@ -988,12 +988,12 @@ public class MainUIScript : MonoBehaviour
         SuperPowerSpawner spawner = FindObjectOfType<SuperPowerSpawner>();
         if (spawner != null)
         {
-            Debug.Log("[MainUIScript] Resetting gold to starting amount before disconnection");
+            
             spawner.ResetGoldToStarting();
         }
         else
         {
-            Debug.LogWarning("[MainUIScript] SuperPowerSpawner not found - cannot reset gold");
+            
         }
     }
 
@@ -1005,12 +1005,12 @@ public class MainUIScript : MonoBehaviour
         SuperPowerSpawner spawner = FindObjectOfType<SuperPowerSpawner>();
         if (spawner != null)
         {
-            Debug.Log("[MainUIScript] Removing all superpower tokens before disconnection");
+            
             spawner.ClearAllSpawnedPowers();
         }
         else
         {
-            Debug.LogWarning("[MainUIScript] SuperPowerSpawner not found - cannot clear superpower tokens");
+            
         }
     }
 

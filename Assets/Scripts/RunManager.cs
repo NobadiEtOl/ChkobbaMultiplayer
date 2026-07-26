@@ -39,7 +39,7 @@ private const string KEY_DECK_CLASS = PLAYERPREFS_PREFIX + "DeckClass";
     {
         if (data == null)
         {
-            Debug.LogError("[RunManager] Cannot save null run progress data!");
+            
             return;
         }
 
@@ -57,7 +57,7 @@ PlayerPrefs.SetString(KEY_DECK_CLASS, data.deckClassName ?? "Balanced");
         PlayerPrefs.SetString(KEY_TIMESTAMP, data.timestamp.ToString());
 
         PlayerPrefs.Save();
-        Debug.Log("[RunManager] Run progress saved successfully");
+        
     }
 
     /// <summary>
@@ -69,7 +69,7 @@ PlayerPrefs.SetString(KEY_DECK_CLASS, data.deckClassName ?? "Balanced");
         // Check if any run progress exists
         if (!PlayerPrefs.HasKey(KEY_STAGE))
         {
-            Debug.Log("[RunManager] No saved run progress found");
+            
             return null;
         }
 
@@ -95,7 +95,7 @@ PlayerPrefs.SetString(KEY_DECK_CLASS, data.deckClassName ?? "Balanced");
         }
         catch (Exception e)
         {
-            Debug.LogError($"[RunManager] Error loading run progress: {e.Message}");
+            
             return null;
         }
     }
@@ -106,7 +106,7 @@ PlayerPrefs.SetString(KEY_DECK_CLASS, data.deckClassName ?? "Balanced");
     /// </summary>
     public static void ClearRunProgress()
     {
-        Debug.Log("[RunManager] Clearing all run progress");
+        
 
         PlayerPrefs.DeleteKey(KEY_STAGE);
         PlayerPrefs.DeleteKey(KEY_OPP_DIFFICULTY);
@@ -119,7 +119,7 @@ PlayerPrefs.DeleteKey(KEY_DECK_CLASS);
         PlayerPrefs.DeleteKey(KEY_TIMESTAMP);
 
         PlayerPrefs.Save();
-        Debug.Log("[RunManager] Run progress cleared");
+        
     }
 
     /// <summary>
@@ -151,7 +151,7 @@ PlayerPrefs.DeleteKey(KEY_DECK_CLASS);
         }
         else
         {
-            Debug.Log("[RunManager] No saved run progress");
+            
         }
     }
 }

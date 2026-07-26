@@ -72,26 +72,26 @@ public class StarShaderPerformanceController : MonoBehaviour
         int graphicsMemory = SystemInfo.graphicsMemorySize;
         string deviceModel = SystemInfo.deviceModel;
         
-        Debug.Log($"Device Performance Detection:");
-        Debug.Log($"System Memory: {systemMemory}MB");
-        Debug.Log($"Graphics Memory: {graphicsMemory}MB");
-        Debug.Log($"Device Model: {deviceModel}");
+        
+        
+        
+        
         
         // Basic performance classification
         if (systemMemory >= 4000 && graphicsMemory >= 1000)
         {
             targetPerformance = PerformanceLevel.High;
-            Debug.Log("Detected HIGH performance device - using original shader");
+            
         }
         else if (systemMemory >= 2000 && graphicsMemory >= 500)
         {
             targetPerformance = PerformanceLevel.Balanced;
-            Debug.Log("Detected BALANCED performance device - using optimized shader");
+            
         }
         else
         {
             targetPerformance = PerformanceLevel.Mobile;
-            Debug.Log("Detected MOBILE performance device - using mobile shader");
+            
         }
     }
     
@@ -125,7 +125,7 @@ public class StarShaderPerformanceController : MonoBehaviour
             // Set animation frame rate
             targetMaterial.SetFloat("_AnimationFrameRate", animationFrameRate);
             
-            Debug.Log($"Applied {targetPerformance} performance settings with {animationFrameRate} FPS animation");
+            
         }
     }
     
@@ -151,13 +151,13 @@ public class StarShaderPerformanceController : MonoBehaviour
     {
         if (averageFPS < 25 && targetPerformance != PerformanceLevel.Mobile)
         {
-            Debug.Log($"Performance dropped to {averageFPS:F1} FPS - switching to lower quality");
+            
             targetPerformance = (PerformanceLevel)((int)targetPerformance + 1);
             ApplyPerformanceSettings();
         }
         else if (averageFPS > 50 && targetPerformance != PerformanceLevel.High)
         {
-            Debug.Log($"Performance improved to {averageFPS:F1} FPS - switching to higher quality");
+            
             targetPerformance = (PerformanceLevel)((int)targetPerformance - 1);
             ApplyPerformanceSettings();
         }

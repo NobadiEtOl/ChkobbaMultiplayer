@@ -41,13 +41,13 @@ public static class OpponentBehaviorManager
     {
         if (config == null)
         {
-            Debug.LogError("[OpponentBehaviorManager] Config is null!");
+            
             return -1;
         }
 
         if (opponentHand == null || opponentHand.Count == 0)
         {
-            Debug.LogWarning("[OpponentBehaviorManager] Opponent hand is empty");
+            
             return -1;
         }
 
@@ -64,7 +64,7 @@ public static class OpponentBehaviorManager
                 break;
 
             default:
-                Debug.LogError($"[OpponentBehaviorManager] Unknown behavior mode: {config.mode}");
+                
                 selectedIndex = 0;
                 break;
         }
@@ -81,7 +81,7 @@ public static class OpponentBehaviorManager
     {
         // Always pick the first card. The shrinking hand size ensures we play them in sequence.
         int selectedIndex = 0;
-        Debug.Log($"[OpponentBehaviorManager] PlayInOrder: turn {currentTurnIndex}, selecting card index {selectedIndex} (first available)");
+        
         return selectedIndex;
     }
 
@@ -97,7 +97,7 @@ public static class OpponentBehaviorManager
         }
 
         int selectedIndex = rng.Next(0, opponentHand.Count);
-        Debug.Log($"[OpponentBehaviorManager] Random: selecting card index {selectedIndex}");
+        
         return selectedIndex;
     }
 
@@ -130,12 +130,12 @@ public static class OpponentBehaviorManager
                 break;
 
             default:
-                Debug.LogWarning($"[OpponentBehaviorManager] Unknown difficulty: {difficulty}, using Easy");
+                
                 mode = OpponentBehaviorMode.PlayInOrder;
                 break;
         }
 
-        Debug.Log($"[OpponentBehaviorManager] Created config for difficulty {difficulty}: mode={mode}");
+        
         return new OpponentBehaviorConfig(mode, rng, randomness);
     }
 }

@@ -26,4 +26,11 @@ public interface IPowerProcessor
     void StartSunuDegisBunuTokusSelection();
     void ExecuteSunuDegisBunuTokus(string[] myCards, string[] oppCards);
     void ExecuteZaferPuani(int points);
+
+    /// <summary>
+    /// Called after any power effect completes to persist game state.
+    /// Multiplayer: saves game state for reconnection sync.
+    /// Singleplayer: saves run progress to disk (auto-checkpoint).
+    /// </summary>
+    void OnGameStateMutated();
 }

@@ -122,6 +122,6 @@ If performance is still poor:
 
 === END GUIDE ===";
 
-        Debug.Log(guide);
+        
     }
 }

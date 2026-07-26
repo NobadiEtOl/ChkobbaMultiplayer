@@ -38,7 +38,7 @@ public class ElHolderScript : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("ElHolderScript: LocalInstance already set, using existing instance.");
+            
         }
 
         List<GameObject> handObjects = new List<GameObject>();
@@ -63,7 +63,7 @@ public class ElHolderScript : MonoBehaviour
         }
 
         // Apply the assigned material to frame objects only
-        Debug.Log($"ElHolderScript: Found {handObjects.Count} hand objects and {frameObjects.Count} frame objects");
+        
         ApplyFrameMaterial();
 
         // Clone the materials so they can change independently at runtime
@@ -244,20 +244,20 @@ public class ElHolderScript : MonoBehaviour
 
     public void ShowcasePower(int playerNumber, string powerName)
     {
-        Debug.Log($"Showcasing power: {powerName} for player {playerNumber}");
+        
         int handIndex = GetHandIndex(playerNumber);
         if (playerNumber == DeckController.LocalInstance.thisPlayerNumber) return;
         powerName = powerName.Replace(" ", "");
 
         if (handIndex < 0 || handIndex >= powerTransformObjects.Count)
         {
-            Debug.LogWarning($"Invalid hand index {handIndex} for player {playerNumber}");
+            
             return;
         }
 
         if (!powerTransformObjects[handIndex].activeInHierarchy)
         {
-            Debug.LogWarning($"Hand {handIndex} is inactive, skipping power showcase");
+            
             return;
         }
 
@@ -275,7 +275,7 @@ public class ElHolderScript : MonoBehaviour
 
         if (powerPrefab == null)
         {
-            Debug.LogWarning($"Power prefab not found for: {targetName}");
+            
             return;
         }
 
@@ -285,7 +285,7 @@ public class ElHolderScript : MonoBehaviour
     private IEnumerator ShowcasePowerCoroutine(int handIndex, string powerName, GameObject powerPrefab)
     {
         yield return new WaitForSeconds(0.5f);
-        Debug.Log($"Showcasing power: {powerName} for hand index: {handIndex}");
+        
 
         Transform startTransform = powerTransformObjects[handIndex].transform;
 
@@ -331,7 +331,7 @@ public class ElHolderScript : MonoBehaviour
         }
 
         smokeObject.SetActive(true);
-        Debug.LogError($"Activating power instance: {powerInstance.name}");
+        
 
         Animator childAnimator = smokeObject.GetComponent<Animator>();
         if (childAnimator != null)
@@ -350,7 +350,7 @@ public class ElHolderScript : MonoBehaviour
 
         yield return fadeSequence.WaitForCompletion();
 
-        Debug.LogError($"Destroying power instance: {powerInstance.name}");
+        
         Destroy(powerInstance);
     }
 
@@ -360,13 +360,13 @@ public class ElHolderScript : MonoBehaviour
 
         if (handIndex < 0 || handIndex >= animatorHands.Count)
         {
-            Debug.LogWarning($"Invalid hand index {handIndex} for player {playerNumber}");
+            
             return;
         }
 
         if (!animatorHands[handIndex].gameObject.activeInHierarchy)
         {
-            Debug.LogWarning($"Hand {handIndex} is inactive, skipping token animation");
+            
             return;
         }
 
@@ -381,7 +381,7 @@ public class ElHolderScript : MonoBehaviour
         AnimatorStateInfo stateInfo = animatorHands[handIndex].GetCurrentAnimatorStateInfo(0);
         float animationDuration = stateInfo.length;
 
-        Debug.Log($"Token animation duration: {animationDuration} seconds");
+        
 
         yield return new WaitForSeconds(animationDuration);
 
@@ -418,27 +418,27 @@ public class ElHolderScript : MonoBehaviour
     {
         if (frameIndex < 0 || frameIndex >= frameObjects.Count)
         {
-            Debug.LogWarning($"Invalid frame index {frameIndex}. Available frames: {frameObjects.Count}");
+            
             return;
         }
 
         if (frameObjects[frameIndex] == null || !frameObjects[frameIndex].activeInHierarchy)
         {
-            Debug.LogWarning($"Frame {frameIndex} is null or inactive");
+            
             return;
         }
 
         Renderer frameRenderer = frameObjects[frameIndex].GetComponent<Renderer>();
         if (frameRenderer == null)
         {
-            Debug.LogWarning($"Frame {frameIndex} does not have a Renderer component");
+            
             return;
         }
 
         // Check if the material uses the Custom_SimpleTwoColorLines shader
         if (frameRenderer.material.shader.name != "Custom/SimpleTwoColorLines")
         {
-            Debug.LogWarning($"Frame {frameIndex} material does not use Custom/SimpleTwoColorLines shader. Current shader: {frameRenderer.material.shader.name}");
+            
             return;
         }
 
@@ -450,13 +450,13 @@ public class ElHolderScript : MonoBehaviour
 
         frameRenderer.SetPropertyBlock(propertyBlock);
 
-        Debug.Log($"Set frame {frameIndex} color1 to {color1} and color2 to {color2}");
+        
     }
 
     public void SetFrameBackgroundToWhite(int playerNumber)
     {
         int frameIndex = GetHandIndex(playerNumber);
-        Debug.Log($"SetFrameBackgroundToWhite called for player {playerNumber}, frame index: {frameIndex}");
+        
         
         // Set Color3 to green for turn indication
         SetFrameColor3ToGreen(frameIndex);
@@ -471,7 +471,7 @@ public class ElHolderScript : MonoBehaviour
     public void ResetFrameBackgroundColor(int playerNumber)
     {
         int frameIndex = GetHandIndex(playerNumber);
-        Debug.Log($"ResetFrameBackgroundColor called for player {playerNumber}, frame index: {frameIndex}");
+        
         
         // Reset Color3 back to original
         ResetFrameColor3ToOriginal(frameIndex);
@@ -513,27 +513,27 @@ public class ElHolderScript : MonoBehaviour
     {
         if (frameIndex < 0 || frameIndex >= frameObjects.Count)
         {
-            Debug.LogWarning($"Invalid frame index {frameIndex}. Available frames: {frameObjects.Count}");
+            
             yield break;
         }
 
         if (frameObjects[frameIndex] == null || !frameObjects[frameIndex].activeInHierarchy)
         {
-            Debug.LogWarning($"Frame {frameIndex} is null or inactive");
+            
             yield break;
         }
 
         Renderer frameRenderer = frameObjects[frameIndex].GetComponent<Renderer>();
         if (frameRenderer == null)
         {
-            Debug.LogWarning($"Frame {frameIndex} does not have a Renderer component");
+            
             yield break;
         }
 
         // Check if the material uses the Custom_SimpleTwoColorLines shader
         if (frameRenderer.material.shader.name != "Custom/SimpleTwoColorLines")
         {
-            Debug.LogWarning($"Frame {frameIndex} material does not use Custom/SimpleTwoColorLines shader. Current shader: {frameRenderer.material.shader.name}");
+            
             yield break;
         }
 
@@ -545,7 +545,7 @@ public class ElHolderScript : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning($"Material on {frameObjects[frameIndex].name} does not have _Color3Intensity property. Using default value.");
+            
             // If the material doesn't have the property, we'll use the default value
         }
 
@@ -571,34 +571,34 @@ public class ElHolderScript : MonoBehaviour
         propertyBlock.SetFloat("_Color3Intensity", targetIntensity);
         frameRenderer.SetPropertyBlock(propertyBlock);
 
-        Debug.Log($"Highlighted frame {frameIndex} with Color3Intensity: {targetIntensity}");
+        
     }
 
     private IEnumerator FadeFrameColor3IntensityToOriginal(int frameIndex, float duration)
     {
         if (frameIndex < 0 || frameIndex >= frameObjects.Count)
         {
-            Debug.LogWarning($"Invalid frame index {frameIndex}. Available frames: {frameObjects.Count}");
+            
             yield break;
         }
 
         if (frameObjects[frameIndex] == null)
         {
-            Debug.LogWarning($"Frame {frameIndex} is null");
+            
             yield break;
         }
 
         Renderer frameRenderer = frameObjects[frameIndex].GetComponent<Renderer>();
         if (frameRenderer == null)
         {
-            Debug.LogWarning($"Frame {frameIndex} does not have a Renderer component");
+            
             yield break;
         }
 
         // Check if the material uses the Custom_SimpleTwoColorLines shader
         if (frameRenderer.material.shader.name != "Custom/SimpleTwoColorLines")
         {
-            Debug.LogWarning($"Frame {frameIndex} material does not use Custom/SimpleTwoColorLines shader. Current shader: {frameRenderer.material.shader.name}");
+            
             yield break;
         }
 
@@ -610,7 +610,7 @@ public class ElHolderScript : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning($"Material on {frameObjects[frameIndex].name} does not have _Color3Intensity property. Using default value.");
+            
             // If the material doesn't have the property, we'll use the default value
         }
         float currentIntensity = activePlayerIntensity; // Current highlighted intensity
@@ -636,27 +636,27 @@ public class ElHolderScript : MonoBehaviour
         // Clear property block to return to original material
         frameRenderer.SetPropertyBlock(null);
 
-        Debug.Log($"Faded frame {frameIndex} back to original Color3Intensity");
+        
     }
 
     private IEnumerator FadeFrameBackgroundColor(int frameIndex, Color targetColor1, Color targetColor2, float duration)
     {
         if (frameIndex < 0 || frameIndex >= frameObjects.Count)
         {
-            Debug.LogWarning($"Invalid frame index {frameIndex}. Available frames: {frameObjects.Count}");
+            
             yield break;
         }
 
         if (frameObjects[frameIndex] == null || !frameObjects[frameIndex].activeInHierarchy)
         {
-            Debug.LogWarning($"Frame {frameIndex} is null or inactive");
+            
             yield break;
         }
 
         Renderer frameRenderer = frameObjects[frameIndex].GetComponent<Renderer>();
         if (frameRenderer == null)
         {
-            Debug.LogWarning($"Frame {frameIndex} does not have a Renderer component");
+            
             yield break;
         }
 
@@ -695,7 +695,7 @@ public class ElHolderScript : MonoBehaviour
 
         frameRenderer.SetPropertyBlock(propertyBlock);
 
-        Debug.Log($"Highlighted frame {frameIndex} with enhanced Color3Intensity, colors: color1: {targetColor1}, color2: {targetColor2}");
+        
     }
 
 
@@ -703,20 +703,20 @@ public class ElHolderScript : MonoBehaviour
     {
         if (frameIndex < 0 || frameIndex >= frameObjects.Count)
         {
-            Debug.LogWarning($"Invalid frame index {frameIndex}. Available frames: {frameObjects.Count}");
+            
             yield break;
         }
 
         if (frameObjects[frameIndex] == null)
         {
-            Debug.LogWarning($"Frame {frameIndex} is null");
+            
             yield break;
         }
 
         Renderer frameRenderer = frameObjects[frameIndex].GetComponent<Renderer>();
         if (frameRenderer == null)
         {
-            Debug.LogWarning($"Frame {frameIndex} does not have a Renderer component");
+            
             yield break;
         }
 
@@ -756,7 +756,7 @@ public class ElHolderScript : MonoBehaviour
         // Clear property block to return to original material
         frameRenderer.SetPropertyBlock(null);
 
-        Debug.Log($"Faded frame {frameIndex} back to original Color3Intensity, colors unchanged");
+        
     }
 
 
@@ -769,7 +769,7 @@ public class ElHolderScript : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("No active player set");
+            
         }
     }
 
@@ -788,7 +788,7 @@ public class ElHolderScript : MonoBehaviour
         }
 
         // Apply the material to all frame objects only
-        Debug.Log($"Applying frame material to {frameObjects.Count} frame objects");
+        
         foreach (GameObject frameObject in frameObjects)
         {
             if (frameObject != null)
@@ -797,11 +797,11 @@ public class ElHolderScript : MonoBehaviour
                 if (renderer != null)
                 {
                     renderer.material = frameMaterial;
-                    Debug.Log($"Applied frame material to frame: {frameObject.name}");
+                    
                 }
                 else
                 {
-                    Debug.LogWarning($"Frame object {frameObject.name} does not have a Renderer component");
+                    
                 }
             }
         }
@@ -812,20 +812,20 @@ public class ElHolderScript : MonoBehaviour
     {
         if (frameIndex < 0 || frameIndex >= frameObjects.Count)
         {
-            Debug.LogWarning($"Invalid frame index {frameIndex}. Available frames: {frameObjects.Count}");
+            
             return;
         }
 
         GameObject frameObject = frameObjects[frameIndex];
         if (frameObject == null)
         {
-            Debug.LogWarning($"Frame object at index {frameIndex} is null");
+            
             return;
         }
 
         if (frameMaterial == null)
         {
-            Debug.LogError("Frame material is not assigned! Please assign a material in the inspector.");
+            
             return;
         }
 
@@ -833,11 +833,11 @@ public class ElHolderScript : MonoBehaviour
         if (renderer != null)
         {
             renderer.material = frameMaterial;
-            Debug.Log($"Applied frame material to frame {frameIndex} ({frameObject.name})");
+            
         }
         else
         {
-            Debug.LogWarning($"Frame object {frameObject.name} does not have a Renderer component");
+            
         }
     }
 
@@ -846,21 +846,21 @@ public class ElHolderScript : MonoBehaviour
     {
         if (frameIndex < 0 || frameIndex >= frameObjects.Count)
         {
-            Debug.LogWarning($"Invalid frame index {frameIndex}. Available frames: {frameObjects.Count}");
+            
             return;
         }
 
         GameObject frameObject = frameObjects[frameIndex];
         if (frameObject == null)
         {
-            Debug.LogWarning($"Frame object at index {frameIndex} is null");
+            
             return;
         }
 
         Renderer renderer = frameObject.GetComponent<Renderer>();
         if (renderer == null)
         {
-            Debug.LogWarning($"Frame object {frameObject.name} does not have a Renderer component");
+            
             return;
         }
 
@@ -878,7 +878,7 @@ public class ElHolderScript : MonoBehaviour
 
         renderer.SetPropertyBlock(propertyBlock);
 
-        Debug.Log($"Set frame {frameIndex} colors: Color1={color1}, Color2={color2}, Color3={color3}");
+        
     }
 
     // Method to set custom colors for all frames
@@ -896,21 +896,21 @@ public class ElHolderScript : MonoBehaviour
     {
         if (frameIndex < 0 || frameIndex >= frameObjects.Count)
         {
-            Debug.LogWarning($"Invalid frame index {frameIndex}. Available frames: {frameObjects.Count}");
+            
             return;
         }
 
         GameObject frameObject = frameObjects[frameIndex];
         if (frameObject == null)
         {
-            Debug.LogWarning($"Frame object at index {frameIndex} is null");
+            
             return;
         }
 
         Renderer renderer = frameObject.GetComponent<Renderer>();
         if (renderer == null)
         {
-            Debug.LogWarning($"Frame object {frameObject.name} does not have a Renderer component");
+            
             return;
         }
 
@@ -934,7 +934,7 @@ public class ElHolderScript : MonoBehaviour
 
         renderer.SetPropertyBlock(propertyBlock);
 
-        Debug.Log($"Set frame {frameIndex} shader properties: LineScale={lineScale}, AnimationSpeed={animationSpeed}, Sharpness={sharpness}");
+        
     }
 
     // Method to set Color3 to green for turn indication
@@ -942,21 +942,21 @@ public class ElHolderScript : MonoBehaviour
     {
         if (frameIndex < 0 || frameIndex >= frameObjects.Count)
         {
-            Debug.LogWarning($"Invalid frame index {frameIndex}. Available frames: {frameObjects.Count}");
+            
             return;
         }
 
         GameObject frameObject = frameObjects[frameIndex];
         if (frameObject == null)
         {
-            Debug.LogWarning($"Frame object at index {frameIndex} is null");
+            
             return;
         }
 
         Renderer renderer = frameObject.GetComponent<Renderer>();
         if (renderer == null)
         {
-            Debug.LogWarning($"Frame object {frameObject.name} does not have a Renderer component");
+            
             return;
         }
 
@@ -968,7 +968,7 @@ public class ElHolderScript : MonoBehaviour
         {
             propertyBlock.SetColor("_Color3", turnIndicationColor);
             renderer.SetPropertyBlock(propertyBlock);
-            Debug.Log($"Set frame {frameIndex} Color3 to {turnIndicationColor} for turn indication");
+            
         }
         
         // Set Color3 animation speed if the shader has this property
@@ -978,11 +978,11 @@ public class ElHolderScript : MonoBehaviour
             renderer.GetPropertyBlock(speedPropertyBlock);
             speedPropertyBlock.SetFloat("_Color3AnimationSpeed", color3AnimationSpeed);
             renderer.SetPropertyBlock(speedPropertyBlock);
-            Debug.Log($"Set frame {frameIndex} Color3 animation speed to {color3AnimationSpeed}");
+            
         }
         else
         {
-            Debug.LogWarning($"Frame {frameIndex} material does not have _Color3 property");
+            
         }
     }
 
@@ -991,26 +991,26 @@ public class ElHolderScript : MonoBehaviour
     {
         if (frameIndex < 0 || frameIndex >= frameObjects.Count)
         {
-            Debug.LogWarning($"Invalid frame index {frameIndex}. Available frames: {frameObjects.Count}");
+            
             return;
         }
 
         GameObject frameObject = frameObjects[frameIndex];
         if (frameObject == null)
         {
-            Debug.LogWarning($"Frame object at index {frameIndex} is null");
+            
             return;
         }
 
         Renderer renderer = frameObject.GetComponent<Renderer>();
         if (renderer == null)
         {
-            Debug.LogWarning($"Frame object {frameObject.name} does not have a Renderer component");
+            
             return;
         }
 
         // Clear the MaterialPropertyBlock to return to original material values
         renderer.SetPropertyBlock(null);
-        Debug.Log($"Reset frame {frameIndex} Color3 and Color3 animation speed to original material values");
+        
     }
 }

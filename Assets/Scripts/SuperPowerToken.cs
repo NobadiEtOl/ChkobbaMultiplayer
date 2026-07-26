@@ -38,13 +38,13 @@ public class SuperPowerToken : MonoBehaviour
     }
 
     [ContextMenu("Activate Power")]
-    public void OnTokenClicked()
+    public void OnTokenDropped()
     {
-        Debug.Log("SuperPowerToken clicked: " + power.name);
+        
 
         if (GameManager.LocalInstance != null && !GameManager.LocalInstance.TryBeginGameplayAction($"SuperPower:{power.name}"))
         {
-            Debug.LogWarning($"Cannot activate {power.name} - another gameplay action is still running.");
+            
             ShowOutOfTurnFeedback();
             return;
         }
@@ -52,7 +52,7 @@ public class SuperPowerToken : MonoBehaviour
         // Check if it's the player's turn before activating
         if (GameManager.LocalInstance != null && !GameManager.LocalInstance.IsLocalPlayerTurn())
         {
-            Debug.LogWarning($"Cannot activate {power.name} - it's not your turn!");
+            
             ShowOutOfTurnFeedback();
             GameManager.LocalInstance?.EndGameplayAction("Superpower denied: out of turn");
             return;
@@ -78,12 +78,12 @@ public class SuperPowerToken : MonoBehaviour
         // CRITICAL FIX: For peek powers, delay InfoBox closure to allow animation to complete
         if (superPowerClassName == "UcundanGözAt" || superPowerClassName == "BayaBayaBak")
         {
-            Debug.Log($"[SuperPowerToken] Peek power detected ({superPowerClassName}) - delaying InfoBox closure");
+            
             StartCoroutine(DelayedCloseInfoBoxForPeekPower());
         }
         else if (ShouldKeepInfoBoxOpenAfterActivation(power != null ? power.name : null))
         {
-            Debug.Log($"[SuperPowerToken] {power.name} requires multi-step guidance - keeping InfoBox open");
+            
 
             GameManager.LocalInstance?.EndGameplayAction("Superpower entered selection phase");
 
@@ -186,7 +186,7 @@ public class SuperPowerToken : MonoBehaviour
     /// </summary>
     private IEnumerator DelayedCloseInfoBoxForPeekPower()
     {
-        Debug.Log($"[SuperPowerToken] Starting delayed closure for peek power: {superPowerClassName}");
+        
         
         // Wait for peek animation to complete
         // Ucundan Göz At: ~2.0 seconds (0.4 move + 1.2 pause + 0.4 move)
@@ -194,7 +194,7 @@ public class SuperPowerToken : MonoBehaviour
         // Add extra buffer time to ensure animation completes
         float delayTime = superPowerClassName == "UcundanGözAt" ? 3.0f : 5.0f;
         
-        Debug.Log($"[SuperPowerToken] Waiting {delayTime} seconds before closing InfoBox");
+        
         yield return new WaitForSeconds(delayTime);
         
         // Clear the active instance before closing
@@ -203,7 +203,7 @@ public class SuperPowerToken : MonoBehaviour
         // Fallback unlock in case animation completion callback is missed.
         GameManager.LocalInstance?.EndGameplayAction("Peek delayed close fallback");
         
-        Debug.Log($"[SuperPowerToken] Delayed closure complete - closing InfoBox now");
+        
         RequestInfoBoxCloseAfterActivation();
     }
 
@@ -320,7 +320,7 @@ public class SuperPowerToken : MonoBehaviour
 
         if (power == null)
         {
-            Debug.LogError("SuperPowerToken: Power is not assigned for " + gameObject.name);
+            
         }
 
         // Ensure a Collider2D is present for drag detection
@@ -349,12 +349,12 @@ public class SuperPowerToken : MonoBehaviour
             }
             else
             {
-                Debug.LogWarning("Animator not found on child object.");
+                
             }
         }
         else
         {
-            Debug.LogWarning("No child object found to play animation.");
+            
         }
     }
 
@@ -473,7 +473,7 @@ public class SuperPowerToken : MonoBehaviour
             CardInteraction card = collider.GetComponent<CardInteraction>();
             if (card != null)
             {
-                Debug.Log($"[Card] {card.gameObject.name}");
+                
                 detectedCard = card;
                 break; // Only select the first detected card
             }
@@ -484,7 +484,7 @@ public class SuperPowerToken : MonoBehaviour
         if (detectedCard != null)
         {
             CardInteraction.currentlySelectedCard = detectedCard;
-            Debug.Log($"[SuperPowerToken] Set currentlySelectedCard to {detectedCard.gameObject.name}");
+            
 
             // Special logic for Bu Daha İyi: set GameManager.currentSelectedHandCard to this card's unique ID
             if (power != null && power.name == "Bu Daha İyi")
@@ -492,7 +492,7 @@ public class SuperPowerToken : MonoBehaviour
                 if (GameManager.LocalInstance != null)
                 {
                     GameManager.LocalInstance.currentSelectedHandCard = detectedCard.uniqueCardInstanceID;
-                    Debug.Log($"[SuperPowerToken] Bu Daha İyi: Set currentSelectedHandCard to {detectedCard.uniqueCardInstanceID}");
+                    
                 }
             }
         }
@@ -506,14 +506,14 @@ public class SuperPowerToken : MonoBehaviour
 
         if (power == null || SuperPowerSpawner.LocalInstance.restirictedPowersName_WaitForSwap.Contains(power.name) == false)
         {
-            Debug.Log($"[SuperPowerToken] Exiting showcase for other hands - power: {(power != null ? power.name : "null")}");
+            
             DeckController.LocalInstance.ExitShowcaseAllOtherHands();
         }
 
         if (distance >= activationDistanceThreshold)
         {
             // Activate power if moved far enough
-            OnTokenClicked();
+            OnTokenDropped();
         }
         else
         {
