@@ -24,6 +24,7 @@ public class SuperPowerToken : MonoBehaviour
     // Powers that require follow-up user action after activation keep InfoBox open.
     private static readonly HashSet<string> keepInfoBoxOpenAfterActivationPowers = new HashSet<string>
     {
+        "Değiş Tokuş",
         "Şunu Değiş Tokuş",
         "Şunu Değiş Bunu Tokuş",
         "Kopyala Yapıştır",
@@ -87,7 +88,11 @@ public class SuperPowerToken : MonoBehaviour
 
             GameManager.LocalInstance?.EndGameplayAction("Superpower entered selection phase");
 
-            if (power.name == "Şunu Değiş Tokuş")
+            if (power.name == "Değiş Tokuş")
+            {
+                SuperPowerSpawner.LocalInstance.ShowDualSelectionStepText("Değişmek için kendi kartlarından birini seç");
+            }
+            else if (power.name == "Şunu Değiş Tokuş")
             {
                 SuperPowerSpawner.LocalInstance.ShowDualSelectionStepText("Değişmek için kendi kartlarından birini seç");
             }

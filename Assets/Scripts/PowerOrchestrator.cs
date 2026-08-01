@@ -32,17 +32,16 @@ public class PowerOrchestrator : MonoBehaviour
     private bool isKapkacPending = false;
     private bool isYandimAnamPending = false;
     private bool isBuDahaIyiPending = false;
+    private bool isDegisTokusPending = false;
     private bool isKopyalaYapistirPhase1Pending = false;  // Select source card
     private bool isKopyalaYapistirPhase2Pending = false;  // Select target card
     private bool isSunuDegisTokusPhase1Pending = false;   // Select my card
     private bool isSunuDegisTokusPhase2Pending = false;   // Select opponent card
-    private bool isSunuDegisBunuTokusPending = false;     // Multi-swap pending (can select multiple opponent cards)
+    private bool isSunuDegisBunuTokusPending = false;     // Multi-swap pending (used by GameManager for loop state)
 
     // ===== STATE: Selection Data (for multi-phase powers) =====
     private string kopyalaYapistirSourceCardId;
     private string sunuDegisTokusMyCardId;     // Stores phase 1 selection for phase 2
-    private List<string> sunuDegisBunuTokusMyCards = new List<string>();
-    private List<string> sunuDegisBunuTokusOppCards = new List<string>();
 
     // ===== STATE: Active Effects =====
     // NOTE: These mirror GameManager state flags. Use GameManager versions for truth.
@@ -73,7 +72,7 @@ public class PowerOrchestrator : MonoBehaviour
     /// <summary>Check if any selection power is already pending (mutual exclusivity).</summary>
     private bool IsAnySelectionPending()
     {
-        return isKapkacPending || isYandimAnamPending || isBuDahaIyiPending ||
+        return isKapkacPending || isYandimAnamPending || isBuDahaIyiPending || isDegisTokusPending ||
                isKopyalaYapistirPhase1Pending || isKopyalaYapistirPhase2Pending ||
                isSunuDegisTokusPhase1Pending || isSunuDegisTokusPhase2Pending ||
                isSunuDegisBunuTokusPending;
@@ -85,6 +84,7 @@ public class PowerOrchestrator : MonoBehaviour
         isKapkacPending = false;
         isYandimAnamPending = false;
         isBuDahaIyiPending = false;
+        isDegisTokusPending = false;
         isKopyalaYapistirPhase1Pending = false;
         isKopyalaYapistirPhase2Pending = false;
         isSunuDegisTokusPhase1Pending = false;
@@ -94,8 +94,6 @@ public class PowerOrchestrator : MonoBehaviour
         // Also clear stored card selections
         kopyalaYapistirSourceCardId = null;
         sunuDegisTokusMyCardId = null;
-        sunuDegisBunuTokusMyCards.Clear();
-        sunuDegisBunuTokusOppCards.Clear();
     }
 
     /// <summary>Ensure modeAdapter is available before transport.</summary>
@@ -164,13 +162,15 @@ public class PowerOrchestrator : MonoBehaviour
         modeAdapter.PersistGameStateAfterPower();
     }
 
-    public void ExecuteSwapCardWithOpponent()
+    public void ExecuteSwapCardWithOpponent(string selectedCardId)
     {
         
         if (!ValidateAdapter()) return;
         
+        isDegisTokusPending = false;
+        
         // Transport: send RPC (server validates and swaps)
-        modeAdapter.ExecuteSwapCardWithOpponent();
+        modeAdapter.ExecuteSwapCardWithOpponent(selectedCardId);
         modeAdapter.PersistGameStateAfterPower();
     }
 
@@ -324,6 +324,25 @@ public class PowerOrchestrator : MonoBehaviour
         }
     }
 
+    public void StartDegisTokusSelection()
+    {
+        
+        if (IsAnySelectionPending())
+        {
+            
+            return;
+        }
+
+        isDegisTokusPending = true;
+        if (ValidateAdapter())
+        {
+            modeAdapter.PrepareForInteractivePowerSelection("Değiş Tokuş", 30f);
+        }
+
+        // UI setup (kept in GameManager for now)
+        gameManager?.StartDegisTokusSelectionPower();
+    }
+
     public void StartBuDahaIyiSelection()
     {
         
@@ -438,10 +457,21 @@ public class PowerOrchestrator : MonoBehaviour
 
     public void ExecuteSunuDegisTokus(string myCardId, string oppCardId = null)
     {
+        // DIRECT EXECUTION: Both cards provided (used by ŞunuDeğişBunuTokuş sequential loop)
+        if (oppCardId != null && myCardId != null && !isSunuDegisTokusPhase1Pending && !isSunuDegisTokusPhase2Pending)
+        {
+            if (ValidateAdapter())
+            {
+                modeAdapter.ExecuteSunuDegisTokus(myCardId, oppCardId);
+                modeAdapter.PersistGameStateAfterPower();
+            }
+            return;
+        }
+        
+        // TWO-PHASE EXECUTION: Used by ŞunuDeğişTokuş dual selection
         // Phase 1: Select my card (oppCardId is null)
         if (isSunuDegisTokusPhase1Pending && myCardId != null && oppCardId == null)
         {
-            
             sunuDegisTokusMyCardId = myCardId;
             isSunuDegisTokusPhase1Pending = false;
             isSunuDegisTokusPhase2Pending = true;
@@ -455,7 +485,6 @@ public class PowerOrchestrator : MonoBehaviour
         // Phase 2: Select opponent card and execute (oppCardId is provided)
         if (isSunuDegisTokusPhase2Pending && oppCardId != null && sunuDegisTokusMyCardId != null)
         {
-            
             isSunuDegisTokusPhase2Pending = false;
             if (ValidateAdapter())
             {
@@ -465,72 +494,25 @@ public class PowerOrchestrator : MonoBehaviour
             sunuDegisTokusMyCardId = null;
             return;
         }
-
-        
     }
 
     // ===== COMPLEX POWERS: Multi-Swap Sequential (Şunu Değiş Bunu Tokuş) =====
 
     public void StartSunuDegisBunuTokusSelection()
     {
-        
         if (IsAnySelectionPending())
         {
-            
             return;
         }
 
         isSunuDegisBunuTokusPending = true;
-        sunuDegisBunuTokusMyCards.Clear();
-        sunuDegisBunuTokusOppCards.Clear();
         
         if (ValidateAdapter())
         {
             modeAdapter.PrepareForInteractivePowerSelection("Şunu Değiş Bunu Tokuş", 60f);  // Longer timeout for multi-swap
         }
-    }
 
-    public void ExecuteSunuDegisBunuTokus(string cardId, bool isMyCard)
-    {
-        
-        if (!isSunuDegisBunuTokusPending || cardId == null)
-        {
-            
-            return;
-        }
-
-        if (isMyCard)
-        {
-            sunuDegisBunuTokusMyCards.Add(cardId);
-            
-        }
-        else
-        {
-            sunuDegisBunuTokusOppCards.Add(cardId);
-            
-        }
-
-        // Keep selection active for accumulation; don't clear pending flag yet
-    }
-
-    public void ExecuteSunuDegisBunuTokusComplete()
-    {
-        
-        if (!isSunuDegisBunuTokusPending || sunuDegisBunuTokusMyCards.Count == 0 || sunuDegisBunuTokusMyCards.Count != sunuDegisBunuTokusOppCards.Count)
-        {
-            
-            return;
-        }
-
-        isSunuDegisBunuTokusPending = false;
-        if (ValidateAdapter())
-        {
-            modeAdapter.ExecuteSunuDegisBunuTokus(sunuDegisBunuTokusMyCards.ToArray(), sunuDegisBunuTokusOppCards.ToArray());
-            modeAdapter.PersistGameStateAfterPower();
-        }
-        
-        sunuDegisBunuTokusMyCards.Clear();
-        sunuDegisBunuTokusOppCards.Clear();
+        gameManager?.StartSunuDegisBunuTokusPower();
     }
 
     // ===== POWER CANCELLATION =====

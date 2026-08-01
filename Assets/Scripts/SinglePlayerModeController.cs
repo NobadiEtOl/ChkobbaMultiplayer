@@ -1699,19 +1699,23 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
         SaveRunState();
     }
 
-    public void ExecuteSwapCardWithOpponent()
+    public void ExecuteSwapCardWithOpponent(string selectedCardId)
     {
         if (GameManager.LocalInstance.myCards == null || GameManager.LocalInstance.myCards.Count == 0 || opponentHandList.Count == 0) return;
-        string myCardId = GameManager.LocalInstance.myCards[UnityEngine.Random.Range(0, GameManager.LocalInstance.myCards.Count)];
+        
+        // Validate selected card is in player hand
+        if (!GameManager.LocalInstance.myCards.Contains(selectedCardId)) return;
+        
+        // Pick random opponent card
         string oppCardId = opponentHandList[UnityEngine.Random.Range(0, opponentHandList.Count)];
         
         if (opponentHandList.Contains(oppCardId))
         {
             opponentHandList.Remove(oppCardId);
-            opponentHandList.Add(myCardId);
+            opponentHandList.Add(selectedCardId);
         }
 
-        GameManager.LocalInstance.StartCoroutine(GameManager.LocalInstance.OnSunuDegisTokusSynced(0, 1, myCardId, oppCardId));
+        GameManager.LocalInstance.StartCoroutine(GameManager.LocalInstance.OnSunuDegisTokusSynced(0, 1, selectedCardId, oppCardId));
         GameManager.LocalInstance.ShowcaseSuperPower("Değiş Tokuş");
         SaveRunState();
     }
@@ -1762,6 +1766,11 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
         SaveRunState();
     }
 
+    public void StartDegisTokusSelection()
+    {
+        GameManager.LocalInstance.StartDegisTokusSelectionPower();
+    }
+
     public void ExecuteBlockNextPlayer()
     {
         GameManager.LocalInstance.SetOynayamazsinActive(true);
@@ -1809,7 +1818,30 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
             localCenterCards[handCardId] = handCardValue;
         }
 
-        GameManager.LocalInstance.OnBuDahaIyiSynced(0, 0, handCardId, topCenterCardId);
+        int playerNo = GameManager.LocalInstance.FindHandOwnerBySearching(handCardId);
+        if (playerNo == -1)
+        {
+            // Fallback to local seat to avoid hard failure if owner resolution misses a transient card.
+            playerNo = 0;
+        }
+
+        // Keep singleplayer hand model authoritative for AI turns.
+        if (playerNo != 0 && opponentHandList.Contains(handCardId))
+        {
+            
+            int index = opponentHandList.IndexOf(handCardId);
+            if (index >= 0)
+            {
+                // Remove the old card
+                opponentHandList.RemoveAt(index);
+
+                // Insert the new card at the same index
+                opponentHandList.Insert(index, topCenterCardId);
+            }
+            
+        }
+
+        GameManager.LocalInstance.OnBuDahaIyiSynced(0, playerNo, handCardId, topCenterCardId);
         GameManager.LocalInstance.ShowcaseSuperPower("Bu Daha İyi");
         SaveRunState();
     }
@@ -1834,28 +1866,7 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
 
     public void StartSunuDegisBunuTokusSelection()
     {
-        GameManager.LocalInstance.ActivateSunuDegisBunuTokusPower();
-    }
-
-    public void ExecuteSunuDegisBunuTokus(string[] myCards, string[] oppCards)
-    {
-        for (int i = 0; i < myCards.Length; i++)
-        {
-            if (opponentHandList.Contains(oppCards[i]))
-            {
-                opponentHandList.Remove(oppCards[i]);
-                opponentHandList.Add(myCards[i]);
-            }
-        }
-
-        for (int i = 0; i < myCards.Length; i++)
-        {
-            bool isLast = (i == myCards.Length - 1);
-            GameManager.LocalInstance.EnqueueSunuDegisBunuTokusSwap(0, 1, myCards[i], oppCards[i], i, isLast);
-        }
-
-        GameManager.LocalInstance.ShowcaseSuperPower("Şunu Değiş Bunu Tokuş");
-        SaveRunState();
+        GameManager.LocalInstance.StartSunuDegisBunuTokusPower();
     }
 
     public void ExecuteZaferPuani(int points)

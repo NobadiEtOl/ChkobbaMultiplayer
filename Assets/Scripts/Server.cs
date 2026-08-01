@@ -2979,6 +2979,35 @@ private void ServerStart()
         networkRelay.UseSunuDegisTokusClientRPC(myPlayerNo, oppPlayer, myCard, oppCard);
     }
 
+    public void ExecuteDegisTokusWithSelectedCard(int myPlayerNo, string selectedCardId)
+    {
+        if (playersHandCardsIDs == null || !playersHandCardsIDs.ContainsKey(myPlayerNo)) return;
+
+        // Validate selected card is in player's hand
+        if (!IsCardInPlayerHand(myPlayerNo, selectedCardId)) return;
+        if (IsCardInCenter(selectedCardId)) return;
+
+        // Find random opponent
+        var validOpponents = new List<int>();
+        foreach (var opp in GetOpponentPlayers(myPlayerNo))
+        {
+            if (playersHandCardsIDs.ContainsKey(opp) && playersHandCardsIDs[opp] != null && playersHandCardsIDs[opp].Count > 0)
+                validOpponents.Add(opp);
+        }
+
+        if (validOpponents.Count == 0) return;
+
+        int oppPlayer = validOpponents[UnityEngine.Random.Range(0, validOpponents.Count)];
+        string oppCard = playersHandCardsIDs[oppPlayer][UnityEngine.Random.Range(0, playersHandCardsIDs[oppPlayer].Count)];
+
+        if (!IsCardInPlayerHand(oppPlayer, oppCard)) return;
+        if (IsCardInCenter(oppCard)) return;
+
+        // Perform swap with selected player card and random opponent card
+        SunuDegisTokusSwap(myPlayerNo, oppPlayer, selectedCardId, oppCard);
+        networkRelay.UseSunuDegisTokusClientRPC(myPlayerNo, oppPlayer, selectedCardId, oppCard);
+    }
+
     public void SunuDegisTokusSwap(int playerANo, int playerBNo, string cardAID, string cardBID)
     {
         // Swap in player hands

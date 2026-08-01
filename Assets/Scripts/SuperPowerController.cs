@@ -92,7 +92,7 @@ public class DeğişTokuş : SuperPower
     private void OnEnable()
     {
         name = "Değiş Tokuş";
-        description = "Bir kartını rakibin elindeki rastgele bir kartla değiştir";
+        description = "Bir kartını seç, seçilen kartın rakibin elindeki rastgele bir kartla değiştirilmesi sağla";
         powerCostTier = 1;
         isPowerEnabled = true;
     }
@@ -100,7 +100,8 @@ public class DeğişTokuş : SuperPower
     {
         
         PowerActivated();
-        GameManager.LocalInstance.PowerOrchestrator?.ExecuteSwapCardWithOpponent();
+        GameManager.LocalInstance.PowerOrchestrator?.StartDegisTokusSelection();
+
         
     }
 }

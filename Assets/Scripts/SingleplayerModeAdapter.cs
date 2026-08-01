@@ -53,11 +53,11 @@ public class SingleplayerModeAdapter : MonoBehaviour, IModeAdapter
         ctrl.ExecuteValeArar();
     }
 
-    public void ExecuteSwapCardWithOpponent()
+    public void ExecuteSwapCardWithOpponent(string selectedCardId)
     {
         var ctrl = GetController();
         if (ctrl == null) return;
-        ctrl.ExecuteSwapCardWithOpponent();
+        ctrl.ExecuteSwapCardWithOpponent(selectedCardId);
     }
 
     public void ExecuteBomba()
@@ -157,15 +157,6 @@ public class SingleplayerModeAdapter : MonoBehaviour, IModeAdapter
         ctrl.ExecuteSunuDegisTokus(myCardId, oppCardId);
     }
 
-    // --- Multi-swap sequential power ---
-
-    public void ExecuteSunuDegisBunuTokus(string[] myCards, string[] oppCards)
-    {
-        var ctrl = GetController();
-        if (ctrl == null) return;
-        ctrl.ExecuteSunuDegisBunuTokus(myCards, oppCards);
-    }
-
     // ===== STATE PERSISTENCE =====
 
     public void PersistGameStateAfterPower()
@@ -173,5 +164,10 @@ public class SingleplayerModeAdapter : MonoBehaviour, IModeAdapter
         var ctrl = GetController();
         if (ctrl == null) return;
         ctrl.SaveRunState();
+    }
+
+    public void ExecuteSunuDegisTokuOnCard(string cardId)
+    {
+        throw new System.NotImplementedException();
     }
 }

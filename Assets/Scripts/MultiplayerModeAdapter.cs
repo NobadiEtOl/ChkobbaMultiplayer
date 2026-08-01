@@ -40,10 +40,10 @@ public class MultiplayerModeAdapter : MonoBehaviour, IModeAdapter
         // Logic already handled in PowerOrchestrator; adapter does nothing.
     }
 
-    public void ExecuteSwapCardWithOpponent()
+    public void ExecuteSwapCardWithOpponent(string selectedCardId)
     {
         if (networkRelay == null) return;
-        networkRelay.UseRandomDegisTokusServerRPC();
+        networkRelay.UseDegisTokusWithSelectedCardServerRPC(selectedCardId);
     }
 
     public void ExecuteBomba()
@@ -134,26 +134,16 @@ public class MultiplayerModeAdapter : MonoBehaviour, IModeAdapter
         networkRelay.UseSunuDegisTokusServerRPC(myCardId, oppCardId);
     }
 
-    // --- Multi-swap sequential power ---
-
-    public void ExecuteSunuDegisBunuTokus(string[] myCards, string[] oppCards)
-    {
-        if (networkRelay == null) return;
-        if (myCards == null || oppCards == null || myCards.Length != oppCards.Length) return;
-
-        // Send one RPC per swap pair, marking the last one with readyToExit=true
-        for (int i = 0; i < myCards.Length; i++)
-        {
-            bool isLast = (i == myCards.Length - 1);
-            networkRelay.UseSunuDegisBunuTokusServerRPC(myCards[i], oppCards[i], i, isLast);
-        }
-    }
-
     // ===== STATE PERSISTENCE =====
 
     public void PersistGameStateAfterPower()
     {
         if (Server.Singleton == null) return;
         Server.Singleton.SaveCurrentGameState();
+    }
+
+    public void ExecuteSunuDegisTokuOnCard(string cardId)
+    {
+        throw new System.NotImplementedException();
     }
 }

@@ -3,6 +3,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using DG.Tweening;
 using System.Collections;
+using System.Linq;
 
 public class CardInteraction : MonoBehaviour
 {
@@ -134,6 +135,7 @@ public class CardInteraction : MonoBehaviour
     private bool stopPower = false;
     public void OnCardTouched(Vector3 touchPosition)
     {
+        Debug.Log($"[CardInteraction] OnCardTouched called for card: {this.uniqueCardInstanceID}, parent: {gameObject.transform.parent?.name}");
         
 
         if (GameManager.LocalInstance != null && GameManager.LocalInstance.IsGameplayActionInProgress())
@@ -186,19 +188,7 @@ public class CardInteraction : MonoBehaviour
             // Bu Daha İyi pending
             if (GameManager.LocalInstance.isBuDahaIyiPending)
             {
-                if (!parentName.StartsWith("PlayerHand"))
-                {
-                    
-                    return;
-                }
-
-                if (GameManager.LocalInstance.centerCards == null || GameManager.LocalInstance.centerCards.Count == 0)
-                {
-                    
-                    return;
-                }
-
-                
+     
                 GameManager.LocalInstance.isBuDahaIyiPending = false;
                 CardInteraction.RestrictSelectionToOwnHand();
 
@@ -210,7 +200,7 @@ public class CardInteraction : MonoBehaviour
                 }
 
                 GameManager.LocalInstance.SetCurrentSelectedHandCard(this.uniqueCardInstanceID);
-                GameManager.LocalInstance.UseBuDahaIyiPower();
+                GameManager.LocalInstance.PowerOrchestrator?.ExecuteBuDahaIyi(this.uniqueCardInstanceID, GameManager.LocalInstance.centerCards.Keys.LastOrDefault());
 
                 if (DeckController.LocalInstance != null)
                 {
@@ -293,23 +283,45 @@ public class CardInteraction : MonoBehaviour
                 return;
             }
 
-            // NOTE: Kopyala Yapıştır and Şunu Değiş Tokuş are now handled via isSunuDegisTokusActive
+            // Değiş Tokuş pending
+            if (GameManager.LocalInstance.isDegisTokusPending)
+            {
+                
+                GameManager.LocalInstance.isDegisTokusPending = false;
+                CardInteraction.RestrictSelectionToOwnHand();
+                
+                // IMPORTANT: Clear any existing selection state before applying Değiş Tokuş
+                if (CardInteraction.currentlySelectedCard != null)
+                {
+                    
+                    CardInteraction.currentlySelectedCard = null;
+                    CardInteraction.isOneCardSelected = false;
+                }
+                
+                GameManager.LocalInstance.PowerOrchestrator?.ExecuteSwapCardWithOpponent(this.uniqueCardInstanceID);
+
+                if (DeckController.LocalInstance != null)
+                {
+                    DeckController.LocalInstance.ExitShowcaseAllOtherHands();
+                }
+
+                if (SuperPowerSpawner.LocalInstance != null)
+                {
+                    SuperPowerSpawner.LocalInstance.StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
+                }
+
+                GameManager.LocalInstance.SetCurrentSelectedHandCardNull();
+                
+                return;
+            }
+
+            // NOTE: Kopyala Yapıştır and Şunu Değiş Tokuş and Şunu Değiş Bunu Tokuş are now handled via isSunuDegisTokusActive
             // and isKopyalaSelectingSource flags in GameManager.CardSelected() to ensure proper
             // event flow and UI state management. The OnCardSelected event must fire to trigger
             // GameManager.CardSelected() which orchestrates the selection phases and UI updates.
 
-            // Şunu Değiş Bunu Tokuş (multi-select accumulation)
-            if (GameManager.LocalInstance.PowerOrchestrator?.IsSunuDegisBunuTokusPending == true)
-            {
-                
-                
-                // Determine if this card is from the local player's hand (index 0) or an opponent's hand
-                // Reuse localPlayerHand from line 158, which is in scope
-                bool isMyCard = (gameObject.transform.parent == localPlayerHand);
-                
-                GameManager.LocalInstance.PowerOrchestrator?.ExecuteSunuDegisBunuTokus(this.uniqueCardInstanceID, isMyCard);
-                return;
-            }
+            // Şunu Değiş Bunu Tokuş is handled in GameManager.CardSelected() through
+            // isSunuDegisBunuTokusActive + sequential ExecuteSunuDegisTokus(my, opp) calls.
         }
 
         // DEBUG: Log all card touches to see what's happening
@@ -395,7 +407,7 @@ public class CardInteraction : MonoBehaviour
             return;
         }
         // Handle center cards and hand cards for selection
-        else if (gameObject.transform.parent.name == "Center" || gameObject.transform.parent.name.StartsWith("PlayerHand"))
+        else if (gameObject.transform.parent.name.StartsWith("PlayerHand"))
         {
             
             
@@ -423,14 +435,14 @@ public class CardInteraction : MonoBehaviour
 
         if (GameManager.LocalInstance != null && GameManager.LocalInstance.isKopyalaSelectingSource)
         {
-            
+            Debug.Log($"[CardInteraction] Kopyala Yapıştır source card selected: {this.uniqueCardInstanceID}");
             GameManager.LocalInstance.SelectKopyalaSource(this);
             return;
         }
 
         if (GameManager.LocalInstance != null && GameManager.LocalInstance.isKopyalaActive)
         {
-            
+            Debug.Log($"[CardInteraction] Kopyala Yapıştır target card selected: {this.uniqueCardInstanceID}");
             GameManager.LocalInstance.TryKopyalaYapistir(this);
             return;
         }
@@ -961,7 +973,7 @@ public class CardInteraction : MonoBehaviour
         {
             if (!isOwnHand)
             {
-                
+                Debug.Log($"[CardInteraction] ŞunuDeğişBunuTokuş: Card {uniqueCardInstanceID} is not from own hand");
                 return true;
             }
             

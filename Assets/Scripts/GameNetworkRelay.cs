@@ -305,9 +305,8 @@ public class GameNetworkRelay : NetworkBehaviour
     [ClientRpc]
     public void UseSunuDegisBunuTokusClientRPC(int myPlayerNo, int otherPlayerNo, string myHandCardID, string otherHandCardID, int myHandIndex, bool readyToExit = false)
     {
-        // Use the sequential queue so concurrent RPCs don't race with showcase restoration.
-        
-        GameManager.LocalInstance.EnqueueSunuDegisBunuTokusSwap(myPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID, myHandIndex, readyToExit);
+        // Sequential flow now reuses the same synced handler as Şunu Değiş Tokuş.
+        StartCoroutine(GameManager.LocalInstance.OnSunuDegisTokusSynced(myPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID));
     }
     [ClientRpc(RequireOwnership = false)]
     public void KapkacCardChangedClientRPC(string cardUniqueID)
@@ -499,6 +498,18 @@ public class GameNetworkRelay : NetworkBehaviour
         if (ShouldRejectPowerRpcDuringMove(nameof(UseRandomDegisTokusServerRPC))) return;
         ShowcaseSuperPowerClientRPC("Değiş Tokuş");
         server.ExecuteRandomDegisTokus(callerPlayerNo);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void UseDegisTokusWithSelectedCardServerRPC(string selectedCardId, ServerRpcParams rpcParams = default)
+    {
+        if (!ValidatePowerCaller(out int callerPlayerNo, rpcParams)) return;
+        if (ShouldRejectPowerRpcDuringMove(nameof(UseDegisTokusWithSelectedCardServerRPC))) return;
+
+        if (string.IsNullOrEmpty(selectedCardId)) return;
+
+        ShowcaseSuperPowerClientRPC("Değiş Tokuş");
+        server.ExecuteDegisTokusWithSelectedCard(callerPlayerNo, selectedCardId);
     }
 
     [ServerRpc(RequireOwnership = false)]

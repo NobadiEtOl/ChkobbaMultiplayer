@@ -15,7 +15,7 @@ public interface IModeAdapter
     void ExecutePeekOpponentCard();
     void ExecuteBayaBayaBak();
     void ExecuteValeArar();
-    void ExecuteSwapCardWithOpponent();
+    void ExecuteSwapCardWithOpponent(string selectedCardId);
     void ExecuteBomba();
     void ExecuteBlockNextPlayer();
     void ExecuteYapamazsın();
@@ -48,9 +48,6 @@ public interface IModeAdapter
     void ExecuteKopyalaYapistir(string targetId, string sourceId);
     void ExecuteSunuDegisTokus(string myCardId, string oppCardId);
     
-    // --- Multi-swap sequential power ---
-    void ExecuteSunuDegisBunuTokus(string[] myCards, string[] oppCards);
-    
     // ===== STATE PERSISTENCE =====
     
     /// <summary>
@@ -59,4 +56,5 @@ public interface IModeAdapter
     /// Singleplayer: save run state to disk.
     /// </summary>
     void PersistGameStateAfterPower();
+    void ExecuteSunuDegisTokuOnCard(string cardId);
 }

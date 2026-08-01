@@ -383,6 +383,8 @@ public class GameManager : MonoBehaviour
     public bool isYandimAnamPending = false;
 
     public bool isBuDahaIyiPending = false;
+
+    public bool isDegisTokusPending = false;
     
     // RECONNECTION TRACKING: Track if we're currently reconnecting
     private bool isReconnecting = false;
@@ -447,6 +449,7 @@ public class GameManager : MonoBehaviour
         isKapkacPending = false;
         isYandimAnamPending = false;
         isBuDahaIyiPending = false;
+        isDegisTokusPending = false;
         isKopyalaActive = false;
         isKopyalaSelectingSource = false;
         kopyalaSourceCard = null;
@@ -551,6 +554,7 @@ public class GameManager : MonoBehaviour
         isKapkacPending = false;
         isYandimAnamPending = false;
         isBuDahaIyiPending = false;
+        isDegisTokusPending = false;
         
         
     }
@@ -1116,6 +1120,7 @@ public class GameManager : MonoBehaviour
     private void CardSelected(string cardID)
 
     {
+        Debug.Log($"[GameManager] CardSelected called with cardID: {cardID}");
 
         AddToDebugLog($"[GameManager] CardSelected called with cardID: {cardID}");
 
@@ -1186,7 +1191,8 @@ public class GameManager : MonoBehaviour
             TriggerActiveSunuDegisTokusPowerActivated();
 
             // 2. Send swap request to server — ClientRPC will handle the swap for all clients (including this one)
-            networkRelay.UseSunuDegisTokusServerRPC(sunuDegisTokusFirstCard, cardID);
+            //networkRelay.UseSunuDegisTokusServerRPC(sunuDegisTokusFirstCard, cardID);
+            powerOrchestrator?.ExecuteSunuDegisTokus(sunuDegisTokusFirstCard, cardID);
 
             // 3. Clear PowerOrchestrator state
             PowerOrchestrator?.ClearAllSelectionFlags();
@@ -1215,70 +1221,43 @@ public class GameManager : MonoBehaviour
             return;
         }
 
+        Debug.Log($"[GameManager] CardSelected completed, checking for ŞunuDeğişBunuTokuş state:" + isSunuDegisBunuTokusActive);
 
-
-        // ŞunuDeğişBunuTokuş logic
-
+        // ŞunuDeğişBunuTokuş SEQUENTIAL SWAP LOGIC
         if (isSunuDegisBunuTokusActive)
-
         {
+            AddToDebugLog($"[GameManager] ŞunuDeğişBunuTokuş is active, opponent card selected: {cardID}");
 
-            AddToDebugLog($"[GameManager] ŞunuDeğişBunuTokuş is active, checking if card is from own hand");
-
-            // Only allow selecting a card from another player's hand
-
-            if (sunuDegisBunuTokusMyHandSnapshot != null && sunuDegisBunuTokusMyHandSnapshot.Contains(cardID))
-
+            // Validate card is NOT from own hand
+            if (sunuDegisBunuTokusMyHandCards != null && sunuDegisBunuTokusMyHandCards.Contains(cardID))
             {
-
                 AddToDebugLogWarning("You must select a card from another player's hand for ŞunuDeğişBunuTokuş.");
-
                 return;
-
             }
 
-            // Guard: no snapshot or all swaps already collected
-            if (sunuDegisBunuTokusMyHandSnapshot == null || sunuDegisBunuTokusSwapIndex >= sunuDegisBunuTokusTotalSwaps)
+            // Guard: invalid state
+            if (sunuDegisBunuTokusMyHandCards == null || sunuDegisBunuTokusSwapIndex >= sunuDegisBunuTokusMyHandCards.Count)
             {
                 AddToDebugLogWarning("No more selections needed for ŞunuDeğişBunuTokuş.");
                 return;
             }
 
-            // Prevent selecting the same opponent card twice
-            if (sunuDegisBunuTokusSelectedOpponentCards.Contains(cardID))
-            {
-                AddToDebugLogWarning("That opponent card is already queued for a swap. Pick a different one.");
-                return;
-            }
+            // Get current own card to swap
+            string myCard = sunuDegisBunuTokusMyHandCards[sunuDegisBunuTokusSwapIndex];
+            sunuDegisBunuTokusCurrentOpponentCardId = cardID;
 
-            // Record selection and show indicators — opponent card (teal) + own hand card (blue)
-            sunuDegisBunuTokusSelectedOpponentCards.Add(cardID);
-            if (CardInteraction.cardLookup.TryGetValue(cardID, out var selectedCI))
-                selectedCI.ShowDebugCandidateIndicator(new Color(0f, 1f, 0.75f, 0.65f));
+            // Show pair indicators: own (blue) + opponent (green)
+            if (CardInteraction.cardLookup.TryGetValue(myCard, out var myCI))
+                myCI.ShowDebugCandidateIndicator(new Color(0.4f, 0.8f, 1f, 0.65f)); // Blue
+            if (CardInteraction.cardLookup.TryGetValue(cardID, out var oppCI))
+                oppCI.ShowDebugCandidateIndicator(new Color(0f, 1f, 0.5f, 0.65f)); // Green
 
-            // Indicate the paired own-hand card so all selected pairs stay visible
-            string pairedHandCard = sunuDegisBunuTokusMyHandSnapshot[sunuDegisBunuTokusSwapIndex];
-            if (CardInteraction.cardLookup.TryGetValue(pairedHandCard, out var pairedCI))
-                pairedCI.ShowDebugCandidateIndicator(new Color(0.4f, 0.8f, 1f, 0.65f));
+            AddToDebugLog($"[GameManager] ŞunuDeğişBunuTokuş Swap {sunuDegisBunuTokusSwapIndex + 1}/{sunuDegisBunuTokusMyHandCards.Count}: {myCard} <-> {cardID}");
 
-            
-
-            sunuDegisBunuTokusSwapIndex++;
-            AddToDebugLog($"ŞunuDeğişBunuTokuş: Queued swap {sunuDegisBunuTokusSwapIndex}/{sunuDegisBunuTokusTotalSwaps}.");
-
-            if (sunuDegisBunuTokusSwapIndex >= sunuDegisBunuTokusTotalSwaps)
-            {
-                // All selections collected — send to server and animate
-                CompleteSunuDegisBunuTokusActivation();
-            }
-            else
-            {
-                // Prompt for next selection
-                SuperPowerSpawner.LocalInstance?.ShowDualSelectionStepText(GetSunuDegisBunuTokusSelectionText(sunuDegisBunuTokusSwapIndex, sunuDegisBunuTokusTotalSwaps));
-            }
+            // Execute this individual swap via PowerOrchestrator (routes to adapter)
+            powerOrchestrator?.ExecuteSunuDegisTokus(myCard, cardID);
 
             return;
-
         }
 
 
@@ -3088,7 +3067,7 @@ public class GameManager : MonoBehaviour
 
         if (!isKopyalaActive || kopyalaSourceCard == null || targetCard == null || targetCard == kopyalaSourceCard)
         {
-            
+            Debug.LogError("TryKopyalaYapistir exit early");
             return;
         }
 
@@ -3105,7 +3084,8 @@ public class GameManager : MonoBehaviour
         }
 
         // Network the change to server and all clients
-        networkRelay.KopyalaYapistirServerRPC(targetCard.uniqueCardInstanceID, kopyalaSourceCard.uniqueCardInstanceID);
+        //networkRelay.KopyalaYapistirServerRPC(targetCard.uniqueCardInstanceID, kopyalaSourceCard.uniqueCardInstanceID);
+        powerProcessor?.ExecuteKopyalaYapistir(targetCard.uniqueCardInstanceID, kopyalaSourceCard.uniqueCardInstanceID); // Ensure game state is saved after the power effect
 
         // Stop hand showcasing
         
@@ -3709,6 +3689,33 @@ public class GameManager : MonoBehaviour
         }
 
         SuperPowerSpawner.LocalInstance?.ShowDualSelectionStepText("Değiştirmek için bir kart seç");
+    }
+
+    public void StartDegisTokusSelectionPower()
+    {
+        
+
+        isDegisTokusPending = true;
+        isKapkacPending = false;
+        isYandimAnamPending = false;
+        isBuDahaIyiPending = false;
+
+        CardInteraction.currentlySelectedCard = null;
+        SetCurrentSelectedHandCardNull();
+
+        if (networkRelay != null)
+        {
+            networkRelay.PauseTurnTimerForPowerServerRPC();
+            networkRelay.StartPowerDurationTimerServerRPC();
+        }
+
+        if (DeckController.LocalInstance != null)
+        {
+            // Keep own hand at normal size while other player hands are enlarged.
+            DeckController.LocalInstance.ShowcaseAllOtherHands(false);
+        }
+
+        SuperPowerSpawner.LocalInstance?.ShowDualSelectionStepText("Değişmek için kendi kartlarından birini seç");
     }
 
 
@@ -4322,130 +4329,47 @@ public class GameManager : MonoBehaviour
         // Visual swap
         yield return StartCoroutine(deckController.SwapCardsBetweenPlayersByID(myPlayerNo, myHandCardID, otherPlayerNo, otherHandCardID, true));
         ShowAffectedCardsDebugVisual("Şunu Değiş Tokuş", myHandCardID, otherHandCardID);
-        DeckController.LocalInstance.ExitShowcaseAllOtherHands();
-        DeckController.LocalInstance.TryStopShowcaseCenterCards();
-    }
-
-
-
-    // Add at the top of GameManager.cs
-
-    public bool isSunuDegisBunuTokusActive = false;
-
-    private int sunuDegisBunuTokusSwapIndex = 0;
-
-    private List<string> sunuDegisBunuTokusMyHandSnapshot = null;
-
-    private int sunuDegisBunuTokusTotalSwaps = 0;
-
-    // Opponent cards selected so far (in order), collected before any RPCs are sent.
-    private List<string> sunuDegisBunuTokusSelectedOpponentCards = new List<string>();
-
-    // Sequential swap queue — prevents concurrent coroutines from causing showcase restoration to
-    // fire while earlier swap animations are still running (which would snap cards back mid-swap).
-    private Queue<IEnumerator> sunuDegisBunuTokusSwapQueue = new Queue<IEnumerator>();
-    private bool sunuDegisBunuTokusSwapProcessing = false;
-    private bool sunuDegisBunuTokusActivationPending = false;
-    private int sunuDegisBunuTokusExpectedSyncs = 0;
-    private int sunuDegisBunuTokusCompletedSyncs = 0;
-
-    public void EnqueueSunuDegisBunuTokusSwap(int myPlayerNo, int otherPlayerNo, string myHandCardID, string otherHandCardID, int myHandIndex, bool readyToExit)
-    {
         
-        sunuDegisBunuTokusSwapQueue.Enqueue(OnSunuDegisBunuTokusSynced(myPlayerNo, otherPlayerNo, myHandCardID, otherHandCardID, myHandIndex, readyToExit));
-        if (!sunuDegisBunuTokusSwapProcessing)
-            StartCoroutine(ProcessSunuDegisBunuTokusSwapQueue());
-    }
-
-    private IEnumerator ProcessSunuDegisBunuTokusSwapQueue()
-    {
-        sunuDegisBunuTokusSwapProcessing = true;
-        
-        while (sunuDegisBunuTokusSwapQueue.Count > 0)
+        // SEQUENTIAL LOOP TRIGGER: If this swap was part of ŞunuDeğişBunuTokuş, move to next iteration
+        if (isSunuDegisBunuTokusActive)
         {
+            AddToDebugLog($"[GameManager] OnSunuDegisTokusSynced: Swap complete, preparing next iteration");
             
-            yield return StartCoroutine(sunuDegisBunuTokusSwapQueue.Dequeue());
-        }
-        sunuDegisBunuTokusSwapProcessing = false;
-        
-    }
-
-
-
-    // Call this to activate the power
-
-    public void ActivateSunuDegisBunuTokusPower()
-
-    {
-
-        List<string> localHandSnapshot = GetCurrentLocalHandCardIdsForSwap();
-        if (localHandSnapshot.Count == 0 && myCards != null)
-        {
-            localHandSnapshot = new List<string>(myCards.Where(id => !string.IsNullOrEmpty(id)));
-        }
-
-        if (localHandSnapshot.Count == 0)
-
-        {
-
+            // Clear current swap indicators
+            ClearSunuDegisBunuTokusIndicators();
             
-
-            return;
-
-        }
-
-        // Count total available opponent cards. Cap totalSwaps so we never ask for
-        // more selections than there are opponent cards to pick from.
-        int availableOpponentCards = GetAvailableOpponentCardCount();
-        if (availableOpponentCards == 0)
-        {
+            // Increment counter and proceed to next iteration
+            sunuDegisBunuTokusSwapIndex++;
+            sunuDegisBunuTokusCurrentOpponentCardId = null;
             
-            return;
-        }
-
-        isSunuDegisBunuTokusActive = true;
-
-        sunuDegisBunuTokusSwapIndex = 0;
-
-        sunuDegisBunuTokusMyHandSnapshot = localHandSnapshot;
-        sunuDegisBunuTokusTotalSwaps = Mathf.Min(sunuDegisBunuTokusMyHandSnapshot.Count, availableOpponentCards);
-        sunuDegisBunuTokusSelectedOpponentCards = new List<string>();
-        sunuDegisBunuTokusActivationPending = false;
-        sunuDegisBunuTokusExpectedSyncs = 0;
-        sunuDegisBunuTokusCompletedSyncs = 0;
-
-        
-        
-
-        // Pause turn timer and start power duration timer
-        if (networkRelay != null)
-        {
-            networkRelay.PauseTurnTimerForPowerServerRPC();
-            networkRelay.StartPowerDurationTimerServerRPC();
-        }
-
-        // Show other hands at centerScale, bring own hand down to normalScale
-        if (DeckController.LocalInstance != null)
-        {
-            DeckController.LocalInstance.ShowcaseAllOtherHands(false);
-            DeckController.LocalInstance.TemporarilySetOwnHandToNormalScale();
-        }
-
-        // Show first selection prompt in InfoBox
-        SuperPowerSpawner.LocalInstance?.ShowDualSelectionStepText(GetSunuDegisBunuTokusSelectionText(0, sunuDegisBunuTokusTotalSwaps));
-
-        // Start hand showcasing for multi-swap selection
-        
-        if (SuperPowerSpawner.LocalInstance != null)
-        {
-            SuperPowerSpawner.LocalInstance.StartHandShowcaseForDualSelection("Şunu Değiş Bunu Tokuş");
+            // Wait a brief moment before showing next card (visual clarity)
+            yield return new WaitForSeconds(0.5f);
             
+            // Trigger next iteration
+            StartSunuDegisBunuTokusIterationN();
         }
         else
         {
-            
+            // Normal ŞunuDeğişTokuş: exit showcase
+            DeckController.LocalInstance.ExitShowcaseAllOtherHands();
+            DeckController.LocalInstance.TryStopShowcaseCenterCards();
         }
+    }
 
+
+
+    // ===== SEQUENTIAL SWAP STATE (Şunu Değiş Bunu Tokuş) =====
+    public bool isSunuDegisBunuTokusActive = false;
+    private List<string> sunuDegisBunuTokusMyHandCards = null;      // Live hand snapshot at power activation
+    private int sunuDegisBunuTokusSwapIndex = 0;                     // Current swap iteration (0 = first card)
+    private string sunuDegisBunuTokusCurrentOpponentCardId = null;   // Opponent card selected for this iteration
+
+
+
+    // Backward-compatible entry point kept for old callers; delegates to new sequential flow.
+    public void ActivateSunuDegisBunuTokusPower()
+    {
+        StartSunuDegisBunuTokusPower();
     }
 
     private List<string> GetCurrentLocalHandCardIdsForSwap()
@@ -4512,41 +4436,20 @@ public class GameManager : MonoBehaviour
         return count;
     }
 
-    private void ResetSunuDegisBunuTokusState(bool clearQueue)
+    private void ResetSunuDegisBunuTokusState(bool clearPendingFlag)
     {
         isSunuDegisBunuTokusActive = false;
-        sunuDegisBunuTokusActivationPending = false;
-        sunuDegisBunuTokusMyHandSnapshot = null;
+        sunuDegisBunuTokusMyHandCards = null;
         sunuDegisBunuTokusSwapIndex = 0;
-        sunuDegisBunuTokusTotalSwaps = 0;
-        sunuDegisBunuTokusExpectedSyncs = 0;
-        sunuDegisBunuTokusCompletedSyncs = 0;
-        sunuDegisBunuTokusSelectedOpponentCards?.Clear();
-        if (clearQueue)
-        {
-            sunuDegisBunuTokusSwapQueue?.Clear();
-            sunuDegisBunuTokusSwapProcessing = false;
-        }
-    }
-
-    private void FinalizeSunuDegisBunuTokusActivation()
-    {
+        sunuDegisBunuTokusCurrentOpponentCardId = null;
         
-
-        deckController.ExitShowcaseAllOtherHands();
-        deckController.TryStopShowcaseCenterCards();
-
-        if (SuperPowerSpawner.LocalInstance != null)
+        if (clearPendingFlag)
         {
-            SuperPowerSpawner.LocalInstance.StopHandShowcase();
-            StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
+            powerOrchestrator?.ClearAllSelectionFlags();  // Clear PowerOrchestrator's isSunuDegisBunuTokusPending
         }
-
-        ResetSunuDegisBunuTokusState(false);
-
-        // CRITICAL FIX: Force game state save after power completion to ensure reconnection sync
-        powerProcessor?.OnGameStateMutated();
     }
+
+
 
     private string GetSunuDegisBunuTokusSelectionText(int index, int totalSwaps)
     {
@@ -4558,149 +4461,132 @@ public class GameManager : MonoBehaviour
 
     private void ClearSunuDegisBunuTokusIndicators()
     {
-        if (sunuDegisBunuTokusSelectedOpponentCards == null) return;
-        foreach (string cardID in sunuDegisBunuTokusSelectedOpponentCards)
+        // Clear opponent card indicator
+        if (!string.IsNullOrEmpty(sunuDegisBunuTokusCurrentOpponentCardId))
         {
-            if (CardInteraction.cardLookup.TryGetValue(cardID, out var ci))
+            if (CardInteraction.cardLookup.TryGetValue(sunuDegisBunuTokusCurrentOpponentCardId, out var ci))
                 ci.HideDebugCandidateIndicator();
         }
-        // Clear own-hand card indicators for all recorded pairs
-        if (sunuDegisBunuTokusMyHandSnapshot != null)
+        
+        // Clear own-hand card indicator for current swap
+        if (sunuDegisBunuTokusMyHandCards != null && sunuDegisBunuTokusSwapIndex < sunuDegisBunuTokusMyHandCards.Count)
         {
-            int pairCount = sunuDegisBunuTokusSelectedOpponentCards.Count;
-            for (int i = 0; i < pairCount && i < sunuDegisBunuTokusMyHandSnapshot.Count; i++)
-            {
-                if (CardInteraction.cardLookup.TryGetValue(sunuDegisBunuTokusMyHandSnapshot[i], out var ci))
-                    ci.HideDebugCandidateIndicator();
-            }
+            string myCard = sunuDegisBunuTokusMyHandCards[sunuDegisBunuTokusSwapIndex];
+            if (CardInteraction.cardLookup.TryGetValue(myCard, out var ci))
+                ci.HideDebugCandidateIndicator();
         }
     }
 
     /// <summary>
-    /// Called when the player has finished making all opponent-card selections for
-    /// Şunu Değiş Bunu Tokuş.  Clears indicators, sends the swap RPCs to the server
-    /// in order, then resets all local selection state.
+    /// Called when the player activates ŞunuDeğişBunuTokuş power.
+    /// Sets up sequential swap state and highlights the first card.
+    /// </summary>
+    public void StartSunuDegisBunuTokusPower()
+    {
+        AddToDebugLog("[GameManager] StartSunuDegisBunuTokusPower called");
+        
+        // Capture live hand at power activation
+        sunuDegisBunuTokusMyHandCards = new List<string>(myCards);
+        
+        if (sunuDegisBunuTokusMyHandCards.Count == 0)
+        {
+            AddToDebugLogWarning("[GameManager] ŞunuDeğişBunuTokuş: No cards in hand");
+            ResetSunuDegisBunuTokusState(true);
+            return;
+        }
+        
+        isSunuDegisBunuTokusActive = true;
+        sunuDegisBunuTokusSwapIndex = 0;
+        sunuDegisBunuTokusCurrentOpponentCardId = null;
+        
+        // Pause turn timer and start power timer
+        if (networkRelay != null)
+        {
+            networkRelay.PauseTurnTimerForPowerServerRPC();
+            networkRelay.StartPowerDurationTimerServerRPC();
+        }
+        
+        // Setup UI
+        if (DeckController.LocalInstance != null)
+        {
+            DeckController.LocalInstance.ShowcaseAllOtherHands(false);
+        }
+        
+        SuperPowerSpawner.LocalInstance?.StartHandShowcaseForDualSelection("Şunu Değiş Bunu Tokuş");
+        
+        // Start first iteration
+        StartSunuDegisBunuTokusIterationN();
+    }
+    
+    /// <summary>
+    /// Called at the start of each swap iteration (or after previous swap completes).
+    /// Highlights the Nth card and waits for opponent card selection.
+    /// </summary>
+    private void StartSunuDegisBunuTokusIterationN()
+    {
+        // Check if loop is complete
+        if (sunuDegisBunuTokusSwapIndex >= sunuDegisBunuTokusMyHandCards.Count)
+        {
+            AddToDebugLog("[GameManager] ŞunuDeğişBunuTokuş: All swaps complete");
+            CompleteSunuDegisBunuTokusActivation();
+            return;
+        }
+        
+        int totalSwaps = sunuDegisBunuTokusMyHandCards.Count;
+        string myCard = sunuDegisBunuTokusMyHandCards[sunuDegisBunuTokusSwapIndex];
+        
+        AddToDebugLog($"[GameManager] ŞunuDeğişBunuTokuş Iteration {sunuDegisBunuTokusSwapIndex + 1}/{totalSwaps}");
+        
+        // Highlight own card
+        if (CardInteraction.cardLookup.TryGetValue(myCard, out var cardCI))
+        {
+            cardCI.ShowDebugCandidateIndicator(new Color(0.4f, 0.8f, 1f, 0.65f)); // Blue
+        }
+        
+        // Update UI
+        SuperPowerSpawner.LocalInstance?.ShowDualSelectionStepText(
+            $"Swap {sunuDegisBunuTokusSwapIndex + 1}/{totalSwaps}: Rakip kartını seç");
+    }
+    
+    /// <summary>
+    /// Called when all swaps are complete. Triggers PowerActivated, cleans up UI, and resets state.
     /// </summary>
     private void CompleteSunuDegisBunuTokusActivation()
     {
-        int pairCount = sunuDegisBunuTokusSelectedOpponentCards.Count;
+        AddToDebugLog("[GameManager] CompleteSunuDegisBunuTokusActivation called");
         
-
-        if (pairCount == 0)
-        {
-            
-            ResetSunuDegisBunuTokusState(false);
-            return;
-        }
-
-        // Local tracking (no showcase — server fires that on the last swap)
+        // Trigger power tracking
         if (DeckController.LocalInstance != null)
         {
             var tempPower = ScriptableObject.CreateInstance<SunuDegisBunuTokus>();
             tempPower.PowerActivated();
             DestroyImmediate(tempPower);
         }
-
-        // Clear selection indicators before animation starts
+        
+        // Cleanup UI
         ClearSunuDegisBunuTokusIndicators();
-
-        isSunuDegisBunuTokusActive = false;
-        sunuDegisBunuTokusActivationPending = true;
-        sunuDegisBunuTokusExpectedSyncs = pairCount;
-        sunuDegisBunuTokusCompletedSyncs = 0;
-
-        SuperPowerSpawner.LocalInstance?.ShowDualSelectionStepText($"Kartlar değiştiriliyor... (0/{pairCount})");
-
-        // Send one RPC per swap pair, marking the last one with readyToExit=true
-        for (int i = 0; i < pairCount; i++)
-        {
-            bool isLast = (i == pairCount - 1);
-            
-            networkRelay.UseSunuDegisBunuTokusServerRPC(
-                sunuDegisBunuTokusMyHandSnapshot[i],
-                sunuDegisBunuTokusSelectedOpponentCards[i],
-                i,
-                isLast);
-        }
-
-        AddToDebugLog("ŞunuDeğişBunuTokuş: All selections sent to server.");
         
+        if (DeckController.LocalInstance != null)
+        {
+            DeckController.LocalInstance.ExitShowcaseAllOtherHands();
+        }
+        
+        if (SuperPowerSpawner.LocalInstance != null)
+        {
+            SuperPowerSpawner.LocalInstance.StopHandShowcase();
+            StartCoroutine(SuperPowerSpawner.LocalInstance.CloseInfoBox());
+        }
+        
+        // Reset state
+        ResetSunuDegisBunuTokusState(true);
+        
+        // Force game state save after power completion
+        powerProcessor?.OnGameStateMutated();
     }
 
 
 
-    // Add this method to handle the synced swap
 
-    public IEnumerator OnSunuDegisBunuTokusSynced(int myPlayerNo, int otherPlayerNo, string myHandCardID, string otherHandCardID, int myHandIndex, bool readyToExit = false)
-
-    {
-        
-        // Track power completion for move chain synchronization
-        MoveChainIntegrator.ReportPowerCompletion("Şunu Değiş Bunu Tokuş", myPlayerNo, $"Swapped {myHandCardID} with {otherHandCardID} from P{otherPlayerNo}");
-
-        // Update myCards if relevant
-
-        if (deckController.thisPlayerNumber == myPlayerNo)
-
-        {
-
-            int idx = myCards.IndexOf(myHandCardID);
-
-            if (idx != -1)
-
-            {
-
-                myCards[idx] = otherHandCardID;
-
-            }
-
-        }
-
-        else if (deckController.thisPlayerNumber == otherPlayerNo)
-
-        {
-
-            int idx = myCards.IndexOf(otherHandCardID);
-
-            if (idx != -1)
-
-            {
-
-                myCards[idx] = myHandCardID;
-
-            }
-
-        }
-
-        // Visual swap at the correct index
-
-        yield return StartCoroutine(deckController.SwapCardsBetweenPlayersByID(myPlayerNo, myHandCardID, otherPlayerNo, otherHandCardID, true));
-        ShowAffectedCardsDebugVisual("Şunu Değiş Bunu Tokuş", myHandCardID, otherHandCardID);
-
-        if (sunuDegisBunuTokusActivationPending)
-        {
-            sunuDegisBunuTokusCompletedSyncs++;
-            
-            SuperPowerSpawner.LocalInstance?.ShowDualSelectionStepText($"Kartlar değiştiriliyor... ({sunuDegisBunuTokusCompletedSyncs}/{Mathf.Max(sunuDegisBunuTokusExpectedSyncs, 1)})");
-        }
-
-        if (readyToExit)
-        {
-            if (!sunuDegisBunuTokusActivationPending)
-            {
-                
-            }
-            else if (sunuDegisBunuTokusCompletedSyncs >= sunuDegisBunuTokusExpectedSyncs)
-            {
-                FinalizeSunuDegisBunuTokusActivation();
-            }
-            else
-            {
-                
-            }
-        }
-
-    }
 
 
 
@@ -5465,10 +5351,9 @@ public class GameManager : MonoBehaviour
         sunuDegisTokusFirstCard = null;
         activeSunuDegisTokusPowerName = "Şunu Değiş Tokuş";
         isSunuDegisBunuTokusActive = false;
-        sunuDegisBunuTokusMyHandSnapshot = null;
+        sunuDegisBunuTokusMyHandCards = null;
         sunuDegisBunuTokusSwapIndex = 0;
-        sunuDegisBunuTokusTotalSwaps = 0;
-        sunuDegisBunuTokusSelectedOpponentCards?.Clear();
+        sunuDegisBunuTokusCurrentOpponentCardId = null;
         
         // Deactivate Vale Arar power at the end of round
         if (valeArarActive)
@@ -7219,6 +7104,43 @@ public class GameManager : MonoBehaviour
         {
             
         }
+    }
+
+    public int FindHandOwnerBySearching(string handCardId)
+    {
+        if (string.IsNullOrEmpty(handCardId) || deckController == null || deckController.playerHandTransforms == null)
+            return -1;
+
+        int mySeat = deckController.thisPlayerNumber;
+        int playerCountLocal = deckController.playerCount;
+        if (mySeat < 0 || playerCountLocal <= 0)
+            return -1;
+
+        // Return ABSOLUTE seat number (0..playerCount-1), not transform index.
+        for (int absSeat = 0; absSeat < playerCountLocal; absSeat++)
+        {
+            int relativeIndex = (absSeat - mySeat + playerCountLocal) % playerCountLocal;
+            int handIndex = deckController.GetHandIndex(relativeIndex);
+            if (handIndex < 0 || handIndex >= deckController.playerHandTransforms.Count)
+                continue;
+
+            Transform handRoot = deckController.playerHandTransforms[handIndex];
+            if (handRoot == null) continue;
+
+            for (int i = 0; i < handRoot.childCount; i++)
+            {
+                Transform child = handRoot.GetChild(i);
+                if (child == null) continue;
+
+                CardInteraction ci = child.GetComponent<CardInteraction>();
+                if (ci != null && !string.IsNullOrEmpty(ci.uniqueCardInstanceID) && ci.uniqueCardInstanceID == handCardId)
+                {
+                    return absSeat;
+                }
+            }
+        }
+
+        return -1;
     }
 
 }

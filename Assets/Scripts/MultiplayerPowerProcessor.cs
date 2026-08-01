@@ -25,9 +25,9 @@ public class MultiplayerPowerProcessor : IPowerProcessor
         networkRelay.UseBayaBayaBakServerRPC();
     }
 
-    public void ExecuteSwapCardWithOpponent()
+    public void ExecuteSwapCardWithOpponent(string selectedCardId)
     {
-        networkRelay.UseRandomDegisTokusServerRPC();
+        networkRelay.UseDegisTokusWithSelectedCardServerRPC(selectedCardId);
     }
 
     public void ExecuteValeArar()
@@ -61,6 +61,11 @@ public class MultiplayerPowerProcessor : IPowerProcessor
     public void StartYandimAnamSelection()
     {
         GameManager.LocalInstance.StartYandimAnamSelectionPower();
+    }
+
+    public void StartDegisTokusSelection()
+    {
+        GameManager.LocalInstance.StartDegisTokusSelectionPower();
     }
 
     public void ExecuteYandimAnamOnCard(string cardId)
@@ -115,24 +120,7 @@ public class MultiplayerPowerProcessor : IPowerProcessor
 
     public void StartSunuDegisBunuTokusSelection()
     {
-        GameManager.LocalInstance.ActivateSunuDegisBunuTokusPower();
-    }
-
-    public void ExecuteSunuDegisBunuTokus(string[] myCards, string[] oppCards)
-    {
-        // Şunu Değiş Bunu Tokuş sends multiple RPCs currently in GameManager.
-        // In the processor, we'll need to adapt how it's called.
-        // For multiplayer, the loop is currently in GameManager.TrySunuDegisBunuTokus selection logic.
-        // I will let GameManager continue to call the RPCs directly or move them here.
-        // Actually, the interface should probably match what the power needs.
-        
-        // Refactoring SunuDegisBunuTokus to use the array if possible, 
-        // but current RPC takes individual pairs.
-        for (int i = 0; i < myCards.Length; i++)
-        {
-            bool isLast = (i == myCards.Length - 1);
-            networkRelay.UseSunuDegisBunuTokusServerRPC(myCards[i], oppCards[i], i, isLast);
-        }
+        GameManager.LocalInstance.StartSunuDegisBunuTokusPower();
     }
 
     public void ExecuteZaferPuani(int points)

@@ -2895,13 +2895,13 @@ public class DeckController : MonoBehaviour
         }
 
         int relativeIndex = (playerNo - thisPlayerNumber + playerCount) % playerCount;
-        int poolIndex = GetPoolIndex(relativeIndex);
-        if (poolIndex < 0 || poolIndex >= playerHandTransforms.Count)
+        int handIndex = GetHandIndex(relativeIndex);
+        if (handIndex < 0 || handIndex >= playerHandTransforms.Count)
         {
             yield break;
         }
 
-        Transform handTransform = playerHandTransforms[poolIndex];
+        Transform handTransform = playerHandTransforms[handIndex];
 
         // Find hand card sibling index in destination hand
         int handCardIndex = -1;
@@ -2935,11 +2935,14 @@ public class DeckController : MonoBehaviour
 
         Vector3 centerCardOldPos = centerCardObj.transform.position;
         Quaternion centerCardOldRot = centerCardObj.transform.rotation;
+        Vector3 targetScaleInHand = (relativeIndex == 0)
+            ? new Vector3(myCardsScale, myCardsScale, myCardsScale)
+            : new Vector3(normalScale, normalScale, normalScale);
 
         // Animate both cards first, then reparent.
         yield return StartCoroutine(WaitForBoth(
             MoveCardCoroutine(centerCardOldPos, handCardObj, 1, centerCardOldRot, new Vector3(centerScale, centerScale, centerScale)),
-            MoveCardCoroutine(handCardOldPos, centerCardObj, 1, handCardOldRot, new Vector3(myCardsScale, myCardsScale, myCardsScale))));
+            MoveCardCoroutine(handCardOldPos, centerCardObj, 1, handCardOldRot, targetScaleInHand)));
 
         // Now swap parents while preserving world transforms.
         handCardObj.transform.SetParent(centerTransform, true);

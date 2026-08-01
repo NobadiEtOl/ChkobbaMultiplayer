@@ -6,7 +6,7 @@ public interface IPowerProcessor
 {
     void ExecutePeekOpponentCard();
     void ExecuteBayaBayaBak();
-    void ExecuteSwapCardWithOpponent();
+    void ExecuteSwapCardWithOpponent(string selectedCardId);
     void ExecuteValeArar();
     void ExecuteBomba();
     void ExecuteYapamazsın();
@@ -14,6 +14,7 @@ public interface IPowerProcessor
     void ExecuteKapkacOnCard(string cardId);
     void StartYandimAnamSelection();
     void ExecuteYandimAnamOnCard(string cardId);
+    void StartDegisTokusSelection();
     void ExecuteBlockNextPlayer();
     void StartKopyalaYapistirSelection();
     void ExecuteKopyalaYapistir(string targetId, string sourceId);
@@ -24,7 +25,6 @@ public interface IPowerProcessor
     void StartSunuDegisTokusSelection();
     void ExecuteSunuDegisTokus(string myCardId, string oppCardId);
     void StartSunuDegisBunuTokusSelection();
-    void ExecuteSunuDegisBunuTokus(string[] myCards, string[] oppCards);
     void ExecuteZaferPuani(int points);
 
     /// <summary>

@@ -1249,7 +1249,7 @@ public class SuperPowerSpawner : MonoBehaviour
     private List<string> powersRequiringHandShowcase = new List<string> { "Kapkaç", "Yandım Anam", "Bu Daha İyi", "Kopyala Yapıştır" };
     
     // Powers that require hand showcasing after activation (for dual selection)
-    private List<string> powersRequiringHandShowcaseAfterActivation = new List<string> { "Şunu Değiş Tokuş", "Kopyala Yapıştır", "Şunu Değiş Bunu Tokuş" };
+    private List<string> powersRequiringHandShowcaseAfterActivation = new List<string> { "Değiş Tokuş", "Şunu Değiş Tokuş", "Kopyala Yapıştır", "Şunu Değiş Bunu Tokuş" };
     
     // Reference to DeckController for showcasing hands
     [SerializeField] private DeckController deckController;

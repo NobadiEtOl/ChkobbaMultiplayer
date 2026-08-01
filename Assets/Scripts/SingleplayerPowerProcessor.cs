@@ -25,9 +25,9 @@ public class SingleplayerPowerProcessor : IPowerProcessor
         controller.ExecuteBayaBayaBak();
     }
 
-    public void ExecuteSwapCardWithOpponent()
+    public void ExecuteSwapCardWithOpponent(string selectedCardId)
     {
-        controller.ExecuteSwapCardWithOpponent();
+        controller.ExecuteSwapCardWithOpponent(selectedCardId);
     }
 
     public void ExecuteValeArar()
@@ -58,6 +58,11 @@ public class SingleplayerPowerProcessor : IPowerProcessor
     public void StartYandimAnamSelection()
     {
         controller.StartYandimAnamSelection();
+    }
+
+    public void StartDegisTokusSelection()
+    {
+        controller.StartDegisTokusSelection();
     }
 
     public void ExecuteYandimAnamOnCard(string cardId)
@@ -113,11 +118,6 @@ public class SingleplayerPowerProcessor : IPowerProcessor
     public void StartSunuDegisBunuTokusSelection()
     {
         controller.StartSunuDegisBunuTokusSelection();
-    }
-
-    public void ExecuteSunuDegisBunuTokus(string[] myCards, string[] oppCards)
-    {
-        controller.ExecuteSunuDegisBunuTokus(myCards, oppCards);
     }
 
     public void ExecuteZaferPuani(int points)

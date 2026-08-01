@@ -66,6 +66,7 @@ public struct SerializableGameState : INetworkSerializable
     // Client-side superpower states that need to persist
     public bool isKapkacPending;
     public bool isYandimAnamPending;
+    public bool isDegisTokusPending;
     public bool isKopyalaActive;
     public bool isSunuDegisTokusActive;
     public bool isSunuDegisBunuTokusActive;
@@ -133,6 +134,7 @@ public struct SerializableGameState : INetworkSerializable
         // Client-side superpower states
         serializer.SerializeValue(ref isKapkacPending);
         serializer.SerializeValue(ref isYandimAnamPending);
+        serializer.SerializeValue(ref isDegisTokusPending);
         serializer.SerializeValue(ref isKopyalaActive);
         serializer.SerializeValue(ref isSunuDegisTokusActive);
         serializer.SerializeValue(ref isSunuDegisBunuTokusActive);
