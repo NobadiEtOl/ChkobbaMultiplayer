@@ -43,8 +43,15 @@ private const string KEY_DECK_CLASS = PLAYERPREFS_PREFIX + "DeckClass";
             return;
         }
 
+        JokerController.JokerDefinition activeJoker = data.activeJokerId >= 0
+            ? JokerController.GetJokerById(data.activeJokerId)
+            : null;
+        string jokerSummary = activeJoker != null
+            ? $"ID={activeJoker.jokerID}, Name='{activeJoker.jokerName}'"
+            : "None";
+
         Debug.Log($"[RunManager] Saving run progress: Stage {data.currentStage}, " +
-                  $"Opponent {data.currentOpponentDifficulty}, Damage {data.totalDamageDealt}");
+                  $"Opponent {data.currentOpponentDifficulty}, Damage {data.totalDamageDealt}, Joker {jokerSummary}");
 
         PlayerPrefs.SetInt(KEY_STAGE, data.currentStage);
         PlayerPrefs.SetInt(KEY_OPP_DIFFICULTY, data.currentOpponentDifficulty);
@@ -95,6 +102,7 @@ PlayerPrefs.SetString(KEY_DECK_CLASS, data.deckClassName ?? "Balanced");
         }
         catch (Exception e)
         {
+            Debug.LogError($"[RunManager] Failed to load run progress: {e.Message}");
             
             return null;
         }

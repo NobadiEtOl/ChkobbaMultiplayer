@@ -10,32 +10,17 @@ using UnityEngine;
 public static class JokerController
 {
     [System.Serializable]
-    public class JokerModifiers
-    {
-        public float damageMultiplier = 1.0f;      // 1.0 = no change, 1.5 = +50%
-        public int extraDamagePerCapture = 0;      // +X to all captures
-        public int jackCaptureBonusDamage = 0;     // +X to Jack captures only
-        public int pistiCaptureBonusDamage = 0;    // +X to pişti captures
-
-        public override string ToString()
-        {
-            return $"[Mult:{damageMultiplier}x | Extra:{extraDamagePerCapture} | Jack+:{jackCaptureBonusDamage} | Pişti+:{pistiCaptureBonusDamage}]";
-        }
-    }
-
-    [System.Serializable]
     public class JokerDefinition
     {
         public int jokerID;
         public string jokerName;
         public string description;
         public Sprite jokerImage;
-        public JokerModifiers modifiers;
         public JokerRarity rarity;
 
         public override string ToString()
         {
-            return $"[{jokerID}] {jokerName}: {modifiers}";
+            return $"[{jokerID}] {jokerName}";
         }
     }
 
@@ -146,30 +131,11 @@ public static class JokerController
         }
     }
 
-    /// <summary>
-    /// Get the modifiers of the currently active joker.
-    /// </summary>
-    public static JokerModifiers GetActiveJokerModifiers(int jokerID)
-    {
-        if (jokerID < 0)
-        {
-            // No joker selected, return neutral modifiers
-            return new JokerModifiers();
-        }
 
-        var joker = GetJokerById(jokerID);
-        if (joker != null)
-        {
-            return joker.modifiers;
-        }
-
-        
-        return new JokerModifiers();
-    }
 
     /// <summary>
-    /// Initialize joker pool with placeholder jokers.
-    /// In production, this would load from a ScriptableObject.
+    /// Initialize joker pool with real joker definitions from JokerDefinitions.
+    /// Populates the pool with all defined jokers (source of truth: JokerDefinitions.cs).
     /// </summary>
     private static void EnsureJokerPoolInitialized()
     {
@@ -183,29 +149,11 @@ public static class JokerController
         // Clear and rebuild pool
         jokerPool.Clear();
 
-        // Create 10 placeholder jokers with random modifiers
-        System.Random rng = new System.Random();
-
-        for (int i = 0; i < 10; i++)
+        // Add all defined jokers from JokerDefinitions
+        var allJokers = JokerDefinitions.GetAllJokerDefinitions();
+        foreach (var jokerDef in allJokers)
         {
-            var joker = new JokerDefinition
-            {
-                jokerID = i,
-                jokerName = $"Joker {i}",
-                description = $"Placeholder joker {i}",
-                jokerImage = null, // Placeholder white image would go here
-                rarity = (JokerRarity)(i % 3),
-                modifiers = new JokerModifiers
-                {
-                    damageMultiplier = 0.8f + (float)rng.NextDouble() * 0.7f, // 0.8 - 1.5
-                    extraDamagePerCapture = rng.Next(0, 3),                    // 0-2
-                    jackCaptureBonusDamage = rng.Next(0, 2),                   // 0-1
-                    pistiCaptureBonusDamage = rng.Next(0, 3)                   // 0-2
-                }
-            };
-
-            jokerPool.Add(joker);
-            
+            jokerPool.Add(jokerDef);
         }
 
         jokerPoolInitialized = true;

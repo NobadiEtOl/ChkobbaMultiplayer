@@ -11,6 +11,31 @@ using UnityEngine;
 /// </summary>
 public static class DamageSystem
 {
+    /// <summary>
+    /// Defines the mutually exclusive capture types.
+    /// A single capture is only one type; layering does not occur.
+    /// </summary>
+    public enum CaptureType
+    {
+        JackPisti,      // 2 Jacks (highest priority)
+        RegularPisti,   // 2 same non-Jack cards
+        Jack,           // Single Jack or multiple Jacks (but not both captured as pişti)
+        Normal,         // At least one non-Jack card
+        None         // No capture
+    }
+
+    [System.Serializable]
+    public class DamageEvaluationBreakdown
+    {
+        public CaptureType captureType;      // The exclusive capture type that occurred
+        public int baseDamage;               // Base damage for the capture type
+        public float damageAfterMultiplier;  // After multiplier applied
+        public int extraDamageBonusApplied;  // Bonus applied
+        public float finalDamageBeforeRounding;
+        public int finalDamage;
+        public bool hasAnyPassiveModifier;
+    }
+
     [System.Serializable]
     public class CaptureTelemetry
     {
@@ -19,6 +44,11 @@ public static class DamageSystem
         public bool isPişti;                 // Was this a pişti (2 cards, same value)?
         public bool isJackPişti;             // Was this a jack pişti (2 jacks)?
         public int playerNumber;             // Who captured (player 0 or 1)
+        public int playedCardValue;          // Value of the card played to capture
+        
+        // Passive effect modifiers (applied by PassiveManager before damage calculation)
+        public float damageMultiplier = 1.0f;      // 1.0 = no change, 1.5 = +50%, 2.0 = x2, etc.
+        public int extraDamageBonus = 0;           // +X to all captures
 
         public CaptureTelemetry()
         {
@@ -27,6 +57,9 @@ public static class DamageSystem
             isPişti = false;
             isJackPişti = false;
             playerNumber = 0;
+            playedCardValue = 0;
+            damageMultiplier = 1.0f;
+            extraDamageBonus = 0;
         }
     }
 
@@ -47,169 +80,97 @@ public static class DamageSystem
     }
 
     /// <summary>
-    /// Damage Condition 1: Jack Capture
-    /// Triggers when a Jack (value 11) is captured.
-    /// Damage: 1
+    /// Determine the exclusive capture type from telemetry.
+    /// Classification rules (non-pişti is determined by played card value):
+    /// 1. JackPişti: isPişti && isJackPişti (2 Jacks)
+    /// 2. RegularPişti: isPişti && !isJackPişti (2 same non-Jack cards)
+    /// 3. Jack: !isPişti && playedCardValue == 11 (played a Jack, not pişti)
+    /// 4. Normal: !isPişti && playedCardValue != 11 (played non-Jack, not pişti)
     /// </summary>
-    [System.Serializable]
-    public class JackCaptureDamage : DamageCondition
+    private static CaptureType DetermineCaptureType(CaptureTelemetry telemetry)
     {
-        public override string ConditionName => "Jack Capture";
-        public int damageAmount = 1;
-
-        public override int EvaluateDamage(CaptureTelemetry telemetry)
-        {
-            // Check if any captured card is a Jack (value 11)
-            bool hasJack = telemetry.capturedCardValues.Contains(11);
-            int damage = hasJack ? damageAmount : 0;
-                            
-            return damage;
-        }
+        CaptureType result;
+        
+        if (telemetry.isPişti && telemetry.isJackPişti)
+            result = CaptureType.JackPisti;
+        else if (telemetry.isPişti && !telemetry.isJackPişti)
+            result = CaptureType.RegularPisti;
+        else if (!telemetry.isPişti && telemetry.playedCardValue == 11)
+            result = CaptureType.Jack;
+        else if (!telemetry.isPişti && telemetry.playedCardValue != 11)
+            result = CaptureType.Normal;
+        else
+            result = CaptureType.None;
+        
+        Debug.Log($"[DamageSystem] Determined capture type: {result} for player {telemetry.playerNumber}");
+        return result;
     }
 
     /// <summary>
-    /// Damage Condition 2: Normal Capture
-    /// Triggers when one or more non-Jack cards are captured.
-    /// Damage: 2
+    /// Get the base damage for a given capture type.
+    /// Pişti captures (both Jack and Normal) are worth 20; regular captures 2-4.
     /// </summary>
-    [System.Serializable]
-    public class NormalCaptureDamage : DamageCondition
+    private static int GetBaseDamageForType(CaptureType captureType)
     {
-        public override string ConditionName => "Normal Capture";
-        public int damageAmount = 2;
-
-        public override int EvaluateDamage(CaptureTelemetry telemetry)
+        return captureType switch
         {
-            // Check if there's at least one non-Jack card captured
-            bool hasNormalCard = telemetry.capturedCardValues.Any(v => v != 11);
-            int damage = hasNormalCard ? damageAmount : 0;
-
-            return damage;
-        }
-    }
-
-    /// <summary>
-    /// Damage Condition 3: Regular Pişti
-    /// Triggers when 2 cards with the same value are captured (but not both Jacks).
-    /// Damage: 3
-    /// </summary>
-    [System.Serializable]
-    public class RegularPistiDamage : DamageCondition
-    {
-        public override string ConditionName => "Regular Pişti";
-        public int damageAmount = 3;
-
-        public override int EvaluateDamage(CaptureTelemetry telemetry)
-        {
-            // Pişti without Jack
-            bool isRegularPisti = telemetry.isPişti && !telemetry.isJackPişti;
-            int damage = isRegularPisti ? damageAmount : 0;
-    
-            return damage;
-        }
-    }
-
-    /// <summary>
-    /// Damage Condition 4: Jack Pişti
-    /// Triggers when 2 Jacks are captured together.
-    /// Damage: 4
-    /// </summary>
-    [System.Serializable]
-    public class JackPistiDamage : DamageCondition
-    {
-        public override string ConditionName => "Jack Pişti";
-        public int damageAmount = 4;
-
-        public override int EvaluateDamage(CaptureTelemetry telemetry)
-        {
-            // Both pişti AND jack pişti
-            bool isJackPisti = telemetry.isPişti && telemetry.isJackPişti;
-            int damage = isJackPisti ? damageAmount : 0;
-                
-            
-            return damage;
-        }
+            CaptureType.JackPisti => 20,
+            CaptureType.RegularPisti => 10,
+            CaptureType.Jack => 2,
+            CaptureType.Normal => 4,
+            _ => 0
+        };
     }
 
     /// <summary>
     /// Evaluate total damage from a capture, considering all registered conditions
-    /// and applying joker modifiers.
+    /// and passive modifiers (already applied to telemetry by PassiveManager).
+    /// 
+    /// NEW: Telemetry contains passive modifiers set by PassiveManager.OnCapture().
+    /// Modifier application happens here using telemetry fields, not via jokerModifiers parameter.
     /// </summary>
-    public static int EvaluateTotalDamage(
-        CaptureTelemetry telemetry,
-        JokerController.JokerModifiers jokerModifiers)
+    public static int EvaluateTotalDamage(CaptureTelemetry telemetry)
     {
-        // Get default conditions (Jack, Normal, Pişti, JackPişti)
-        var conditions = GetDefaultConditions();
-
-        int baseDamage = 0;
-        foreach (var condition in conditions)
-        {
-            int conditionDamage = condition.EvaluateDamage(telemetry);
-            baseDamage += conditionDamage;
-        }
-
-        
-
-        // Apply joker modifiers
-        int modifiedDamage = ApplyJokerModifiers(baseDamage, telemetry, jokerModifiers);
-
-        
-
-        return modifiedDamage;
+        return EvaluateDamageBreakdown(telemetry).finalDamage;
     }
 
     /// <summary>
-    /// Apply joker modifiers to damage.
-    /// Multiplies damage based on joker effects.
+    /// Evaluate total damage and return a detailed breakdown of each calculation step.
+    /// Uses exclusive capture type classification (not layered conditions).
+    /// Useful for logging and debugging passive/joker effect application.
     /// </summary>
-    private static int ApplyJokerModifiers(
-        int baseDamage,
-        CaptureTelemetry telemetry,
-        JokerController.JokerModifiers jokerModifiers)
+    public static DamageEvaluationBreakdown EvaluateDamageBreakdown(CaptureTelemetry telemetry)
     {
-        if (jokerModifiers == null)
+        if (telemetry == null)
         {
-            return baseDamage;
+            return new DamageEvaluationBreakdown();
         }
 
+        // Determine which exclusive capture type occurred
+        CaptureType captureType = DetermineCaptureType(telemetry);
+        int baseDamage = GetBaseDamageForType(captureType);
+
+        // Apply passive modifiers already embedded in telemetry
         float modifiedDamage = baseDamage;
 
-        // Apply damage multiplier
-        modifiedDamage *= jokerModifiers.damageMultiplier;
+        // Apply damage multiplier (set by passives, default 1.0)
+        modifiedDamage *= telemetry.damageMultiplier;
 
-        // Apply extra damage per capture
-        modifiedDamage += jokerModifiers.extraDamagePerCapture;
+        // Apply extra damage bonus per capture (set by passives, default 0)
+        modifiedDamage += telemetry.extraDamageBonus;
 
-        // Apply specific card type bonuses
-        if (telemetry.capturedCardValues.Contains(11))
+        int finalDamage = Mathf.RoundToInt(modifiedDamage);
+
+        return new DamageEvaluationBreakdown
         {
-            modifiedDamage += jokerModifiers.jackCaptureBonusDamage;
-        }
-
-        if (telemetry.isPişti)
-        {
-            modifiedDamage += jokerModifiers.pistiCaptureBonusDamage;
-        }
-        
-
-        // Round to nearest integer
-        return Mathf.RoundToInt(modifiedDamage);
-    }
-
-    /// <summary>
-    /// Get the default set of 4 damage conditions.
-    /// This list defines the base damage evaluation rules.
-    /// Can be extended with new conditions in the future.
-    /// </summary>
-    public static List<DamageCondition> GetDefaultConditions()
-    {
-        return new List<DamageCondition>
-        {
-            new JackCaptureDamage(),
-            new NormalCaptureDamage(),
-            new RegularPistiDamage(),
-            new JackPistiDamage()
+            captureType = captureType,
+            baseDamage = baseDamage,
+            damageAfterMultiplier = baseDamage * telemetry.damageMultiplier,
+            extraDamageBonusApplied = telemetry.extraDamageBonus,
+            finalDamageBeforeRounding = modifiedDamage,
+            finalDamage = finalDamage,
+            hasAnyPassiveModifier = !Mathf.Approximately(telemetry.damageMultiplier, 1.0f)
+                                   || telemetry.extraDamageBonus != 0
         };
     }
 }

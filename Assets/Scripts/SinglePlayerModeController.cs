@@ -804,8 +804,14 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
             return;
         }
 
-        // Generate 3 random joker options
-        currentJokerOptions = JokerController.GenerateRandomJokerOptions(3, UnityEngine.Random.state);
+        // ===== TESTING: Show ALL jokers in order for testing purposes =====
+        // TODO: This is temporary for testing. Will be changed back to randomized selection of 3 options later.
+        // Original logic (commented out):
+        // currentJokerOptions = JokerController.GenerateRandomJokerOptions(3, UnityEngine.Random.state);
+        
+        // Testing: Get all available jokers in order
+        var allJokers = JokerDefinitions.GetAllJokerDefinitions();
+        currentJokerOptions = new List<JokerController.JokerDefinition>(allJokers);
 
         // Clear any existing jokers
         foreach (Transform child in jokerDisplayParent)
@@ -813,7 +819,7 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
             Destroy(child.gameObject);
         }
 
-        // Create 3 joker objects under jokerDisplayParent
+        // Create joker objects for all available jokers (testing: normally would be 3 random options)
         for (int i = 0; i < currentJokerOptions.Count; i++)
         {
             JokerController.JokerDefinition joker = currentJokerOptions[i];
@@ -862,6 +868,14 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
 
         currentRoundData.activeJokerId = jokerID;
         JokerController.SetActiveJoker(jokerID);
+        
+        // NEW: Initialize PassiveManager with selected joker
+        if (PassiveManager.Instance != null)
+        {
+            PassiveManager.Instance.SetActivePassive(jokerID);
+            GameManager.AddToDebugLog($"[SinglePlayer] OnJokerSelected: Initialized PassiveManager with jokerID={jokerID}");
+        }
+        
         RunManager.SaveRunProgress(BuildRunProgressData());
 
         // Clear jokers from display
@@ -1149,7 +1163,7 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
     /// DEBUG METHOD: Simulate a capture for testing without full game loop.
     /// Call this from console to test damage calculations.
     /// </summary>
-    public void DebugSimulateCapture(List<int> capturedCardValues, bool isPişti = false, bool isJackPişti = false)
+    public void DebugSimulateCapture(List<int> capturedCardValues, int playedCardValue = 0, bool isPişti = false, bool isJackPişti = false)
     {
         if (!isGameRunning)
         {
@@ -1165,12 +1179,18 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
             capturedCardCount = capturedCardValues.Count,
             isPişti = isPişti,
             isJackPişti = isJackPişti,
-            playerNumber = 0 // Player is always seat 0
+            playerNumber = 0, // Player is always seat 0
+            playedCardValue = playedCardValue
         };
 
-        // Evaluate damage
-        var jokerModifiers = JokerController.GetActiveJokerModifiers(currentRoundData.activeJokerId);
-        int damageDealt = DamageSystem.EvaluateTotalDamage(lastCaptureTelemetry, jokerModifiers);
+        // NEW: PassiveManager applies joker effects to telemetry before damage calculation
+        if (PassiveManager.Instance != null)
+        {
+            lastCaptureTelemetry = PassiveManager.Instance.OnCapture(lastCaptureTelemetry);
+        }
+
+        // Evaluate damage (now reads modifiers from telemetry, not from separate jokerModifiers)
+        int damageDealt = DamageSystem.EvaluateTotalDamage(lastCaptureTelemetry);
 
         currentRoundData.totalDamageDealt += damageDealt;
         opponentHealth += damageDealt;
@@ -1297,7 +1317,7 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
             SerializableCard capturedCards = new SerializableCard(selectedCenterCards);
             GameManager.AddToDebugLog($"[SingleplayerCardPlay] DECISION: Routing to ProcessPlayerMove (CAPTURE) with {selectedCenterCards.Count} center cards");
             
-            ProcessPlayerMove(cardId, capturedCards, isPisti: false, isJackPisti: false);
+            ProcessPlayerMove(cardId, capturedCards, isPisti: false, isJackPisti: false, cardValue);
         }
         else
         {
@@ -1312,18 +1332,20 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
     /// <summary>
     /// Called by GameManager when the player plays a card that potentially captures.
     /// Routes to coroutine that handles animation and game state updates.
+    /// cardValue is the validated card value from server validation (required for damage calculation).
     /// </summary>
-    public void ProcessPlayerMove(string cardId, SerializableCard capturedCards, bool isPisti, bool isJackPisti)
+    public void ProcessPlayerMove(string cardId, SerializableCard capturedCards, bool isPisti, bool isJackPisti, int cardValue)
     {
         if (!isGameRunning || !IsPlayerTurn) return;
-        StartCoroutine(ProcessPlayerMoveCoroutine(cardId, capturedCards, isPisti, isJackPisti));
+        StartCoroutine(ProcessPlayerMoveCoroutine(cardId, capturedCards, isPisti, isJackPisti, cardValue));
     }
 
     /// <summary>
     /// Coroutine: Process player card play with animation.
     /// Updates GameManager state, animates card, evaluates damage, then unblocks turn loop.
+    /// cardValue: the validated card value from server validation (no lookup needed).
     /// </summary>
-    private IEnumerator ProcessPlayerMoveCoroutine(string cardId, SerializableCard capturedCards, bool isPisti, bool isJackPisti)
+    private IEnumerator ProcessPlayerMoveCoroutine(string cardId, SerializableCard capturedCards, bool isPisti, bool isJackPisti, int cardValue)
     {
         if (!isGameRunning || !IsPlayerTurn) yield break;
 
@@ -1378,17 +1400,29 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
             yield return StartCoroutine(deckController.DiscardCapturedCards(cardId, capturedCards, 0));
         }
 
+        // Use the validated cardValue passed from server validation (no lookup needed)
+        int playedCardValue = cardValue;
+
+        Debug.Log($"[SingleplayerCardPlay] ProcessPlayerMoveCoroutine: cardId={cardId}, playedCardValue={playedCardValue}, capturedCount={capturedValues.Count}, isPisti={isPisti}, isJackPisti={isJackPisti}");
+
         lastCaptureTelemetry = new DamageSystem.CaptureTelemetry
         {
             capturedCardValues = capturedValues,
             capturedCardCount = capturedValues.Count,
             isPişti = isPisti,
             isJackPişti = isJackPisti,
-            playerNumber = 0
+            playerNumber = 0,
+            playedCardValue = playedCardValue
         };
 
-        var jokerModifiers = JokerController.GetActiveJokerModifiers(currentRoundData.activeJokerId);
-        int damageDealt = DamageSystem.EvaluateTotalDamage(lastCaptureTelemetry, jokerModifiers);
+        // NEW: PassiveManager applies joker effects to telemetry before damage calculation
+        if (PassiveManager.Instance != null)
+        {
+            lastCaptureTelemetry = PassiveManager.Instance.OnCapture(lastCaptureTelemetry);
+        }
+
+        // EvaluateTotalDamage now reads modifiers from telemetry (no separate jokerModifiers parameter)
+        int damageDealt = DamageSystem.EvaluateTotalDamage(lastCaptureTelemetry);
 
         currentRoundData.totalDamageDealt += damageDealt;
         opponentHealth += damageDealt;
@@ -1457,11 +1491,12 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
     /// Called when player plays a card and makes a capture.
     /// Evaluate damage based on capture type and joker modifiers.
     /// Check if opponent is defeated.
+    /// cardValue is required for correct damage calculation.
     /// </summary>
-    public void OnPlayerCardPlayed(string cardId, SerializableCard capturedCards, bool isPişti, bool isJackPişti)
+    public void OnPlayerCardPlayed(string cardId, SerializableCard capturedCards, bool isPişti, bool isJackPişti, int cardValue)
     {
         // Delegate to the turn-loop-aware method
-        ProcessPlayerMove(cardId, capturedCards, isPişti, isJackPişti);
+        ProcessPlayerMove(cardId, capturedCards, isPişti, isJackPişti, cardValue);
     }
 
     /// <summary>
@@ -1506,6 +1541,13 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
 
             ShowRoundEndScreen("Round Complete! Press Continue for the next opponent.");
 
+            // NEW: Notify PassiveManager of round end
+            if (PassiveManager.Instance != null)
+            {
+                bool playerWon = true;  // Player won this round (opponent defeated)
+                PassiveManager.Instance.OnRoundEnd(currentOpponentDifficulty, playerWon);
+            }
+
             // Determine next action based on stage progress
             if (currentRoundInStage < 3) // More opponents in this stage (0-indexed: 0, 1, 2)
             {
@@ -1540,6 +1582,12 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
         
         
         
+
+        // NEW: Notify PassiveManager of stage progression
+        if (PassiveManager.Instance != null)
+        {
+            PassiveManager.Instance.OnStageCleared(currentStage);
+        }
 
         currentStage++;
         isDeckInitializedForRound = false; // Reset deck flag for next stage
