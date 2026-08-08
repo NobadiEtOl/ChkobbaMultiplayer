@@ -1162,8 +1162,9 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
     /// <summary>
     /// DEBUG METHOD: Simulate a capture for testing without full game loop.
     /// Call this from console to test damage calculations.
+    /// Pass fullCapturedCards as a List<int[]> where each int[] is {suit, value}.
     /// </summary>
-    public void DebugSimulateCapture(List<int> capturedCardValues, int playedCardValue = 0, bool isPişti = false, bool isJackPişti = false)
+    public void DebugSimulateCapture(List<int[]> fullCapturedCards, int playedCardValue = 0, bool isPişti = false, bool isJackPişti = false)
     {
         if (!isGameRunning)
         {
@@ -1171,12 +1172,12 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
             return;
         }
 
-        
+        Debug.Log($"[DebugSimulateCapture] Simulating capture with {fullCapturedCards.Count} cards, playedCardValue={playedCardValue}, isPişti={isPişti}");
 
         lastCaptureTelemetry = new DamageSystem.CaptureTelemetry
         {
-            capturedCardValues = capturedCardValues,
-            capturedCardCount = capturedCardValues.Count,
+            fullCapturedCards = fullCapturedCards,
+            capturedCardCount = fullCapturedCards.Count,
             isPişti = isPişti,
             isJackPişti = isJackPişti,
             playerNumber = 0, // Player is always seat 0
@@ -1351,10 +1352,12 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
 
         var capturedDict = capturedCards.ToDictionary();
         
-
-        var capturedValues = new List<int>();
+        // Build fullCapturedCards list with complete card data {suit, value}
+        var fullCapturedCards = new List<int[]>();
         foreach (var kvp in capturedDict)
-            capturedValues.Add(kvp.Value[1]);
+            fullCapturedCards.Add(kvp.Value);
+
+        Debug.Log($"[SingleplayerCardPlay] Captured {fullCapturedCards.Count} cards for damage evaluation (player 0, playedCard value={cardValue})");
 
         // Remove captured cards from local center
         foreach (string capturedId in capturedDict.Keys)
@@ -1403,12 +1406,12 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
         // Use the validated cardValue passed from server validation (no lookup needed)
         int playedCardValue = cardValue;
 
-        Debug.Log($"[SingleplayerCardPlay] ProcessPlayerMoveCoroutine: cardId={cardId}, playedCardValue={playedCardValue}, capturedCount={capturedValues.Count}, isPisti={isPisti}, isJackPisti={isJackPisti}");
+        Debug.Log($"[SingleplayerCardPlay] ProcessPlayerMoveCoroutine: cardId={cardId}, playedCardValue={playedCardValue}, capturedCount={fullCapturedCards.Count}, isPisti={isPisti}, isJackPisti={isJackPisti}");
 
         lastCaptureTelemetry = new DamageSystem.CaptureTelemetry
         {
-            capturedCardValues = capturedValues,
-            capturedCardCount = capturedValues.Count,
+            fullCapturedCards = fullCapturedCards,
+            capturedCardCount = fullCapturedCards.Count,
             isPişti = isPisti,
             isJackPişti = isJackPisti,
             playerNumber = 0,

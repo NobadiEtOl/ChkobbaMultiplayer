@@ -78,6 +78,62 @@ public static class JokerDefinitions
     };
 
     /// <summary>
+    /// JOKER 5: Two of Clubs Bonus
+    /// Adds +3 bonus damage when 2 of Clubs is captured.
+    /// Behavior implemented in JokerLogic.OnCapture_JokerTwoOfClubsBonus().
+    /// </summary>
+    public static readonly JokerController.JokerDefinition TwoOfClubsBonus = new JokerController.JokerDefinition
+    {
+        jokerID = 5,
+        jokerName = "Two of Clubs Bonus",
+        description = "Adds +3 bonus damage when 2 of Clubs is captured",
+        jokerImage = null, // Placeholder; art will be added later
+        rarity = JokerController.JokerRarity.Uncommon
+    };
+
+    /// <summary>
+    /// JOKER 6: Two of Clubs Multiplier
+    /// Doubles the base damage when 2 of Clubs is captured.
+    /// Behavior implemented in JokerLogic.OnCapture_JokerTwoOfClubsMultiplier().
+    /// </summary>
+    public static readonly JokerController.JokerDefinition TwoOfClubsMultiplier = new JokerController.JokerDefinition
+    {
+        jokerID = 6,
+        jokerName = "Two of Clubs Multiplier",
+        description = "Doubles the base damage when capturing 2 of Clubs",
+        jokerImage = null, // Placeholder; art will be added later
+        rarity = JokerController.JokerRarity.Rare
+    };
+
+    /// <summary>
+    /// JOKER 7: Ten of Diamonds Bonus
+    /// Adds +3 bonus damage when 10 of Diamonds is captured.
+    /// Behavior implemented in JokerLogic.OnCapture_JokerTenOfDiamondsBonus().
+    /// </summary>
+    public static readonly JokerController.JokerDefinition TenOfDiamondsBonus = new JokerController.JokerDefinition
+    {
+        jokerID = 7,
+        jokerName = "Ten of Diamonds Bonus",
+        description = "Adds +3 bonus damage when 10 of Diamonds is captured",
+        jokerImage = null, // Placeholder; art will be added later
+        rarity = JokerController.JokerRarity.Uncommon
+    };
+
+    /// <summary>
+    /// JOKER 8: Ten of Diamonds Multiplier
+    /// Doubles the base damage when 10 of Diamonds is captured.
+    /// Behavior implemented in JokerLogic.OnCapture_JokerTenOfDiamondsMultiplier().
+    /// </summary>
+    public static readonly JokerController.JokerDefinition TenOfDiamondsMultiplier = new JokerController.JokerDefinition
+    {
+        jokerID = 8,
+        jokerName = "Ten of Diamonds Multiplier",
+        description = "Doubles the base damage when capturing 10 of Diamonds",
+        jokerImage = null, // Placeholder; art will be added later
+        rarity = JokerController.JokerRarity.Rare
+    };
+
+    /// <summary>
     /// Get all defined jokers as a collection.
     /// Used by JokerController to populate the joker pool.
     /// </summary>
@@ -90,7 +146,10 @@ public static class JokerDefinitions
             NormalCaptureDoubler,
             RegularPiştiDoubler,
             JackPiştiDoubler,
-            // Add new jokers to this list as they are defined above
+            TwoOfClubsBonus,
+            TwoOfClubsMultiplier,
+            TenOfDiamondsBonus,
+            TenOfDiamondsMultiplier,
         };
     }
 }

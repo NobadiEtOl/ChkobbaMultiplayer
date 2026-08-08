@@ -34,6 +34,14 @@ public static class JokerLogic
                 return OnCapture_JokerRegularPiştiDoubler(telemetry);
             case 4:
                 return OnCapture_JokerJackPiştiDoubler(telemetry);
+            case 5:
+                return OnCapture_JokerTwoOfClubsBonus(telemetry);
+            case 6:
+                return OnCapture_JokerTwoOfClubsMultiplier(telemetry);
+            case 7:
+                return OnCapture_JokerTenOfDiamondsBonus(telemetry);
+            case 8:
+                return OnCapture_JokerTenOfDiamondsMultiplier(telemetry);
             default:
                 return telemetry;  // Unknown joker ID, no effect
         }
@@ -176,6 +184,142 @@ public static class JokerLogic
             Debug.Log($"[JokerLogic] Joker 4 (Jack Pişti Doubler) skipped: Not a jack pişti");
         }
         
+        return telemetry;
+    }
+
+    // ===== JOKER 5: Two of Clubs Bonus =====
+    /// <summary>
+    /// Real Joker 5: Adds +3 bonus damage when 2 of Clubs is captured.
+    /// Scans fullCapturedCards directly since special card flags are set after joker processing.
+    /// </summary>
+    private static DamageSystem.CaptureTelemetry OnCapture_JokerTwoOfClubsBonus(
+        DamageSystem.CaptureTelemetry telemetry)
+    {
+        bool hasTwoOfClubs = false;
+        if (telemetry.capturedCardCount > 0)
+        {
+            foreach (int[] card in telemetry.fullCapturedCards)
+            {
+                if (card[0] == 1 && card[1] == 2)  // Clubs (1), Value 2
+                {
+                    hasTwoOfClubs = true;
+                    break;
+                }
+            }
+        }
+
+        if (hasTwoOfClubs)
+        {
+            telemetry.extraDamageBonus += 3;
+            Debug.Log($"[JokerLogic] Joker 5 (Two of Clubs Bonus) applied: extraDamageBonus={telemetry.extraDamageBonus}");
+        }
+        else
+        {
+            Debug.Log($"[JokerLogic] Joker 5 (Two of Clubs Bonus) skipped: 2 of Clubs not captured");
+        }
+
+        return telemetry;
+    }
+
+    // ===== JOKER 6: Two of Clubs Multiplier =====
+    /// <summary>
+    /// Real Joker 6: Doubles the base damage when 2 of Clubs is captured.
+    /// Scans fullCapturedCards directly since special card flags are set after joker processing.
+    /// </summary>
+    private static DamageSystem.CaptureTelemetry OnCapture_JokerTwoOfClubsMultiplier(
+        DamageSystem.CaptureTelemetry telemetry)
+    {
+        bool hasTwoOfClubs = false;
+        if (telemetry.capturedCardCount > 0)
+        {
+            foreach (int[] card in telemetry.fullCapturedCards)
+            {
+                if (card[0] == 1 && card[1] == 2)  // Clubs (1), Value 2
+                {
+                    hasTwoOfClubs = true;
+                    break;
+                }
+            }
+        }
+
+        if (hasTwoOfClubs)
+        {
+            telemetry.damageMultiplier *= 2.0f;
+            Debug.Log($"[JokerLogic] Joker 6 (Two of Clubs Multiplier) applied: damageMultiplier={telemetry.damageMultiplier}x");
+        }
+        else
+        {
+            Debug.Log($"[JokerLogic] Joker 6 (Two of Clubs Multiplier) skipped: 2 of Clubs not captured");
+        }
+
+        return telemetry;
+    }
+
+    // ===== JOKER 7: Ten of Diamonds Bonus =====
+    /// <summary>
+    /// Real Joker 7: Adds +3 bonus damage when 10 of Diamonds is captured.
+    /// Scans fullCapturedCards directly since special card flags are set after joker processing.
+    /// </summary>
+    private static DamageSystem.CaptureTelemetry OnCapture_JokerTenOfDiamondsBonus(
+        DamageSystem.CaptureTelemetry telemetry)
+    {
+        bool hasTenOfDiamonds = false;
+        if (telemetry.capturedCardCount > 0)
+        {
+            foreach (int[] card in telemetry.fullCapturedCards)
+            {
+                if (card[0] == 2 && card[1] == 10)  // Diamonds (2), Value 10
+                {
+                    hasTenOfDiamonds = true;
+                    break;
+                }
+            }
+        }
+
+        if (hasTenOfDiamonds)
+        {
+            telemetry.extraDamageBonus += 3;
+            Debug.Log($"[JokerLogic] Joker 7 (Ten of Diamonds Bonus) applied: extraDamageBonus={telemetry.extraDamageBonus}");
+        }
+        else
+        {
+            Debug.Log($"[JokerLogic] Joker 7 (Ten of Diamonds Bonus) skipped: 10 of Diamonds not captured");
+        }
+
+        return telemetry;
+    }
+
+    // ===== JOKER 8: Ten of Diamonds Multiplier =====
+    /// <summary>
+    /// Real Joker 8: Doubles the base damage when 10 of Diamonds is captured.
+    /// Scans fullCapturedCards directly since special card flags are set after joker processing.
+    /// </summary>
+    private static DamageSystem.CaptureTelemetry OnCapture_JokerTenOfDiamondsMultiplier(
+        DamageSystem.CaptureTelemetry telemetry)
+    {
+        bool hasTenOfDiamonds = false;
+        if (telemetry.capturedCardCount > 0)
+        {
+            foreach (int[] card in telemetry.fullCapturedCards)
+            {
+                if (card[0] == 2 && card[1] == 10)  // Diamonds (2), Value 10
+                {
+                    hasTenOfDiamonds = true;
+                    break;
+                }
+            }
+        }
+
+        if (hasTenOfDiamonds)
+        {
+            telemetry.damageMultiplier *= 2.0f;
+            Debug.Log($"[JokerLogic] Joker 8 (Ten of Diamonds Multiplier) applied: damageMultiplier={telemetry.damageMultiplier}x");
+        }
+        else
+        {
+            Debug.Log($"[JokerLogic] Joker 8 (Ten of Diamonds Multiplier) skipped: 10 of Diamonds not captured");
+        }
+
         return telemetry;
     }
 }
