@@ -134,6 +134,21 @@ public static class JokerDefinitions
     };
 
     /// <summary>
+    /// JOKER 9: Active Joker Bonus
+    /// Adds bonus damage equal to the number of active jokers the player has (including itself).
+    /// Scales with the total number of active jokers on the board.
+    /// Behavior implemented in JokerLogic.OnCapture_JokerActiveJokerBonus().
+    /// </summary>
+    public static readonly JokerController.JokerDefinition ActiveJokerBonus = new JokerController.JokerDefinition
+    {
+        jokerID = 9,
+        jokerName = "Active Joker Bonus",
+        description = "Adds bonus damage equal to the number of active jokers you have (including itself)",
+        jokerImage = null, // Placeholder; art will be added later
+        rarity = JokerController.JokerRarity.Rare
+    };
+
+    /// <summary>
     /// Get all defined jokers as a collection.
     /// Used by JokerController to populate the joker pool.
     /// </summary>
@@ -150,6 +165,7 @@ public static class JokerDefinitions
             TwoOfClubsMultiplier,
             TenOfDiamondsBonus,
             TenOfDiamondsMultiplier,
+            ActiveJokerBonus,
         };
     }
 }

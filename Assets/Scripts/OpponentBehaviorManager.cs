@@ -138,4 +138,23 @@ public static class OpponentBehaviorManager
         
         return new OpponentBehaviorConfig(mode, rng, randomness);
     }
+
+    /// <summary>
+    /// Get human-readable description of the given playstyle mode.
+    /// Used by UI to display opponent behavior to the player.
+    /// </summary>
+    public static string GetPlaystyleDescription(OpponentBehaviorMode mode)
+    {
+        switch (mode)
+        {
+            case OpponentBehaviorMode.PlayInOrder:
+                return "Plays cards in order";
+
+            case OpponentBehaviorMode.Random:
+                return "Plays random cards";
+
+            default:
+                return "Unknown playstyle";
+        }
+    }
 }

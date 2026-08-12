@@ -42,6 +42,8 @@ public static class JokerLogic
                 return OnCapture_JokerTenOfDiamondsBonus(telemetry);
             case 8:
                 return OnCapture_JokerTenOfDiamondsMultiplier(telemetry);
+            case 9:
+                return OnCapture_JokerActiveJokerBonus(telemetry);
             default:
                 return telemetry;  // Unknown joker ID, no effect
         }
@@ -320,6 +322,28 @@ public static class JokerLogic
             Debug.Log($"[JokerLogic] Joker 8 (Ten of Diamonds Multiplier) skipped: 10 of Diamonds not captured");
         }
 
+        return telemetry;
+    }
+
+    // ===== JOKER 9: Active Joker Bonus =====
+    /// <summary>
+    /// Real Joker 9: Adds bonus damage equal to the number of active jokers the player has.
+    /// Scales with the total count of active jokers (including itself).
+    /// Example: If player has 2 active jokers, this joker adds +2 bonus damage.
+    /// </summary>
+    private static DamageSystem.CaptureTelemetry OnCapture_JokerActiveJokerBonus(
+        DamageSystem.CaptureTelemetry telemetry)
+    {
+        if (PassiveManager.Instance == null)
+        {
+            Debug.LogWarning("[JokerLogic] Joker 9 (Active Joker Bonus) skipped: PassiveManager not found");
+            return telemetry;
+        }
+
+        int activeJokerCount = PassiveManager.Instance.GetActiveJokerCount();
+        telemetry.extraDamageBonus += activeJokerCount;
+        
+        Debug.Log($"[JokerLogic] Joker 9 (Active Joker Bonus) applied: +{activeJokerCount} bonus damage (active jokers: {activeJokerCount}), extraDamageBonus now={telemetry.extraDamageBonus}");
         return telemetry;
     }
 }

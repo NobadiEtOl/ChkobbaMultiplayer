@@ -53,6 +53,15 @@ public class PassiveManager : MonoBehaviour
     }
 
     /// <summary>
+    /// Returns the count of currently active jokers.
+    /// Used by joker effects that scale with the number of active jokers.
+    /// </summary>
+    public int GetActiveJokerCount()
+    {
+        return activeJokerIds.Count;
+    }
+
+    /// <summary>
     /// EVENT: Called when a capture occurs.
     /// Passives can modify the telemetry before damage calculation.
     /// Returns modified telemetry.

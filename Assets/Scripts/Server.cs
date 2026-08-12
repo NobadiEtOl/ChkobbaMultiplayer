@@ -1886,9 +1886,45 @@ private void ServerStart()
 
         // Get the cardID for rules
         
+        // Check if top center card has Yandım Anam — if so, only another Yandım Anam can capture
+        bool isValidCapture = false;
+        bool topCardHasYandimAnam = false;
         
+        if (centerCardsDict.Count > 0)
+        {
+            string topCardId = centerCardsDict.Keys.Last();
+            GameManager gameManager = GameManager.LocalInstance;
+            if (gameManager != null)
+            {
+                var cardPowerEffects = gameManager.GetCardPowerEffectsSnapshot();
+                topCardHasYandimAnam = cardPowerEffects.ContainsKey(topCardId) && 
+                                       cardPowerEffects[topCardId] == "YandımAnam";
+            }
+        }
         
+        // Determine if this is a valid capture
         if (selectedHandCard[1] == sumValue || (selectedHandCard[1] == 11 && sumValue != 0))
+        {
+            if (topCardHasYandimAnam)
+            {
+                // Top card is Yandım Anam: only another Yandım Anam card can capture
+                GameManager gameManager = GameManager.LocalInstance;
+                if (gameManager != null)
+                {
+                    var cardPowerEffects = gameManager.GetCardPowerEffectsSnapshot();
+                    bool playedCardHasYandimAnam = cardPowerEffects.ContainsKey(selectedHandCardUniqueID) && 
+                                                   cardPowerEffects[selectedHandCardUniqueID] == "YandımAnam";
+                    isValidCapture = playedCardHasYandimAnam;
+                }
+            }
+            else
+            {
+                // Top card is not Yandım Anam: normal capture rules apply
+                isValidCapture = true;
+            }
+        }
+        
+        if (isValidCapture)
         {
             // This is a capture move
             // NOTE: Card play is already recorded by TrackHybridPowerTrueActivation if a hybrid power was pending

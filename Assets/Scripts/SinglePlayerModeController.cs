@@ -74,15 +74,18 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
     // UI references
     [SerializeField] private TextMeshProUGUI stageRoundDisplayText;
     [SerializeField] private Transform jokerDisplayParent; // Assign joker overlay parent in Inspector
+    [SerializeField] private GameObject roundsShowcaseParent; // RoundsShowcaseParent - assign in Inspector
+    private RoundsShowcaseController roundsShowcaseController; // Reference to rounds showcase controller
+    [SerializeField]private JokerDisplayController jokerDisplayController; // NEW: Controller for joker UI prefab
     
     // UI containers (for runtime creation)
-    private List<JokerController.JokerDefinition> currentJokerOptions;
     private Canvas uiCanvas;
     private OpponentHealthDisplay opponentHealthDisplay;
     
     // References needed for dealing
     private DeckController deckController;
     private bool roundIsWaiting = true; // Flag to signal round end conditions
+    private bool awaitingRoundShowcaseContinue = false; // Flag to wait for rounds showcase to be dismissed
 
     // Deck management - mirroring multiplayer Server.deckCardsDict
     private Dictionary<string, int[]> deckCardsDict; // Full shuffled deck for current stage
@@ -122,6 +125,27 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
     {
         // Get references
         deckController = FindFirstObjectByType<DeckController>();
+        //jokerDisplayController = GetComponent<JokerDisplayController>(); // NEW: Get joker UI controller
+        
+        // Get rounds showcase controller from parent GameObject
+        if (roundsShowcaseParent != null)
+        {
+            roundsShowcaseController = roundsShowcaseParent.GetComponent<RoundsShowcaseController>();
+            if (roundsShowcaseController != null)
+            {
+                roundsShowcaseController.onContinuePressed += OnRoundsShowcaseContinue;
+                // Ensure parent is disabled initially
+                roundsShowcaseParent.SetActive(false);
+            }
+            else
+            {
+                Debug.LogError("[SinglePlayerModeController] RoundsShowcaseController component not found on roundsShowcaseParent");
+            }
+        }
+        else
+        {
+            Debug.LogError("[SinglePlayerModeController] roundsShowcaseParent is not assigned in Inspector");
+        }
         
         // Create placeholder UI at runtime if it doesn't exist
         EnsureUIExists();
@@ -155,24 +179,6 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
             CanvasScaler scaler = canvasGO.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         }
-
-        // Create stage display if not assigned
-        /*if (stageRoundDisplayText == null)
-        {
-            GameObject stageDisplayGO = new GameObject("StageDisplay");
-            stageDisplayGO.transform.SetParent(uiCanvas.transform, false);
-            RectTransform stageRect = stageDisplayGO.AddComponent<RectTransform>();
-            stageRect.anchoredPosition = new Vector2(0, 300);
-            stageRect.sizeDelta = new Vector2(600, 100);
-            
-            stageRoundDisplayText = stageDisplayGO.AddComponent<TextMeshProUGUI>();
-            stageRoundDisplayText.text = "Stage 1 • Opponent 1/3 (Easy) • Round 0";
-            stageRoundDisplayText.alignment = TextAlignmentOptions.Center;
-            stageRoundDisplayText.fontSize = 36;
-            
-            Image bgImage = stageDisplayGO.AddComponent<Image>();
-            bgImage.color = new Color(0.1f, 0.1f, 0.1f, 0.8f);
-        }*/
 
         // Try to find the pre-existing OpponentHealthDisplay on the table first
         if (opponentHealthDisplay == null)
@@ -787,80 +793,96 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
         currentStage = stageNumber;
         ResetForStage(stageNumber);
 
-        // Show joker selection panel for this stage
-        ShowJokerSelectionPanel();
+        // NEW: Show joker selection using new controller and flow
+        if (jokerDisplayController != null)
+        {
+            StartCoroutine(ShowJokerSelectionFlow());
+        }
+        else
+        {
+            Debug.LogError("[SinglePlayerModeController] JokerDisplayController not found! Cannot show joker selection.");
+        }
     }
 
     /// <summary>
-    /// Display 3 random joker options under the assigned jokerDisplayParent.
+    /// NEW: Flow for showing joker selection using the new JokerDisplayController.
+    /// Orchestrates the display → selection → cleanup sequence.
+    /// 
+    /// Flow:
+    /// 1. Show 3 random jokers with sprites and descriptions
+    /// 2. Wait for player to click a joker button
+    /// 3. Process the selection (initialize PassiveManager, save progress)
+    /// 4. Hide jokers with animation support
+    /// 5. Reset selection state for next stage
+    /// 6. Start the round loop
     /// </summary>
-    private void ShowJokerSelectionPanel()
+    private IEnumerator ShowJokerSelectionFlow()
     {
-        
-
-        if (jokerDisplayParent == null)
+        if (jokerDisplayController == null)
         {
-            
-            return;
+            Debug.LogError("[SinglePlayerModeController] JokerDisplayController is null!");
+            yield break;
         }
 
-        // ===== TESTING: Show ALL jokers in order for testing purposes =====
-        // TODO: This is temporary for testing. Will be changed back to randomized selection of 3 options later.
-        // Original logic (commented out):
-        // currentJokerOptions = JokerController.GenerateRandomJokerOptions(3, UnityEngine.Random.state);
-        
-        // Testing: Get all available jokers in order
-        var allJokers = JokerDefinitions.GetAllJokerDefinitions();
-        currentJokerOptions = new List<JokerController.JokerDefinition>(allJokers);
+        // Step 0: Activate the joker selection panel
+        jokerDisplayController.ActivatePanel();
 
-        // Clear any existing jokers
-        foreach (Transform child in jokerDisplayParent)
-        {
-            Destroy(child.gameObject);
-        }
+        // Step 1: Display 3 random jokers
+        yield return StartCoroutine(jokerDisplayController.ShowJokers());
 
-        // Create joker objects for all available jokers (testing: normally would be 3 random options)
-        for (int i = 0; i < currentJokerOptions.Count; i++)
+        // Step 2: Wait for player to select a joker
+        yield return StartCoroutine(jokerDisplayController.WaitForSelection());
+
+        // Step 3: Process the selection
+        int selectedJokerId = jokerDisplayController.GetSelectedJokerId();
+        if (selectedJokerId >= 0)
         {
-            JokerController.JokerDefinition joker = currentJokerOptions[i];
-            
-            GameObject jokerGO = new GameObject($"Joker_{i}_{joker.jokerName}");
-            jokerGO.transform.SetParent(jokerDisplayParent, false);
-            
-            // Add image component and set sprite
-            Image image = jokerGO.AddComponent<Image>();
-            if (joker.jokerImage != null)
+            // Initialize game state with selected joker
+            if (currentRoundData == null)
             {
-                image.sprite = joker.jokerImage;
+                currentRoundData = new SinglePlayerRoundData();
             }
-            
-            // Add button component for selection
-            Button button = jokerGO.AddComponent<Button>();
-            button.targetGraphic = image;
-            button.onClick.AddListener(() => OnJokerButtonClicked(joker.jokerID));
-            
-            
+
+            currentRoundData.activeJokerId = selectedJokerId;
+            JokerController.SetActiveJoker(selectedJokerId);
+
+            // Initialize PassiveManager with selected joker
+            if (PassiveManager.Instance != null)
+            {
+                PassiveManager.Instance.SetActivePassive(selectedJokerId);
+                GameManager.AddToDebugLog($"[SinglePlayer] ShowJokerSelectionFlow: Initialized PassiveManager with jokerID={selectedJokerId}");
+            }
+
+            // Save run progress
+            RunManager.SaveRunProgress(BuildRunProgressData());
+
+            Debug.Log($"[SinglePlayerModeController] Joker selected: ID={selectedJokerId}");
+        }
+        else
+        {
+            Debug.LogWarning("[SinglePlayerModeController] No joker selected (selectedJokerId < 0)");
         }
 
-        
+        // Step 4: Hide jokers (currently instant; animation can be added here)
+        yield return StartCoroutine(jokerDisplayController.HideJokers());
+
+        // Step 5: Reset selection state for next stage
+        jokerDisplayController.ResetSelection();
+
+        // Step 6: Deactivate the joker selection panel
+        jokerDisplayController.DeactivatePanel();
+
+        // Step 7: Start the round loop with first opponent (difficulty 0)
+        StartCoroutine(StartRoundLoop(0));
     }
 
     /// <summary>
-    /// Called when player clicks a joker button.
-    /// </summary>
-    private void OnJokerButtonClicked(int jokerID)
-    {
-        OnJokerSelected(jokerID);
-    }
-
-    /// <summary>
-    /// Callback when player selects a joker.
-    /// Saves the joker selection and starts the stage's round loop.
+    /// DEBUG-ONLY: Manually select a joker for testing.
+    /// This method is kept minimal and only used by DebugSelectJoker().
+    /// The actual joker selection flow is now handled by ShowJokerSelectionFlow().
     /// </summary>
     private void OnJokerSelected(int jokerID)
     {
-        
-
         if (currentRoundData == null)
         {
             currentRoundData = new SinglePlayerRoundData();
@@ -869,7 +891,7 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
         currentRoundData.activeJokerId = jokerID;
         JokerController.SetActiveJoker(jokerID);
         
-        // NEW: Initialize PassiveManager with selected joker
+        // Initialize PassiveManager with selected joker
         if (PassiveManager.Instance != null)
         {
             PassiveManager.Instance.SetActivePassive(jokerID);
@@ -878,14 +900,7 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
         
         RunManager.SaveRunProgress(BuildRunProgressData());
 
-        // Clear jokers from display
-        if (jokerDisplayParent != null)
-        {
-            foreach (Transform child in jokerDisplayParent)
-            {
-                Destroy(child.gameObject);
-            }
-        }
+        // NOTE: Joker display cleanup is now handled by JokerDisplayController.HideJokers() in ShowJokerSelectionFlow()
 
         // STAGE LOOP: Start with first opponent (difficulty 0)
         StartCoroutine(StartRoundLoop(0));
@@ -950,6 +965,25 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
             opponentDifficulty,
             currentRunConfig.seed
         );
+
+        // Show showcase for all 3 opponents before the round starts
+        if (roundsShowcaseController != null && stageOpponentsInfo != null && stageOpponentsInfo.Count == 3)
+        {
+            // Gather health and behavior modes for all 3 opponents
+            int[] allHealthValues = new int[3];
+            OpponentBehaviorManager.OpponentBehaviorMode[] allModes = new OpponentBehaviorManager.OpponentBehaviorMode[3];
+            
+            for (int i = 0; i < 3; i++)
+            {
+                allHealthValues[i] = stageOpponentsInfo[i].maxHealth;
+                var config = OpponentBehaviorManager.GetConfigForDifficulty(i, currentRunConfig.seed);
+                allModes[i] = config.mode;
+            }
+            
+            roundsShowcaseController.ShowAllOpponents(allHealthValues, allModes, opponentDifficulty);
+            awaitingRoundShowcaseContinue = true;
+            yield return new WaitUntil(() => !awaitingRoundShowcaseContinue);
+        }
 
         UpdateStageDisplay();
 
@@ -1116,10 +1150,40 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
         Dictionary<string, int[]> capturedCenterDict = new Dictionary<string, int[]>();
 
         // Capture conditions:
-        // 1. Jack captures all center cards
+        // 1. Jack captures all center cards (unless top card is Yandım Anam)
         // 2. Non-Jack captures only if top card (most recent) matches played card value
+        // 3. Yandım Anam rule: If top card has Yandım Anam, only another Yandım Anam card can capture
         var topCard = localCenterCards.Values.LastOrDefault();
-        if (localCenterCards.Count > 0 && (isJack || (topCard != null && topCard[1] == playedValue)))
+        var topCardId = localCenterCards.Keys.LastOrDefault();
+        
+        bool topCardHasYandimAnam = false;
+        if (topCardId != null && GameManager.LocalInstance != null)
+        {
+            var cardPowerEffects = GameManager.LocalInstance.GetCardPowerEffectsSnapshot();
+            topCardHasYandimAnam = cardPowerEffects.ContainsKey(topCardId) && 
+                                   cardPowerEffects[topCardId] == "YandımAnam";
+        }
+        
+        bool shouldCapture = false;
+        if (localCenterCards.Count > 0)
+        {
+            if (topCardHasYandimAnam)
+            {
+                // Top card is Yandım Anam: only another Yandım Anam card can capture
+                var cardPowerEffects = GameManager.LocalInstance?.GetCardPowerEffectsSnapshot();
+                bool playedCardHasYandimAnam = cardPowerEffects != null && 
+                                               cardPowerEffects.ContainsKey(playedCardId) && 
+                                               cardPowerEffects[playedCardId] == "YandımAnam";
+                shouldCapture = playedCardHasYandimAnam;
+            }
+            else
+            {
+                // Normal capture rules
+                shouldCapture = isJack || (topCard != null && topCard[1] == playedValue);
+            }
+        }
+        
+        if (shouldCapture)
         {
             capturedSomething = true;
             
@@ -1299,9 +1363,46 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
         else if (cardValue == sumValue || (cardValue == 11 && sumValue != 0))
         {
             // Capture rules: card matches sum, or jack (11) with non-empty center
-            GameManager.AddToDebugLog($"[SingleplayerCardPlay] Validation: cardValue={cardValue} matches sumValue={sumValue} → CAPTURE VALID");
+            // BUT: If top center card has Yandım Anam, only another Yandım Anam card can capture
             
-            isValidCapture = true;
+            // Check if top card has Yandım Anam
+            bool topCardHasYandimAnam = false;
+            if (localCenterCards.Count > 0)
+            {
+                string topCardId = localCenterCards.Keys.Last();
+                if (GameManager.LocalInstance != null)
+                {
+                    var cardPowerEffects = GameManager.LocalInstance.GetCardPowerEffectsSnapshot();
+                    topCardHasYandimAnam = cardPowerEffects.ContainsKey(topCardId) && 
+                                           cardPowerEffects[topCardId] == "YandımAnam";
+                }
+            }
+            
+            if (topCardHasYandimAnam)
+            {
+                // Top card is Yandım Anam: only another Yandım Anam card can capture
+                var cardPowerEffects = GameManager.LocalInstance?.GetCardPowerEffectsSnapshot();
+                bool playedCardHasYandimAnam = cardPowerEffects != null && 
+                                               cardPowerEffects.ContainsKey(cardId) && 
+                                               cardPowerEffects[cardId] == "YandımAnam";
+                
+                if (playedCardHasYandimAnam)
+                {
+                    GameManager.AddToDebugLog($"[SingleplayerCardPlay] Validation: Top card has YandımAnam and played card also has YandımAnam → CAPTURE VALID");
+                    isValidCapture = true;
+                }
+                else
+                {
+                    GameManager.AddToDebugLog($"[SingleplayerCardPlay] Validation: Top card has YandımAnam but played card does not → ADD-TO-CENTER (Yandım Anam block)");
+                    isValidCapture = false;
+                }
+            }
+            else
+            {
+                // Top card is not Yandım Anam: normal capture rules apply
+                GameManager.AddToDebugLog($"[SingleplayerCardPlay] Validation: cardValue={cardValue} matches sumValue={sumValue} → CAPTURE VALID");
+                isValidCapture = true;
+            }
         }
         else
         {
@@ -1651,9 +1752,7 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
     {
         if (stageRoundDisplayText != null)
         {
-            int opponentNumber = currentOpponentDifficulty + 1; // 1-indexed for display
-            string difficultyName = GetDifficultyName(currentOpponentDifficulty);
-            string displayText = $"Stage {currentStage + 1} • Opponent {opponentNumber}/3 ({difficultyName}) • Round {currentRoundData?.currentRound ?? 0}";
+            string displayText = $"Kademe: {currentStage + 1}";
             stageRoundDisplayText.text = displayText;
         }
     }
@@ -1676,6 +1775,15 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
     private string GetDifficultyName(int difficulty)
     {
         return difficulty == 0 ? "Easy" : (difficulty == 1 ? "Normal" : "Hard");
+    }
+
+    /// <summary>
+    /// Called when the rounds showcase continue button is pressed.
+    /// Unblocks the StartRound coroutine to proceed with gameplay.
+    /// </summary>
+    private void OnRoundsShowcaseContinue()
+    {
+        awaitingRoundShowcaseContinue = false;
     }
 
     /// <summary>
