@@ -320,42 +320,79 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
     /// <summary>
     /// Disable UI screens when game starts (same as multiplayer).
     /// Hide MainUI, WinScreen, and other blocking screens so game is visible.
+    /// Called from StartNewRun() but the actual fade-out happens asynchronously in StartStage().
     /// </summary>
     private void DisableGameScreensForSinglePlayer()
     {
-        
+        // This method is kept for compatibility but the actual deactivation
+        // now happens via FadeOutGameScreensForSinglePlayer() in StartStage()
+        // to allow synchronized fade-out with joker display fade-in.
+    }
 
-        // 1. Disable waiting screen
+    /// <summary>
+    /// Fade out all UI screens over fadeDuration (0.5s).
+    /// Synchronized with joker display fade-in in StartStage().
+    /// Finds and fades out: WaitingScreen, MainScreen, WinScreen, MainUI.
+    /// </summary>
+    private IEnumerator FadeOutGameScreensForSinglePlayer(float fadeDuration = 0.5f)
+    {
+        // Collect all screens to fade out
+        List<GameObject> screensToFadeOut = new List<GameObject>();
+        
         GameObject waitingScreen = GameObject.Find("WaitingScreen");
         if (waitingScreen != null && waitingScreen.activeSelf)
-        {
-            waitingScreen.SetActive(false);
-            
-        }
+            screensToFadeOut.Add(waitingScreen);
 
-        // 2. Disable main/lobby screen
         GameObject mainScreen = GameObject.Find("MainScreen");
         if (mainScreen != null && mainScreen.activeSelf)
-        {
-            mainScreen.SetActive(false);
-            
-        }
+            screensToFadeOut.Add(mainScreen);
 
-        // 3. Disable win screen
         GameObject winScreen = GameObject.Find("WinScreen");
         if (winScreen != null && winScreen.activeSelf)
-        {
-            winScreen.SetActive(false);
-            
-        }
+            screensToFadeOut.Add(winScreen);
 
-        // 4. Disable MainUI
         GameObject mainUI = GameObject.Find("MainUI");
         if (mainUI != null && mainUI.activeSelf)
+            screensToFadeOut.Add(mainUI);
+
+        // Get or add CanvasGroup to each screen for fade animation
+        List<CanvasGroup> canvasGroups = new List<CanvasGroup>();
+        foreach (var screen in screensToFadeOut)
         {
-            mainUI.SetActive(false);
-            
+            CanvasGroup cg = screen.GetComponent<CanvasGroup>();
+            if (cg == null)
+            {
+                cg = screen.AddComponent<CanvasGroup>();
+            }
+            canvasGroups.Add(cg);
         }
+
+        // Fade out all screens over fadeDuration
+        float elapsedTime = 0f;
+        while (elapsedTime < fadeDuration)
+        {
+            elapsedTime += Time.deltaTime;
+            float normalizedTime = Mathf.Clamp01(elapsedTime / fadeDuration);
+            float alphaValue = Mathf.Lerp(1f, 0f, normalizedTime);
+
+            foreach (var cg in canvasGroups)
+            {
+                cg.alpha = alphaValue;
+            }
+
+            yield return null;
+        }
+
+        // Ensure alpha is fully 0 and deactivate screens
+        foreach (var screen in screensToFadeOut)
+        {
+            CanvasGroup cg = screen.GetComponent<CanvasGroup>();
+            if (cg != null)
+                cg.alpha = 0f;
+            screen.SetActive(false);
+        }
+
+        Debug.Log($"[SinglePlayerModeController] Screen fade-out complete");
     }
 
     /// <summary>
@@ -785,23 +822,113 @@ public class SinglePlayerModeController : MonoBehaviour, IGameModeInitState
     /// <summary>
     /// Start a new stage. Display stage UI and show joker selection panel.
     /// A stage contains 3 opponents (Easy, Normal, Hard).
+    /// Runs screen fade-out and joker display fade-in in parallel.
     /// </summary>
     private void StartStage(int stageNumber)
     {
-        
-
         currentStage = stageNumber;
         ResetForStage(stageNumber);
 
         // NEW: Show joker selection using new controller and flow
         if (jokerDisplayController != null)
         {
-            StartCoroutine(ShowJokerSelectionFlow());
+            StartCoroutine(StartStageWithFade(stageNumber));
         }
         else
         {
             Debug.LogError("[SinglePlayerModeController] JokerDisplayController not found! Cannot show joker selection.");
         }
+    }
+
+    /// <summary>
+    /// Run stage initialization with synchronized fade animations.
+    /// First moves visualElementsHolder down out of screen, then fades out main screens while fading in joker display.
+    /// </summary>
+    private IEnumerator StartStageWithFade(int stageNumber)
+    {
+        // STEP 1: Move visualElementsHolder down out of screen
+        MainUIScript mainUIScript = FindObjectOfType<MainUIScript>();
+        if (mainUIScript != null)
+        {
+            yield return StartCoroutine(mainUIScript.MoveVisualElementsHolderDown(duration: 0.8f, moveDistance: 1500f));
+            Debug.Log("[SinglePlayerModeController] Visual elements movement complete, starting fade animations");
+        }
+        else
+        {
+            Debug.LogWarning("[SinglePlayerModeController] MainUIScript not found, skipping visual elements movement");
+        }
+
+        // STEP 2: Start both fades in parallel: screens fade out, joker panel fades in
+        Coroutine screenFadeOut = StartCoroutine(FadeOutGameScreensForSinglePlayer(fadeDuration: 0.5f));
+        Coroutine jokerFadeIn = StartCoroutine(ShowJokerSelectionFlowWithSync());
+
+        // Wait for both to complete
+        yield return screenFadeOut;
+        yield return jokerFadeIn;
+    }
+
+    /// <summary>
+    /// Modified joker selection flow that handles panel activation and synchronized fade-in.
+    /// Called by StartStageWithFade() to run joker panel reveal in parallel with screen fade-out.
+    /// </summary>
+    private IEnumerator ShowJokerSelectionFlowWithSync()
+    {
+        if (jokerDisplayController == null)
+        {
+            Debug.LogError("[SinglePlayerModeController] JokerDisplayController is null!");
+            yield break;
+        }
+
+        // Step 0: Activate the joker selection panel (this shows it but it's transparent initially)
+        jokerDisplayController.ActivatePanel();
+
+        // Step 1: Display 3 random jokers and fade in (synced with screen fade out)
+        yield return StartCoroutine(jokerDisplayController.ShowJokers());
+
+        // Step 2: Wait for player to select a joker
+        yield return StartCoroutine(jokerDisplayController.WaitForSelection());
+
+        // Step 3: Process the selection
+        int selectedJokerId = jokerDisplayController.GetSelectedJokerId();
+        if (selectedJokerId >= 0)
+        {
+            // Initialize game state with selected joker
+            if (currentRoundData == null)
+            {
+                currentRoundData = new SinglePlayerRoundData();
+            }
+
+            currentRoundData.activeJokerId = selectedJokerId;
+            JokerController.SetActiveJoker(selectedJokerId);
+
+            // Initialize PassiveManager with selected joker
+            if (PassiveManager.Instance != null)
+            {
+                PassiveManager.Instance.SetActivePassive(selectedJokerId);
+                GameManager.AddToDebugLog($"[SinglePlayer] ShowJokerSelectionFlowWithSync: Initialized PassiveManager with jokerID={selectedJokerId}");
+            }
+
+            // Save run progress
+            RunManager.SaveRunProgress(BuildRunProgressData());
+
+            Debug.Log($"[SinglePlayerModeController] Joker selected: ID={selectedJokerId}");
+        }
+        else
+        {
+            Debug.LogWarning("[SinglePlayerModeController] No joker selected (selectedJokerId < 0)");
+        }
+
+        // Step 4: Hide jokers (currently instant; animation can be added here)
+        yield return StartCoroutine(jokerDisplayController.HideJokers());
+
+        // Step 5: Reset selection state for next stage
+        jokerDisplayController.ResetSelection();
+
+        // Step 6: Deactivate the joker selection panel
+        jokerDisplayController.DeactivatePanel();
+
+        // Step 7: Start the round loop with first opponent (difficulty 0)
+        StartCoroutine(StartRoundLoop(0));
     }
 
     /// <summary>

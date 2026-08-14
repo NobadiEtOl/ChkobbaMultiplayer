@@ -1,15 +1,22 @@
+using System.Collections;
 using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
+using DG.Tweening;
 
 /// <summary>
 /// Displays opponent information (max health and playstyle) before each round starts.
 /// Integrates with SinglePlayerModeController to show/hide the showcase screen and block round progression until player continues.
+/// Animates fade in and fade out transitions.
+/// Animates moving element holder sliding up/down during transitions.
 /// </summary>
 public class RoundsShowcaseController : MonoBehaviour
 {
     // Default background color for inactive opponents
     [SerializeField] private Color defaultBackgroundColor = Color.white;
+    [SerializeField] private float fadeDuration = 0.5f;
+    [SerializeField] private float slideDuration = 0.6f;
+    [SerializeField] private float slideDistance = 200f; // How far down the moving element starts
 
     // Easy opponent (difficulty 0) UI references
     [SerializeField] private TextMeshProUGUI easyHealthText;
@@ -32,8 +39,15 @@ public class RoundsShowcaseController : MonoBehaviour
     // Continue button
     [SerializeField] private Button continueButton;
 
+    [SerializeField] private GameObject movingElementHolder;
+
     // Callback invoked when player presses Continue
     public System.Action onContinuePressed;
+
+    private CanvasGroup canvasGroup;
+    private RectTransform movingElementRectTransform;
+    private Vector2 movingElementOriginalPosition;
+    private Sequence currentAnimationSequence;
 
     /// <summary>
     /// Display opponent information for the upcoming round.
@@ -103,6 +117,10 @@ public class RoundsShowcaseController : MonoBehaviour
 
         // Show the showcase screen
         gameObject.SetActive(true);
+        if (canvasGroup != null)
+        {
+            canvasGroup.alpha = 0f;
+        }
 
         // Setup continue button
         if (continueButton != null)
@@ -114,6 +132,9 @@ public class RoundsShowcaseController : MonoBehaviour
         {
             Debug.LogError("[RoundsShowcaseController] Continue button is not assigned!");
         }
+
+        // Fade in the showcase screen
+        StartCoroutine(FadeIn());
     }
 
     /// <summary>
@@ -188,6 +209,10 @@ public class RoundsShowcaseController : MonoBehaviour
 
         // Show the showcase screen
         gameObject.SetActive(true);
+        if (canvasGroup != null)
+        {
+            canvasGroup.alpha = 0f;
+        }
 
         // Setup continue button
         if (continueButton != null)
@@ -199,14 +224,27 @@ public class RoundsShowcaseController : MonoBehaviour
         {
             Debug.LogError("[RoundsShowcaseController] Continue button is not assigned!");
         }
+
+        // Fade in the showcase screen
+        StartCoroutine(FadeIn());
     }
 
     /// <summary>
     /// Called when the continue button is pressed.
-    /// Hides the showcase screen and invokes the callback to unblock SinglePlayerModeController.
+    /// Fades out, hides the showcase screen and invokes the callback to unblock SinglePlayerModeController.
     /// </summary>
     private void OnContinueButtonPressed()
     {
+        StartCoroutine(FadeOutAndHide());
+    }
+
+    /// <summary>
+    /// Fade out the panel and hide it, then invoke the callback.
+    /// </summary>
+    private IEnumerator FadeOutAndHide()
+    {
+        yield return StartCoroutine(FadeOut());
+
         // Hide the showcase screen
         gameObject.SetActive(false);
 
@@ -214,14 +252,105 @@ public class RoundsShowcaseController : MonoBehaviour
         onContinuePressed?.Invoke();
     }
 
-    private void Start()
+    /// <summary>
+    /// Fade in the panel and slide the moving element up into place.
+    /// Both animations happen in parallel for a smooth entrance.
+    /// </summary>
+    private IEnumerator FadeIn()
     {
-        // Ensure screen starts hidden
-        gameObject.SetActive(false);
+        if (canvasGroup == null) yield break;
+
+        // Kill any existing animation sequence
+        if (currentAnimationSequence != null && currentAnimationSequence.IsActive())
+        {
+            currentAnimationSequence.Kill();
+        }
+
+        currentAnimationSequence = DOTween.Sequence();
+
+        // Fade in the main panel
+        currentAnimationSequence.Append(DOTween.To(() => canvasGroup.alpha, x => canvasGroup.alpha = x, 1f, fadeDuration)
+            .SetEase(Ease.InOutQuad));
+
+        // Slide the moving element up in parallel (at the same time as fade in)
+        if (movingElementRectTransform != null)
+        {
+            currentAnimationSequence.Insert(0, DOTween.To(() => movingElementRectTransform.anchoredPosition, x => movingElementRectTransform.anchoredPosition = x, movingElementOriginalPosition, slideDuration)
+                .SetEase(Ease.OutCubic));
+        }
+
+        yield return currentAnimationSequence.WaitForCompletion();
+        Debug.Log($"[RoundsShowcaseController] Fade in and slide up complete");
     }
 
-    private void Update()
+    /// <summary>
+    /// Fade out the panel and slide the moving element down in parallel.
+    /// </summary>
+    private IEnumerator FadeOut()
     {
-        // No-op; all logic is event-driven
+        if (canvasGroup == null) yield break;
+
+        // Kill any existing animation sequence
+        if (currentAnimationSequence != null && currentAnimationSequence.IsActive())
+        {
+            currentAnimationSequence.Kill();
+        }
+
+        currentAnimationSequence = DOTween.Sequence();
+
+        // Fade out the main panel
+        currentAnimationSequence.Append(DOTween.To(() => canvasGroup.alpha, x => canvasGroup.alpha = x, 0f, fadeDuration)
+            .SetEase(Ease.InOutQuad));
+
+        // Slide the moving element down in parallel (at the same time as fade out)
+        if (movingElementRectTransform != null)
+        {
+            currentAnimationSequence.Insert(0, DOTween.To(() => movingElementRectTransform.anchoredPosition, x => movingElementRectTransform.anchoredPosition = x, 
+                movingElementOriginalPosition - new Vector2(0, slideDistance), slideDuration)
+                .SetEase(Ease.InCubic));
+        }
+
+        yield return currentAnimationSequence.WaitForCompletion();
+        Debug.Log($"[RoundsShowcaseController] Fade out and slide down complete");
+    }
+
+    private void Start()
+    {
+        // Get or add CanvasGroup for fade animations
+        canvasGroup = GetComponent<CanvasGroup>();
+        if (canvasGroup == null)
+        {
+            canvasGroup = gameObject.AddComponent<CanvasGroup>();
+        }
+
+        // Get the RectTransform of the moving element
+        if (movingElementHolder != null)
+        {
+            movingElementRectTransform = movingElementHolder.GetComponent<RectTransform>();
+            if (movingElementRectTransform != null)
+            {
+                // Store the original position
+                movingElementOriginalPosition = movingElementRectTransform.anchoredPosition;
+                
+                // Start with the element positioned lower (hidden below)
+                movingElementRectTransform.anchoredPosition = movingElementOriginalPosition - new Vector2(0, slideDistance);
+            }
+        }
+
+        // Ensure screen starts hidden
+        gameObject.SetActive(false);
+        canvasGroup.alpha = 0f;
+    }
+
+    /// <summary>
+    /// Clean up DOTween sequences when the object is destroyed.
+    /// Prevents animation errors and memory leaks.
+    /// </summary>
+    private void OnDestroy()
+    {
+        if (currentAnimationSequence != null && currentAnimationSequence.IsActive())
+        {
+            currentAnimationSequence.Kill();
+        }
     }
 }

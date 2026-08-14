@@ -35,6 +35,7 @@ public class MainUIScript : MonoBehaviour
     
     [SerializeField] private BreathingAnimation settingButtonBreathing;
     [SerializeField] private BreathingAnimation undoButtonBreathing;
+    [SerializeField] private GameObject visualElementsHolder;
 
     // Start is called before the first frame update
     void Start()
@@ -146,6 +147,47 @@ public class MainUIScript : MonoBehaviour
     }
 
     // ===== SINGLE PLAYER MODE =====
+
+    /// <summary>
+    /// Move visualElementsHolder downward out of the screen.
+    /// Called before the fade transition to create a smooth exit animation.
+    /// Returns a coroutine that completes when the movement finishes.
+    /// </summary>
+    public IEnumerator MoveVisualElementsHolderDown(float duration = 0.8f, float moveDistance = 1500f)
+    {
+        if (visualElementsHolder == null)
+        {
+            Debug.LogWarning("[MainUIScript] visualElementsHolder is not assigned!");
+            yield break;
+        }
+
+        RectTransform rectTransform = visualElementsHolder.GetComponent<RectTransform>();
+        if (rectTransform == null)
+        {
+            Debug.LogWarning("[MainUIScript] visualElementsHolder does not have a RectTransform!");
+            yield break;
+        }
+
+        Vector2 startPosition = rectTransform.anchoredPosition;
+        Vector2 endPosition = startPosition + new Vector2(0, -moveDistance); // Move down
+
+        float elapsedTime = 0f;
+        while (elapsedTime < duration)
+        {
+            elapsedTime += Time.deltaTime;
+            float normalizedTime = Mathf.Clamp01(elapsedTime / duration);
+            
+            // Use easing for smooth animation
+            float easedTime = Mathf.Pow(normalizedTime, 2); // EaseIn
+            rectTransform.anchoredPosition = Vector2.Lerp(startPosition, endPosition, easedTime);
+
+            yield return null;
+        }
+
+        // Ensure final position
+        rectTransform.anchoredPosition = endPosition;
+        Debug.Log($"[MainUIScript] visualElementsHolder movement complete");
+    }
 
     /// <summary>
     /// Called when the Start Single Player button is pressed in the run settings panel.
